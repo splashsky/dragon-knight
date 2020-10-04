@@ -4,7 +4,9 @@ All the notable changes done for Dragon Knight's development will be recorded in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-No planned features right at this moment
+### Changed
+- Moved `templates` directory to `resources`
+- Moved `images` directory to `resources` and renamed to `img`
 
 ## v1.3.0 - 2020/10/03
 ### Added

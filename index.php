@@ -250,20 +250,17 @@ function babblebox()
     }
     
     $babblebox = ['content' => ''];
-    $bg = 1;
     $babbles = query('select * from {{ table }} order by id desc limit 20', 'babble');
+
     foreach ($babbles->fetchAll() as $babble) {
         $message = safe($babble['babble']);
-        if ($bg == 1) { $new = "<div style=\"width:98%; background-color:#eeeeee;\">[<b>{$babble['author']}</b>] {$message}</div>\n"; $bg = 2; }
-        else { $new = "<div style=\"width:98%; background-color:#ffffff;\">[<b>{$babble['author']}</b>] {$message}</div>\n"; $bg = 1; }
+        $new = "<div><b>{$babble['author']}</b> {$message}</div>\n";
         $babblebox["content"] = $new . $babblebox["content"];
     }
-    $babblebox["content"] .= "<center><form action=\"index.php?do=babblebox\" method=\"post\"><input type=\"text\" name=\"babble\" size=\"15\" maxlength=\"120\" /><br /><input type=\"submit\" name=\"submit\" value=\"Babble\" /> <input type=\"reset\" name=\"reset\" value=\"Clear\" /></form></center>";
+
+    $babblebox["content"] .= "<form action=\"index.php?do=babblebox\" method=\"post\" class=\"w-full text-center py-4\"><input type=\"text\" name=\"babble\" maxlength=\"120\" class=\"mb-2\" style=\"background-color: rgba(0, 0, 0, 0.1); outline: none; border: none; padding: 0.5rem;\" /><br /><input type=\"submit\" name=\"submit\" value=\"Babble\" class=\"button mr-2\" /> <input type=\"reset\" name=\"reset\" value=\"Clear\" class=\"button\" /></form>";
     
-    // Make page tags for XHTML validation.
-    $xml = "<!DOCTYPE html>\n"
-    . "<html lang=\"en\">\n";
-    $page = $xml . gettemplate("babblebox");
+    $page = gettemplate("babblebox");
     echo parsetemplate($page, $babblebox);
 }
 

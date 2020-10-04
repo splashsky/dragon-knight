@@ -321,16 +321,12 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
 
     if ($badstart == false) { global $starttime; } else { $starttime = $badstart; }
     
-    // Make page tags for XHTML validation.
-    $xml = "<!DOCTYPE html>\n"
-    . "<html lang=\"en\">\n";
-
     $template = gettemplate("primary");
     
     if ($rightnav == true) { $rightnav = gettemplate("rightnav"); } else { $rightnav = ""; }
     if ($leftnav == true) { $leftnav = gettemplate("leftnav"); } else { $leftnav = ""; }
     if ($topnav == true) {
-        $topnav = "<a href=\"users.php?do=logout\"><img src=\"resources/img/button_logout.gif\" alt=\"Log Out\" title=\"Log Out\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
+        $topnav = "<a href=\"users.php?do=logout\" class=\"title swash mr-8\">Log out</a> <a href=\"help.php\" class=\"title swash\">Help</a>";
     } else {
         $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/img/button_login.gif\" alt=\"Log In\" title=\"Log In\" border=\"0\" /></a> <a href=\"users.php?do=register\"><img src=\"resources/img/button_register.gif\" alt=\"Register\" title=\"Register\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
     }
@@ -430,7 +426,6 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         "version"=>$version,
         "build"=>$build);
     $page = parsetemplate($template, $finalarray);
-    $page = $xml . $page;
     
     echo $page;
     die();

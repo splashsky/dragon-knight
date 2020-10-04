@@ -1,12 +1,12 @@
-<p style="margin-bottom: 1rem;">
+<div class="mb-4">
     Resting at the inn will refill your current HP, MP, and TP to their maximum levels.
-</p>
+</div>
 
-<p style="margin-bottom: 1rem;">
+<div class="mb-4">
     A night's sleep at this Inn will cost you <b>{{innprice}} gold</b>. Is that ok?
-</p>
+</div>
 
 <form action="index.php?do=inn" method="post">
-    <button type="submit" name="submit">Yes</button>
-    <button href="index.php">No</button>
+    <button type="submit" name="submit" class="button">Yes</button>
+    <button type="submit" name="cancel" class="button">No</button>
 </form>

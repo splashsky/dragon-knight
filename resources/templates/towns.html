@@ -1,22 +1,23 @@
-<table width="100%">
-<tr><td class="title"><img src="resources/img/town_{{id}}.gif" alt="Welcome to {{name}}" title="Welcome to {{name}}" /></td></tr>
-<tr><td>
-<b>Town Options:</b><br />
-<ul>
-<li /><a href="index.php?do=inn">Rest at the Inn</a>
-<li /><a href="index.php?do=buy">Buy Weapons/Armor</a>
-<li /><a href="index.php?do=maps">Buy Maps</a>
-</ul>
-</td></tr>
-<tr><td><center>
-{{news}}
-<br />
-<table width="95%">
-<tr><td width="50%">
-{{whosonline}}
-</td><td>
-{{babblebox}}
-</td></tr>
-</table>
-</td></tr>
-</table>
+<div>
+    <h1 class="title my-0">Welcome to <span class="swash">{{ name }}</span></h1>
+
+    <div class="divider my-4"></div>
+
+    <div>
+        <span class="block bold">Town Options:</span>
+        <ul>
+            <li><a href="index.php?do=inn">Rest at the Inn</a></li>
+            <li><a href="index.php?do=buy">Buy Weapons/Armor</a></li>
+            <li><a href="index.php?do=maps">Buy Maps</a></li>
+        </ul>
+    </div>
+
+    <div class="my-8 box">
+        {{ news }}
+    </div>
+
+    <div class="flex">
+        <div class="w-full">{{ whosonline }}</div>
+        <div class="w-full box">{{ babblebox }}</div>
+    </div>
+</div>

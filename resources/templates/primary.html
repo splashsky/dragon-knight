@@ -1,83 +1,47 @@
+<!doctype html>
+<html lang="en">
 <head>
-<title>{{title}}</title>
-<style type="text/css">
-body {
-  background-image: url(resources/img/background.jpg);
-}
-table {
-  border-style: none;
-  padding: 0px;
-}
-td {
-  border-style: none;
-  padding: 3px;
-  vertical-align: top;
-}
-td.top {
-  border-bottom: solid 2px black;
-}
-td.left {
-  width: 180px;
-  border-right: solid 2px black;
-}
-td.right {
-  width: 180px;
-  border-left: solid 2px black;
-}
-a {
-    color: #663300;
-    text-decoration: none;
-    font-weight: bold;
-}
-a:hover {
-    color: #330000;
-}
-.small {
-  font: 10px verdana;
-}
-.highlight {
-  color: red;
-}
-.light {
-  color: #999999;
-}
-.title {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font-weight: bold;
-  padding: 5px;
-  margin: 3px;
-}
-.copyright {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font: 10px verdana;
-}
-</style>
-<script>
-function opencharpopup(){
-var popurl="index.php?do=showchar"
-winpops=window.open(popurl,"","width=210,height=500,scrollbars")
-}
-function openmappopup(){
-var popurl="index.php?do=showmap"
-winpops=window.open(popurl,"","width=520,height=520,scrollbars")
-}
-</script>
+    <title>{{title}}</title>
+
+    <link rel="stylesheet" href="resources/css/game.css">
+
+    <script>
+        function opencharpopup() {
+            let popurl = "index.php?do=showchar";
+            window.open(popurl, "", "width=210, height=500, scrollbars");
+        }
+
+        function openmappopup() {
+            let popurl = "index.php?do=showmap";
+            window.open(popurl, "", "width=520, height=520, scrollbars")
+        }
+    </script>
 </head>
-<body><center>
-<table cellspacing="0" width="90%"><tr>
-<td class="top" colspan="3">
-  <table width="100%"><tr><td><img src="resources/img/logo.gif" alt="{{dkgamename}}" title="{{dkgamename}}" border="0" /></td><td style="text-align:right; vertical-align:middle;">{{topnav}}</td></tr></table>
-</td>
-</tr><tr>
-<td class="left">{{leftnav}}</td>
-<td class="middle">{{content}}</td>
-<td class="right">{{rightnav}}</td>
-</tr>
-</table><br />
-<table class="copyright" width="90%"><tr>
-<td width="25%" align="center">Powered by <a href="http://dragon.se7enet.com/dev.php" target="_new">Dragon Knight</a></td><td width="25%" align="center">&copy; 2003-2006 by renderse7en</td><td width="25%" align="center">{{totaltime}} Seconds, {{numqueries}} Queries</td><td width="25%" align="center">Version {{version}} {{build}}</td>
-</tr></table>
-</center></body>
+<body>
+    <table width="90%" class="mx-auto">
+        <tr>
+            <td class="top" colspan="3" style="padding-bottom: 2rem;">
+                <table width="100%">
+                    <tr>
+                        <td><img src="resources/img/logo.gif" alt="{{ dkgamename }}" title="{{ dkgamename }}"></td>
+                        <td style="text-align: right; vertical-align: middle;">{{ topnav }}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="left">{{leftnav}}</td>
+            <td class="middle px-4">{{content}}</td>
+            <td class="right">{{rightnav}}</td>
+        </tr>
+    </table>
+
+    <footer class="copyright flex items-center" style="width: 90%;">
+        <div class="w-1/4 text-center">Powered by <a href="https://dragonknight.dev" target="_new">Dragon Knight</a></div>
+        <div class="w-1/4 text-center">&copy; <a href="https://surf.gg">Surf</a> 2020</div>
+        <div class="w-1/4 text-center">{{totaltime}} Seconds, {{numqueries}} Queries</div>
+        <div class="w-1/4 text-center">Version {{version}} {{build}}</div>
+    </footer>
+</body>
 </html>

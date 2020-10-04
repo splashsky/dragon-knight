@@ -1,35 +1,44 @@
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_character.gif" alt="Character" title="Character" /></td></tr>
-<tr><td>
-<b>{{username}}</b><br />
-Level: {{level}}<br />
-Exp: {{experience}}<br />
-Gold: {{gold}}<br />
-HP: {{currenthp}}<br />
-MP: {{currentmp}}<br />
-TP: {{currenttp}}<br />
-{{statbars}}<br />
-<a href="javascript:opencharpopup()">Extended Stats</a>
-</td></tr>
-</table><br />
+<div class="character box mb-4">
+    <span class="block title swash text-center mb-4">Character</span>
 
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_inventory.gif" alt="Inventory" title="Inventory" /></td></tr>
-<tr><td>
-<table width="100%">
-<tr><td><img src="resources/img/icon_weapon.gif" alt="Weapon" title="Weapon" /></td><td width="100%">Weapon: {{weaponname}}</td></tr>
-<tr><td><img src="resources/img/icon_armor.gif" alt="Armor" title="Armor" /></td><td width="100%">Armor: {{armorname}}</td></tr>
-<tr><td><img src="resources/img/icon_shield.gif" alt="Shield" title="Shield" /></td><td width="100%">Shield: {{shieldname}}</td></tr>
-</table>
-Slot 1: {{slot1name}}<br />
-Slot 2: {{slot2name}}<br />
-Slot 3: {{slot3name}}
-</td></tr>
-</table><br />
+    <span class="block bold">{{ username }}</span>
+    <span class="block">Level {{ level }}</span>
+    
+    <table>
+        <tbody>
+            <tr><td>EXP:</td> <td>{{ experience }}</td></tr>
+            <tr><td>Gold:</td> <td>{{ gold }}</td></tr>
+            <tr><td>HP:</td> <td>{{ currenthp }}</td></tr>
+            <tr><td>MP:</td> <td>{{ currentmp }}</td></tr>
+            <tr><td>TP:</td> <td>{{ currenttp }}</td></tr>
+        </tbody>
+    </table>
 
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_fastspells.gif" alt="Fast Spells" title="Fast Spells" /></td></tr>
-<tr><td>
-{{magiclist}}
-</td></tr>
-</table><br />
+    <div class="my-2">
+        {{ statbars }}
+    </div>
+
+    <a href="javascript:opencharpopup()">Extended Stats</a>
+</div>
+
+<div class="inventory box mb-4">
+    <span class="block title swash text-center mb-4">Inventory</span>
+
+    <ul class="mb-4">
+        <li class="flex items-center"><img src="resources/img/icon_weapon.gif" alt="Weapon" title="Weapon" class="mr-2"> {{ weaponname }}</li>
+        <li class="flex items-center"><img src="resources/img/icon_armor.gif" alt="Armor" title="Armor" class="mr-2"> {{ armorname }}</li>
+        <li class="flex items-center"><img src="resources/img/icon_shield.gif" alt="Shield" title="Shield" class="mr-2"> {{ shieldname }}</li>
+    </ul>
+
+    <ul>
+        <li>Slot 1: {{ slot1name }}</li>
+        <li>Slot 2: {{ slot2name }}</li>
+        <li>Slot 3: {{ slot3name }}</li>
+    </ul>
+</div>
+
+<div class="fast-spells box mb-4">
+    <span class="block title swash text-center mb-4">Fast Spells</span>
+
+    {{ magiclist }}
+</div>

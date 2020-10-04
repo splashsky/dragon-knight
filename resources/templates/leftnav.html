@@ -1,36 +1,46 @@
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_location.gif" alt="Location" title="Location" /></td></tr>
-<tr><td>
-Currently: {{currentaction}}<br />
-Latitude: {{latitude}}<br />
-Longitude: {{longitude}}<br />
-<a href="javascript:openmappopup()">View Map</a><br /><br />
-<form action="index.php?do=move" method="post">
-<center>
-<input name="north" type="submit" value="North" /><br />
-<input name="west" type="submit" value="West" /><input name="east" type="submit" value="East" /><br />
-<input name="south" type="submit" value="South" />
-</center>
-</form>
-</td></tr>
-</table><br />
+<div class="compass box mb-4">
+    <span class="block title swash text-center">Location</span>
 
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_towns.gif" alt="Towns" title="Towns" /></td></tr>
-<tr><td>
-{{currenttown}}
-Travel To:<br />
-{{townslist}}
-</td></tr>
-</table><br />
+    <div class="my-4">
+        <ul>
+            <li>Currently {{ currentaction }}</li>
+            <li>Latitude: {{ latitude }}</li>
+            <li>Longitude: {{longitude}}</li>
+        </ul>
 
-<table width="100%">
-<tr><td class="title"><img src="resources/img/button_functions.gif" alt="Functions" title="Functions" /></td></tr>
-<tr><td>
-{{forumslink}}
-{{adminlink}}
-<a href="users.php?do=changepassword">Change Password</a><br />
-<a href="users.php?do=logout">Log Out</a><br />
-<a href="help.php">Help</a>
-</td></tr>
-</table><br />
+        <a href="javascript:openmappopup()">View Map</a>
+    </div>
+    
+
+    <form action="index.php?do=move" method="post" class="text-center">
+        <button type="submit" name="north" class="button">North</button>
+        <div class="flex justify-between my-2">
+            <button type="submit" name="west" class="button">West</button>
+            <button type="submit" name="east" class="button">East</button>
+        </div>
+        <button type="submit" name="south" class="button">South</button>
+    </form>
+</div>
+
+<div class="fast-travel box mb-4">
+    <span class="block title swash text-center mb-4">Towns</span>
+
+    <span class="block">{{ currenttown }}</span>
+
+    <div>
+        <span class="block">Travel To:</span>
+        {{ townslist }}
+    </div>
+</div>
+
+<div class="functions box mb-4">
+    <span class="block title swash text-center mb-4">Functions</span>
+
+    <ul>
+        <li>{{ forumslink }}</li>
+        <li>{{ adminlink }}</li>
+        <li><a href="users.php?do=changepassword">Change Password</a></li>
+        <li><a href="users.php?do=logout">Log Out</a></li>
+        <li><a href="help.php">Help</a></li>
+    </ul>
+</div>
