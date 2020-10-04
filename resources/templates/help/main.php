@@ -4,7 +4,7 @@
 <title><?php echo $control["gamename"]; ?> Help</title>
 <style type="text/css">
 body {
-  background-image: url(resources/imagesbackground.jpg);
+  background-image: url(resources/images/background.jpg);
 }
 table {
   border-style: none;
