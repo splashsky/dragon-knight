@@ -232,7 +232,7 @@ function showmap()
     . "<html lang=\"en\">\n";
     
     $page = $xml . gettemplate("minimal");
-    $array = array("content"=>"<center><img src=\"images/map.gif\" alt=\"Map\" /></center>", "title"=>"Map");
+    $array = array("content"=>"<center><img src=\"resources/imagesmap.gif\" alt=\"Map\" /></center>", "title"=>"Map");
     echo parsetemplate($page, $array);
 }
 

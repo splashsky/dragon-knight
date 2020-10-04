@@ -54,9 +54,9 @@ function buy()
     foreach ($query->fetchAll() as $itemsrow) {
         if ($itemsrow["type"] == 1) { $attrib = "Attack Power:"; } else  { $attrib = "Defense Power:"; }
         $page .= "<tr><td width=\"4%\">";
-        if ($itemsrow["type"] == 1) { $page .= "<img src=\"images/icon_weapon.gif\" alt=\"weapon\" /></td>"; }
-        if ($itemsrow["type"] == 2) { $page .= "<img src=\"images/icon_armor.gif\" alt=\"armor\" /></td>"; }
-        if ($itemsrow["type"] == 3) { $page .= "<img src=\"images/icon_shield.gif\" alt=\"shield\" /></td>"; }
+        if ($itemsrow["type"] == 1) { $page .= "<img src=\"resources/imagesicon_weapon.gif\" alt=\"weapon\" /></td>"; }
+        if ($itemsrow["type"] == 2) { $page .= "<img src=\"resources/imagesicon_armor.gif\" alt=\"armor\" /></td>"; }
+        if ($itemsrow["type"] == 3) { $page .= "<img src=\"resources/imagesicon_shield.gif\" alt=\"shield\" /></td>"; }
         if ($user["weaponid"] == $itemsrow["id"] || $user["armorid"] == $itemsrow["id"] || $user["shieldid"] == $itemsrow["id"]) {
             $page .= "<td width=\"32%\"><span class=\"light\">".$itemsrow["name"]."</span></td><td width=\"32%\"><span class=\"light\">$attrib ".$itemsrow["attribute"]."</span></td><td width=\"32%\"><span class=\"light\">Already purchased</span></td></tr>\n";
         } else {

@@ -330,9 +330,9 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
     if ($rightnav == true) { $rightnav = gettemplate("rightnav"); } else { $rightnav = ""; }
     if ($leftnav == true) { $leftnav = gettemplate("leftnav"); } else { $leftnav = ""; }
     if ($topnav == true) {
-        $topnav = "<a href=\"users.php?do=logout\"><img src=\"images/button_logout.gif\" alt=\"Log Out\" title=\"Log Out\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"images/button_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
+        $topnav = "<a href=\"users.php?do=logout\"><img src=\"resources/imagesbutton_logout.gif\" alt=\"Log Out\" title=\"Log Out\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"resources/imagesbutton_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
     } else {
-        $topnav = "<a href=\"users.php?do=login\"><img src=\"images/button_login.gif\" alt=\"Log In\" title=\"Log In\" border=\"0\" /></a> <a href=\"users.php?do=register\"><img src=\"images/button_register.gif\" alt=\"Register\" title=\"Register\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"images/button_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
+        $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/imagesbutton_login.gif\" alt=\"Log In\" title=\"Log In\" border=\"0\" /></a> <a href=\"users.php?do=register\"><img src=\"resources/imagesbutton_register.gif\" alt=\"Register\" title=\"Register\" border=\"0\" /></a> <a href=\"help.php\"><img src=\"resources/imagesbutton_help.gif\" alt=\"Help\" title=\"Help\" border=\"0\" /></a>";
     }
     
     if (isset($user)) {
@@ -365,19 +365,19 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         $stattp = ceil($user["currenttp"] / $user["maxtp"] * 100);
         $stattable = "<table width=\"100\"><tr><td width=\"33%\">\n";
         $stattable .= "<table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"padding:0px; width:15px; height:100px; border:solid 1px black; vertical-align:bottom;\">\n";
-        if ($stathp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(images/bars_green.gif);\"><img src=\"images/bars_green.gif\" alt=\"\" /></div>"; }
-        if ($stathp < 66 && $stathp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(images/bars_yellow.gif);\"><img src=\"images/bars_yellow.gif\" alt=\"\" /></div>"; }
-        if ($stathp < 33) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(images/bars_red.gif);\"><img src=\"images/bars_red.gif\" alt=\"\" /></div>"; }
+        if ($stathp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_green.gif);\"><img src=\"resources/imagesbars_green.gif\" alt=\"\" /></div>"; }
+        if ($stathp < 66 && $stathp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_yellow.gif);\"><img src=\"resources/imagesbars_yellow.gif\" alt=\"\" /></div>"; }
+        if ($stathp < 33) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_red.gif);\"><img src=\"resources/imagesbars_red.gif\" alt=\"\" /></div>"; }
         $stattable .= "</td></tr></table></td><td width=\"33%\">\n";
         $stattable .= "<table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"padding:0px; width:15px; height:100px; border:solid 1px black; vertical-align:bottom;\">\n";
-        if ($statmp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(images/bars_green.gif);\"><img src=\"images/bars_green.gif\" alt=\"\" /></div>"; }
-        if ($statmp < 66 && $statmp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(images/bars_yellow.gif);\"><img src=\"images/bars_yellow.gif\" alt=\"\" /></div>"; }
-        if ($statmp < 33) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(images/bars_red.gif);\"><img src=\"images/bars_red.gif\" alt=\"\" /></div>"; }
+        if ($statmp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_green.gif);\"><img src=\"resources/imagesbars_green.gif\" alt=\"\" /></div>"; }
+        if ($statmp < 66 && $statmp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_yellow.gif);\"><img src=\"resources/imagesbars_yellow.gif\" alt=\"\" /></div>"; }
+        if ($statmp < 33) { $stattable .= "<div style=\"padding:0px; height:".$statmp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_red.gif);\"><img src=\"resources/imagesbars_red.gif\" alt=\"\" /></div>"; }
         $stattable .= "</td></tr></table></td><td width=\"33%\">\n";
         $stattable .= "<table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"padding:0px; width:15px; height:100px; border:solid 1px black; vertical-align:bottom;\">\n";
-        if ($stattp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(images/bars_green.gif);\"><img src=\"images/bars_green.gif\" alt=\"\" /></div>"; }
-        if ($stattp < 66 && $stattp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(images/bars_yellow.gif);\"><img src=\"images/bars_yellow.gif\" alt=\"\" /></div>"; }
-        if ($stattp < 33) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(images/bars_red.gif);\"><img src=\"images/bars_red.gif\" alt=\"\" /></div>"; }
+        if ($stattp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_green.gif);\"><img src=\"resources/imagesbars_green.gif\" alt=\"\" /></div>"; }
+        if ($stattp < 66 && $stattp >= 33) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_yellow.gif);\"><img src=\"resources/imagesbars_yellow.gif\" alt=\"\" /></div>"; }
+        if ($stattp < 33) { $stattable .= "<div style=\"padding:0px; height:".$stattp."px; border-top:solid 1px black; background-image:url(resources/imagesbars_red.gif);\"><img src=\"resources/imagesbars_red.gif\" alt=\"\" /></div>"; }
         $stattable .= "</td></tr></table></td>\n";
         $stattable .= "</tr><tr><td>HP</td><td>MP</td><td>TP</td></tr></table>\n";
         $user["statbars"] = $stattable;
