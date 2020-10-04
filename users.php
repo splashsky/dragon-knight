@@ -135,7 +135,7 @@ function register()
 
     $page = parsetemplate($page, $control);
     
-    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/images/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/images/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/images/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
+    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/img/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/img/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
     display($page, "Register", false, false, false);
 }
 
@@ -162,7 +162,7 @@ function verify()
     }
 
     $page = gettemplate("verify");
-    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/images/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/images/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/images/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
+    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/img/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/img/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
     display($page, "Verify Email", false, false, false);
 }
 
@@ -197,7 +197,7 @@ function lostpassword()
     }
 
     $page = gettemplate("lostpassword");
-    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/images/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/images/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/images/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
+    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/img/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/img/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
     display($page, "Lost Password", false, false, false);
 }
 
@@ -227,7 +227,7 @@ function changepassword()
     }
 
     $page = gettemplate("changepassword");
-    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/images/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/images/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/images/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
+    $topnav = "<a href=\"users.php?do=login\"><img src=\"resources/img/button_login.gif\" alt=\"Log In\" border=\"0\" /></a><a href=\"users.php?do=register\"><img src=\"resources/img/button_register.gif\" alt=\"Register\" border=\"0\" /></a><a href=\"help.php\"><img src=\"resources/img/button_help.gif\" alt=\"Help\" border=\"0\" /></a>";
     display($page, "Change Password", false, false, false); 
 }
 
