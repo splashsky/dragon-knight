@@ -2,64 +2,11 @@
 <html lang="en">
 <head>
 <title><?php echo $control["gamename"]; ?> Help</title>
-<style type="text/css">
-body {
-  background-image: url(resources/img/background.jpg);
-}
-table {
-  border-style: none;
-  padding: 0px;
-}
-td {
-  border-style: none;
-  padding: 3px;
-  vertical-align: top;
-}
-td.top {
-  border-bottom: solid 2px black;
-}
-td.left {
-  width: 150px;
-  border-right: solid 2px black;
-}
-td.right {
-  width: 150px;
-  border-left: solid 2px black;
-}
-a {
-    color: #663300;
-    text-decoration: none;
-    font-weight: bold;
-}
-a:hover {
-    color: #330000;
-}
-.small {
-  font: 10px verdana;
-}
-.highlight {
-  color: red;
-}
-.light {
-  color: #999999;
-}
-.title {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font-weight: bold;
-  padding: 5px;
-  margin: 3px;
-}
-.copyright {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font: 10px verdana;
-}
-</style>
+    <link rel="stylesheet" href="resources/css/game.css">
 </head>
 <body>
 <a name="top"></a>
-<h1>{{gamename}} Help: Items & Drops</h1>
+<h1><?php echo $control["gamename"]; ?> Help: Items & Drops</h1>
 [ <a href="help.php">Return to Help</a> | <a href="index.php">Return to the game</a> ]
 
 <br /><br /><hr />

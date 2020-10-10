@@ -23,11 +23,28 @@ return [
      * - prefix: an optional prefix for your tables (e.g. dk_users), you can leave it empty 
      */
     'db' => [
-        'server' => 'localhost',
+        'server' => 'mariadb',
         'database' => 'testdk',
-        'user' => 'testdk',
-        'password' => '',
+        'user' => 'root',
+        'password' => 'secret',
         'prefix' => ''
+    ],
+
+    'difficulties' => [
+        'easy' => [
+            'title' => 'Easy',
+            'mod' => 0.8
+        ],
+
+        'normal' => [
+            'title' => 'Normal',
+            'mod' => 1
+        ],
+
+        'hard' => [
+            'title' => 'Hard',
+            'mod' => 1.45
+        ],
     ],
 
 ];

@@ -1,12 +1,23 @@
 <?php
 
 /**
- * Debug flag; when set to true, full errror reporting is
- * enabled and the game won't check for the installation
- * file
+ * This script contains global helper functions used throughout
+ * the game. It can be added to at any time.
  */
-define('DEBUG', false);
 
+// These variables help us keep track of script execution time, and the
+// number of queries we're running on any given page.
+$start = microtime(true);
+$queries = 0;
+
+// This is the almighty DEBUG constant. If set to true, you'll be able
+// to do things you normally wouldn't be allowed to, such as running
+// the installer after the game is already installed.
+define('DEBUG', true);
+
+// If DEBUG is set to true, we'll enable PHP's full, complete error
+// reporting. It gives a lot of debug information for errors, but can
+// also be a security concern. Be careful if the game is in production.
 if (DEBUG) {
     ini_set('display_errors', 1);
     ini_set('display_startup_errors', 1);
@@ -14,15 +25,19 @@ if (DEBUG) {
 }
 
 /**
+ * Define the root path for the game, so our require statements work no matter
+ * where we call them from.
+ */
+define('ROOT', $_SERVER['DOCUMENT_ROOT']);
+
+/**
  * On every page we use the Helpers library, we'll likely use the Database
  * library. As such, we'll require it here. We'll also open a link to the
  * database, since almost every page requires it.
  */
-require 'app/Libs/Database.php';
+require ROOT.'/app/Libs/Database.php';
+require ROOT.'/app/Models/User.php';
 
-$config = require 'app/config.php';
-$starttime = getmicrotime();
-$queryCount = 0;
 $version = config('general.version');
 $build = config('general.build');
 
@@ -31,17 +46,14 @@ $build = config('general.build');
  * by dot notation. For example, instead of $config['db']['username']
  * we can do config('db.username')
  */
-function config(string $key = '')
+function config(string $key = '', string $file = 'game')
 {
-    global $config;
+    $file = is_readable(ROOT."/app/Config/{$file}.php") ? $file : 'game';
+    $config = require ROOT."/app/Config/{$file}.php";
 
-    if (empty($key)) {
-        return $config;
-    }
+    if (empty($key)) {  return $config; }
 
-    if (array_key_exists($key, $config)) {
-        return $config[$key];
-    }
+    if (array_key_exists($key, $config)) { return $config[$key]; }
 
     $result = $config;
 
@@ -65,7 +77,7 @@ function dd($variable = '', bool $die = true) {
     echo '<pre>';
     echo var_export($variable, true);
     echo '</pre>';
-    if ($die) { die(); }
+    if ($die) { die; }
 }
 
 /**
@@ -74,25 +86,47 @@ function dd($variable = '', bool $die = true) {
 function redirect(string $location)
 {
     header("Location: {$location}");
-    exit;
+    die;
 }
 
 /**
  * Increments the query count by 1.
  */
-function incrementQueryCount()
+function incrementQueries()
 {
-    global $queryCount;
-    $queryCount++;
+    global $queries;
+    $queries++;
 }
 
 /**
  * Gets the current query count.
  */
-function getQueryCount()
+function getQueries()
 {
-    global $queryCount;
-    return $queryCount;
+    global $queries;
+    return $queries;
+}
+
+/**
+ * Checks whether $test is a closure/anonymous function.
+ */
+function is_closure($test)
+{
+    return $test instanceof Closure;
+}
+
+/**
+ * Sees if there's a $_GET[$key] set; if so, we'll return the value associated
+ * with it. If not, we return the default. It can accept closures as a default
+ * argument as well.
+ */
+function GET(string $key = 'do', $default = null)
+{
+    if (! isset($_GET[$key])) {
+        return is_closure($default) ? call_user_func($default) : $default;
+    }
+
+    return $_GET[$key];
 }
 
 /**
@@ -171,15 +205,7 @@ function prettydate($uglydate) {
  * Alias for prettydate()
  */
 function prettyforumdate($uglydate) {
-    prettydate($uglydate);
-}
-
-/**
- * Validate the formatting of an email address
- */
-function is_email(string $email)
-{
-    return filter_var($email, FILTER_VALIDATE_EMAIL);
+    return prettydate($uglydate);
 }
 
 /**
@@ -260,66 +286,33 @@ function deleteCookie()
     setcookie('dkgame', '', time() - 10000, '', '', '');
 }
 
-/**
- * Get the user's data from the cookie.
- */
-function getUserFromCookie($link = null)
+function dieIfGameClosed($control)
 {
-    $link = openLinkIfNull($link);
-
-    /**
-     * Cookie Format
-     * {user id} {username} {password from login} {remember me}
-     */
-    $cookie = explode(' ', $_COOKIE['dkgame']);
-
-    $user = prepare('select * from {{ table }} where id=?', 'users', $link);
-    $user = execute($user, [$cookie[0]])->fetch();
-    return $user;
+    if (! (bool) $control['gameopen']) {
+        $page = gettemplate('gameClosed');
+        $page = parsetemplate($page, ['title' => $control['gamename']]);
+        die($page);
+    }
 }
 
 /**
- * Get the user with the given id
+ * Generate a flash message component.
  */
-function getUserFromId(int $id, $link = null)
+function generateFlash(string $message, string $type = 'info', string $classes = 'my-8')
 {
-    $link = openLinkIfNull($link);
-
-    $user = prepare('select * from {{ table }} where id=?', 'users', $link);
-    $user = execute($user, [$id])->fetch();
-    return $user;
-}
-
-function admindisplay($content, $title) { // Finalize page and output to browser.
-    
-    global $queryCount, $user, $control, $starttime, $version, $build, $link;
-    
-    $template = gettemplate("admin");
-    
-    // Make page tags for XHTML validation.
-    $xml = "<!DOCTYPE html>\n"
-    . "<html lang=\"en\">\n";
-
-    $finalarray = array(
-        "title"=>$title,
-        "content"=>$content,
-        "totaltime"=>round(getmicrotime() - $starttime, 4),
-        "numqueries"=>$queryCount,
-        "version"=>$version,
-        "build"=>$build);
-    $page = parsetemplate($template, $finalarray);
-    $page = $xml . $page;
-
-    echo $page;
-    die();
-    
+    $template = gettemplate('flash');
+    return parsetemplate($template, [
+        'message' => $message,
+        'type' => $type,
+        'classes' => $classes
+    ]);
 }
 
 function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, $badstart=false)
 {
-    global $queryCount, $user, $control, $version, $build, $link;
+    global $queries, $user, $control, $version, $build, $link;
 
-    if ($badstart == false) { global $starttime; } else { $starttime = $badstart; }
+    if ($badstart == false) { global $start; } else { $start = $badstart; }
     
     $template = gettemplate("primary");
     
@@ -353,7 +346,7 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         if ($user["longitude"] < 0) { $user["longitude"] = $user["longitude"] * -1 . "W"; } else { $user["longitude"] .= "E"; }
         $user["experience"] = number_format($user["experience"]);
         $user["gold"] = number_format($user["gold"]);
-        if ($user["authlevel"] == 1) { $user["adminlink"] = "<a href=\"admin.php\">Admin</a><br />"; } else { $user["adminlink"] = ""; }
+        $user['adminlink'] = checkAuthLevel($user['authlevel'], config('auth.admin')) ? '<a href="admin.php">Admin</a>' : '';
         
         // HP/MP/TP bars.
         $stathp = ceil($user["currenthp"] / $user["maxhp"] * 100);
@@ -421,12 +414,74 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         "rightnav"=>parsetemplate($rightnav,$user),
         "leftnav"=>parsetemplate($leftnav,$user),
         "topnav"=>$topnav,
-        "totaltime"=>round(getmicrotime() - $starttime, 4),
-        "numqueries"=>$queryCount,
+        "totaltime"=>round(getmicrotime() - $start, 4),
+        "numqueries"=>$queries,
         "version"=>$version,
         "build"=>$build);
     $page = parsetemplate($template, $finalarray);
     
     echo $page;
     die();
+}
+
+/**
+ * Our all-around function to fetch templates! It will find whatever
+ * template you provide, so long as it's a fully qualified path. If
+ * you don't want to provide an extension, it will try a list of
+ * file extensions. If it still cannot find the template file, it
+ * will simply return the passed string.
+ */
+function fetchTemplate(string $template)
+{
+    $path = ROOT.'/resources/templates/';
+    if (is_readable($path.$template)) { return read($path.$template); }
+
+    $extensions = ['.html', '.php'];
+    foreach ($extensions as $ext) {
+        if (is_readable($path.$template.$ext)) { return read($path.$template.$ext); }
+    }
+    
+    return $template;
+}
+
+/**
+ * We're using this function as an alias for file_get_contents
+ */
+function read(string $file)
+{
+    return file_get_contents($file);
+}
+
+/**
+ * It's a little oddly named, but this function allows you to
+ * parse either a string or a template file. Passing TRUE to $safe
+ * will auto escape all content passed through.
+ */
+function view(string $template, array $values = [], bool $safe = false)
+{
+    $template = fetchTemplate($template);
+
+    return preg_replace_callback(
+        '/{{\s*([A-Za-z0-9_-]+?)\s*}}/',
+        function($match) use ($values, $safe) {
+            if (isset($values[$match[1]])) {
+                return $safe ? safe($values[$match[1]]) : $values[$match[1]];
+            }
+
+            return $match[0];
+        },
+        $template
+    );
+}
+
+function parse(string $template, array $values = [])
+{
+    return preg_replace_callback(
+        '/{{\s*([A-Za-z0-9_-]+?)\s*}}/',
+        function($match) use ($values) {
+            if (isset($values[$match[1]])) { return $values[$match[1]]; }
+            return $match[0];
+        },
+        $template
+    );
 }

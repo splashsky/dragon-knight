@@ -96,13 +96,13 @@ function register()
                 $verifycode='1';
             }
 
-            $insert = prepare('insert into {{ table }} set regdate=now(), verify=?, username=?, password=?, email=?, charclass=?, difficulty=?', 'users', $link);
+            $insert = prepare('insert into {{ table }} set regdate=now(), verify=?, username=?, password=?, email=?, class=?, difficulty=?', 'users', $link);
             execute($insert, [
                 $verifycode,
                 $username,
                 $password,
                 $email,
-                $_POST['charclass'],
+                $_POST['class'],
                 $_POST['difficulty'],
             ]);
             

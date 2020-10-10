@@ -1,10 +1,11 @@
 <?php
 
+require 'app/Libs/Helpers.php';
+
 if (file_exists('install.php') && !DEBUG) {
     die('Please delete <b>install.php</b> from your Dragon Knight directory before continuing.'); 
 }
 
-require 'app/Libs/Helpers.php';
 require 'app/Libs/Explore.php';
 require 'app/Libs/Towns.php';
 require 'app/Libs/Fight.php';
@@ -84,7 +85,7 @@ function doCurrentAction()
  */
 function displayTown()
 {
-    global $user, $control, $link, $queryCount;
+    global $user, $control, $link, $queries;
 
     $townrow = getTown($user['latitude'], $user['longitude'], $link);
     
@@ -94,7 +95,7 @@ function displayTown()
         $news = $news->fetch();
         
         $townrow['news'] = "<table width=\"95%\"><tr><td class=\"title\">Latest News</td></tr><tr><td>\n";
-        $townrow['news'] .= $news ? "<span class=\"light\">[".prettydate($news["postdate"])."]</span><br />".nl2br($news["content"]) : "Woah! There's no news post.";
+        $townrow['news'] .= $news ? "<span class=\"light\">".prettydate($news["postdate"])."</span><br />".nl2br($news["content"]) : "Woah! There's no news post.";
         $townrow['news'] .= "</td></tr></table>\n";
     } else {
         $townrow['news'] = '';
@@ -127,7 +128,7 @@ function displayTown()
         $townrow["babblebox"] = "";
     }
     
-    $page = gettemplate("towns");
+    $page = gettemplate("town/towns");
     $page = parsetemplate($page, $townrow);
     
     return $page;
@@ -152,13 +153,13 @@ function showchar()
         $user["plusgold"] = "<span class=\"light\">(".$user["goldbonus"]."%)</span>";
     } else { $user["plusgold"] = ""; }
     
-    $exp = prepare("select {$user['charclass']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
+    $exp = prepare("select {$user['class']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
     $levelrow = execute($exp, [$user['level'] + 1])->fetch();
-    if ($user["level"] < 99) { $user["nextlevel"] = number_format($levelrow[$user["charclass"]."_exp"]); } else { $user["nextlevel"] = "<span class=\"light\">None</span>"; }
+    if ($user["level"] < 99) { $user["nextlevel"] = number_format($levelrow[$user["class"]."_exp"]); } else { $user["nextlevel"] = "<span class=\"light\">None</span>"; }
 
-    if ($user["charclass"] == 1) { $user["charclass"] = $control["class1name"]; }
-    elseif ($user["charclass"] == 2) { $user["charclass"] = $control["class2name"]; }
-    elseif ($user["charclass"] == 3) { $user["charclass"] = $control["class3name"]; }
+    if ($user["class"] == 1) { $user["class"] = $control["class1name"]; }
+    elseif ($user["class"] == 2) { $user["class"] = $control["class2name"]; }
+    elseif ($user["class"] == 3) { $user["class"] = $control["class3name"]; }
     
     if ($user["difficulty"] == 1) { $user["difficulty"] = $control["diff1name"]; }
     elseif ($user["difficulty"] == 2) { $user["difficulty"] = $control["diff2name"]; }
@@ -208,13 +209,13 @@ function onlinechar($id)
         $user["plusgold"] = "<span class=\"light\">(".$user["goldbonus"]."%)</span>";
     } else { $user["plusgold"] = ""; }
     
-    $exp = prepare("select {$user['charclass']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
+    $exp = prepare("select {$user['class']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
     $levelrow = execute($exp, [$user['level'] + 1])->fetch();
-    $user["nextlevel"] = number_format($levelrow[$user["charclass"]."_exp"]);
+    $user["nextlevel"] = number_format($levelrow[$user["class"]."_exp"]);
 
-    if ($user["charclass"] == 1) { $user["charclass"] = $control["class1name"]; }
-    elseif ($user["charclass"] == 2) { $user["charclass"] = $control["class2name"]; }
-    elseif ($user["charclass"] == 3) { $user["charclass"] = $control["class3name"]; }
+    if ($user["class"] == 1) { $user["class"] = $control["class1name"]; }
+    elseif ($user["class"] == 2) { $user["class"] = $control["class2name"]; }
+    elseif ($user["class"] == 3) { $user["class"] = $control["class3name"]; }
     
     if ($user["difficulty"] == 1) { $user["difficulty"] = $control["diff1name"]; }
     elseif ($user["difficulty"] == 2) { $user["difficulty"] = $control["diff2name"]; }
@@ -227,12 +228,8 @@ function onlinechar($id)
 
 function showmap()
 {
-    // Make page tags for XHTML validation.
-    $xml = "<!DOCTYPE html>\n"
-    . "<html lang=\"en\">\n";
-    
-    $page = $xml . gettemplate("minimal");
-    $array = array("content"=>"<center><img src=\"resources/img/map.gif\" alt=\"Map\" /></center>", "title"=>"Map");
+    $page = gettemplate("minimal");
+    $array = array("content"=>"<div style=\"padding: 1rem;\"><img src=\"resources/img/map.gif\" alt=\"Map\"></div>", "title" => "Map");
     echo parsetemplate($page, $array);
 }
 

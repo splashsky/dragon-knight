@@ -1,27 +1,206 @@
-<b><u>Main Settings</u></b><br />
-These options control several major settings for the overall game engine.<br /><br />
-<form action="admin.php?do=main" method="post">
-<table width="90%">
-<tr><td width="20%"><span class="highlight">Game Open:</span></td><td><select name="gameopen"><option value="1" {{open1select}}>Open</option><option value="0" {{open0select}}>Closed</option></select><br /><span class="small">Close the game if you are upgrading or working on settings and don't want to cause odd errors for end-users. Closing the game will completely halt all activity.</span></td></tr>
-<tr><td width="20%">Game Name:</td><td><input type="text" name="gamename" size="30" maxlength="50" value="{{gamename}}" /><br /><span class="small">Default is "Dragon Knight". Change this if you want to change to call your game something different.</span></td></tr>
-<tr><td width="20%">Game URL:</td><td><input type="text" name="gameurl" size="50" maxlength="100" value="{{gameurl}}" /><br /><span class="small">Please specify the full URL to your game installation ("http://www.server.com/dkpath/index.php").  This gets used in the registration email sent to users. If you leave this field blank or incorrect, users may not be able to register correctly.</span></td></tr>
-<tr><td width="20%">Admin Email:</td><td><input type="text" name="adminemail" size="30" maxlength="100" value="{{adminemail}}" /><br /><span class="small">Please specify your email address. This gets used when the game has to send an email to users.</span></td></tr>
-<tr><td width="20%">Map Size:</td><td><input type="text" name="gamesize" size="3" maxlength="3" value="{{gamesize}}" /><br /><span class="small">Default is 250. This is the size of each map quadrant. Note that monster levels increase every 5 spaces, so you should ensure that you have at least (map size / 5) monster levels total, otherwise there will be parts of the map without any monsters, or some monsters won't ever get used. Ex: with a map size of 250, you should have 50 monster levels total.</span></td></tr>
-<tr><td width="20%">Forum Type:</td><td><select name="forumtype"><option value="0" {{selecttype0}}>Disabled</option><option value="1" {{selecttype1}}>Internal</option><option value="2" {{selecttype2}}>External</option></select><br /><span class="small">'Disabled' removes the forum link. 'Internal' uses the built-in (and very stripped-down) forum program included with Dragon Knight, if you don't have your own forums software already installed. 'External' uses the address provided below and links to your own forums software.</span></td></tr>
-<tr><td width="20%">External Forum:</td><td><input type="text" name="forumaddress" size="30" maxlength="200" value="{{forumaddress}}" /><br /><span class="small">If the above value is set to 'External,' please specify the complete URL to your forums here.</span></td></tr>
-<tr><td width="20%">Page Compression:</td><td><select name="compression"><option value="0" {{selectcomp0}}>Disabled</option><option value="1" {{selectcomp1}}>Enabled</option></select><br /><span class="small">Enable page compression if it is supported by your server, and this will greatly reduce the amount of bandwidth required by the game.</span></td></tr>
-<tr><td width="20%">Email Verification:</td><td><select name="verifyemail"><option value="0" {{selectverify0}}>Disabled</option><option value="1" {{selectverify1}}>Enabled</option></select><br /><span class="small">Make users verify their email address for added security.</span></td></tr>
-<tr><td width="20%">Show News:</td><td><select name="shownews"><option value="0" {{selectnews0}}>No</option><option value="1" {{selectnews1}}>Yes</option></select><br /><span class="small">Toggle display of the Latest News box in towns.</td></tr>
-<tr><td width="20%">Show Who's Online:</td><td><select name="showonline"><option value="0" {{selectonline0}}>No</option><option value="1" {{selectonline1}}>Yes</option></select><br /><span class="small">Toggle display of the Who's Online box in towns.</span></td></tr>
-<tr><td width="20%">Show Babblebox:</td><td><select name="showbabble"><option value="0" {{selectbabble0}}>No</option><option value="1" {{selectbabble1}}>Yes</option></select><br /><span class="small">Toggle display of the Babble Box in towns.</span></td></tr>
-<tr><td width="20%">Class 1 Name:</td><td><input type="text" name="class1name" size="20" maxlength="50" value="{{class1name}}" /><br /></td></tr>
-<tr><td width="20%">Class 2 Name:</td><td><input type="text" name="class2name" size="20" maxlength="50" value="{{class2name}}" /><br /></td></tr>
-<tr><td width="20%">Class 3 Name:</td><td><input type="text" name="class3name" size="20" maxlength="50" value="{{class3name}}" /><br /></td></tr>
-<tr><td width="20%">Difficulty 1 Name:</td><td><input type="text" name="diff1name" size="20" maxlength="50" value="{{diff1name}}" /><br /></td></tr>
-<tr><td width="20%">Difficulty 2 Name:</td><td><input type="text" name="diff2name" size="20" maxlength="50" value="{{diff2name}}" /><br /></td></tr>
-<tr><td width="20%">Difficulty 2 Value:</td><td><input type="text" name="diff2mod" size="3" maxlength="3" value="{{diff2mod}}" /><br /><span class="small">Default is 1.2. Specify factoral value for medium difficulty here.</span></td></tr>
-<tr><td width="20%">Difficulty 3 Name:</td><td><input type="text" name="diff3name" size="20" maxlength="50" value="{{diff3name}}" /><br /></td></tr>
-<tr><td width="20%">Difficulty 3 Value:</td><td><input type="text" name="diff3mod" size="3" maxlength="3" value="{{diff3mod}}" /><br /><span class="small">Default is 1.5. Specify factoral value for hard difficulty here.</span></td></tr>
-</table>
-<input type="submit" name="submit" value="Submit" /> <input type="reset" name="reset" value="Reset" />
+<p>
+    These options control several major settings for the overall game engine.
+</p>
+
+<p class="my-8">
+    If you want to know what each setting does, <a href="admin.php?do=manual&panel=main">click here</a>.
+</p>
+
+<form action="admin.php?do=main" method="post" style="width: 50%;">
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="gameopen" class="highlight">Game Open</label>
+        </div>
+        <div class="w-full">
+            <select id="gameopen" name="gameopen">
+                <option value="1" {{ open1select }}>Open</option>
+                <option value="0" {{ open0select }}>Closed</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;">
+            <label for="gamename">Game Name</label>
+        </div>
+        <div class="w-full">
+            <input id="gamename" type="text" name="gamename" value="{{ gamename }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="gameurl">Game URL</label>
+        </div>
+        <div class="w-full">
+            <input id="gameurl" type="text" name="gameurl" value="{{ gameurl }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;">
+            <label for="adminemail">Admin Email</label>
+        </div>
+        <div class="w-full">
+            <input id="adminemail" type="email" name="adminemail" value="{{ adminemail }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="gamesize">Map Size</label>
+        </div>
+        <div class="w-full">
+            <input id="gamesize" type="number" name="gamesize" value="{{ gamesize }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="forumtype">Forum Type</label>
+        </div>
+        <div class="w-full">
+            <select id="forumtype" name="forumtype">
+                <option value="0" {{ selecttype0 }}>Disabled</option>
+                <option value="1" {{ selecttype1 }}>Internal</option>
+                <option value="2" {{ selecttype2 }}>External</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="forumaddress">External Forum</label>
+        </div>
+        <div class="w-full">
+            <input id="forumaddress" type="text" name="forumaddress" value="{{ forumaddress }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="verifyemail">Email Verification</label>
+        </div>
+        <div class="w-full">
+            <select id="verifyemail" name="verifyemail">
+                <option value="0" {{ selectverify0 }}>Disabled</option>
+                <option value="1" {{ selectverify1 }}>Enabled</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="shownews">Show News</label>
+        </div>
+        <div class="w-full">
+            <select id="shownews" name="shownews">
+                <option value="0" {{ selectnews0 }}>No</option>
+                <option value="1" {{ selectnews1 }}>Yes</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="showonline">Show Who's Online</label>
+        </div>
+        <div class="w-full">
+            <select id="showonline" name="showonline">
+                <option value="0" {{ selectonline0 }}>No</option>
+                <option value="1" {{ selectonline1 }}>Yes</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="showbabble">Show Babblebox</label>
+        </div>
+        <div class="w-full">
+            <select id="showbabble" name="showbabble">
+                <option value="0" {{ selectbabble0 }}>No</option>
+                <option value="1" {{ selectbabble1 }}>Yes</option>
+            </select>
+        </div>
+    </div>
+
+    <h3 class="mb-2 mt-8 title">Classes</h3>
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="class1name">Class 1 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="class1name" type="text" name="class1name" value="{{ class1name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="class2name">Class 2 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="class2name" type="text" name="class2name" value="{{ class2name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="class3name">Class 3 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="class3name" type="text" name="class3name" value="{{ class3name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <h3 class="mb-2 mt-8 title">Difficulties</h3>
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="diff1name">Diff 1 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="diff1name" type="text" name="diff1name" value="{{ diff1name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="diff2name">Diff 2 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="diff2name" type="text" name="diff2name" value="{{ diff2name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="diff2mod">Diff 2 Mod</label>
+        </div>
+        <div class="w-full">
+            <input id="diff2mod" type="text" name="diff2mod" value="{{ diff2mod }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="diff3name">Diff 3 Name</label>
+        </div>
+        <div class="w-full">
+            <input id="diff3name" type="text" name="diff3name" value="{{ diff3name }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex mb-4 items-center">
+        <div style="width: 30%;">
+            <label for="diff3mod">Diff 3 Mod</label>
+        </div>
+        <div class="w-full">
+            <input id="diff3mod" type="text" name="diff3mod" value="{{ diff3mod }}" class="text-input w-full">
+        </div>
+    </div>
+
+    <div style="margin-top: 4rem;">
+        <button type="submit" name="submit" class="button">Save</button>
+        <button type="reset" class="button">Reset</button>
+    </div>
 </form>

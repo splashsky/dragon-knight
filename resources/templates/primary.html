@@ -6,21 +6,29 @@
     <link rel="stylesheet" href="resources/css/game.css">
 
     <script>
-        function opencharpopup() {
-            let popurl = "index.php?do=showchar";
-            window.open(popurl, "", "width=210, height=500, scrollbars");
+        function openWindow(url)
+        {
+            let window = open(url, '_blank');
+            let contentWidth = window.document.getElementById('game').offsetWidth;
+            var contentHeight = window.document.getElementById('game').offsetHeight;
+            window.resizeTo(contentWidth,contentHeight);
         }
 
-        function openmappopup() {
-            let popurl = "index.php?do=showmap";
-            window.open(popurl, "", "width=520, height=520, scrollbars")
+        function opencharpopup()
+        {
+            openWindow('index.php?do=showchar');
+        }
+
+        function openmappopup()
+        {
+            openWindow('index.php?do=showmap');
         }
     </script>
 </head>
-<body>
+<body id="game">
     <table width="90%" class="mx-auto">
         <tr>
-            <td class="top" colspan="3" style="padding-bottom: 2rem;">
+            <td class="top" colspan="3" style="padding-bottom: 1rem;">
                 <table width="100%">
                     <tr>
                         <td><img src="resources/img/logo.gif" alt="{{ dkgamename }}" title="{{ dkgamename }}"></td>
@@ -32,7 +40,7 @@
 
         <tr>
             <td class="left">{{leftnav}}</td>
-            <td class="middle px-4">{{content}}</td>
+            <td class="middle" style="padding: 0 2rem;">{{content}}</td>
             <td class="right">{{rightnav}}</td>
         </tr>
     </table>

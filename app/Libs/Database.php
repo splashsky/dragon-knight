@@ -48,7 +48,7 @@ function parseQuery(string $query, string $table = '')
 
 function query(string $query, string $table = '', $link = null)
 {
-    incrementQueryCount();
+    incrementQueries();
 
     $link = openLinkIfNull($link);
     $query = parseQuery($query, $table);
@@ -64,7 +64,7 @@ function prepare(string $query, string $table = '', $link = null)
 
 function execute($prepared, array $params = [])
 {
-    incrementQueryCount();
+    incrementQueries();
     
     $prepared->execute($params);
     return $prepared;
@@ -72,7 +72,7 @@ function execute($prepared, array $params = [])
 
 function quick(string $query, string $table = '', array $params = [], $link = null)
 {
-    incrementQueryCount();
+    incrementQueries();
 
     $link = openLinkIfNull($link);
     $query = prepare($query, $table, $link);

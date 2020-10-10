@@ -1,6 +1,11 @@
-<b><u>Add A News Post</u></b><br /><br />
+<p class="mb-8">
+    If <b>Show News</b> is enabled, you can write a news post here that will be displayed in every town. Please note
+    that only one news post can be viewed at any given time; writing a new one will overwrite the last one.
+</p>
+
 <form action="admin.php?do=news" method="post">
-Type your post below and then click Submit to add it.<br />
-<textarea name="content" rows="5" cols="50"></textarea><br />
-<input type="submit" name="submit" value="Submit" /> <input type="reset" name="reset" value="Reset" />
+    <textarea name="content" class="text-input mb-4 block w-full" style="min-height: 200px; max-width: 80%;"></textarea>
+
+    <button class="button" type="submit" name="submit">Submit</button>
+    <button class="button" type="reset">Reset</button>
 </form>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>{{ title }} - Admin Panel</title>
+
+        <link rel="stylesheet" href="resources/css/game.css">
+    </head>
+
+    <body id="game">
+        <h1 class="py-8 mx-auto block text-center" style="width: 90%;">
+            {{ game }} Control Panel
+        </h1>
+
+        <div class="admin-panel mx-auto flex" style="width: 90%;">
+            <!-- Sidebar -->
+            <div class="w-full mr-8" style="max-width: 200px; min-width: 150px;">
+                <div class="box mb-4">
+                    <span class="block title swash text-center mb-4">Primary</span>
+                
+                    <ul>
+                        <li><a href="admin.php?do=main">Main Settings</a></li>
+                        <li><a href="admin.php?do=news">News Post</a></li>
+                        <li><a href="admin.php?do=users">Manage Users</a></li>
+                    </ul>
+                </div>
+
+                <div class="box mb-4">
+                    <span class="block title swash text-center mb-4">Game</span>
+                
+                    <ul>
+                        <li><a href="admin.php?do=items">Items</a></li>
+                        <li><a href="admin.php?do=drops">Drops</a></li>
+                        <li><a href="admin.php?do=towns">Towns</a></li>
+                        <li><a href="admin.php?do=monsters">Monsters</a></li>
+                        <li><a href="admin.php?do=spells">Spells</a></li>
+                        <li><a href="admin.php?do=levels">Levels</a></li>
+                    </ul>
+                </div>
+
+                <div class="box mb-4">
+                    <a href="index.php">Back to the game</a>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <main class="w-full">
+                <h1 class="my-0 mb-4 title">{{ title }}</h1>
+
+                {{ flash }}
+
+                {{ content }}
+            </main>
+        </div>
+
+        <footer class="copyright flex items-center" style="width: 90%;">
+            <div class="w-1/4 text-center">Powered by <a href="https://dragonknight.dev" target="_new">Dragon Knight</a></div>
+            <div class="w-1/4 text-center">&copy; <a href="https://surf.gg">Surf</a> 2020</div>
+            <div class="w-1/4 text-center">{{ time }} Seconds, {{ queries }} Queries</div>
+            <div class="w-1/4 text-center">Version {{ version }} {{ build }}</div>
+        </footer>
+    </body>
+</html>

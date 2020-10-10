@@ -1,0 +1,21 @@
+<div>
+    <div class="flex items-center">
+        <a class="mr-4 block" href="forum.php"><h1 class="title my-0 swash">Forum</h1></a>
+        <h1 class="title my-0">{{ title }}</h1>
+    </div>
+
+    <div>
+        {{ list }}
+    </div>
+
+    <div class="box">
+        <form action="forum.php?do=reply" method="post">
+            <input type="hidden" name="parent" value="{{ id }}">
+            <input type="hidden" name="title" value="Re: {{ title }}">
+
+            <textarea name="content" class="block w-full mb-4 resize-vertical px-4 py-2 text-input" style="min-height: 6rem;" required placeholder="Present your wisdom to your peers."></textarea>
+            <button type="submit" name="submit" class="button mr-4">Reply</button>
+            <button type="reset" class="button">Reset</button>
+        </form>
+    </div>
+</div>

@@ -4,9 +4,15 @@ All the notable changes done for Dragon Knight's development will be recorded in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added a `.gitignore` to hide development-only files
+- Created a fonts/ and css/ directory
+- Refactored the primary and minimal templates to use the CSS file for the game
+
 ### Changed
 - Moved `templates` directory to `resources`
 - Moved `images` directory to `resources` and renamed to `img`
+- Huge visual overhaul, now cleaner and more neutral than before
 
 ## v1.3.0 - 2020/10/03
 ### Added
@@ -15,8 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A new `getControl` function that accepts a PDO link as a parameter, retrieves the game's control row
 - Added two ways of retrieving user data; `getUserFromCookie` and `getUserFromId`
 - Added a super-helpful debug method that formats var_dump and dies, called `dd()`
-- Added two helper functions to increment and get the number of queries executed; `incrementQueryCounter` and `getQueryCount`
-- The PDO database methods now increments the global `$queryCounter` via `incrementQueryCounter()`
+- Added two helper functions to increment and get the number of queries executed; `incrementQuerieser` and `getQueries`
+- The PDO database methods now increments the global `$querieser` via `incrementQuerieser()`
 - Created a new `resources` directory to contain css, images and sql query files
 
 ### Changed
@@ -27,7 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Moved functions in `login.php` to `users.php`, changed all game links accordingly
 - Renamed `Lib.php` to `Helpers.php`, updated previous changelog entries to reflect this
 - `makesafe()` has been refactored to `safe()`, but performs the same function
-- The `$numqueries` global variable has been refactored to `$queryCount`
+- The `$numqueries` global variable has been refactored to `$queries`
 - All install pages are now contained in templates in `templates/install`
 - The installation `create` and `populate` queries have been moved into the new sql directory, `resoures/sql/install`
 - Errors in the admin account creation part of the installation process will now display the admin account field again, with the errors listed

@@ -1,0 +1,73 @@
+<p>
+    Now you must create an administrator account so you can use the control panel. Fill out the form below to create your account. 
+    You will be able to customize the class names through the control panel once your admin account is created.
+</p>
+
+<div class="my-8" style="color: red;">
+    {{ errors }}
+</div>
+
+<form action="install.php?step=finish" method="post" style="width: 50%;">
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;">
+            <label for="username">Username</label>
+        </div>
+        <div class="w-full">
+            <input id="username" type="text" name="username" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="my-8">
+        <div class="form-group flex items-center mb-4">
+            <div style="width: 30%;">
+                <label for="password1">Password</label>
+            </div>
+            <div class="w-full">
+                <input id="password1" type="password" name="password1" class="text-input w-full">
+            </div>
+        </div>
+
+        <div class="form-group flex items-center mb-4">
+            <div style="width: 30%;">
+                <label for="password2">Confirm Password</label>
+            </div>
+            <div class="w-full">
+                <input id="password2" type="password" name="password2" class="text-input w-full">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-8">
+        <div style="width: 30%;">
+            <label for="email">Email</label>
+        </div>
+        <div class="w-full">
+            <input id="email" type="email" name="email" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="class">Class</label></div>
+        <div class="w-full">
+            <select id="class" name="class">
+                <option value="1">Mage</option>
+                <option value="2">Warrior</option>
+                <option value="3">Paladin</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="difficulty">Difficulty</label></div>
+        <div class="w-full">
+            <select id="difficulty" name="difficulty">
+                <option value="1">Easy</option>
+                <option value="2">Normal</option>
+                <option value="3">Hard</option>
+            </select>
+        </div>
+    </div>
+
+    <button type="submit" name="submit" class="button">Submit</button>
+    <button type="rest" class="button">Reset</button>
+</form>

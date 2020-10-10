@@ -12,6 +12,6 @@ if (! in_array($with, $pages)) { $with = 'main'; }
 
 ob_start();
 
-require "templates/help/{$with}.php";
+require "resources/templates/help/{$with}.php";
 
 echo ob_get_clean();

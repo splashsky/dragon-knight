@@ -360,9 +360,14 @@ if ($dead != 1) {
 $pagearray["command"] = <<<END
 Command?<br /><br />
 <form action="index.php?do=fight" method="post">
-<input type="submit" name="fight" value="Fight" /><br /><br />
-<select name="userspell"><option value="0">Choose One</option>$magiclist</select> <input type="submit" name="spell" value="Spell" /><br /><br />
-<input type="submit" name="run" value="Run" /><br /><br />
+    <button type="submit" name="fight" class="button mb-4">Fight</button>
+
+    <div>
+        <select name="userspell" class="select-input"><option value="0">Choose One</option>$magiclist</select> 
+        <button type="submit" name="spell" class="button mb-4">Cast</button>
+    </div>
+
+    <button type="submit" name="run" class="button mb-4">Run</button>
 </form>
 END;
     $query = "update {{ table }} set currentaction='Fighting', currenthp=?, currentmp=?, currentfight=?, currentmonster=?, currentmonsterhp=?, currentmonstersleep=?, currentmonsterimmune=?, currentuberdamage=?, currentuberdefense=? WHERE id=?";
@@ -419,23 +424,23 @@ function victory()
     $levelrow = execute($expQuery, [$user['level'] + 1])->fetch();
     
     if ($user["level"] < 100) {
-        if ($newexp >= $levelrow[$user["charclass"]."_exp"]) {
-            $newhp = $user["maxhp"] + $levelrow[$user["charclass"]."_hp"];
-            $newmp = $user["maxmp"] + $levelrow[$user["charclass"]."_mp"];
-            $newtp = $user["maxtp"] + $levelrow[$user["charclass"]."_tp"];
-            $newstrength = $user["strength"] + $levelrow[$user["charclass"]."_strength"];
-            $newdexterity = $user["dexterity"] + $levelrow[$user["charclass"]."_dexterity"];
-            $newattack = $user["attackpower"] + $levelrow[$user["charclass"]."_strength"];
-            $newdefense = $user["defensepower"] + $levelrow[$user["charclass"]."_dexterity"];
+        if ($newexp >= $levelrow[$user["class"]."_exp"]) {
+            $newhp = $user["maxhp"] + $levelrow[$user["class"]."_hp"];
+            $newmp = $user["maxmp"] + $levelrow[$user["class"]."_mp"];
+            $newtp = $user["maxtp"] + $levelrow[$user["class"]."_tp"];
+            $newstrength = $user["strength"] + $levelrow[$user["class"]."_strength"];
+            $newdexterity = $user["dexterity"] + $levelrow[$user["class"]."_dexterity"];
+            $newattack = $user["attackpower"] + $levelrow[$user["class"]."_strength"];
+            $newdefense = $user["defensepower"] + $levelrow[$user["class"]."_dexterity"];
             $newlevel = $levelrow["id"];
             
-            if ($levelrow[$user["charclass"]."_spells"] != 0) {
-                $userspells = $user["spells"] . ",".$levelrow[$user["charclass"]."_spells"];
+            if ($levelrow[$user["class"]."_spells"] != 0) {
+                $userspells = $user["spells"] . ",".$levelrow[$user["class"]."_spells"];
                 $newspell = "spells='$userspells',";
                 $spelltext = "You have learned a new spell.<br />";
             } else { $spelltext = ""; $newspell=""; }
             
-            $page = "Congratulations. You have defeated the ".$monster["name"].".<br />You gain $exp experience. $warnexp <br />You gain $gold gold. $warngold <br /><br /><b>You have gained a level!</b><br /><br />You gain ".$levelrow[$user["charclass"]."_hp"]." hit points.<br />You gain ".$levelrow[$user["charclass"]."_mp"]." magic points.<br />You gain ".$levelrow[$user["charclass"]."_tp"]." travel points.<br />You gain ".$levelrow[$user["charclass"]."_strength"]." strength.<br />You gain ".$levelrow[$user["charclass"]."_dexterity"]." dexterity.<br />$spelltext<br />You can now continue <a href=\"index.php\">exploring</a>.";
+            $page = "Congratulations. You have defeated the ".$monster["name"].".<br />You gain $exp experience. $warnexp <br />You gain $gold gold. $warngold <br /><br /><b>You have gained a level!</b><br /><br />You gain ".$levelrow[$user["class"]."_hp"]." hit points.<br />You gain ".$levelrow[$user["class"]."_mp"]." magic points.<br />You gain ".$levelrow[$user["class"]."_tp"]." travel points.<br />You gain ".$levelrow[$user["class"]."_strength"]." strength.<br />You gain ".$levelrow[$user["class"]."_dexterity"]." dexterity.<br />$spelltext<br />You can now continue <a href=\"index.php\">exploring</a>.";
             $title = "Courage and Wit have served thee well!";
             $dropcode = "";
         } else {

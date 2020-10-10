@@ -1,2 +1,4 @@
+.docker/
+docker-compose.yml
 resources/css/game.css.map
 resources/scss
