@@ -1,11 +1,8 @@
 <?php
 
-require 'app/Libs/Helpers.php'; 
+require 'app/Game.php';
 
-$link = openLink();
-$control = getControl($link);
-
-$with = isset($_GET['with']) ? $_GET['with'] : 'main';
+$with = GET('with', 'main');
 $pages = ['main', 'items', 'monsters', 'spells', 'levels'];
 
 if (! in_array($with, $pages)) { $with = 'main'; }

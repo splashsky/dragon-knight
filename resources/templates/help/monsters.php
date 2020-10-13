@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title><?php echo $control["gamename"]; ?> Help</title>
+<title><?php echo $control['game_name']; ?> Help</title>
     <link rel="stylesheet" href="resources/css/game.css">
 </head>
 <body>
 <a name="top"></a>
-<h1><?php echo $control["gamename"]; ?> Help: Monsters</h1>
+<h1><?php echo $control['game_name']; ?> Help: Monsters</h1>
 [ <a href="help.php">Return to Help</a> | <a href="index.php">Return to the game</a> ]
 
 <br /><br /><hr />
@@ -21,7 +21,7 @@ $monsters = query('select * from {{ table }}', 'monsters', $link);
 foreach ($monsters->fetchAll() as $itemsrow) {
     if ($count == 1) { $color = "bgcolor=\"#ffffff\""; $count = 2; } else { $color = ""; $count = 1; }
     if ($itemsrow["immune"] == 0) { $immune = "<span class=\"light\">None</span>"; } elseif ($itemsrow["immune"] == 1) { $immune = "Hurt"; } else { $immune = "Hurt & Sleep"; }
-    echo "<tr><td $color width=\"30%\">".$itemsrow["name"]."</td><td $color width=\"10%\">".$itemsrow["maxhp"]."</td><td $color width=\"10%\">".$itemsrow["maxdam"]."</td><td $color width=\"10%\">".$itemsrow["armor"]."</td><td $color width=\"10%\">".$itemsrow["level"]."</td><td $color width=\"10%\">".$itemsrow["maxexp"]."</td><td $color width=\"10%\">".$itemsrow["maxgold"]."</td><td $color width=\"20%\">$immune</td></tr>\n";
+    echo "<tr><td $color width=\"30%\">".$itemsrow["name"]."</td><td $color width=\"10%\">".$itemsrow["hp"]."</td><td $color width=\"10%\">".$itemsrow["damage"]."</td><td $color width=\"10%\">".$itemsrow["armor"]."</td><td $color width=\"10%\">".$itemsrow["level"]."</td><td $color width=\"10%\">".$itemsrow["exp"]."</td><td $color width=\"10%\">".$itemsrow["gold"]."</td><td $color width=\"20%\">$immune</td></tr>\n";
 }
 ?>
 </table>

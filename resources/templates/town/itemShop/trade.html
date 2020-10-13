@@ -1,0 +1,14 @@
+<h1 class="title my-0"><span class="swash">{{ town_name }}</span> Item Shop</span></h1>
+
+<p>
+    So you want to buy the {{ name }} for <b>{{ value }} gold</b>? Just making sure.
+</p>
+
+<p>
+    I also see you've got a {{ item2_name }} there. I'll buy it from you for <b>{{ item2_sell }} gold</b>. How's that sound?
+</p>
+
+<form action="index.php?do=giveItem&item={{ id }}" method="post">
+    <button type="submit" name="submit" class="button">Yes</button>
+    <button type="submit" name="cancel" class="button">Nah</button>
+</form>

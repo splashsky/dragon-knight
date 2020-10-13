@@ -57,7 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The login function now displays an error at the top of the form instead of die'ing at runtime.
 - The installer will now drop existing tables when it creates new ones.
 - Cookies now store the password used at login, and checks it against the hashed version in the database.
-- The installer will now set `verifyemail` to `false` by default, changed from `true`
+- The installer will now set `verify_email` to `false` by default, changed from `true`
 - The `checkcookies` function was moved to `Helpers.php`
 
 ### Deprecated

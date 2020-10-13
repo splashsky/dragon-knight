@@ -16,14 +16,14 @@ dieIfGameClosed($control);
 $user = getUserIfLoggedInByCookie($link);
 
 // Perform usual authentication checks.
-redirectIfNotVerified($user['verify'], $control['verifyemail']);
+redirectIfNotVerified($user['verify'], $control['verify_email']);
 dieIfBanned($user['authlevel']);
 
 // Get the requested action, or default to the user's current action.
 $do = GET('do', 'default');
 
 // If the game is closed, set our action to the correct endpoint.
-if ($control['gameopen'] == 0) { $do = 'gameClosed'; }
+if ($control['game_open'] == 0) { $do = 'gameClosed'; }
 
 if ($do == "thread") { showThread($link); }
 elseif ($do == "new") { newThread($user, $link); }

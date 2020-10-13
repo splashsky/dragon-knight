@@ -14,9 +14,9 @@ dieIfGameClosed($control);
 $user = getUserIfLoggedInByCookie($link);
 
 // Perform usual authentication checks.
-redirectIfNotVerified($user['verify'], $control['verifyemail']);
-dieIfBanned($user['authlevel']);
-redirectIfNotAuthorized($user['authlevel'], config('auth.admin'));
+redirectIfNotVerified($user['verified'], $control['verify_email']);
+dieIfBanned($user['role']);
+redirectIfNotAuthorized($user['role'], 'admin');
 
 // Get the requested action, or default to the user's current action.
 $do = GET('do', 'default');
@@ -55,29 +55,29 @@ function intro()
 function getMainSelections(array $data)
 {
     // Forum type selection
-    $data['selecttype0'] = $data['forumtype'] == 0 ? 'selected' : ''; 
-    $data['selecttype1'] = $data['forumtype'] == 1 ? 'selected' : ''; 
-    $data['selecttype2'] = $data['forumtype'] == 2 ? 'selected' : '';
+    $data['selecttype0'] = $data['forum_type'] == 0 ? 'selected' : ''; 
+    $data['selecttype1'] = $data['forum_type'] == 1 ? 'selected' : ''; 
+    $data['selecttype2'] = $data['forum_type'] == 2 ? 'selected' : '';
 
     // Email verification selection
-    $data['selectverify0'] = $data['verifyemail'] == 0 ? 'selected' : '';
-    $data['selectverify1'] = $data['verifyemail'] == 1 ? 'selected' : '';
+    $data['selectverify0'] = $data['verify_email'] == 0 ? 'selected' : '';
+    $data['selectverify1'] = $data['verify_email'] == 1 ? 'selected' : '';
 
     // Show news selection
-    $data['selectnews0'] = $data['shownews'] == 0 ? 'selected' : '';
-    $data['selectnews1'] = $data['shownews'] == 1 ? 'selected' : '';
+    $data['selectnews0'] = $data['show_news'] == 0 ? 'selected' : '';
+    $data['selectnews1'] = $data['show_news'] == 1 ? 'selected' : '';
 
     // Show who's online selection
-    $data['selectonline0'] = $data['showonline'] == 0 ? 'selected' : '';
-    $data['selectonline1'] = $data['showonline'] == 1 ? 'selected' : '';
+    $data['selectonline0'] = $data['show_online'] == 0 ? 'selected' : '';
+    $data['selectonline1'] = $data['show_online'] == 1 ? 'selected' : '';
 
     // Show babblebox selection
-    $data['selectbabble0'] = $data['showbabble'] == 0 ? 'selected' : '';
-    $data['selectbabble1'] = $data['showbabble'] == 1 ? 'selected' : '';
+    $data['selectbabble0'] = $data['show_babble'] == 0 ? 'selected' : '';
+    $data['selectbabble1'] = $data['show_babble'] == 1 ? 'selected' : '';
 
     // Game open selection
-    $data['open0select'] = $data['gameopen'] == 0 ? 'selected' : '';
-    $data['open1select'] = $data['gameopen'] == 1 ? 'selected' : '';
+    $data['open0select'] = $data['game_open'] == 0 ? 'selected' : '';
+    $data['open1select'] = $data['game_open'] == 1 ? 'selected' : '';
 
     return $data;
 }
@@ -111,66 +111,37 @@ function main()
         $data = getMainSelections($_POST);
         $page = parsetemplate($page, $data);
 
-        $errorlist = '';
-
-        if ($gamename == '') { $errors .= "Game name is required.<br />"; }
-        if (($gamesize % 5) != 0) { $errors .= "Map size must be divisible by five.<br />"; }
-        if (! is_numeric($gamesize)) { $errors .= "Map size must be a number.<br />"; }
-        if ($forumtype == 2 && $forumaddress == '') { $errors .= "You must specify a forum address when using the External setting.<br />"; }
-        if ($class1name == '') { $errors .= "Class 1 name is required.<br />"; }
-        if ($class2name == '') { $errors .= "Class 2 name is required.<br />"; }
-        if ($class3name == '') { $errors .= "Class 3 name is required.<br />"; }
-        if ($diff1name == '') { $errors .= "Difficulty 1 name is required.<br />"; }
-        if ($diff2name == '') { $errors .= "Difficulty 2 name is required.<br />"; }
-        if ($diff3name == '') { $errors .= "Difficulty 3 name is required.<br />"; }
-        if ($diff2mod == '') { $errors .= "Difficulty 2 value is required.<br />"; }
-        if ($diff3mod == '') { $errors .= "Difficulty 3 value is required.<br />"; }
+        $errors = '';
+        if ($game_name == '') { $errors .= "Game name is required.<br />"; }
+        if (($game_size % 5) != 0) { $errors .= "Map size must be divisible by five.<br />"; }
+        if (! is_numeric($game_size)) { $errors .= "Map size must be a number.<br />"; }
+        if ($forum_type == 2 && $forum_address == '') { $errors .= "You must specify a forum address when using the External setting.<br />"; }
         
-        if (! empty($errorlist)) {
-            buildAdmin($page, $title, $errorlist, 'error');
+        if (! empty($errors)) {
+            buildAdmin($page, $title, $errors, 'error');
             return;
         }
 
-        $query = prepare("update {{ table }} set gamename=?, gamesize=?, forumtype=?, forumaddress=?, class1name=?, class2name=?, class3name=?, diff1name=?, diff2name=?, diff3name=?, diff2mod=?, diff3mod=?, gameopen=?, verifyemail=?, gameurl=?, adminemail=?, shownews=?, showonline=?, showbabble=? WHERE id='1'", 'control', $link);
+        $query = prepare("update {{ table }} set game_name=?, game_size=?, forum_type=?, forum_address=?, game_open=?, verify_email=?, game_url=?, admin_email=?, show_news=?, show_online=?, show_babble=? WHERE id='1'", 'control', $link);
         execute($query, [
-            $gamename,
-            $gamesize,
-            $forumtype,
-            $forumaddress,
-            $class1name,
-            $class2name,
-            $class3name,
-            $diff1name,
-            $diff2name,
-            $diff3name,
-            $diff2mod,
-            $diff3mod,
-            $gameopen,
-            $verifyemail,
-            $gameurl,
-            $adminemail,
-            $shownews,
-            $showonline,
-            $showbabble
+            $game_name,
+            $game_size,
+            $forum_type,
+            $forum_address,
+            $game_open,
+            $verify_email,
+            $game_url,
+            $admin_email,
+            $show_news,
+            $show_online,
+            $show_babble
         ]);
 
         buildAdmin($page, $title, 'Successfully updated.', 'success');
         return;
     }
 
-    if ($control["forumtype"] == 0) { $control["selecttype0"] = 'selected'; } else { $control["selecttype0"] = ''; }
-    if ($control["forumtype"] == 1) { $control["selecttype1"] = 'selected'; } else { $control["selecttype1"] = ''; }
-    if ($control["forumtype"] == 2) { $control["selecttype2"] = 'selected'; } else { $control["selecttype2"] = ''; }
-    if ($control["verifyemail"] == 0) { $control["selectverify0"] = 'selected'; } else { $control["selectverify0"] = ''; }
-    if ($control["verifyemail"] == 1) { $control["selectverify1"] = 'selected'; } else { $control["selectverify1"] = ''; }
-    if ($control["shownews"] == 0) { $control["selectnews0"] = 'selected'; } else { $control["selectnews0"] = ''; }
-    if ($control["shownews"] == 1) { $control["selectnews1"] = 'selected'; } else { $control["selectnews1"] = ''; }
-    if ($control["showonline"] == 0) { $control["selectonline0"] = 'selected'; } else { $control["selectonline0"] = ''; }
-    if ($control["showonline"] == 1) { $control["selectonline1"] = 'selected'; } else { $control["selectonline1"] = ''; }
-    if ($control["showbabble"] == 0) { $control["selectbabble0"] = 'selected'; } else { $control["selectbabble0"] = ''; }
-    if ($control["showbabble"] == 1) { $control["selectbabble1"] = 'selected'; } else { $control["selectbabble1"] = ''; }
-    if ($control["gameopen"] == 1) { $control["open1select"] = 'selected'; } else { $control["open1select"] = ''; }
-    if ($control["gameopen"] == 0) { $control["open0select"] = 'selected'; } else { $control["open0select"] = ''; }
+    $control = getMainSelections($control);
 
     $page = parsetemplate($page, $control);
     buildAdmin($page, $title);
@@ -786,7 +757,7 @@ function editUser()
 
 function news()
 {
-    global $link;
+    global $link, $user;
 
     $page = gettemplate('admin/addNews');
     $title = 'Add News';
@@ -801,8 +772,8 @@ function news()
             return;
         }
 
-        $query = prepare('insert into {{ table }} set postdate=now(), content=?', 'news', $link);
-        execute($query, [$content]);
+        $query = prepare('insert into {{ table }} set user_id=?, posted=now(), content=?', 'news', $link);
+        execute($query, [$user['id'], $content]);
 
         buildAdmin($page, $title, 'News post added.', 'success');
         return;
@@ -828,7 +799,7 @@ function buildAdmin(string $content, string $title, string $flash = '', string $
         'content' => $content,
         'flash' => $flash,
         'flashType' => $flashType,
-        'game' => $control['gamename'],
+        'game' => $control['game_name'],
         'time' => round(getmicrotime() - $start, 4),
         'queries' => $queries,
         'version' => $version,

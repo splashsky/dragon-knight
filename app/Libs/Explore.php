@@ -12,11 +12,11 @@ function displayExplore()
 
 function move()
 {
-    global $user, $control, $testLink;
+    global $user, $control, $link;
 
-    $gSize = $control['gamesize'];
+    $gSize = $control['game_size'];
     
-    if ($user["currentaction"] == "Fighting") { redirect("index.php?do=fight"); }
+    if ($user['action'] == "Fighting") { redirect("index.php?do=fight"); }
     
     $latitude = $user["latitude"];
     $longitude = $user["longitude"];
@@ -25,19 +25,19 @@ function move()
     if (isset($_POST["east"])) { $longitude++; if ($longitude > $gSize) { $longitude = $gSize; } }
     if (isset($_POST["west"])) { $longitude--; if ($longitude < ($gSize * -1)) { $longitude = ($gSize * -1); } }
     
-    if (townExists($latitude, $longitude, $testLink)) {
-        $town = getTown($latitude, $longitude, $testLink);
-        travelto($town["id"], false);
+    if (townExists($latitude, $longitude, $link)) {
+        $town = getTown($latitude, $longitude, $link);
+        travelTo($town['id'], false);
     }
     
     $chanceToFight = rand(1, 5);
     if ($chanceToFight == 1) { 
-        $action = "currentaction='Fighting', currentfight='1'";
+        $action = "action='Fighting'";
     } else {
-        $action = "currentaction='Exploring'";
+        $action = "action='Exploring'";
     }
 
-    $update = prepare("update {{ table }} set {$action}, latitude=?, longitude=?, dropcode='0' where id=?", 'users');
+    $update = prepare("update {{ table }} set action='Exploring', latitude=?, longitude=?, drop_code='0' where id=?", 'users');
     execute($update, [$latitude, $longitude, $user['id']]);
 
     header("Location: index.php");

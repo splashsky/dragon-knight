@@ -5,51 +5,25 @@
  * the game. It can be added to at any time.
  */
 
-// These variables help us keep track of script execution time, and the
-// number of queries we're running on any given page.
-$start = microtime(true);
-$queries = 0;
-
-// This is the almighty DEBUG constant. If set to true, you'll be able
-// to do things you normally wouldn't be allowed to, such as running
-// the installer after the game is already installed.
-define('DEBUG', true);
-
-// If DEBUG is set to true, we'll enable PHP's full, complete error
-// reporting. It gives a lot of debug information for errors, but can
-// also be a security concern. Be careful if the game is in production.
-if (DEBUG) {
-    ini_set('display_errors', 1);
-    ini_set('display_startup_errors', 1);
-    error_reporting(E_ALL);
+ /**
+  * If we cannot find the installed.txt file, and if we're not in DEBUG mode, then
+  * we'll die with a simple error message.
+  */
+function dieIfNotInstalled()
+{
+    if (! file_exists(ROOT.'/app/installed.txt') && ! DEBUG) {
+        die('The game has not yet been installed.');
+    }
 }
-
-/**
- * Define the root path for the game, so our require statements work no matter
- * where we call them from.
- */
-define('ROOT', $_SERVER['DOCUMENT_ROOT']);
-
-/**
- * On every page we use the Helpers library, we'll likely use the Database
- * library. As such, we'll require it here. We'll also open a link to the
- * database, since almost every page requires it.
- */
-require ROOT.'/app/Libs/Database.php';
-require ROOT.'/app/Models/User.php';
-
-$version = config('general.version');
-$build = config('general.build');
 
 /**
  * This helper function allows us to access config values
  * by dot notation. For example, instead of $config['db']['username']
  * we can do config('db.username')
  */
-function config(string $key = '', string $file = 'game')
+function config(string $key = '')
 {
-    $file = is_readable(ROOT."/app/Config/{$file}.php") ? $file : 'game';
-    $config = require ROOT."/app/Config/{$file}.php";
+    global $config;
 
     if (empty($key)) {  return $config; }
 
@@ -172,6 +146,20 @@ function getTown(int $latitude, int $longitude, $link = null)
     return execute($town, [$latitude, $longitude])->fetch();
 }
 
+function townGetFromId(int $id, $link = null, string $fields = '*')
+{
+    $link = openLinkIfNull($link);
+    $town = prepare("SELECT {$fields} FROM {{ table }} WHERE id=?", 'towns', $link);
+    return execute($town, [$id])->fetch();
+}
+
+function getExpForNextLevel(int $currentLevel, int $currentExp, string $class)
+{
+    $class = config("classes.{$class}");
+    $next = $class['exp']($currentLevel + 1);
+    return $next - $currentExp;
+}
+
 /**
  * Parse a template with all the correct data
  */
@@ -268,7 +256,7 @@ function checkcookies($link = null)
             setcookie('dkgame', $new, $expireTime, '/', '', 0);
 
             // Update the user's logged in time
-            quick('update {{ table }} set onlinetime=now() where id=?', 'users', [$cookie[0]], $link);
+            quick('update {{ table }} set online_last=now() where id=?', 'users', [$cookie[0]], $link);
 
             return true;
         }
@@ -286,11 +274,15 @@ function deleteCookie()
     setcookie('dkgame', '', time() - 10000, '', '', '');
 }
 
+function isAdmin($user)
+{
+    return $user['role'] == 'admin';
+}
+
 function dieIfGameClosed($control)
 {
-    if (! (bool) $control['gameopen']) {
-        $page = gettemplate('gameClosed');
-        $page = parsetemplate($page, ['title' => $control['gamename']]);
+    if (! (bool) $control['game_open']) {
+        $page = view('gameClosed', ['title' => $control['game_name']]);
         die($page);
     }
 }
@@ -330,28 +322,28 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         $user = quick('select * from {{ table }} where id=?', 'users', [$user['id']], $link)->fetch();
         
         // Current town name.
-        if ($user["currentaction"] == "In Town") {
+        if ($user["action"] == "In Town") {
             $townrow = getTown($user['latitude'], $user['longitude'], $link);
             $user["currenttown"] = "Welcome to <b>".$townrow["name"]."</b>.<br /><br />";
         } else {
             $user["currenttown"] = "";
         }
         
-        if ($control["forumtype"] == 0) { $user["forumslink"] = ""; }
-        elseif ($control["forumtype"] == 1) { $user["forumslink"] = "<a href=\"forum.php\">Forum</a><br />"; }
-        elseif ($control["forumtype"] == 2) { $user["forumslink"] = "<a href=\"".$control["forumaddress"]."\">Forum</a><br />"; }
+        if ($control["forum_type"] == 0) { $user["forumslink"] = ""; }
+        elseif ($control["forum_type"] == 1) { $user["forumslink"] = "<a href=\"forum.php\">Forum</a><br />"; }
+        elseif ($control["forum_type"] == 2) { $user["forumslink"] = "<a href=\"".$control["forumaddress"]."\">Forum</a><br />"; }
         
         // Format various userrow stuffs...
         if ($user["latitude"] < 0) { $user["latitude"] = $user["latitude"] * -1 . "S"; } else { $user["latitude"] .= "N"; }
         if ($user["longitude"] < 0) { $user["longitude"] = $user["longitude"] * -1 . "W"; } else { $user["longitude"] .= "E"; }
         $user["experience"] = number_format($user["experience"]);
         $user["gold"] = number_format($user["gold"]);
-        $user['adminlink'] = checkAuthLevel($user['authlevel'], config('auth.admin')) ? '<a href="admin.php">Admin</a>' : '';
+        $user['adminlink'] = isAdmin($user) ? '<a href="admin.php">Admin</a>' : '';
         
         // HP/MP/TP bars.
-        $stathp = ceil($user["currenthp"] / $user["maxhp"] * 100);
-        if ($user["maxmp"] != 0) { $statmp = ceil($user["currentmp"] / $user["maxmp"] * 100); } else { $statmp = 0; }
-        $stattp = ceil($user["currenttp"] / $user["maxtp"] * 100);
+        $stathp = ceil($user['hp'] / $user['max_hp'] * 100);
+        if ($user['max_mp'] != 0) { $statmp = ceil($user['mp'] / $user['max_mp'] * 100); } else { $statmp = 0; }
+        $stattp = ceil($user['tp'] / $user['max_tp'] * 100);
         $stattable = "<table width=\"100\"><tr><td width=\"33%\">\n";
         $stattable .= "<table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"padding:0px; width:15px; height:100px; border:solid 1px black; vertical-align:bottom;\">\n";
         if ($stathp >= 66) { $stattable .= "<div style=\"padding:0px; height:".$stathp."px; border-top:solid 1px black; background-image:url(resources/img/bars_green.gif);\"><img src=\"resources/img/bars_green.gif\" alt=\"\" /></div>"; }
@@ -372,8 +364,8 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         $user["statbars"] = $stattable;
         
         // Now make numbers stand out if they're low.
-        if ($user["currenthp"] <= ($user["maxhp"]/5)) { $user["currenthp"] = "<blink><span class=\"highlight\"><b>*".$user["currenthp"]."*</b></span></blink>"; }
-        if ($user["currentmp"] <= ($user["maxmp"]/5)) { $user["currentmp"] = "<blink><span class=\"highlight\"><b>*".$user["currentmp"]."*</b></span></blink>"; }
+        if ($user['hp'] <= ($user['max_hp']/5)) { $user['hp'] = "<blink><span class=\"highlight\"><b>*".$user['hp']."*</b></span></blink>"; }
+        if ($user['mp'] <= ($user['max_mp']/5)) { $user['mp'] = "<blink><span class=\"highlight\"><b>*".$user['mp']."*</b></span></blink>"; }
 
         $spellquery = query('select id, name, type from {{ table }}', 'spells', $link);
         $userspells = explode(",",$user["spells"]);
@@ -399,7 +391,7 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
                 if ($b == $townrow2["id"]) { $town = true; }
             }
             if ($town == true) { 
-                $user["townslist"] .= "<a href=\"index.php?do=gotown:".$townrow2["id"]."\">".$townrow2["name"]."</a><br />\n"; 
+                $user["townslist"] .= "<a href=\"index.php?do=goto&town=".$townrow2["id"]."\">".$townrow2["name"]."</a><br />\n"; 
             }
         }
         
@@ -407,11 +399,19 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         $user = array();
     }
 
+    $inventory = getUserInventory($user['id'], $link);
+    foreach ($inventory as $key => $item) {
+        if (empty($item)) {
+            $inventory[$key] = '<span class="light">None</span>';
+        }
+    }
+    $rightNav = array_merge($user, $inventory);
+
     $finalarray = array(
-        "dkgamename"=>$control["gamename"],
+        "dkgamename"=>$control["game_name"],
         "title"=>$title,
         "content"=>$content,
-        "rightnav"=>parsetemplate($rightnav,$user),
+        "rightnav" => view('rightnav', $rightNav),
         "leftnav"=>parsetemplate($leftnav,$user),
         "topnav"=>$topnav,
         "totaltime"=>round(getmicrotime() - $start, 4),

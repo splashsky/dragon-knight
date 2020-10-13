@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <title><?php echo $control["gamename"]; ?> Help</title>
+    <title><?php echo $control["game_name"]; ?> Help</title>
 
     <link rel="stylesheet" href="resources/css/game.css">
 
@@ -17,7 +17,7 @@
     <div class="mx-auto" style="width: 90%;">
         <a name="top"></a>
         <header class="my-8">
-            <h1><?php echo $control["gamename"]; ?> Guide</h1>
+            <h1><?php echo $control['game_name']; ?> Guide</h1>
             [ <a href="index.php">Return to the game</a> ]
         </header>
 
@@ -91,7 +91,7 @@
             </p>
 
             <p>
-                <h3><?php echo $control["class1name"]; ?></h3>
+                <h3><?php echo config('classes.mage.title'); ?></h3>
                 <ul>
                     <li>Fast level-ups</li>
                     <li>High hit points</li>
@@ -107,7 +107,7 @@
             </p>
 
             <p>
-                <h3><?php echo $control["class2name"]; ?></h3>
+                <h3><?php echo config('classes.warrior.title'); ?></h3>
                 <ul>
                     <li>Medium level-ups</li>
                     <li>Medium hit points</li>
@@ -123,7 +123,7 @@
             </p>
 
             <p>
-                <h3><?php echo $control["class3name"]; ?></h3>
+                <h3><?php echo config('classes.paladin.title'); ?></h3>
                 <ul>
                     <li>Slow level-ups</li>
                     <li>Medium hit points</li>
@@ -148,7 +148,7 @@
             <h2>Difficulty Levels</h2>
 
             <p>
-                <i><?php echo $control["gamename"]; ?></i> includes the ability to play using one of three difficulty levels.
+                <i><?php echo $control['game_name']; ?></i> includes the ability to play using one of three difficulty levels.
                 All monster statistics in the game are set at a base number. However, using a difficulty multiplier, certain statistics
                 are increased. The amount of hit points a monster has goes up, which means it will take longer to kill. But the amount
                 of experience and gold you gain from killing it also goes up. So the game is a little bit harder, but it is also more
@@ -157,9 +157,9 @@
             </p>
             
             <ul class="my-8">
-                <li><?php echo $control["diff1name"]; ?>: <b><?php echo $control["diff1mod"]; ?>x</b></li>
-                <li><?php echo $control["diff2name"]; ?>: <b><?php echo $control["diff2mod"]; ?>x</b></li>
-                <li><?php echo $control["diff3name"]; ?>: <b><?php echo $control["diff3mod"]; ?>x</b></li>
+                <li><?php echo config('game.difficulties.easy.title'); ?>: <b><?php echo config('game.difficulties.easy.mod'); ?>x</b></li>
+                <li><?php echo config('game.difficulties.normal.title'); ?>: <b><?php echo config('game.difficulties.normal.mod'); ?>x</b></li>
+                <li><?php echo config('game.difficulties.hard.title'); ?>: <b><?php echo config('game.difficulties.hard.mod'); ?>x</b></li>
             </ul>
 
             <div>[ <a href="#top">Top</a> ]</div>
@@ -215,7 +215,7 @@
 
             <p>
                 Once you're done in town, you are free to start exploring the world. Use the compass buttons on the left status panel to move around.
-                The game world is basically a big square, divided into four quadrants. Each quadrant is <?php echo $control["gamesize"]; ?> spaces
+                The game world is basically a big square, divided into four quadrants. Each quadrant is <?php echo $control["game_size"]; ?> spaces
                 square. The first town is usually located at [0, 0]. Click the North button from the first town, and now you'll be at [1N, 0E].
                 Likewise, if you now click the West button, you'll be at [1N, 1W]. Monster levels increase with every 5 spaces you move outward 
                 from [0N, 0E].

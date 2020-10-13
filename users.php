@@ -87,7 +87,7 @@ function register()
         
         if (empty($errors)) {
             
-            if ($control["verifyemail"] == 1) {
+            if ($control["verify_email"] == 1) {
                 $verifycode = "";
                 for ($i=0; $i<8; $i++) {
                     $verifycode .= chr(rand(65,90));
@@ -106,7 +106,7 @@ function register()
                 $_POST['difficulty'],
             ]);
             
-            if ($control["verifyemail"] == 1) {
+            if ($control["verify_email"] == 1) {
                 if (sendregmail($email, $verifycode) == true) {
                     $page = "Your account was created successfully.<br /><br />You should receive an Account Verification email shortly. You will need the verification code contained in that email before you are allowed to log in. Once you have received the email, please visit the <a href=\"users.php?do=verify\">Verification Page</a> to enter your code and start playing.";
                 } else {
@@ -127,7 +127,7 @@ function register()
         $page = gettemplate("register");
     }
 
-    if ($control["verifyemail"] == 1) { 
+    if ($control["verify_email"] == 1) { 
         $control["verifytext"] = "<br /><span class=\"small\">A verification code will be sent to the address above, and you will not be able to log in without first entering the code. Please be sure to enter your correct email address.</span>";
     } else {
         $control["verifytext"] = "";

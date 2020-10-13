@@ -6,12 +6,9 @@
  * user.
  */
 
- // Get our libraries...
-require '../app/Libs/Helpers.php';
-require '../app/Libs/Validation.php';
+// The core game file contains all the stuff we need to make the installer work.
+require '../app/Game.php';
 
-// Open a link to the DB and get our page request.
-$link = openLink();
 $request = GET('step', 'intro');
 
 // Decipher which page we want to go to.
@@ -20,23 +17,17 @@ elseif ($request == 'admin') { admin(); }
 elseif ($request == 'finish') { finish(); }
 else { intro(); }
 
-/**
- * Get a query file and it's contents from our sql/ directory.
- */
 function getQuery(string $query)
 {
     return file_get_contents("sql/{$query}.sql");
 }
 
-/**
- * Performs an install query. Just a convenient wrapper. Also
- * returns a result string.
- */
-function doInstallQuery(string $query, string $table, string $verb = 'create')
+function doInstallQuery(string $query, string $table, string $verb = 'create', array $extras = [])
 {
     global $link;
 
     $query = getQuery($query);
+    if (! empty($extras)) { $query = parse($query, $extras); }
     $result = query($query, $table, $link);
 
     if ($verb === 'create') {
@@ -73,21 +64,11 @@ function database()
         $results[] = doInstallQuery("create{$table}", strtolower($table));
     }
 
-    // Because the inventories have a foreign key linking them to a user, we need to parse it serparately to provide a
-    // prefixed users table, if necessary.
-    $query = getQuery('createInventories');
-    $query = parse($query, ['users' => prefix('users')]);
-    $results[] = query($query, 'inventories', $link) ? 'Created '.prefix('inventories').' table.' : 'Failed to create '.prefix('inventories').'.';
-
-    // See above; it is the same case with the fights table.
-    $query = getQuery('createFights');
-    $query = parse($query, ['users' => prefix('users')]);
-    $results[] = query($query, 'fights', $link) ? 'Created '.prefix('fights').' table.' : 'Failed to create '.prefix('fights').'.';
-
-    // See above; the new Babble system requires messages be linked to the user who submitted them.
-    $query = getQuery('createBabble');
-    $query = parse($query, ['users' => prefix('users')]);
-    $results[] = query($query, 'babble', $link) ? 'Created '.prefix('babble').' table.' : 'Failed to create '.prefix('babble').'.';
+    // Some of the new tables (as of v2.0.0) require a foreign key for the users table. Due to this, they require
+    // an extra parse to properly link it to the users table.
+    $results[] = doInstallQuery('createInventories', 'inventories', 'create', ['users' => prefix('users')]);
+    $results[] = doInstallQuery('createFights', 'fights', 'create', ['users' => prefix('users')]);
+    $results[] = doInstallQuery('createInventories', 'inventories', 'create', ['users' => prefix('users')]);
 
     // Since the game needs basic settings no matter what, we'll populate the control table with a default row here.
     $query = "insert into {{ table }} (id) values (null);";
@@ -102,7 +83,9 @@ function database()
     }
 
     $result = '';
-    foreach ($results as $r) { $result .= "<li>{$r}</li>"; }
+    foreach ($results as $r) {
+        $result .= "<li>{$r}</li>";
+    }
     $result = "<ul>{$result}</ul>";
 
     $page = view('install/database', ['result' => $result]);
@@ -136,18 +119,17 @@ function finish()
         foreach ($errors as $error) { $list .= "<li>{$error}</li>"; }
         $list = "<ul>{$list}</ul>";
 
-        admin($list);
-        return;
+        return admin($list);
     }
 
-    $password = password_hash($data['password1'], PASSWORD_DEFAULT);
-    
-    $query = "insert into {{ table }} set username=?, password=?, email=?, verified='1', class=?, registered=now(), online_last=now(), role='admin';";
-    quick($query, 'users', [
-        $data['username'],
-        $password,
-        $data['email'],
-        $data['class'],
+    createUser([
+        'username' => $data['username'],
+        'password' => password_hash($data['password1'], PASSWORD_DEFAULT),
+        'email' => $data['email'],
+        'verified' => 1,
+        'class' => $data['class'],
+        'difficulty' => $data['difficulty'],
+        'role' => 'admin'
     ], $link);
 
     // If all is well, we'll create a file in the app/ directory that will

@@ -6,22 +6,20 @@
     <link rel="stylesheet" href="resources/css/game.css">
 
     <script>
-        function openWindow(url)
+        function openWindow(url, width, height)
         {
-            let window = open(url, '_blank');
-            let contentWidth = window.document.getElementById('game').offsetWidth;
-            var contentHeight = window.document.getElementById('game').offsetHeight;
-            window.resizeTo(contentWidth,contentHeight);
+            let settings = 'location=no,width='+width+',height='+height;
+            window.open(url, '_blank', settings);
         }
 
         function opencharpopup()
         {
-            openWindow('index.php?do=showchar');
+            openWindow('index.php?do=extendedStats', 400, 800);
         }
 
         function openmappopup()
         {
-            openWindow('index.php?do=showmap');
+            openWindow('index.php?do=showmap', 550, 550);
         }
     </script>
 </head>

@@ -9,10 +9,10 @@
 <form action="admin.php?do=main" method="post" style="width: 50%;">
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="gameopen" class="highlight">Game Open</label>
+            <label for="game_open" class="highlight">Game Open</label>
         </div>
         <div class="w-full">
-            <select id="gameopen" name="gameopen">
+            <select id="game_open" name="game_open">
                 <option value="1" {{ open1select }}>Open</option>
                 <option value="0" {{ open0select }}>Closed</option>
             </select>
@@ -21,46 +21,46 @@
 
     <div class="form-group flex items-center mb-4">
         <div style="width: 30%;">
-            <label for="gamename">Game Name</label>
+            <label for="game_name">Game Name</label>
         </div>
         <div class="w-full">
-            <input id="gamename" type="text" name="gamename" value="{{ gamename }}" class="text-input w-full">
+            <input id="game_name" type="text" name="game_name" value="{{ game_name }}" class="text-input w-full">
         </div>
     </div>
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="gameurl">Game URL</label>
+            <label for="game_url">Game URL</label>
         </div>
         <div class="w-full">
-            <input id="gameurl" type="text" name="gameurl" value="{{ gameurl }}" class="text-input w-full">
+            <input id="game_url" type="text" name="game_url" value="{{ game_url }}" class="text-input w-full">
         </div>
     </div>
 
     <div class="form-group flex items-center mb-4">
         <div style="width: 30%;">
-            <label for="adminemail">Admin Email</label>
+            <label for="admin_email">Admin Email</label>
         </div>
         <div class="w-full">
-            <input id="adminemail" type="email" name="adminemail" value="{{ adminemail }}" class="text-input w-full">
+            <input id="admin_email" type="email" name="admin_email" value="{{ admin_email }}" class="text-input w-full">
         </div>
     </div>
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="gamesize">Map Size</label>
+            <label for="game_size">Map Size</label>
         </div>
         <div class="w-full">
-            <input id="gamesize" type="number" name="gamesize" value="{{ gamesize }}" class="text-input w-full">
+            <input id="game_size" type="number" name="game_size" value="{{ game_size }}" class="text-input w-full">
         </div>
     </div>
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="forumtype">Forum Type</label>
+            <label for="forum_type">Forum Type</label>
         </div>
         <div class="w-full">
-            <select id="forumtype" name="forumtype">
+            <select id="forum_type" name="forum_type">
                 <option value="0" {{ selecttype0 }}>Disabled</option>
                 <option value="1" {{ selecttype1 }}>Internal</option>
                 <option value="2" {{ selecttype2 }}>External</option>
@@ -70,19 +70,19 @@
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="forumaddress">External Forum</label>
+            <label for="forum_address">External Forum</label>
         </div>
         <div class="w-full">
-            <input id="forumaddress" type="text" name="forumaddress" value="{{ forumaddress }}" class="text-input w-full">
+            <input id="forum_address" type="text" name="forum_address" value="{{ forum_address }}" class="text-input w-full">
         </div>
     </div>
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="verifyemail">Email Verification</label>
+            <label for="verify_email">Email Verification</label>
         </div>
         <div class="w-full">
-            <select id="verifyemail" name="verifyemail">
+            <select id="verify_email" name="verify_email">
                 <option value="0" {{ selectverify0 }}>Disabled</option>
                 <option value="1" {{ selectverify1 }}>Enabled</option>
             </select>
@@ -91,10 +91,10 @@
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="shownews">Show News</label>
+            <label for="show_news">Show News</label>
         </div>
         <div class="w-full">
-            <select id="shownews" name="shownews">
+            <select id="show_news" name="show_news">
                 <option value="0" {{ selectnews0 }}>No</option>
                 <option value="1" {{ selectnews1 }}>Yes</option>
             </select>
@@ -103,10 +103,10 @@
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="showonline">Show Who's Online</label>
+            <label for="show_online">Show Who's Online</label>
         </div>
         <div class="w-full">
-            <select id="showonline" name="showonline">
+            <select id="show_online" name="show_online">
                 <option value="0" {{ selectonline0 }}>No</option>
                 <option value="1" {{ selectonline1 }}>Yes</option>
             </select>
@@ -115,87 +115,13 @@
 
     <div class="form-group flex mb-4 items-center">
         <div style="width: 30%;">
-            <label for="showbabble">Show Babblebox</label>
+            <label for="show_babble">Show Babblebox</label>
         </div>
         <div class="w-full">
-            <select id="showbabble" name="showbabble">
+            <select id="show_babble" name="show_babble">
                 <option value="0" {{ selectbabble0 }}>No</option>
                 <option value="1" {{ selectbabble1 }}>Yes</option>
             </select>
-        </div>
-    </div>
-
-    <h3 class="mb-2 mt-8 title">Classes</h3>
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="class1name">Class 1 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="class1name" type="text" name="class1name" value="{{ class1name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="class2name">Class 2 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="class2name" type="text" name="class2name" value="{{ class2name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="class3name">Class 3 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="class3name" type="text" name="class3name" value="{{ class3name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <h3 class="mb-2 mt-8 title">Difficulties</h3>
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="diff1name">Diff 1 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="diff1name" type="text" name="diff1name" value="{{ diff1name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="diff2name">Diff 2 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="diff2name" type="text" name="diff2name" value="{{ diff2name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="diff2mod">Diff 2 Mod</label>
-        </div>
-        <div class="w-full">
-            <input id="diff2mod" type="text" name="diff2mod" value="{{ diff2mod }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="diff3name">Diff 3 Name</label>
-        </div>
-        <div class="w-full">
-            <input id="diff3name" type="text" name="diff3name" value="{{ diff3name }}" class="text-input w-full">
-        </div>
-    </div>
-
-    <div class="form-group flex mb-4 items-center">
-        <div style="width: 30%;">
-            <label for="diff3mod">Diff 3 Mod</label>
-        </div>
-        <div class="w-full">
-            <input id="diff3mod" type="text" name="diff3mod" value="{{ diff3mod }}" class="text-input w-full">
         </div>
     </div>
 

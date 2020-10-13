@@ -2,7 +2,7 @@
 
 function openLink(array $opts = [])
 {
-    $config = config('db');
+    $config = config('game.db');
 
     // We're initializing the DSN, or a string containing connection info.
     // Our host is our db.server config, the database we're accessing is named

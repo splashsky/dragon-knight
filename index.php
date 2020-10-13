@@ -1,65 +1,56 @@
 <?php
 
-require 'app/Libs/Helpers.php';
+// Most of the functionality we need can be found in the Game script...
+require 'app/Game.php';
 
-if (file_exists('install.php') && !DEBUG) {
-    die('Please delete <b>install.php</b> from your Dragon Knight directory before continuing.'); 
-}
+dieIfNotInstalled();
+dieIfGameClosed($control);
 
+// These are the libraries for various game functions.
 require 'app/Libs/Explore.php';
 require 'app/Libs/Towns.php';
 require 'app/Libs/Fight.php';
 
-$link = openLink();
-$control = getControl($link);
-
-// If the user isn't logged in, redirect to the login page
-if (! checkcookies($link)) { redirect('users.php?do=login'); }
-
-// Get the user's data based on the cookie.
-$user = getUserFromCookie($link);
+// Get the user if their cookie exists.
+$user = getUserIfLoggedInByCookie($link);
+$inventory = getUserInventory($user['id']);
 
 // Force verify if the user isn't verified yet.
-if ($control['verifyemail'] == 1 && $user["verify"] != 1) { redirect('users.php?do=verify'); }
-
-// Kill the script if the user has been banned.
-if ($user["authlevel"] == 2) { die('You\'ve been banned. Try again later.'); }
+redirectIfNotVerified($user['verified'], $control['verify_email']);
+dieIfBanned($user['role']);
 
 // Get the requested action, or default to the user's current action.
-$do = isset($_GET['do']) ? explode(':', $_GET['do']) : 'currentAction';
-
-// If the game is closed, set our action to the correct endpoint.
-if ($control['gameopen'] == 0) { $do = 'gameClosed'; }
+$request = GET('do', 'default');
 
 // Town Functions
-if ($do[0] == "inn") { inn(); }
-elseif ($do[0] == "buy") { buy(); }
-elseif ($do[0] == "buy2") { buy2($do[1]); }
-elseif ($do[0] == "buy3") { buy3($do[1]); }
-//elseif ($do[0] == "sell") { sell(); }
-elseif ($do[0] == "maps") { maps(); }
-elseif ($do[0] == "maps2") { maps2($do[1]); }
-elseif ($do[0] == "maps3") { maps3($do[1]); }
-elseif ($do[0] == "gotown") { travelto($do[1]); }
+if ($request == "inn") { inn(); }
+elseif ($request == "itemShop") { itemShop(); }
+elseif ($request == "buyItem") { buyitem(); }
+elseif ($request == "giveItem") { giveItem(); }
+//elseif ($request == "sell") { sell(); }
+elseif ($request == "maps") { maps(); }
+elseif ($request == "buymap") { buyMap(); }
+elseif ($request == "givemap") { giveMap(); }
+elseif ($request == "goto") { travelTo(); }
 
 // Exploration functions
-elseif ($do[0] == "move") { move(); }
+elseif ($request == "move") { move(); }
 
 // Fight functions
-elseif ($do[0] == "fight") { fight(); }
-elseif ($do[0] == "victory") { victory(); }
-elseif ($do[0] == "drop") { drop(); }
-elseif ($do[0] == "dead") { dead(); }
+elseif ($request == "fight") { fight(); }
+elseif ($request == "victory") { victory(); }
+elseif ($request == "drop") { drop(); }
+elseif ($request == "dead") { dead(); }
 
 // Other functions
-elseif ($do[0] == "verify") { header("Location: users.php?do=verify"); }
-elseif ($do[0] == "spell") { include('app/Libs/Heal.php'); healspells($do[1]); }
-elseif ($do[0] == "showchar") { showchar(); }
-elseif ($do[0] == "onlinechar") { onlinechar($do[1]); }
-elseif ($do[0] == "showmap") { showmap(); }
-elseif ($do[0] == "babblebox") { babblebox(); }
-elseif ($do[0] == "ninja") { ninja(); }
-elseif ($do == 'gameClosed') { gameClosed(); }
+elseif ($request == "verify") { header("Location: users.php?do=verify"); }
+elseif ($request == "spell") { include('app/Libs/Heal.php'); healspells(''); }
+elseif ($request == "extendedStats") { extendedStats(); }
+elseif ($request == "onlinechar") { onlinechar(''); }
+elseif ($request == "showmap") { showmap(); }
+elseif ($request == "babblebox") { babblebox(); }
+elseif ($request == "ninja") { ninja(); }
+elseif ($request == 'gameClosed') { gameClosed(); }
 
 // Default function
 else { doCurrentAction(); }
@@ -70,9 +61,9 @@ else { doCurrentAction(); }
 function doCurrentAction()
 {
     global $user;
-    $currently = $user['currentaction'];
+    $currently = $user['action'];
 
-    if ($currently == 'In Town') { $page = displayTown(); }
+    if ($currently == 'In Town') { $page = townSquare(); }
     elseif ($currently == "Exploring") { $page = displayExplore(); }
     elseif ($currently == "Fighting") { redirect('index.php?do=fight'); }
     else { $page = 'There was an error in the current action.'; }
@@ -80,113 +71,42 @@ function doCurrentAction()
     display($page, $currently);
 }
 
-/**
- * Generate the town page.
- */
-function displayTown()
+function extendedStats()
 {
-    global $user, $control, $link, $queries;
-
-    $townrow = getTown($user['latitude'], $user['longitude'], $link);
-    
-    // Generate the news box
-    if ($control["shownews"] == 1) { 
-        $news = query('select * from {{ table }} order by id desc limit 1', 'news', $link);
-        $news = $news->fetch();
-        
-        $townrow['news'] = "<table width=\"95%\"><tr><td class=\"title\">Latest News</td></tr><tr><td>\n";
-        $townrow['news'] .= $news ? "<span class=\"light\">".prettydate($news["postdate"])."</span><br />".nl2br($news["content"]) : "Woah! There's no news post.";
-        $townrow['news'] .= "</td></tr></table>\n";
-    } else {
-        $townrow['news'] = '';
-    }
-    
-    // Who's online? Shows users who've logged in within the last 10 minutes
-    if ($control["showonline"] == 1) {
-        $online = query('select id, username from {{ table }} where onlinetime >= date_sub(now(), interval 10 minute) ORDER BY username', 'users', $link);
-        $online = $online->fetchAll();
-
-        $townrow["whosonline"] = "<table width=\"95%\"><tr><td class=\"title\">Who's Online</td></tr><tr><td>\n";
-        $townrow["whosonline"] .= "There are <b>" . count($online) . "</b> user(s) online within the last 10 minutes: ";
-
-        foreach ($online as $user) {
-            $townrow["whosonline"] .= "<a href=\"index.php?do=onlinechar:{$user['id']}\">{$user['username']}</a>, ";
-        }
-
-        $townrow["whosonline"] = rtrim($townrow["whosonline"], ", ");
-        $townrow["whosonline"] .= "</td></tr></table>\n";
-    } else {
-        $townrow["whosonline"] = "";
-    }
-    
-    // The Babblebox currently works through an IFrame. I'd like to change this soon.
-    if ($control["showbabble"] == 1) {
-        $townrow["babblebox"] = "<table width=\"95%\"><tr><td class=\"title\">Babble Box</td></tr><tr><td>\n";
-        $townrow["babblebox"] .= "<iframe src=\"index.php?do=babblebox\" name=\"sbox\" width=\"100%\" height=\"250\" frameborder=\"0\" id=\"bbox\">Your browser does not support inline frames! The Babble Box will not be available until you upgrade to a newer <a href=\"http://www.mozilla.org\" target=\"_new\">browser</a>.</iframe>";
-        $townrow["babblebox"] .= "</td></tr></table>\n";
-    } else {
-        $townrow["babblebox"] = "";
-    }
-    
-    $page = gettemplate("town/towns");
-    $page = parsetemplate($page, $townrow);
-    
-    return $page;
-}
-
-function showchar()
-{
-    
-    global $user, $control, $link;
+    global $user, $link;
     
     // Format various userrow stuffs.
-    $user["experience"] = number_format($user["experience"]);
-    $user["gold"] = number_format($user["gold"]);
-    if ($user["expbonus"] > 0) { 
-        $user["plusexp"] = "<span class=\"light\">(+".$user["expbonus"]."%)</span>"; 
-    } elseif ($user["expbonus"] < 0) {
-        $user["plusexp"] = "<span class=\"light\">(".$user["expbonus"]."%)</span>";
-    } else { $user["plusexp"] = ""; }
-    if ($user["goldbonus"] > 0) { 
-        $user["plusgold"] = "<span class=\"light\">(+".$user["goldbonus"]."%)</span>"; 
-    } elseif ($user["goldbonus"] < 0) { 
-        $user["plusgold"] = "<span class=\"light\">(".$user["goldbonus"]."%)</span>";
-    } else { $user["plusgold"] = ""; }
-    
-    $exp = prepare("select {$user['class']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
-    $levelrow = execute($exp, [$user['level'] + 1])->fetch();
-    if ($user["level"] < 99) { $user["nextlevel"] = number_format($levelrow[$user["class"]."_exp"]); } else { $user["nextlevel"] = "<span class=\"light\">None</span>"; }
+    $user['experience'] = number_format($user['experience']);
+    $user['gold'] = number_format($user['gold']);
 
-    if ($user["class"] == 1) { $user["class"] = $control["class1name"]; }
-    elseif ($user["class"] == 2) { $user["class"] = $control["class2name"]; }
-    elseif ($user["class"] == 3) { $user["class"] = $control["class3name"]; }
+    $bonus = $user['exp_bonus'] > 0 ? "+{$user['exp_bonus']}" : $user['exp_bonus'];
+    $user['plus_exp'] = "<span class=\"light\">({$bonus}%)</span>";
+
+    $bonus = $user['gold_bonus'] > 0 ? "+{$user['gold_bonus']}" : $user['gold_bonus'];
+    $user['plus_gold'] = "<span class=\"light\">({$bonus}%)</span>";
     
-    if ($user["difficulty"] == 1) { $user["difficulty"] = $control["diff1name"]; }
-    elseif ($user["difficulty"] == 2) { $user["difficulty"] = $control["diff2name"]; }
-    elseif ($user["difficulty"] == 3) { $user["difficulty"] = $control["diff3name"]; }
+    $exp = getExpForNextLevel($user['level'], $user['experience'], $user['class']);
+    $user['next_level'] = $user['level'] < 99 ? number_format($exp) : "<span class=\"light\">Max Level</span>";
+
+    $user['class'] = config("classes.{$user['class']}")['title'];
+    $user['difficulty'] = config("game.difficulties.{$user['difficulty']}")['title'];
     
     $spells = query('select id, name from {{ table }}', 'spells', $link);
     $userspells = explode(",", $user["spells"]);
-    $user["magiclist"] = "";
+    $user['magic_list'] = "";
     foreach ($spells->fetchAll() as $spellrow) {
         $spell = false;
         foreach($userspells as $a => $b) {
             if ($b == $spellrow["id"]) { $spell = true; }
         }
         if ($spell == true) {
-            $user["magiclist"] .= $spellrow["name"]."<br />";
+            $user['magic_list'] .= $spellrow["name"]."<br />";
         }
     }
-    if ($user["magiclist"] == "") { $user["magiclist"] = "None"; }
+    if ($user['magic_list'] == "") { $user['magic_list'] = "None"; }
     
-    // Make page tags for XHTML validation.
-    $xml = "<!DOCTYPE html>\n"
-    . "<html lang=\"en\">\n";
-    
-    $charsheet = gettemplate("showchar");
-    $page = $xml . gettemplate("minimal");
-    $array = ["content" => parsetemplate($charsheet, $user), "title" => "Character Information"];
-    echo parsetemplate($page, $array);
+    $page = view('showchar', $user);
+    echo view('minimal', ['content' => $page, 'title' => 'Player Info']);
 }
 
 function onlinechar($id)
@@ -196,30 +116,30 @@ function onlinechar($id)
     $user = getUserFromId($id, $link);
     
     // Format various userrow stuffs.
-    $user["experience"] = number_format($user["experience"]);
-    $user["gold"] = number_format($user["gold"]);
-    if ($user["expbonus"] > 0) { 
-        $user["plusexp"] = "<span class=\"light\">(+".$user["expbonus"]."%)</span>"; 
-    } elseif ($user["expbonus"] < 0) {
-        $user["plusexp"] = "<span class=\"light\">(".$user["expbonus"]."%)</span>";
+    $user['experience'] = number_format($user['experience']);
+    $user['gold'] = number_format($user['gold']);
+    if ($user['exp_bonus'] > 0) { 
+        $user["plusexp"] = "<span class=\"light\">(+".$user['exp_bonus']."%)</span>"; 
+    } elseif ($user['exp_bonus'] < 0) {
+        $user["plusexp"] = "<span class=\"light\">(".$user['exp_bonus']."%)</span>";
     } else { $user["plusexp"] = ""; }
-    if ($user["goldbonus"] > 0) { 
-        $user["plusgold"] = "<span class=\"light\">(+".$user["goldbonus"]."%)</span>"; 
-    } elseif ($user["goldbonus"] < 0) { 
-        $user["plusgold"] = "<span class=\"light\">(".$user["goldbonus"]."%)</span>";
-    } else { $user["plusgold"] = ""; }
+    if ($user['gold_bonus'] > 0) { 
+        $user['plus_gold'] = "<span class=\"light\">(+".$user['gold_bonus']."%)</span>"; 
+    } elseif ($user['gold_bonus'] < 0) { 
+        $user['plus_gold'] = "<span class=\"light\">(".$user['gold_bonus']."%)</span>";
+    } else { $user['plus_gold'] = ""; }
     
     $exp = prepare("select {$user['class']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
     $levelrow = execute($exp, [$user['level'] + 1])->fetch();
-    $user["nextlevel"] = number_format($levelrow[$user["class"]."_exp"]);
+    $user['next_level'] = number_format($levelrow[$user['class']."_exp"]);
 
-    if ($user["class"] == 1) { $user["class"] = $control["class1name"]; }
-    elseif ($user["class"] == 2) { $user["class"] = $control["class2name"]; }
-    elseif ($user["class"] == 3) { $user["class"] = $control["class3name"]; }
+    if ($user['class'] == 1) { $user['class'] = $control["class1name"]; }
+    elseif ($user['class'] == 2) { $user['class'] = $control["class2name"]; }
+    elseif ($user['class'] == 3) { $user['class'] = $control["class3name"]; }
     
-    if ($user["difficulty"] == 1) { $user["difficulty"] = $control["diff1name"]; }
-    elseif ($user["difficulty"] == 2) { $user["difficulty"] = $control["diff2name"]; }
-    elseif ($user["difficulty"] == 3) { $user["difficulty"] = $control["diff3name"]; }
+    if ($user['difficulty'] == 1) { $user['difficulty'] = $control["diff1name"]; }
+    elseif ($user['difficulty'] == 2) { $user['difficulty'] = $control["diff2name"]; }
+    elseif ($user['difficulty'] == 3) { $user['difficulty'] = $control["diff3name"]; }
     
     $charsheet = gettemplate("onlinechar");
     $page = parsetemplate($charsheet, $user);

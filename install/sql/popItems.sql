@@ -1,33 +1,36 @@
-INSERT INTO {{ table }} VALUES (1, 1, 'Stick', 10, 2, 'X');
-INSERT INTO {{ table }} VALUES (2, 1, 'Branch', 30, 4, 'X');
-INSERT INTO {{ table }} VALUES (3, 1, 'Club', 40, 5, 'X');
-INSERT INTO {{ table }} VALUES (4, 1, 'Dagger', 90, 8, 'X');
-INSERT INTO {{ table }} VALUES (5, 1, 'Hatchet', 150, 12, 'X');
-INSERT INTO {{ table }} VALUES (6, 1, 'Axe', 200, 16, 'X');
-INSERT INTO {{ table }} VALUES (7, 1, 'Brand', 300, 25, 'X');
-INSERT INTO {{ table }} VALUES (8, 1, 'Poleaxe', 500, 35, 'X');
-INSERT INTO {{ table }} VALUES (9, 1, 'Broadsword', 800, 45, 'X');
-INSERT INTO {{ table }} VALUES (10, 1, 'Battle Axe', 1200, 50, 'X');
-INSERT INTO {{ table }} VALUES (11, 1, 'Claymore', 2000, 60, 'X');
-INSERT INTO {{ table }} VALUES (12, 1, 'Dark Axe', 3000, 100, 'expbonus,-5');
-INSERT INTO {{ table }} VALUES (13, 1, 'Dark Sword', 4500, 125, 'expbonus,-10');
-INSERT INTO {{ table }} VALUES (14, 1, 'Bright Sword', 6000, 100, 'expbonus,10');
-INSERT INTO {{ table }} VALUES (15, 1, 'Magic Sword', 10000, 150, 'maxmp,50');
-INSERT INTO {{ table }} VALUES (16, 1, 'Destiny Blade', 50000, 250, 'strength,50');
-INSERT INTO {{ table }} VALUES (17, 2, 'Skivvies', 25, 2, 'goldbonus,10');
-INSERT INTO {{ table }} VALUES (18, 2, 'Clothes', 50, 5, 'X');
-INSERT INTO {{ table }} VALUES (19, 2, 'Leather Armor', 75, 10, 'X');
-INSERT INTO {{ table }} VALUES (20, 2, 'Hard Leather Armor', 150, 25, 'X');
-INSERT INTO {{ table }} VALUES (21, 2, 'Chain Mail', 300, 30, 'X');
-INSERT INTO {{ table }} VALUES (22, 2, 'Bronze Plate', 900, 50, 'X');
-INSERT INTO {{ table }} VALUES (23, 2, 'Iron Plate', 2000, 100, 'X');
-INSERT INTO {{ table }} VALUES (24, 2, 'Magic Armor', 4000, 125, 'maxmp,50');
-INSERT INTO {{ table }} VALUES (25, 2, 'Dark Armor', 5000, 150, 'expbonus,-10');
-INSERT INTO {{ table }} VALUES (26, 2, 'Bright Armor', 10000, 175, 'expbonus,10');
-INSERT INTO {{ table }} VALUES (27, 2, 'Destiny Raiment', 50000, 200, 'dexterity,50');
-INSERT INTO {{ table }} VALUES (28, 3, 'Reed Shield', 50, 2, 'X');
-INSERT INTO {{ table }} VALUES (29, 3, 'Buckler', 100, 4, 'X');
-INSERT INTO {{ table }} VALUES (30, 3, 'Small Shield', 500, 10, 'X');
-INSERT INTO {{ table }} VALUES (31, 3, 'Large Shield', 2500, 30, 'X');
-INSERT INTO {{ table }} VALUES (32, 3, 'Silver Shield', 10000, 60, 'X');
-INSERT INTO {{ table }} VALUES (33, 3, 'Destiny Aegis', 25000, 100, 'maxhp,50');
+insert into
+    {{ table }}(name, type, value, attribute, special)
+values
+    ('Stick', 'weapon', 10, 2, ''),
+    ('Branch', 'weapon', 30, 4, ''),
+    ('Club', 'weapon', 40, 5, ''),
+    ('Dagger', 'weapon', 90, 8, ''),
+    ('Hatchet', 'weapon', 150, 12, ''),
+    ('Axe', 'weapon', 200, 16, ''),
+    ('Brand', 'weapon', 300, 25, ''),
+    ('Poleaxe', 'weapon', 500, 35, ''),
+    ('Broadsword', 'weapon', 800, 45, ''),
+    ('Battle Axe', 'weapon', 1200, 50, ''),
+    ('Claymore', 'weapon', 2000, 60, ''),
+    ('Dark Axe', 'weapon', 3000, 100, 'expbonus,-5'),
+    ('Dark Sword', 'weapon', 4500, 125, 'expbonus,-10'),
+    ('Bright Sword', 'weapon', 6000, 100, 'expbonus,10'),
+    ('Magic Sword', 'weapon', 10000, 150, 'maxmp,50'),
+    ('Destiny Blade', 'weapon', 50000, 250, 'strength,50'),
+    ('Skivvies', 'armor', 25, 2, 'goldbonus,10'),
+    ('Clothes', 'armor', 50, 5, ''),
+    ('Leather Armor', 'armor', 75, 10, ''),
+    ('Hard Leather Armor', 'armor', 150, 25, ''),
+    ('Chain Mail', 'armor', 300, 30, ''),
+    ('Bronze Plate', 'armor', 900, 50, ''),
+    ('Iron Plate', 'armor', 2000, 100, ''),
+    ('Magic Armor', 'armor', 4000, 125, 'maxmp,50'),
+    ('Dark Armor', 'armor', 5000, 150, 'expbonus,-10'),
+    ('Bright Armor', 'armor', 10000, 175, 'expbonus,10'),
+    ('Destiny Raiment', 'armor', 50000, 200, 'dexterity,50'),
+    ('Reed Shield', 'shield', 50, 2, ''),
+    ('Buckler', 'shield', 100, 4, ''),
+    ('Small Shield', 'shield', 500, 10, ''),
+    ('Large Shield', 'shield', 2500, 30, ''),
+    ('Silver Shield', 'shield', 10000, 60, ''),
+    ('Destiny Aegis', 'shield', 25000, 100, 'maxhp,50');

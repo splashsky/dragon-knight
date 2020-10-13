@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title><?php echo $control["gamename"]; ?> Help</title>
+<title><?php echo $control['game_name']; ?> Help</title>
     <link rel="stylesheet" href="resources/css/game.css">
 </head>
 <body>
 <a name="top"></a>
-<h1><?php echo $control["gamename"]; ?> Help: Items & Drops</h1>
+<h1><?php echo $control['game_name']; ?> Help: Items & Drops</h1>
 [ <a href="help.php">Return to Help</a> | <a href="index.php">Return to the game</a> ]
 
 <br /><br /><hr />
@@ -19,8 +19,8 @@
     $items = query('select * from {{ table }} order by id', 'items', $link);
     foreach ($items->fetchAll() as $itemsrow) {
         if ($count == 1) { $color = "bgcolor=\"#ffffff\""; $count = 2; } else { $color = ""; $count = 1; }
-        if ($itemsrow["type"] == 1) { $image = "weapon"; $power = "Attack"; } elseif ($itemsrow["type"] == 2) { $image = "armor"; $power = "Defense"; } else { $image = "shield"; $power = "Defense"; }
-        if ($itemsrow["special"] != "X") {
+        if ($itemsrow["type"] == 'weapon') { $image = "weapon"; $power = "Attack"; } elseif ($itemsrow["type"] == 'armor') { $image = "armor"; $power = "Defense"; } else { $image = "shield"; $power = "Defense"; }
+        if (!empty($itemsrow["special"])) {
             $special = explode(",",$itemsrow["special"]);
             if ($special[0] == "maxhp") { $attr = "Max HP"; }
             elseif ($special[0] == "maxmp") { $attr = "Max MP"; }
@@ -35,7 +35,7 @@
             if ($special[1] > 0) { $stat = "+" . $special[1]; } else { $stat = $special[1]; }
             $bigspecial = "$attr $stat";
         } else { $bigspecial = "<span class=\"light\">None</span>"; }
-        echo "<tr><td $color width=\"5%\"><img src=\"resources/img/icon_$image.gif\" alt=\"$image\"></td><td $color width=\"30%\">".$itemsrow["name"]."</td><td $color width=\"20%\">".$itemsrow["buycost"]." Gold</td><td $color width=\"20%\">".$itemsrow["attribute"]." $power Power</td><td $color width=\"25%\">$bigspecial</td></tr>\n";
+        echo "<tr><td $color width=\"5%\"><img src=\"resources/img/icon_$image.gif\" alt=\"$image\"></td><td $color width=\"30%\">".$itemsrow["name"]."</td><td $color width=\"20%\">".$itemsrow["value"]." Gold</td><td $color width=\"20%\">".$itemsrow["attribute"]." $power Power</td><td $color width=\"25%\">$bigspecial</td></tr>\n";
     }
 ?>
 </table>
@@ -49,8 +49,8 @@ $count = 1;
 $drops = query('select * from {{ table }} order by id', 'drops', $link);
 foreach ($drops->fetchAll() as $itemsrow) {
     if ($count == 1) { $color = "bgcolor=\"#ffffff\""; $count = 2; } else { $color = ""; $count = 1; }
-    if ($itemsrow["attribute1"] != "X") {
-        $special1 = explode(",",$itemsrow["attribute1"]);
+    if (! empty($itemsrow["special_1"])) {
+        $special1 = explode(",",$itemsrow["special_1"]);
         if ($special1[0] == "maxhp") { $attr1 = "Max HP"; }
         elseif ($special1[0] == "maxmp") { $attr1 = "Max MP"; }
         elseif ($special1[0] == "maxtp") { $attr1 = "Max TP"; }
@@ -64,8 +64,8 @@ foreach ($drops->fetchAll() as $itemsrow) {
         if ($special1[1] > 0) { $stat1 = "+" . $special1[1]; } else { $stat1 = $special1[1]; }
         $bigspecial1 = "$attr1 $stat1";
     } else { $bigspecial1 = "<span class=\"light\">None</span>"; }
-    if ($itemsrow["attribute2"] != "X") {
-        $special2 = explode(",",$itemsrow["attribute2"]);
+    if (! empty($itemsrow["special_2"])) {
+        $special2 = explode(",",$itemsrow["special_2"]);
         if ($special2[0] == "maxhp") { $attr2 = "Max HP"; }
         elseif ($special2[0] == "maxmp") { $attr2 = "Max MP"; }
         elseif ($special2[0] == "maxtp") { $attr2 = "Max TP"; }
@@ -79,7 +79,7 @@ foreach ($drops->fetchAll() as $itemsrow) {
         if ($special2[1] > 0) { $stat2 = "+" . $special2[1]; } else { $stat2 = $special2[1]; }
         $bigspecial2 = "$attr2 $stat2";
     } else { $bigspecial2 = "<span class=\"light\">None</span>"; }
-    echo "<tr><td $color width=\"25%\">".$itemsrow["name"]."</td><td $color width=\"15%\">".$itemsrow["mlevel"]."</td><td $color width=\"30%\">$bigspecial1</td><td $color width=\"30%\">$bigspecial2</td></tr>\n";
+    echo "<tr><td $color width=\"25%\">".$itemsrow["name"]."</td><td $color width=\"15%\">".$itemsrow["level"]."</td><td $color width=\"30%\">$bigspecial1</td><td $color width=\"30%\">$bigspecial2</td></tr>\n";
 }
 ?>
 </table>

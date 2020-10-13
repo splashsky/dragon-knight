@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en">
 <head>
-<title><?php echo $control["gamename"]; ?> Help</title>
+<title><?php echo $control['game_name']; ?> Help</title>
     <link rel="stylesheet" href="resources/css/game.css">
 </head>
 <body>
 <a name="top"></a>
-<h1><?php echo $control["gamename"]; ?> Help: Spells</h1>
+<h1><?php echo $control['game_name']; ?> Help: Spells</h1>
 [ <a href="help.php">Return to Help</a> | <a href="index.php">Return to the game</a> ]
 
 <br /><br /><hr />
@@ -25,7 +25,7 @@ foreach ($spells->fetchAll() as $itemsrow) {
     elseif ($itemsrow["type"] == 3) { $type = "Sleep"; }
     elseif ($itemsrow["type"] == 4) { $type = "+Damage (%)"; }
     elseif ($itemsrow["type"] == 5) { $type = "+Defense (%)"; }
-    echo "<tr><td $color width=\"25%\">".$itemsrow["name"]."</td><td $color width=\"25%\">".$itemsrow["mp"]."</td><td $color width=\"25%\">$type</td><td $color width=\"25%\">".$itemsrow["attribute"]."</td></tr>\n";
+    echo "<tr><td $color width=\"25%\">".$itemsrow["name"]."</td><td $color width=\"25%\">".$itemsrow["mp"]."</td><td $color width=\"25%\">$type</td><td $color width=\"25%\">".$itemsrow["power"]."</td></tr>\n";
 }
 ?>
 </table>

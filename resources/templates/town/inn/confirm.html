@@ -1,12 +1,12 @@
 <h1 class="title my-0"><span class="swash">{{ name }}</span> Inn</span></h1>
 
-<div class="mb-4">
+<p>
     Resting at the inn will refill your current HP, MP, and TP to their maximum levels.
-</div>
+</p>
 
-<div class="mb-4">
-    A night's sleep at this Inn will cost you <b>{{innprice}} gold</b>. Is that ok?
-</div>
+<p>
+    A night's sleep at this Inn will cost you <b>{{ inn_price }} gold</b>. Is that ok?
+</p>
 
 <form action="index.php?do=inn" method="post">
     <button type="submit" name="submit" class="button">Yes</button>
