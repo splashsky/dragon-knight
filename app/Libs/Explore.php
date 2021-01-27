@@ -32,13 +32,13 @@ function move()
     
     $chanceToFight = rand(1, 5);
     if ($chanceToFight == 1) { 
-        $action = "action='Fighting'";
+        $action = "Fighting";
     } else {
-        $action = "action='Exploring'";
+        $action = "Exploring";
     }
 
-    $update = prepare("update {{ table }} set action='Exploring', latitude=?, longitude=?, drop_code='0' where id=?", 'users');
-    execute($update, [$latitude, $longitude, $user['id']]);
+    $update = prepare("update {{ table }} set action=?, latitude=?, longitude=?, drop_code='0' where id=?", 'users');
+    execute($update, [$action, $latitude, $longitude, $user['id']]);
 
     header("Location: index.php");
 }

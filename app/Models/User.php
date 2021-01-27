@@ -1,5 +1,97 @@
 <?php
 
+class User
+{
+    private Database $db;
+    private array $hidden = ['id', 'password'];
+    public int $id = 0;
+    public array $props;
+
+    public function __construct(Database $db)
+    {
+        $this->db = $db;
+    }
+
+    /**
+     * Create a user with data passed to the $data parameter. The keys in $data must be column names
+     * for the user table, or it will fail.
+     */
+    public function create(array $data): User
+    {
+        $fields = $this->db->fieldsForQuery(array_keys($data));
+
+        $new = $this->db->prepare("INSERT INTO {{ table }} SET {$fields};", 'users');
+        $new->execute(array_values($data));
+
+        $id = $this->db->lastInsertId();
+        $this->id = $id;
+
+        $this->db->quick('INSERT INTO {{ table }} SET user_id=?;', 'inventories', [$id]);
+
+        return $this->getById($id);
+    }
+
+    /**
+     * Attempts to locate the user by the passed $id. If the user does not exist and DEBUG is true,
+     * this function will throw an exception. Otherwise it will return the user instance with no data.
+     */
+    public function getById(int $id): User
+    {
+        $user = $this->db->prepare('SELECT * FROM {{ table }} WHERE id=?', 'users');
+        $user->execute([$id]);
+
+        if ($user = $user->fetch()) {
+            $this->id = $id;
+
+            foreach ($user as $k => $v) {
+                if (! in_array($k, $this->hidden)) {
+                    $this->{$k} = $v;
+                    $this->props[] = $k;
+                }
+            }
+        } elseif (DEBUG) {
+            throw new Exception('User not found by id '.$id);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Takes all the properties on the current User instance and persists them to the database. Returns
+     * the result of the query, i.e. true/PDO object on success, false on failure.
+     */
+    public function save(): bool
+    {
+        $fields = $this->db->fieldsForQuery($this->props);
+
+        $data = [];
+        foreach ($this->props as $k) { $data[] = $this->{$k}; }
+        $data[] = $this->id;
+
+        $save = $this->db->prepare("UPDATE {{ table }} SET {$fields} WHERE id=?", 'users');
+        return $save->execute($data);
+    }
+
+    /**
+     * The more conservative version of the save() method; takes an array of data (with keys that match actual columns) and an
+     * optional $save (defaults to true) and will update those values on the User instance. If $save is true, the updated data
+     * will be persisted to the database.
+     */
+    public function update(array $data, bool $save = true): bool
+    {
+        foreach ($data as $k => $v) { $this->{$k} = $v; }
+
+        if ($save) {
+            $fields = $this->db->fieldsForQuery(array_keys($data));
+
+            $save = $this->db->prepare("UPDATE {{ table }} SET {$fields} WHERE id=?", 'users');
+            return $save->execute($data);
+        }
+
+        return true;
+    }
+}
+
 function createUser(array $data, $link = null)
 {
     $link = openLinkIfNull($link);

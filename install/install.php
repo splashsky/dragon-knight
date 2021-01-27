@@ -17,25 +17,24 @@ elseif ($request == 'admin') { admin(); }
 elseif ($request == 'finish') { finish(); }
 else { intro(); }
 
-function getQuery(string $query)
+function getQuery(string $query): string
 {
     return file_get_contents("sql/{$query}.sql");
 }
 
-function doInstallQuery(string $query, string $table, string $verb = 'create', array $extras = [])
+function doInstallQuery(string $query, string $table, string $verb = 'create', array $extras = []): string
 {
-    global $link;
+    global $db;
 
-    $query = getQuery($query);
-    if (! empty($extras)) { $query = parse($query, $extras); }
-    $result = query($query, $table, $link);
+    $extras['table'] = $table;
+    $result = $db->quick(getQuery($query), $extras);
 
     if ($verb === 'create') {
-        return $result ? "Created {$table} table." : "Failed to create {$table}.";
+        return $result->errorCode() == 0 ? "Created {$table} table." : "Failed to create {$table}.";
     } elseif ($verb === 'populate') {
-        return $result ? "Populated {$table} table." : "Failed to populate {$table}.";
+        return $result->errorCode() == 0 ? "Populated {$table} table." : "Failed to populate {$table}.";
     } else {
-        return $result ? 'Performed an install query.' : 'An install query failed.';
+        return $result->errorCode() == 0 ? 'Performed an install query.' : 'An install query failed.';
     }
 }
 
@@ -54,7 +53,7 @@ function intro()
  */
 function database()
 {
-    global $link;
+    global $db;
 
     $results = [];
 
@@ -68,11 +67,11 @@ function database()
     // an extra parse to properly link it to the users table.
     $results[] = doInstallQuery('createInventories', 'inventories', 'create', ['users' => prefix('users')]);
     $results[] = doInstallQuery('createFights', 'fights', 'create', ['users' => prefix('users')]);
-    $results[] = doInstallQuery('createInventories', 'inventories', 'create', ['users' => prefix('users')]);
+    $results[] = doInstallQuery('createBabble', 'babble', 'create', ['users' => prefix('users')]);
 
     // Since the game needs basic settings no matter what, we'll populate the control table with a default row here.
     $query = "insert into {{ table }} (id) values (null);";
-    $results[] = query($query, 'control', $link) ? 'Populated '.prefix('control').' table.' : 'Failed to populate '.prefix('control').'.';
+    $results[] = $db->quick($query, 'control') ? 'Populated '.prefix('control').' table.' : 'Failed to populate '.prefix('control').'.';
 
     // We'll populate the tables with some basic content if the "Complete" install was selected.
     if (isset($_POST['complete'])) {
@@ -102,35 +101,35 @@ function admin(string $errors = '')
 // If all checks out, create the adming account and congratulate the player.
 function finish()
 {
-    global $link;
+    global $db;
 
-    $data = trimData($_POST);
-    $errors = [];
+    $data = new Validator($_POST);
+    $valid = $data->validate([
+        'username' => 'required|alpha',
+        'password' => 'required|min:8',
+        'email' => 'required|email'
+    ]);
 
-    required($data['username']) ?: $errors[] = 'Username is required.';
-    required($data['password1']) ?: $errors[] = 'Password is required.';
-    required($data['password2']) ?: $errors[] = 'Password confirmation is required.';
-    matches($data['password1'], $data['password2']) ?: $errors[] = 'Passwords must match.';
-    required($data['email']) ?: $errors[] = 'Email is required.';
-    is_email($data['email']) ?: $errors[] = 'Must give valid email address.';
-
-    if (! empty($errors)) {
+    if (! $valid) {
         $list = '';
-        foreach ($errors as $error) { $list .= "<li>{$error}</li>"; }
+        foreach ($data->errors() as $field) {
+            foreach ($field as $error) {
+                $list .= "<li>{$error}</li>";
+            }
+        }
         $list = "<ul>{$list}</ul>";
 
         return admin($list);
     }
 
-    createUser([
-        'username' => $data['username'],
-        'password' => password_hash($data['password1'], PASSWORD_DEFAULT),
-        'email' => $data['email'],
+    $user = new User($db);
+    $user = $user->create([
+        'username' => $data->data('username'),
+        'password' => password_hash($data->data('password'), PASSWORD_DEFAULT),
+        'email' => $data->data('email'),
         'verified' => 1,
-        'class' => $data['class'],
-        'difficulty' => $data['difficulty'],
-        'role' => 'admin'
-    ], $link);
+        'role' => 'admin',
+    ]);
 
     // If all is well, we'll create a file in the app/ directory that will
     // be used to tell the game we're installed!
@@ -141,13 +140,13 @@ function finish()
 
 function buildInstall($page, $title)
 {
-    global $start, $version, $build;
+    global $start, $version, $build, $db;
 
     return view('install/layout', [
         'content' => $page,
         'title' => $title,
         'time' => round(microtime(true) - $start, 4),
-        'queries' => getQueries(),
+        'queries' => $db->queryCount(),
         'version' => $version,
         'build' => $build
     ]);

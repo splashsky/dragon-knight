@@ -3,6 +3,8 @@
 // Most of the functionality we need can be found in the Game script...
 require 'app/Game.php';
 
+$control = getControl($link);
+
 dieIfNotInstalled();
 dieIfGameClosed($control);
 
@@ -43,7 +45,7 @@ elseif ($request == "drop") { drop(); }
 elseif ($request == "dead") { dead(); }
 
 // Other functions
-elseif ($request == "verify") { header("Location: users.php?do=verify"); }
+elseif ($request == "verify") { redirect('users.php?do=verify'); }
 elseif ($request == "spell") { include('app/Libs/Heal.php'); healspells(''); }
 elseif ($request == "extendedStats") { extendedStats(); }
 elseif ($request == "onlinechar") { onlinechar(''); }
@@ -159,8 +161,8 @@ function babblebox()
     
     if (isset($_POST['babble'])) {
         if (! empty($_POST['babble'])) {
-            $insert = prepare('insert into {{ table }} set posttime=now(), author=?, babble=?', 'babble', $link);
-            execute($insert, [$user['username'], $_POST['babble']]);
+            $insert = prepare('insert into {{ table }} set posted=now(), user_id=?, babble=?', 'babble', $link);
+            execute($insert, [$user['id'], $_POST['babble']]);
         }
 
         redirect('index.php?do=babblebox');
@@ -170,6 +172,8 @@ function babblebox()
     $babbles = query('select * from {{ table }} order by id desc limit 20', 'babble');
 
     foreach ($babbles->fetchAll() as $babble) {
+        $babble['author'] = quick('select username from {{ table }} where id=?', 'users', [$babble['user_id']])->fetch()['username'];
+
         $message = safe($babble['babble']);
         $new = "<div><b>{$babble['author']}</b> {$message}</div>\n";
         $babblebox["content"] = $new . $babblebox["content"];

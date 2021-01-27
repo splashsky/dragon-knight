@@ -1,0 +1,53 @@
+<h1 class="title swash">Register</h1>
+
+<p>
+    Are you ready for adventure, combat and glory? Then register with the Adventurer's Guild here!
+</p>
+
+<p>
+    Already a member? <a href="users.php?do=login">Log in here.</a>
+</p>
+
+
+<form action="users.php?do=register" method="post" style="width: 80%;">
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="username">Username</label></div>
+        <div class="w-full">
+            <input id="username" type="text" name="username" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="password">Password</label></div>
+        <div class="w-full">
+            <input id="password" type="password" name="password" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="email">Email</label></div>
+        <div class="w-full">
+            <input id="email" type="email" name="email" class="text-input w-full">
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="class">Class</label></div>
+        <div class="w-full">
+            <select id="class" name="class">
+                {{ classList }}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group flex items-center mb-4">
+        <div style="width: 30%;"><label for="difficulty">Difficulty</label></div>
+        <div class="w-full">
+            <select id="difficulty" name="difficulty">
+                {{ diffList }}
+            </select>
+        </div>
+    </div>
+
+    <button type="submit" class="button" name="submit">Register</button>
+</form>

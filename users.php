@@ -1,19 +1,17 @@
-<?php // users.php :: Handles user account functions.
+<?php
 
-require 'app/Libs/Helpers.php';
+require 'app/Game.php';
 
-$link = openLink();
 $control = getControl($link);
 
-$do = isset($_GET['do']) ? $_GET['do'] : 'login';
+$do = GET('do', 'login');
 
+if ($do === 'login') { login(); }
 if ($do === 'register') { register(); }
-elseif ($do === 'login') { login(); }
-elseif ($do === 'verify') { verify(); }
-elseif ($do === 'lostpassword') { lostpassword(); }
-elseif ($do === 'changepassword') { changepassword(); }
-elseif ($do === 'logout') { logout(); }
-else { login(); }
+if ($do === 'verify') { verify(); }
+if ($do === 'lostpassword') { lostpassword(); }
+if ($do === 'changepassword') { changepassword(); }
+if ($do === 'logout') { logout(); }
 
 /**
  * Either displays the login page, or handles the login process.
@@ -48,83 +46,62 @@ function login()
 
 function register()
 {   
-    global $control, $link;
+    global $control, $link, $db;
+
+    $classList = '';
+    foreach (config('classes') as $key => $class) {
+        $classList .= "<option value=\"{$key}\">{$class['title']}</option>";
+    }
+    $control['classList'] = $classList;
+
+    $diffList = '';
+    foreach (config('game.difficulties') as $key => $diff) {
+        $diffList .= "<option value=\"{$key}\">{$diff['title']}</option>";
+    }
+    $control['diffList'] = $diffList;
     
     if (isset($_POST['submit'])) {
-        $username = trim($_POST['username']);
-        $email = trim($_POST['email']);
-        $emailConfirm = trim($_POST['email_confirm']);
-        $password = trim($_POST['password']);
-        $passwordConfirm = trim($_POST['password_confirm']);
-        
-        $errors = [];
-        
-        // Process the username
-        if (empty($username)) { $errors[] = 'A username is required.'; }
+        $data = new Validator($_POST);
+        $data->setDb($db);
 
-        // According to this pattern, usernames must be alphanumeric. Underscores and dashes CAN be
-        // used, but the username must start and end with an alphanumeric character.
-        $regex = '/^[a-zA-Z0-9][a-zA-Z0-9_-]+[a-zA-Z0-9]$/';
-        if (! preg_match($regex, $username)) { $errors[] = 'Username must be alphanumeric.'; }
-
-        $usernameExists = prepare('select id from {{ table }} where username=?', 'users', $link);
-        $usernameExists = execute($usernameExists, [$username])->fetch() ? true : false;
-        if ($usernameExists) { $errors[] = "{$username} is already taken. Try another one."; }
-    
-        // Process the email address
-        if (empty($email) || empty($emailConfirm)) { $errors[] = 'Email is required.'; }
-        if ($email !== $emailConfirm) { $errors[] = 'Email addresses must match.'; }
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) { $errors[] = 'Must provide valid email address.'; }
-
-        $emailExists = prepare('select id from {{ table }} where email=?', 'users', $link);
-        $emailExists = execute($emailExists, [$email])->fetch() ? true : false;
-        if ($emailExists) { $errors[] = "Email address is already in use. Try another one."; }
+        $valid = $data->validate([
+            'username' => 'required|min:2|alpha|unique:users',
+            'password' => 'required|min:8',
+            'email' => 'required|email|unique:users',
+            'class' => 'class',
+            'difficulty' => 'diff',
+        ]);
         
-        // Process the password
-        if (empty($password) || empty($passwordConfirm)) { $errors[] = 'Passwords are required.'; }
-        if ($password !== $passwordConfirm) { $errors[] = 'Passwords must match.'; }
-        $password = password_hash($password, PASSWORD_DEFAULT);
-        
-        if (empty($errors)) {
-            
-            if ($control["verify_email"] == 1) {
-                $verifycode = "";
-                for ($i=0; $i<8; $i++) {
-                    $verifycode .= chr(rand(65,90));
-                }
-            } else {
-                $verifycode='1';
-            }
+        if ($valid) {
+            $token = generateToken();
 
-            $insert = prepare('insert into {{ table }} set regdate=now(), verify=?, username=?, password=?, email=?, class=?, difficulty=?', 'users', $link);
-            execute($insert, [
-                $verifycode,
-                $username,
-                $password,
-                $email,
-                $_POST['class'],
-                $_POST['difficulty'],
+            $user = new User($db);
+            $user = $user->create([
+                'registered' => date('Y-m-d H:i:s'),
+                'token' => $token,
+                'username' => $data->username,
+                'password' => password_hash($data->password, PASSWORD_DEFAULT),
+                'email' => $data->email,
+                'class' => $data->class,
+                'difficulty' => $data->difficulty
             ]);
-            
-            if ($control["verify_email"] == 1) {
-                if (sendregmail($email, $verifycode) == true) {
+
+            if ((bool) $control['verify_email']) {
+                if (sendregmail($data->email, $token) == true) {
                     $page = "Your account was created successfully.<br /><br />You should receive an Account Verification email shortly. You will need the verification code contained in that email before you are allowed to log in. Once you have received the email, please visit the <a href=\"users.php?do=verify\">Verification Page</a> to enter your code and start playing.";
                 } else {
                     $page = "Your account was created successfully.<br /><br />However, there was a problem sending your verification email. Please check with the game administrator to help resolve this problem.";
                 }
             } else {
-                $page = "Your account was created succesfully.<br /><br />You may now continue to the <a href=\"users.php?do=login\">Login Page</a> and continue playing ".$control["gamename"]."!";
+                $page = "Your account was created succesfully.<br /><br />You may now continue to the <a href=\"users.php?do=login\">Login Page</a> and continue playing ".$control["game_name"]."!";
             }
         } else {
-            $errorList = '';
-            foreach ($errors as $error) {
-                $errorList .= "{$error} <br />";
-            }
+            dd($data->errors());
 
-            $page = "The following error(s) occurred when your account was being made:<br /><span style=\"color:red;\">$errorList</span><br />Please go back and try again.";
+            $page = "The following error(s) occurred when your account was being made:<br /><span style=\"color:red;\">POOP</span><br />Please go back and try again.";
         }
     } else {
-        $page = gettemplate("register");
+        $page = view('users/register');
     }
 
     if ($control["verify_email"] == 1) { 

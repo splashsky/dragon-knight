@@ -266,6 +266,11 @@ function checkcookies($link = null)
     return false;
 }
 
+function generateToken(): string
+{
+    return bin2hex(random_bytes(16));
+}
+
 /**
  * Set the 'dkgame' cookie to a time in the past to clear it.
  */
@@ -317,6 +322,14 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
     }
     
     if (isset($user)) {
+
+        $inventory = getUserInventory($user['id'], $link);
+        foreach ($inventory as $key => $item) {
+            if (empty($item)) {
+                $inventory[$key] = '<span class="light">None</span>';
+            }
+        }
+        $rightnav = view('rightnav', array_merge($user, $inventory));
         
         // Get userrow again, in case something has been updated.
         $user = quick('select * from {{ table }} where id=?', 'users', [$user['id']], $link)->fetch();
@@ -399,19 +412,11 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
         $user = array();
     }
 
-    $inventory = getUserInventory($user['id'], $link);
-    foreach ($inventory as $key => $item) {
-        if (empty($item)) {
-            $inventory[$key] = '<span class="light">None</span>';
-        }
-    }
-    $rightNav = array_merge($user, $inventory);
-
     $finalarray = array(
         "dkgamename"=>$control["game_name"],
         "title"=>$title,
         "content"=>$content,
-        "rightnav" => view('rightnav', $rightNav),
+        "rightnav" => $rightnav,
         "leftnav"=>parsetemplate($leftnav,$user),
         "topnav"=>$topnav,
         "totaltime"=>round(getmicrotime() - $start, 4),

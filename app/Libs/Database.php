@@ -1,5 +1,83 @@
 <?php
 
+class Database
+{
+    public PDO $conn;
+    public string $prefix = '';
+    public int $queries = 0;
+
+    public function __construct(array $config, array $opts = [])
+    {
+        $this->prefix = $config['prefix'];
+        $dsn = "mysql:host={$config['server']};dbname={$config['database']};charset=utf8mb4";
+
+        $opts = ! empty($opts) ? $opts : [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ];
+
+        try {
+            $this->conn = new PDO($dsn, $config['user'], $config['password'], $opts);
+            return $this;
+        } catch (PDOException $e) {
+            if (DEBUG) { throw new Exception($e->getMessage(), $e->getCode()); }
+        }
+    }
+
+    public function parse(string $query, $tokens = []): string
+    {
+        // If only a string was passed to $tokens, we'll assume it was the table
+        // name for the query.
+        $tokens = is_string($tokens) ? ['table' => $tokens] : $tokens;
+
+        return parse($query, $tokens);
+    }
+
+    public function prepare(string $query, $tokens): PDOStatement
+    {
+        $query = $this->parse($query, $tokens);
+        return $this->conn->prepare($query);
+    }
+
+    public function query(string $query, $tokens = ''): PDOStatement
+    {
+        $this->incrementQueries();
+        $query = $this->parse($query, $tokens);
+        return $this->conn->query($query);
+    }
+
+    public function quick(string $query, $tokens, array $params = []): PDOStatement
+    {
+        $this->incrementQueries();
+        $query = $this->parse($query, $tokens);
+        $query = $this->prepare($query, $tokens);
+        $query->execute($params);
+        return $query;
+    }
+
+    public function incrementQueries(int $amount = 1): void
+    {
+        $this->queries += $amount;
+    }
+
+    public function queryCount(): int
+    {
+        return $this->queries;
+    }
+
+    public function lastInsertId(): int
+    {
+        return (int) $this->conn->lastInsertId();
+    }
+
+    public function fieldsForQuery(array $props = []): string
+    {
+        $fields = '';
+        foreach ($props as $k) { $fields .= "{$k}=?, "; }
+        return rtrim($fields, ', ');
+    }
+}
+
 function openLink(array $opts = [])
 {
     $config = config('game.db');

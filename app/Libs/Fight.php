@@ -9,33 +9,34 @@
  */
 function fight()
 {
-    global $user, $control, $testLink;
+    global $user, $control, $link, $db;
 
-    if ($user['currentaction'] != 'Fighting') { die('[FL1] Error detected. Go back and try again.'); }
+    if ($user['action'] != 'Fighting') { redirect('index.php'); }
 
-    $pagearray = [];
-    $dead = 0;
+    $page = [];
+    $dead = false;
     
-    $pagearray["magiclist"] = "";
-    $userspells = explode(",", $user["spells"]);
+    $page['magicList'] = '';
+    $userSpells = explode(',', $user['spells']);
 
-    $spells = query('select id, name from {{ table }}', 'spells', $testLink);
-    foreach ($spells->fetchAll() as $spellrow) {
-        $spell = false;
-        foreach ($userspells as $a => $b) {
-            if ($b == $spellrow["id"]) { $spell = true; }
-        }
-        if ($spell == true) {
-            $pagearray["magiclist"] .= "<option value=\"".$spellrow["id"]."\">".$spellrow["name"]."</option>\n";
+    $spells = query('select id, name from {{ table }}', 'spells', $link);
+    foreach ($spells->fetchAll() as $spellId => $spellName) {
+        foreach ($userSpells as $knownId) {
+            if ($knownId === $spellId) {
+                $page['magicList'] .= "<option value=\"{$spellId}\">{$spellName}</option>";
+            }
         }
     }
 
-    if ($pagearray["magiclist"] == "") { $pagearray["magiclist"] = "<option value=\"0\">None</option>\n"; }
-    $magiclist = $pagearray["magiclist"];
-    
-    $chancetoswingfirst = 1;
+    if ($page['magicList'] == '') { $page['magiclist'] = '<option value="0">None</option>'; }
+
+    $firstStrikeChance = 1;
 
     // First, check to see if we need to pick a monster.
+    $fight = $db->quick('select * from {{ table }} where user_id=?', 'fights', [$user['id']]);
+    dd($fight);
+    $fight = $fight->fetch();
+
     if ($user["currentfight"] == 1) {
         if ($user["latitude"] < 0) { $user["latitude"] *= -1; } // Equalize negatives.
         if ($user["longitude"] < 0) { $user["longitude"] *= -1; } // Ditto.
@@ -45,7 +46,7 @@ function fight()
         if ($minlevel < 1) { $minlevel = 1; }
         
         // Pick a monster.
-        $monster = prepare('select * from {{ table }} where level >= ? and level <= ? order by rand() limit 1', 'monsters', $testLink);
+        $monster = prepare('select * from {{ table }} where level >= ? and level <= ? order by rand() limit 1', 'monsters', $link);
         $monster = execute($monster, [$minlevel, $maxlevel])->fetch();
 
         $user["currentmonster"] = $monster["id"];
@@ -55,14 +56,14 @@ function fight()
         $user["currentmonstersleep"] = 0;
         $user["currentmonsterimmune"] = $monster["immune"];
         
-        $chancetoswingfirst = rand(1,10) + ceil(sqrt($user["dexterity"]));
-        if ($chancetoswingfirst > (rand(1,7) + ceil(sqrt($monster["maxdam"])))) { $chancetoswingfirst = 1; } else { $chancetoswingfirst = 0; }
+        $firstStrikeChance = rand(1,10) + ceil(sqrt($user["dexterity"]));
+        if ($firstStrikeChance > (rand(1,7) + ceil(sqrt($monster["maxdam"])))) { $firstStrikeChance = 1; } else { $firstStrikeChance = 0; }
         
         unset($monster);
     }
     
     // Next, get the monster statistics.
-    $monster = prepare('select * from {{ table }} where id = ?', 'monsters', $testLink);
+    $monster = prepare('select * from {{ table }} where id = ?', 'monsters', $link);
     $monster = execute($monster, [$user['currentmonster']])->fetch();
 
     $pagearray["monstername"] = $monster["name"];
@@ -113,14 +114,14 @@ function fight()
                     $newhp = ceil($user["maxhp"]/4);
 
                     $query = "update {{ table }} set currenthp=?, currentaction='In Town', currentmonster='0', currentmonsterhp='0', currentmonstersleep='0', currentmonsterimmune='0', currentfight='0', latitude='0', longitude='0', gold=? where id=?";
-                    quick($query, 'users', [$newhp, $newgold, $user['id']], $testLink);
+                    quick($query, 'users', [$newhp, $newgold, $user['id']], $link);
 
                     $dead = 1;
                 }
             }
         }
 
-        quick("update {{ table }} set currentaction='Exploring' where id=?", 'users', [$user['id']], $testLink);
+        quick("update {{ table }} set currentaction='Exploring' where id=?", 'users', [$user['id']], $link);
         
         redirect('index.php');
         
@@ -148,7 +149,7 @@ function fight()
         $user["currentmonsterhp"] -= $monsterdamage;
         $pagearray["monsterhp"] = "Monster's HP: " . $user["currentmonsterhp"] . "<br /><br />";
         if ($user["currentmonsterhp"] <= 0) {
-            quick("update {{ table }} set currentmonsterhp='0' where id=?", 'users', [$user['id']], $testLink);
+            quick("update {{ table }} set currentmonsterhp='0' where id=?", 'users', [$user['id']], $link);
 
             redirect('index.php?do=victory');
         }
@@ -188,7 +189,7 @@ function fight()
                 $newhp = ceil($user["maxhp"]/4);
 
                 $query = "update {{ table }} set currenthp=?, currentaction='In Town', currentmonster='0', currentmonsterhp='0', currentmonstersleep='0', currentmonsterimmune='0', currentfight='0', latitude='0', longitude='0', gold=? where id=?";
-                quick($query, 'users', [$newhp, $newgold, $user['id']], $testLink);
+                quick($query, 'users', [$newhp, $newgold, $user['id']], $link);
 
                 $dead = 1;
             }
@@ -201,7 +202,7 @@ function fight()
         $pickedspell = $_POST["userspell"];
         if ($pickedspell == 0) { display("You must select a spell first. Please go back and try again.", "Error"); die(); }
         
-        $newSpell = prepare('select * from {{ table }} where id=?', 'spells', $testLink);
+        $newSpell = prepare('select * from {{ table }} where id=?', 'spells', $link);
         $newspellrow = execute($newSpell, [$pickedspell])->fetch();
         
         $spell = false;
@@ -248,7 +249,7 @@ function fight()
 
         if ($user["currentmonsterhp"] <= 0) {
             $query = "update {{ table }} set currentmonsterhp='0', currenthp=?, currentmp=? WHERE id=?";
-            quick($query, 'users', [$user['currenthp'], $user['currentmp'], $user['id']], $testLink);
+            quick($query, 'users', [$user['currenthp'], $user['currentmp'], $user['id']], $link);
             
             redirect('index.php?do=victory');
         }
@@ -289,14 +290,14 @@ function fight()
                 $newhp = ceil($user["maxhp"]/4);
 
                 $query = "update {{ table }} set currenthp=?, currentaction='In Town', currentmonster='0', currentmonsterhp='0', currentmonstersleep='0', currentmonsterimmune='0', currentfight='0', latitude='0', longitude='0', gold=? where id=?";
-                quick($query, 'users', [$newhp, $newgold, $user['id']], $testLink);
+                quick($query, 'users', [$newhp, $newgold, $user['id']], $link);
                 
                 $dead = 1;
             }
         }
     
     // Do a monster's turn if person lost the chance to swing first. Serves him right!
-    } elseif ( $chancetoswingfirst == 0 ) {
+    } elseif ( $firstStrikeChance == 0 ) {
         $pagearray["yourturn"] = "The monster attacks before you are ready!<br /><br />";
         $pagearray["monsterhp"] = "Monster's HP: " . $user["currentmonsterhp"] . "<br /><br />";
         $pagearray["monsterturn"] = "";
@@ -333,7 +334,7 @@ function fight()
                 $newhp = ceil($user["maxhp"]/4);
 
                 $query = "update {{ table }} set currenthp=?, currentaction='In Town', currentmonster='0', currentmonsterhp='0', currentmonstersleep='0', currentmonsterimmune='0', currentfight='0', latitude='0', longitude='0', gold=? where id=?";
-                quick($query, 'users', [$newhp, $newgold, $user['id']], $testLink);
+                quick($query, 'users', [$newhp, $newgold, $user['id']], $link);
 
                 $dead = 1;
             }
@@ -382,7 +383,7 @@ END;
         $newuberdamage,
         $newuberdefense,
         $user['id']
-    ], $testLink);
+    ], $link);
 } else {
     $pagearray["command"] = "<b>You have died.</b><br /><br />As a consequence, you've lost half of your gold. However, you have been given back a portion of your hit points to continue your journey.<br /><br />You may now continue back to <a href=\"index.php\">town</a>, and we hope you fair better next time.";
 }
@@ -399,12 +400,12 @@ END;
  */
 function victory()
 {
-    global $user, $control, $testLink;
+    global $user, $control, $link;
     
     if ($user["currentmonsterhp"] != 0) { header("Location: index.php?do=fight"); die(); }
     if ($user["currentfight"] == 0) { header("Location: index.php"); die(); }
     
-    $monster = prepare('select * from {{ table }} where id = ?', 'monsters', $testLink);
+    $monster = prepare('select * from {{ table }} where id = ?', 'monsters', $link);
     $monster = execute($monster, [$user['currentmonster']])->fetch();
     
     $exp = rand((($monster["maxexp"]/6)*5),$monster["maxexp"]);
@@ -420,7 +421,7 @@ function victory()
     if ($user["experience"] + $exp < 16777215) { $newexp = $user["experience"] + $exp; $warnexp = ""; } else { $newexp = $user["experience"]; $exp = 0; $warnexp = "You have maxed out your experience points."; }
     if ($user["gold"] + $gold < 16777215) { $newgold = $user["gold"] + $gold; $warngold = ""; } else { $newgold = $user["gold"]; $gold = 0; $warngold = "You have maxed out your experience points."; }
     
-    $expQuery = prepare("select * from {{ table }} where id=?", 'levels', $testLink);
+    $expQuery = prepare("select * from {{ table }} where id=?", 'levels', $link);
     $levelrow = execute($expQuery, [$user['level'] + 1])->fetch();
     
     if ($user["level"] < 100) {
@@ -456,7 +457,7 @@ function victory()
             $page = "Congratulations. You have defeated the ".$monster["name"].".<br />You gain $exp experience. $warnexp <br />You gain $gold gold. $warngold <br /><br />";
             
             if (rand(1, 30) == 1) {
-                $drop = prepare('select * from {{ table }} where mlevel <= ? order by rand() limit 1', 'drops', $testLink);
+                $drop = prepare('select * from {{ table }} where mlevel <= ? order by rand() limit 1', 'drops', $link);
                 $droprow = execute($drop, [$monster['level']])->fetch();
                 $dropcode = "dropcode='".$droprow["id"]."',";
                 $page .= "This monster has dropped an item. <a href=\"index.php?do=drop\">Click here</a> to reveal and equip the item, or you may also move on and continue <a href=\"index.php\">exploring</a>.";
@@ -482,18 +483,18 @@ function victory()
         $newexp,
         $newgold,
         $user['id']
-    ], $testLink);
+    ], $link);
 
     display($page, $title);
 }
 
 function drop()
 {
-    global $user, $testLink;
+    global $user, $link;
     
     if ($user["dropcode"] == 0) { redirect('index.php'); }
     
-    $drop = prepare('select * from {{ table }} where id=?', 'drops', $testLink);
+    $drop = prepare('select * from {{ table }} where id=?', 'drops', $link);
     $droprow = execute($drop, [$user['dropcode']])->fetch();
     
     if (isset($_POST["submit"])) {
@@ -503,7 +504,7 @@ function drop()
         
         if ($user["slot".$slot."id"] != 0) {
             
-            $slot = prepare('select * from {{ table }} where id=?', 'drops', $testLink);
+            $slot = prepare('select * from {{ table }} where id=?', 'drops', $link);
             $slotrow = execute($slot, [$user["slot{$slot}id"]])->fetch();
             
             $old1 = explode(",",$slotrow["attribute1"]);
@@ -547,7 +548,7 @@ function drop()
                 $user["currenttp"],
                 $user['id']
             ];
-            quick($query, 'users', $data, $testLink);
+            quick($query, 'users', $data, $link);
         } else {
             $new1 = explode(",",$droprow["attribute1"]);
             if ($droprow["attribute2"] != "X") { $new2 = explode(",",$droprow["attribute2"]); } else { $new2 = array(0=>"maxhp",1=>0); }
@@ -571,7 +572,7 @@ function drop()
                 $user["defensepower"],
                 $user['id']
             ];
-            quick($query, 'users', $data, $testLink);
+            quick($query, 'users', $data, $link);
         }
 
         $page = "The item has been equipped. You can now continue <a href=\"index.php\">exploring</a>.";
