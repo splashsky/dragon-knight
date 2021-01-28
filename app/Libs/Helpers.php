@@ -323,28 +323,26 @@ function display($content, $title, $topnav=true, $leftnav=true, $rightnav=true, 
     
     if (isset($user)) {
 
-        $inventory = getUserInventory($user['id'], $link);
+        $inventory = getUserInventory($user->id, $link);
         foreach ($inventory as $key => $item) {
             if (empty($item)) {
                 $inventory[$key] = '<span class="light">None</span>';
             }
         }
-        $rightnav = view('rightnav', array_merge($user, $inventory));
-        
-        // Get userrow again, in case something has been updated.
-        $user = quick('select * from {{ table }} where id=?', 'users', [$user['id']], $link)->fetch();
+        $userData = $user->getInDataFormat();
+        $rightnav = view('rightnav', array_merge($userData, $inventory));
         
         // Current town name.
-        if ($user["action"] == "In Town") {
-            $townrow = getTown($user['latitude'], $user['longitude'], $link);
-            $user["currenttown"] = "Welcome to <b>".$townrow["name"]."</b>.<br /><br />";
+        if ($user->action == "In Town") {
+            $townrow = getTown($user->latitude, $user->longitude, $link);
+            $userData['currenttown'] = "Welcome to <b>".$townrow["name"]."</b>.<br /><br />";
         } else {
-            $user["currenttown"] = "";
+            $userData['currenttown'] = "";
         }
         
-        if ($control["forum_type"] == 0) { $user["forumslink"] = ""; }
-        elseif ($control["forum_type"] == 1) { $user["forumslink"] = "<a href=\"forum.php\">Forum</a><br />"; }
-        elseif ($control["forum_type"] == 2) { $user["forumslink"] = "<a href=\"".$control["forumaddress"]."\">Forum</a><br />"; }
+        if ($control["forum_type"] == 0) { $userData['forumslink'] = ""; }
+        elseif ($control["forum_type"] == 1) { $userData['forumslink'] = "<a href=\"forum.php\">Forum</a><br />"; }
+        elseif ($control["forum_type"] == 2) { $userData['forumslink'] = "<a href=\"".$control["forumaddress"]."\">Forum</a><br />"; }
         
         // Format various userrow stuffs...
         if ($user["latitude"] < 0) { $user["latitude"] = $user["latitude"] * -1 . "S"; } else { $user["latitude"] .= "N"; }

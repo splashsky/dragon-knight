@@ -38,7 +38,7 @@ function move()
     }
 
     $update = prepare("update {{ table }} set action=?, latitude=?, longitude=?, drop_code='0' where id=?", 'users');
-    execute($update, [$action, $latitude, $longitude, $user['id']]);
+    execute($update, [$action, $latitude, $longitude, $user->id]);
 
     header("Location: index.php");
 }

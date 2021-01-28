@@ -24,7 +24,7 @@ function healspells($id)
     $newmp = $user["currentmp"] - $spellrow["mp"];
     
     $update = prepare('update {{ table }} set currenthp=?, currentmp=? where id=?', 'users', $link);
-    execute($update, [$newhp, $newmp, $user['id']]);
+    execute($update, [$newhp, $newmp, $user->id]);
     
     display("You have cast the ".$spellrow["name"]." spell, and gained ".$spellrow["attribute"]." Hit Points. You can now continue <a href=\"index.php\">exploring</a>.", "Healing Spell");
 }

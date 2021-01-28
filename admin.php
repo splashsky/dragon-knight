@@ -580,7 +580,7 @@ function users()
 
     if ($users && count($users) > 0) {
         foreach ($users as $user) {
-            $list .= "<tr><td class=\"pr-8\">{$user['id']}</td> <td class=\"pb-4\"><a href=\"admin.php?do=edituser&user={$user['id']}\">{$user['username']}</a></td></tr>";
+            $list .= "<tr><td class=\"pr-8\">{$user->id}</td> <td class=\"pb-4\"><a href=\"admin.php?do=edituser&user={$user->id}\">{$user['username']}</a></td></tr>";
         }
     } else {
         $list = '<tr><td>No users found.</td></tr>';
@@ -773,7 +773,7 @@ function news()
         }
 
         $query = prepare('insert into {{ table }} set user_id=?, posted=now(), content=?', 'news', $link);
-        execute($query, [$user['id'], $content]);
+        execute($query, [$user->id, $content]);
 
         buildAdmin($page, $title, 'News post added.', 'success');
         return;

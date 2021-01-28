@@ -14,12 +14,14 @@ require 'app/Libs/Towns.php';
 require 'app/Libs/Fight.php';
 
 // Get the user if their cookie exists.
-$user = getUserIfLoggedInByCookie($link);
-$inventory = getUserInventory($user['id']);
+$userData = getUserIfLoggedInByCookie($link);
+$user = new User($db);
+$user = $user->getById($userData['id']);
+$inventory = getUserInventory($user->id);
 
 // Force verify if the user isn't verified yet.
-redirectIfNotVerified($user['verified'], $control['verify_email']);
-dieIfBanned($user['role']);
+redirectIfNotVerified($user->verified, $control['verify_email']);
+dieIfBanned($user->role);
 
 // Get the requested action, or default to the user's current action.
 $request = GET('do', 'default');
@@ -63,7 +65,7 @@ else { doCurrentAction(); }
 function doCurrentAction()
 {
     global $user;
-    $currently = $user['action'];
+    $currently = $user->action;
 
     if ($currently == 'In Town') { $page = townSquare(); }
     elseif ($currently == "Exploring") { $page = displayExplore(); }
@@ -78,23 +80,23 @@ function extendedStats()
     global $user, $link;
     
     // Format various userrow stuffs.
-    $user['experience'] = number_format($user['experience']);
-    $user['gold'] = number_format($user['gold']);
+    $user->experience = number_format($user->experience);
+    $user->gold = number_format($user->gold);
 
-    $bonus = $user['exp_bonus'] > 0 ? "+{$user['exp_bonus']}" : $user['exp_bonus'];
+    $bonus = $user->exp_bonus > 0 ? "+{$user->exp_bonus}" : $user->exp_bonus;
     $user['plus_exp'] = "<span class=\"light\">({$bonus}%)</span>";
 
-    $bonus = $user['gold_bonus'] > 0 ? "+{$user['gold_bonus']}" : $user['gold_bonus'];
+    $bonus = $user->gold_bonus > 0 ? "+{$user->gold_bonus}" : $user->gold_bonus;
     $user['plus_gold'] = "<span class=\"light\">({$bonus}%)</span>";
     
-    $exp = getExpForNextLevel($user['level'], $user['experience'], $user['class']);
-    $user['next_level'] = $user['level'] < 99 ? number_format($exp) : "<span class=\"light\">Max Level</span>";
+    $exp = getExpForNextLevel($user->level, $user->experience, $user->class);
+    $user['next_level'] = $user->level < 99 ? number_format($exp) : "<span class=\"light\">Max Level</span>";
 
-    $user['class'] = config("classes.{$user['class']}")['title'];
-    $user['difficulty'] = config("game.difficulties.{$user['difficulty']}")['title'];
+    $user->class = config("classes.{$user->class}")['title'];
+    $user->difficulty = config("game.difficulties.{$user->difficulty}")['title'];
     
     $spells = query('select id, name from {{ table }}', 'spells', $link);
-    $userspells = explode(",", $user["spells"]);
+    $userspells = explode(",", $user->spells);
     $user['magic_list'] = "";
     foreach ($spells->fetchAll() as $spellrow) {
         $spell = false;
@@ -118,30 +120,30 @@ function onlinechar($id)
     $user = getUserFromId($id, $link);
     
     // Format various userrow stuffs.
-    $user['experience'] = number_format($user['experience']);
-    $user['gold'] = number_format($user['gold']);
-    if ($user['exp_bonus'] > 0) { 
-        $user["plusexp"] = "<span class=\"light\">(+".$user['exp_bonus']."%)</span>"; 
-    } elseif ($user['exp_bonus'] < 0) {
-        $user["plusexp"] = "<span class=\"light\">(".$user['exp_bonus']."%)</span>";
+    $user->experience = number_format($user->experience);
+    $user->gold = number_format($user->gold);
+    if ($user->exp_bonus > 0) { 
+        $user["plusexp"] = "<span class=\"light\">(+".$user->exp_bonus."%)</span>"; 
+    } elseif ($user->exp_bonus < 0) {
+        $user["plusexp"] = "<span class=\"light\">(".$user->exp_bonus."%)</span>";
     } else { $user["plusexp"] = ""; }
-    if ($user['gold_bonus'] > 0) { 
-        $user['plus_gold'] = "<span class=\"light\">(+".$user['gold_bonus']."%)</span>"; 
-    } elseif ($user['gold_bonus'] < 0) { 
-        $user['plus_gold'] = "<span class=\"light\">(".$user['gold_bonus']."%)</span>";
+    if ($user->gold_bonus > 0) { 
+        $user['plus_gold'] = "<span class=\"light\">(+".$user->gold_bonus."%)</span>"; 
+    } elseif ($user->gold_bonus < 0) { 
+        $user['plus_gold'] = "<span class=\"light\">(".$user->gold_bonus."%)</span>";
     } else { $user['plus_gold'] = ""; }
     
-    $exp = prepare("select {$user['class']}_exp from {{ table }} where id=? limit 1", 'levels', $link);
-    $levelrow = execute($exp, [$user['level'] + 1])->fetch();
-    $user['next_level'] = number_format($levelrow[$user['class']."_exp"]);
+    $exp = prepare("select {$user->class}_exp from {{ table }} where id=? limit 1", 'levels', $link);
+    $levelrow = execute($exp, [$user->level + 1])->fetch();
+    $user['next_level'] = number_format($levelrow[$user->class."_exp"]);
 
-    if ($user['class'] == 1) { $user['class'] = $control["class1name"]; }
-    elseif ($user['class'] == 2) { $user['class'] = $control["class2name"]; }
-    elseif ($user['class'] == 3) { $user['class'] = $control["class3name"]; }
+    if ($user->class == 1) { $user->class = $control["class1name"]; }
+    elseif ($user->class == 2) { $user->class = $control["class2name"]; }
+    elseif ($user->class == 3) { $user->class = $control["class3name"]; }
     
-    if ($user['difficulty'] == 1) { $user['difficulty'] = $control["diff1name"]; }
-    elseif ($user['difficulty'] == 2) { $user['difficulty'] = $control["diff2name"]; }
-    elseif ($user['difficulty'] == 3) { $user['difficulty'] = $control["diff3name"]; }
+    if ($user->difficulty == 1) { $user->difficulty = $control["diff1name"]; }
+    elseif ($user->difficulty == 2) { $user->difficulty = $control["diff2name"]; }
+    elseif ($user->difficulty == 3) { $user->difficulty = $control["diff3name"]; }
     
     $charsheet = gettemplate("onlinechar");
     $page = parsetemplate($charsheet, $user);
@@ -162,7 +164,7 @@ function babblebox()
     if (isset($_POST['babble'])) {
         if (! empty($_POST['babble'])) {
             $insert = prepare('insert into {{ table }} set posted=now(), user_id=?, babble=?', 'babble', $link);
-            execute($insert, [$user['id'], $_POST['babble']]);
+            execute($insert, [$user->id, $_POST['babble']]);
         }
 
         redirect('index.php?do=babblebox');

@@ -90,6 +90,17 @@ class User
 
         return true;
     }
+
+    public function getInDataFormat(): array
+    {
+        $data = [];
+
+        foreach ($this->props as $key) {
+            $data[$key] = $this->{$key};
+        }
+
+        return $data;
+    }
 }
 
 function createUser(array $data, $link = null)
@@ -212,11 +223,11 @@ function equipItemOnUser(array $item, array $user, array $inventory, $link = nul
 
     if (userHasItemInSlot($item['type'], $inventory)) {
         $equipped = getItemIdForSlot($item['type'], $inventory);
-        userUnequipItem($user['id'], $equipped, $link);
+        userUnequipItem($user->id, $equipped, $link);
     }
 
     $equip = prepare("UPDATE {{ table }} SET {$item['type']}_id=?, {$item['type']}_name=? WHERE user_id=?", 'inventories', $link);
-    execute($equip, [$item['id'], $item['name'], $user['id']], $link);
+    execute($equip, [$item['id'], $item['name'], $user->id], $link);
 
     if ($item['type'] == 'weapon') {
         $user['attack'] += $item['attribute'];
@@ -226,7 +237,7 @@ function equipItemOnUser(array $item, array $user, array $inventory, $link = nul
 
     // TODO handle adding specials on equip
 
-    return userSave($user['id'], $user);
+    return userSave($user->id, $user);
 }
 
 function userUnequipItem(int $userId, int $itemId, $link = null)

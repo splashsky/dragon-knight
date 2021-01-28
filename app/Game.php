@@ -28,6 +28,7 @@ require_once ROOT.'/app/Libs/Validation.php';
 require_once ROOT.'/app/Models/User.php';
 require_once ROOT.'/app/Models/Item.php';
 require_once ROOT.'/app/Models/Drop.php';
+require_once ROOT.'/app/Models/Fight.php';
 
 // We'll build our config array by grabbing the contents of our config files.
 $config = [
@@ -47,4 +48,3 @@ $version = config('game.general.version');
 $build = config('game.general.build');
 $link = openLink();
 $db = new Database(config('game.db'));
-// $control = getControl($link);

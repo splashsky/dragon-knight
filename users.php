@@ -33,7 +33,7 @@ function login()
 
         if (! $error) {
             if (isset($_POST["rememberme"])) { $expiretime = time() + 31536000; $rememberme = 1; } else { $expiretime = 0; $rememberme = 0; }
-            $cookie = "{$user['id']} {$username} {$password} {$rememberme}";
+            $cookie = "{$user->id} {$username} {$password} {$rememberme}";
             setcookie('dkgame', $cookie, $expiretime, '/', '', 0);
             redirect('index.php');
         }

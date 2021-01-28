@@ -13,7 +13,7 @@ function townSquare()
 {
     global $user, $control, $link;
 
-    $town = getTown($user['latitude'], $user['longitude'], $link);
+    $town = getTown($user->latitude, $user->longitude, $link);
     
     // Generate the news box
     if ($control["show_news"] == 1) { 
@@ -40,8 +40,8 @@ function townSquare()
         $online = $online->fetchAll();
 
         $list = '';
-        foreach ($online as $user) {
-            $list .= "<a href=\"index.php?do=user&user={$user['id']}\">{$user['username']}</a>, ";
+        foreach ($online as $online) {
+            $list .= "<a href=\"index.php?do=user&user={$online['id']}\">{$online['username']}</a>, ";
         }
         $list = rtrim($list, ', ');
 
@@ -53,7 +53,6 @@ function townSquare()
     // The Babblebox currently works through an IFrame. I'd like to change this soon.
     $showBabble = (bool) $control['show_babble'];
     $town['babblebox'] = $showBabble ? view('town/babbleBox') : '';
-    
     return view('town/square', $town);
 }
 
@@ -67,14 +66,14 @@ function inn()
     
     global $user, $link;
 
-    $town = getTown($user['latitude'], $user['longitude'], $link);
-    $afford = $user['gold'] >= $town['inn_price'];
+    $town = getTown($user->latitude, $user->longitude, $link);
+    $afford = $user->gold >= $town['inn_price'];
     $page = $afford ? view('town/inn/confirm', $town) : view('town/inn/cantAfford', $town);
     
     if (isset($_POST["submit"]) && $afford) {
-        $gold = $user['gold'] - $town['inn_price'];
+        $gold = $user->gold - $town['inn_price'];
         $rested = prepare('update {{ table }} set gold=?, hp=max_hp, mp=max_mp, tp=max_tp where id=?', 'users', $link);
-        execute($rested, [$gold, $user['id']]);
+        execute($rested, [$gold, $user->id]);
 
         $page = view('town/inn/rested', $town);
     }
@@ -89,7 +88,7 @@ function itemShop()
 {
     global $user, $link;
     
-    $town = getTown($user['latitude'], $user['longitude'], $link);
+    $town = getTown($user->latitude, $user->longitude, $link);
     $items = explode(',', $town['items']);
 
     $query = "";
@@ -123,16 +122,16 @@ function buyItem()
     $id = GET('item', fn() => redirect('index.php'));
 
     // Check and make sure the requested item is actually an item sold by this town.
-    $town = getTown($user['latitude'], $user['longitude'], $link);
+    $town = getTown($user->latitude, $user->longitude, $link);
     $items = explode(',', $town['items']);
     if (! in_array($id, $items)) { die('Cheat attempt detected. Please go back and try again.'); }
     
     $item = getItemById($id, $link);
     $item['town_name'] = $town['name']; // This is for convenience during transactions.
-    $afford = $user['gold'] >= $item['value'];
+    $afford = $user->gold >= $item['value'];
 
     if (! $afford) {
-        $item['more'] = $item['value'] - $user['gold'];
+        $item['more'] = $item['value'] - $user->gold;
         display(view('town/itemShop/cantAfford', $item), 'Item Shop - Can\'t Afford');
     }
 
@@ -160,16 +159,16 @@ function giveItem()
     $id = GET('item', fn() => redirect('index.php'));
 
     // Check and make sure the requested item is actually an item sold by this town.
-    $town = getTown($user['latitude'], $user['longitude'], $link);
+    $town = getTown($user->latitude, $user->longitude, $link);
     $items = explode(',', $town['items']);
     if (! in_array($id, $items)) { die('Cheat attempt detected. Please go back and try again.'); }
     
     $item = getItemById($id, $link);
     $item['town_name'] = $town['name']; // This is for convenience during transactions.
-    $afford = $user['gold'] >= $item['value'];
+    $afford = $user->gold >= $item['value'];
 
     if (! $afford) {
-        $item['more'] = $item['value'] - $user['gold'];
+        $item['more'] = $item['value'] - $user->gold;
         display(view('town/itemShop/cantAfford', $item), 'Item Shop - Can\'t Afford');
     }
 
@@ -181,8 +180,8 @@ function giveItem()
 
     equipItemOnUser($item, $user, $inventory);
     
-    $newgold = $user['gold'] - ($item['value'] - $discount);
-    userSave($user['id'], ['gold' => $newgold], $link);
+    $newgold = $user->gold - ($item['value'] - $discount);
+    userSave($user->id, ['gold' => $newgold], $link);
     
     $page = view('town/itemShop/bought', $item);
     display($page, 'Item Shop - Bought!');
@@ -261,7 +260,7 @@ function giveMap()
     $newgold = $user["gold"] - $townrow["map_price"];
     
     $update = prepare('update {{ table }} set towns=?, gold=? where id=?', 'users', $link);
-    execute($update, [$mappedtowns, $newgold, $user['id']]);
+    execute($update, [$mappedtowns, $newgold, $user->id]);
     
     display("Thank you for purchasing this map.<br /><br />You may return to <a href=\"index.php\">town</a>, <a href=\"index.php?do=maps\">store</a>, or use the direction buttons on the left to start exploring.", "Buy Maps");
 }
@@ -289,20 +288,20 @@ function travelTo($town = 0, $usePoints = true)
         if (! in_array($id, $mapped)) { die('Cheat attempt detected.'); }
     }
     
-    if ($user['latitude'] == $town['latitude'] && $user['longitude'] == $town['longitude']) {
+    if ($user->latitude == $town['latitude'] && $user->longitude == $town['longitude']) {
         $page = view('town/travel/alreadyHere', $town);
         display($page, 'Travelling - Already in Town');
     }
 
     $user['action'] = 'In Town';
     $user['tp'] = $usePoints ? $user['tp'] - $town['tp_cost'] : $user['tp'];
-    $user['latitude'] = $town['latitude'];
-    $user['longitude'] = $town['longitude'];
+    $user->latitude = $town['latitude'];
+    $user->longitude = $town['longitude'];
     
     // If they got here by exploring, add this town to their map.
     if (! in_array($town['id'], $mapped)) { $user['towns'] .= ",{$town['id']}"; }
     
-    userSave($user['id'], $user, $link);
+    userSave($user->id, $user, $link);
     
     $page = view('town/travel/arrived', $town);
     display($page, 'Travelling - Arrived');
