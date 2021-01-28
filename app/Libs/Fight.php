@@ -19,7 +19,7 @@ function fight()
     $page['magicList'] = '';
     $userSpells = explode(',', $user['spells']);
 
-    $spells = query('select id, name from {{ table }}', 'spells', $link);
+    $spells = $db->query('select id, name from {{ table }}', 'spells');
     foreach ($spells->fetchAll() as $spellId => $spellName) {
         foreach ($userSpells as $knownId) {
             if ($knownId === $spellId) {
@@ -32,34 +32,48 @@ function fight()
 
     $firstStrikeChance = 1;
 
-    // First, check to see if we need to pick a monster.
-    $fight = $db->quick('select * from {{ table }} where user_id=?', 'fights', [$user['id']]);
-    dd($fight);
-    $fight = $fight->fetch();
+    // Does our user currently have a fight?
+    $fight = $db->quick('select * from {{ table }} where user_id=?', 'fights', [$user['id']])->fetch();
 
-    if ($user["currentfight"] == 1) {
-        if ($user["latitude"] < 0) { $user["latitude"] *= -1; } // Equalize negatives.
-        if ($user["longitude"] < 0) { $user["longitude"] *= -1; } // Ditto.
-        $maxlevel = floor(max($user["latitude"]+5, $user["longitude"]+5) / 5); // One mlevel per five spaces.
-        if ($maxlevel < 1) { $maxlevel = 1; }
-        $minlevel = $maxlevel - 2;
-        if ($minlevel < 1) { $minlevel = 1; }
-        
-        // Pick a monster.
-        $monster = prepare('select * from {{ table }} where level >= ? and level <= ? order by rand() limit 1', 'monsters', $link);
-        $monster = execute($monster, [$minlevel, $maxlevel])->fetch();
+    // If not, we'll generate a fight for them.
+    if ($fight === false) {
+        $latitude = abs($user['latitude']);
+        $longitude = abs($user['longitude']);
 
-        $user["currentmonster"] = $monster["id"];
-        $user["currentmonsterhp"] = rand((($monster["maxhp"] / 5) * 4),$monster["maxhp"]);
-        if ($user["difficulty"] == 2) { $user["currentmonsterhp"] = ceil($user["currentmonsterhp"] * $control["diff2mod"]); }
-        if ($user["difficulty"] == 3) { $user["currentmonsterhp"] = ceil($user["currentmonsterhp"] * $control["diff3mod"]); }
-        $user["currentmonstersleep"] = 0;
-        $user["currentmonsterimmune"] = $monster["immune"];
+        // Determine the highest level of monster we can find. 1 monster level for every 5 spaces.
+        $maxLevel = floor(max($latitude + 5, $longitude + 5) / 5);
+        if ($maxLevel < 1) { $maxLevel = 1; }
+        $minLevel = $maxLevel - 2;
+        if ($minLevel < 1) { $minLevel = 1; }
         
-        $firstStrikeChance = rand(1,10) + ceil(sqrt($user["dexterity"]));
-        if ($firstStrikeChance > (rand(1,7) + ceil(sqrt($monster["maxdam"])))) { $firstStrikeChance = 1; } else { $firstStrikeChance = 0; }
+        // Pick a random monster within our level limit.
+        $monster = $db->prepare('select * from {{ table }} where level >= ? and level <= ? order by rand() limit 1', 'monsters');
+        $monster->execute([$minLevel, $maxLevel]);
+        $monster = $monster->fetch();
+
+        // Get the user's difficulty mod.
+        $mod = config("game.difficulties.{$user['difficulty']}")['mod'];
+
+        // Get a more randomized value for the monster's HP.
+        $newHp = rand((($monster['hp'] / 5) * 4), $monster['hp']) * $mod;
+
+        // Set up fight data to be put into the database.
+        $fight = [
+            'user_id' => $user['id'],
+            'monster_id' => $monster['id'],
+            'monster_name' => $monster['name'],
+            'monster_hp' => $newHp,
+            'monster_damage' => $monster['damage'] * $mod,
+            'monster_armor' => $monster['armor'] * $mod,
+            'monster_immune' => $monster['immune']
+        ];
         
-        unset($monster);
+        $firstStrikeChance = rand(1, 10) + ceil(sqrt($user['dexterity']));
+        $firstStrikeChance = $firstStrikeChance > (rand(1, 7) + ceil(sqrt($monster['damage']))) ? 1 : 0;
+
+        $query = 'insert into {{ table }} set user_id=?, monster_id=?, monster_name=?, monster_hp=?, monster_damage=?, monster_armor=?, monster_immune=?';
+        $db->quick($query, 'fights', array_values($fight));
+        dd('check db');
     }
     
     // Next, get the monster statistics.
