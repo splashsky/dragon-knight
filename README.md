@@ -1,62 +1,36 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Dragon Knight
+- [Official Dev Site](https://dragonknight.dev)
+- [Live Demo](https://demo.dragonknight.dev)
+- [Old repo](https://github.com/renderse7en/dragon-knight)
+- See also: [Dragon Scourge](https://github.com/renderse7en/dragon-scourge)
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Many years ago, [@renderse7en](https://github.com/renderse7en) made a cool little text-based RPG in PHP4. It was a fun side project, helped him learn to code, and a lot of people like it.
+Then, everything changed when he abandoned the source code to the wastes of the internet in 2007.
 
-## About Laravel
+Fast forward 3 years and [@splashsky](https://github.com/splashsky) finds that abandoned, decrepit code. He learns how to program in PHP from it. Another 10 years into the future, and
+now he's reviving that project so that other rookies can learn from the same fun project he did!
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Found a bug? Have a suggestion, or a question? [Open an Issue!](https://github.com/surfgg/dragon-knight/issues)
+- Fixed a bug? Implemented a cool idea? [Open a Pull Request!](https://github.com/surfgg/dragon-knight/pulls)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+# Server Requirements
+- PHP 7.0+
+- A MySQL server; we recommend [MariaDB](https://mariadb.org)
+- A web server; we use [Nginx](https://www.nginx.com/)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+You can host the game on your local computer if you'd like, but for maximum fun we recommend hosting your game on the web. Our official demo version
+runs on a [$5 DigitalOcean server](https://www.digitalocean.com/products/droplets/), and deployment is handled through 
+[Laravel Forge](https://forge.laravel.com/) (but that isn't necessary).
 
-## Learning Laravel
+# Installation Instructions
+1. Clone this repo or download the zip.
+2. Create a new database for Dragon Knight to use, if you don't already have one set up.
+3. Edit `config.php` to include the correct values for your database setup.
+4. Upload the contents of the Dragon Knight folder to your site.
+5. In your browser, run `install.php` and follow the instructions.
+6. After completing installation, delete `install.php` from your Dragon Knight directory for security.
+7. Enjoy the game.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/)**
-- **[OP.GG](https://op.gg)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# License
+This project uses the MIT license, meaning you can do anything you'd like with it! See the
+`license` file for the full license.
