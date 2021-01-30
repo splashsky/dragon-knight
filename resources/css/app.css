@@ -1,0 +1,13 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+@layer base {
+    body {
+        @apply text-genshin;
+    }
+}
+
+.button-bg {
+    background-color: rgba(57, 59, 64, 0.18);
+}
