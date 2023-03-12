@@ -2,95 +2,101 @@
 
 class Router
 {
-    private static array $routes = [];
-    private static $pathNotFound;
-    private static $methodNotAllowed;
-    private static string $defaultConstraint = '([\w\-]+)';
-    private static string $currentPrefix = '';
-    private static string $lastInsertedRoute = '';
+    private array $routes = [];
+    private $notFound;
+    private string $defaultConstraint = '([\w\-]+)';
+    private string $currentPrefix = '';
+    private string $lastInsertedRoute = '';
 
     /**
-     * A quick static function to register a route in the router. Used by the shorthand methods as well.
+     * Create an instance of a router. The provided basePath will be the / root of all routes.
      */
-    public static function add(string $route, callable|string $action, string|array $methods = 'GET')
+    public function __construct(private string $basePath = '') {}
+
+    /**
+     * Register a GET route.
+     */
+    public function get(string $route, callable $action): self
     {
-        // If a prefix exists, prepend it to the route
-        if (!empty(self::$currentPrefix)) {
-            $route = self::$currentPrefix.$route;
-        }
-
-        $trimmed = self::trimRoute($route);
-
-        self::$routes[] = [
-            'route' => $trimmed,
-            'action' => $action,
-            'methods' => $methods,
-            'constraints' => []
-        ];
-
-        self::$lastInsertedRoute = $trimmed;
-
-        return new self;
-    }
-
-    public static function get(string $route, callable $action)
-    {
-        return self::add($route, $action, 'GET');
-    }
-
-    public static function post(string $route, callable $action)
-    {
-        return self::add($route, $action, 'POST');
+        $this->add($route, $action, 'GET');
+        return $this;
     }
 
     /**
-     * Return all routes currently registered
+     * Register a POST route.
      */
-    public static function getAllRoutes()
+    public function post(string $route, callable $action): self
     {
-        return self::$routes;
+        $this->add($route, $action, 'POST');
+        return $this;
     }
 
     /**
-     * Defines an action to be called when a path isn't found - i.e. a 404
+     * Register a PUT route.
      */
-    public static function pathNotFound(callable $action)
+    public function put(string $route, callable $action): self
     {
-        self::$pathNotFound = $action;
+        $this->add($route, $action, 'PUT');
+        return $this;
     }
 
     /**
-     * Defines an action to be called with a method isn't allowed on a route - i.e. a 405
+     * Register a PATCH route.
      */
-    public static function methodNotAllowed(callable $action)
+    public function patch(string $route, callable $action): self
     {
-        self::$methodNotAllowed = $action;
+        $this->add($route, $action, 'PATCH');
+        return $this;
     }
 
     /**
-     * Redefine the default constraint for route parameters. Default is '([\w\-]+)'
+     * Register a DELETE route.
      */
-    public static function setDefaultConstraint(string $constraint = '([\w\-]+)')
+    public function delete(string $route, callable $action): self
     {
-        self::$defaultConstraint = $constraint;
+        $this->add($route, $action, 'DELETE');
+        return $this;
     }
 
-    private static function trimRoute(string $route): string
+    /**
+     * Return the array of registered routes.
+     */
+    public function routes(): array
+    {
+        return $this->routes;
+    }
+
+    /**
+     * Set a callable for 404 responses.
+     */
+    public function setNotFound(callable $action)
+    {
+        $this->notFound = $action;
+    }
+
+    /**
+     * Change the default constraint for URI parameters from ([\w\-]+)
+     */
+    public function setDefaultConstraint(string $constraint = '([\w\-]+)')
+    {
+        $this->defaultConstraint = $constraint;
+    }
+
+    private function trimRoute(string $route): string
     {
         $route = trim(trim($route), '/');
         return "/$route";
     }
 
     /**
-     * Accepts a callable that defines routes, and adds a prefix to them.
+     * Create a prefix group for routes. To use, pass a closure that can take one argument to $routes,
+     * and define routes in that closure as normal, using the argument as the router.
      */
-    public static function prefix(string $prefix, callable $routes)
+    public function prefix(string $prefix, callable $routes)
     {
-        self::$currentPrefix = $prefix;
-
-        $routes();
-
-        self::$currentPrefix = '';
+        $this->currentPrefix = $prefix;
+        $routes($this);
+        $this->currentPrefix = '';
     }
 
     /**
@@ -99,43 +105,42 @@ class Router
      * adding constraints for multiple parameters, pass an array of 'parameter' => 'constraint'
      * pairs.
      */
-    public static function with(string|array $parameter, string $constraint = '')
+    public function with(string|array $parameter, string $constraint = ''): self
     {
-        $last = self::$lastInsertedRoute;
+        $method = $_SERVER['REQUEST_METHOD'];
+        $last = $this->lastInsertedRoute;
 
         if (is_array($parameter)) {
             foreach ($parameter as $param => $constraint) {
-                self::$routes[$last]['constraints'][$param] = $constraint;
+                $this->routes[$method][$last]['constraints'][$param] = $constraint;
             }
 
-            return new self;
+            return $this;
         }
 
-        self::$routes[$last]['constraints'][$parameter] = $constraint;
+        $this->routes[$method][$last]['constraints'][$parameter] = $constraint;
 
-        return new self;
+        return $this;
     }
 
     /**
-     * Tokenizes the given URI using our constraint rules and returns the tokenized URI
+     * Tokenizes a URI according to constraint rules. 
      */
-    private static function tokenize(string $uri, array $constraints)
+    private function tokenize(string $uri, array $constraints = []): string
     {
-        $constraintKeys = array_keys($constraints);
-
         preg_match_all('/(?:{([\w\-]+)})+/', $uri, $matches);
         $matches = $matches[1];
 
         foreach ($matches as $match) {
             $pattern = '{'.$match.'}';
 
-            if (in_array($match, $constraintKeys)) {
+            if (in_array($match, array_keys($constraints))) {
                 // Do some voodoo to allow users to use parentheses in their constraints if they want
                 $constraint = '('.rtrim(ltrim(trim($constraints[$match]), '('), ')').')';
 
                 $uri = str_replace($pattern, $constraint, $uri);
             } else {
-                $uri = str_replace($pattern, self::$defaultConstraint, $uri);
+                $uri = str_replace($pattern, $this->defaultConstraint, $uri);
             }
         }
 
@@ -143,74 +148,46 @@ class Router
     }
 
     /**
-     * Runs the router. Accepts a base path from which to serve the routes, and optionally whether you want to try
-     * and match multiple routes.
+     * Add a route to the list of registered routes.
      */
-    public static function run(string $basePath = '', bool $multimatch = false)
+    public function add(string $route, callable|string $action, string $method = 'GET')
     {
-        $basePath = self::trimRoute($basePath);
-        $method = $_SERVER['REQUEST_METHOD'];
+        // If a prefix exists, prepend it to the route
+        if (!empty($this->currentPrefix)) {
+            $route = $this->currentPrefix . $route;
+        }
+
+        $trimmed = $this->trimRoute($route);
+        $this->lastInsertedRoute = $trimmed;
+
+        $this->routes[$method][$trimmed] = ['action' => $action, 'constraints' => []];
+    }
+
+    /**
+     * Runs the router. Returns the results of the action of the route, if found. Executes
+     * the $notFound callable if there is one, or just dies with '404' if not.
+     */
+    public function run()
+    {
+        $basePath = $this->trimRoute($this->basePath);
         $uri = parse_url($_SERVER['REQUEST_URI'])['path'];
-        $path = urldecode(self::trimRoute($uri));
+        $path = urldecode($this->trimRoute($uri));
 
-        $pathMatchFound = false;
-        $routeMatchFound = false;
+        foreach ($this->routes[$_SERVER['REQUEST_METHOD']] as $route => $opts) {
+            $tokenized = '#^'.$this->tokenize($this->trimRoute($basePath.$route), $opts['constraints']).'$#u';
 
-        // Begin looking through routes
-        foreach (self::$routes as $route) {
-            // If the basePath isn't just "root"
-            if ($basePath != '/') {
-                $route['route'] = self::trimRoute($basePath.$route['route']);
-            }
-        
-            // Prepare route by tokenizing.
-            $tokenized = '#^'.self::tokenize($route['route'], $route['constraints']).'$#u';
-
-            // If the tokenized route matches the current path...
             if (preg_match($tokenized, $path, $matches)) {
-                $pathMatchFound = true;
-        
-                // Run through the route's accepted method(s)
-                foreach ((array) $route['methods'] as $allowedMethod) {
-                    // See if the current request method matches
-                    if (strtolower($method) == strtolower($allowedMethod)) {
-                        array_shift($matches); // Remove the first match - always contains the full url
-            
-                        // If we're successful at calling the route's action, echo the result
-                        if ($return = call_user_func_array($route['action'], $matches)) {
-                            echo $return;
-                        }
-            
-                        $routeMatchFound = true;
-            
-                        // Do not check other routes.
-                        break;
-                    }
+                array_shift($matches);
+                if ($return = call_user_func_array($opts['action'], $matches)) {
+                    return $return;
                 }
-            }
-
-            // Break the loop if the first found route is a match.
-            if($routeMatchFound && !$multimatch) {
-                break;
             }
         }
 
-        // No matching route was found
-        if (!$routeMatchFound) {
-            // But a matching path exists
-            if ($pathMatchFound) {
-                if (self::$methodNotAllowed) {
-                    call_user_func_array(self::$methodNotAllowed, Array($path, $method));
-                } else {
-                    die('405');
-                }
-            } else {
-                if (self::$pathNotFound) {
-                    call_user_func_array(self::$pathNotFound, Array($path));
-                } else {
-                    die('404');
-                }
-            }
+        if (is_callable($this->notFound)) {
+            return call_user_func_array($this->notFound, [$path]);
+        } else {
+            die('404');
         }
     }
 }

@@ -1,18 +1,16 @@
 <?php
 
-require './bootstrap.php';
-require './tools/router.php';
+// Timer for this request.
+define('START', microtime(true));
 
-Router::get('/', function() {
-    echo 'root';
+// Pull in all our libraries and load our env vars
+require '../bootstrap.php';
+
+$router = new Router();
+//$DB = new Database();
+
+$router->get('', function() {
+    return env('test');
 });
 
-Router::get('/login', function() {
-    require './pages/login.html';
-});
-
-Router::post('/login', function() {
-    echo $_POST['username'];
-});
-
-Router::run();
+echo $router->run();
