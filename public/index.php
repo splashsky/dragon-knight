@@ -7,9 +7,9 @@ define('START', microtime(true));
 require '../bootstrap.php';
 
 $router = new Router();
-//$DB = new Database();
+$DB = new Database();
 
-$router->get('', function() {
+$router->get('/', function() {
     return env('test');
 });
 

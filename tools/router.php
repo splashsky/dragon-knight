@@ -178,9 +178,7 @@ class Router
 
             if (preg_match($tokenized, $path, $matches)) {
                 array_shift($matches);
-                if ($return = call_user_func_array($opts['action'], $matches)) {
-                    return $return;
-                }
+                return call_user_func_array($opts['action'], $matches);
             }
         }
 
