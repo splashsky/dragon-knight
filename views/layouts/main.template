@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    @hasblock('title')
+        <title>Dragon Knight - @yield('title')</title>
+    @endif
+
+    @blockmissing('title')
+        <title>Dragon Knight</title>
+    @endif
+
+    <link rel="stylesheet" href="/css/vollkorn.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <div id="container" class="container max-w-5xl mx-auto">
+        <header class="flex justify-between">
+            <img src="/img/dk.png" alt="Dragon Knight" class="max-w-xs">
+            <nav class="flex items-center">
+                <a class="mr-2" href="/login">Log in</a>
+                <a class="mr-2" href="/register">Register</a>
+                <a href="/help">Help</a>
+            </nav>
+        </header>
+
+        <main class="my-4">
+            @yield('content')
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+    @apply font-serif bg-repeat;
+    background-image: url(/img/bg/bg.jpg);
+}
+
+a, a:visited {
+    @apply text-red-600;
+}
+
+a:hover, a:visited:hover {
+    @apply text-red-800;
+}
+
+a.disabled, a.disabled:hover {
+    @apply text-gray-400 cursor-not-allowed;
+}
+
+p {
+    @apply py-2;
+}
+
+p:first-of-type {
+    @apply pt-0;
+}
+
+p:last-of-type {
+    @apply pb-0;
+}
+
+h1 {
+    @apply text-3xl;
+}
+
+h2 {
+    @apply text-2xl;
+}
+
+h3 {
+    @apply text-xl;
+}
+
+h4 {
+    @apply text-lg;
+}
+
+h1, h2, h3 {
+    @apply font-bold;
+}

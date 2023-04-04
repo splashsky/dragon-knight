@@ -2,18 +2,17 @@
 
 /**
  * A session handler.
- * Helps create, maintain, update, and delete sessions. Requires the
- * Database object so it can interface with it's table in the db.
+ * Helps create, maintain, update, and delete sessions.
  */
 
 class Session
 {
-    private string $lifetime   = '';
-    private string $cookieName = '';
-    private bool   $valid      = false;
-    private string $token      = '';
+    private string $lifetime       = '';
+    private string $cookieName     = '';
+    private bool   $valid          = false;
+    private string $token          = '';
 
-    public function __construct(private Database $DB)
+    public function __construct()
     {
         $this->lifetime = env('session_lifetime');
         $this->cookieName = env('cookie_name');
@@ -63,7 +62,7 @@ class Session
     public function sessionExists(string $token = '')
     {
         $token = empty($token) ? $this->token : $token;
-        return $this->DB->qe('select id from sessions where token = ?;', [$token]) === false ? false : true;
+        return db()->qe('select id from sessions where token = ?;', [$token]) === false ? false : true;
     }
 
     public function setCookie(): bool
@@ -85,28 +84,28 @@ class Session
     public function createSession(int $userID)
     {
         $this->setCookie();
-        $this->DB->qe('insert into sessions set user_id = ?, token = ?, created_at = now(), refreshed_at = now();', [$userID, $this->token]);
+        db()->qe('insert into sessions set user_id = ?, token = ?, created_at = now(), refreshed_at = now();', [$userID, $this->token]);
         return $this->sessionExists();
     }
 
     public function deleteSession(string $token = ''): bool
     {
         $token = empty($token) ? $this->token : $token;
-        $this->DB->qe('delete from sessions where token = ?;', [$this->token]);
+        db()->qe('delete from sessions where token = ?;', [$this->token]);
         return !$this->sessionExists() ? true : false;
     }
 
     public function renewSession(string $token = ''): bool
     {
         $token = empty($token) ? $this->token : $token;
-        $session = $this->DB->qe('select * from sessions where token = ?;', [$token])->fetch();
+        $session = db()->qe('select * from sessions where token = ?;', [$token])->fetch();
 
         $updated = new DateTime($session['refreshed_at']);
         $future = new DateTime($session['refreshed_at']);
         $future->modify($this->lifetime);
 
         if ($updated < $future) {
-            $this->DB->qe('update sessions set refreshed_at = now() where token = ?;', [$token]);
+            db()->qe('update sessions set refreshed_at = now() where token = ?;', [$token]);
             return true;
         }
 

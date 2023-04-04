@@ -173,12 +173,17 @@ class Router
         $uri = parse_url($_SERVER['REQUEST_URI'])['path'];
         $path = urldecode($this->trimRoute($uri));
 
-        foreach ($this->routes[$_SERVER['REQUEST_METHOD']] as $route => $opts) {
-            $tokenized = '#^'.$this->tokenize($this->trimRoute($basePath.$route), $opts['constraints']).'$#u';
+        
 
-            if (preg_match($tokenized, $path, $matches)) {
+        foreach ($this->routes[$_SERVER['REQUEST_METHOD']] as $route => $opts) {
+            $tokenized = $this->tokenize($this->trimRoute($basePath.$route), $opts['constraints']);
+            $tokenized = str_replace('/', '\/', $tokenized);
+            
+            if (preg_match('/^'.$tokenized.'$/', $path, $matches)) {
                 array_shift($matches);
-                return call_user_func_array($opts['action'], $matches);
+                if (is_callable($opts['action'])) {
+                    return call_user_func_array($opts['action'], $matches);
+                }
             }
         }
 

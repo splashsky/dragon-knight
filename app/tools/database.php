@@ -75,4 +75,14 @@ class Database
         $this->prepare($query, $options);
         return $this->execute($params);
     }
+
+    /**
+     * Use COUNT() to see if the requested entry exists in the table.
+     */
+    public function exists(string $table, string $column, string $value): bool
+    {
+        $query = "SELECT COUNT(*) FROM $table WHERE $column = ?";
+        $statement = $this->qe($query, [$value]);
+        return $statement->fetchColumn() > 0;
+    }
 }
