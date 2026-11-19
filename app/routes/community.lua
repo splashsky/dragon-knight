@@ -1,6 +1,7 @@
--- routes/community.lua :: forum (legacy forum.php) and help pages (help*.php).
+-- routes/community.lua :: forum (legacy forum.php), help pages (help*.php) and changelog.
 local forum = require("community.forum")
 local help = require("community.help")
+local changelog = require("community.changelog")
 
 return function(r)
 	r:get("/forum", forum.guard, forum.index)
@@ -14,4 +15,6 @@ return function(r)
 	r:get("/help/spells", help.spells)
 	r:get("/help/monsters", help.monsters)
 	r:get("/help/levels", help.levels)
+
+	r:get("/changelog", changelog.page)
 end

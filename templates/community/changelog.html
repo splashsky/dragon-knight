@@ -1,0 +1,21 @@
+{#- Version history (community/changelog.lua). Uses the help pages' look and footer. -#}
+<div class="help-page changelog" id="top">
+<h1>{{ gamename }} Changelog</h1>
+[ <a href="/help">Help</a> | <a href="/">Return to the game</a> ]
+<br><br><hr>
+{% for _, r in ipairs(releases) do %}
+<section class="changelog-release" id="{{ r.anchor }}">
+<h3><a href="#{{ r.anchor }}">{{ r.version }}</a> <span class="light">({{ r.date }})</span></h3>
+{% if r.thanks then %}<p class="changelog-thanks">{{ r.thanks }}</p>
+{% end -%}
+<ul>
+{% for _, c in ipairs(r.changes) do -%}
+<li>{{ c }}</li>
+{% end -%}
+</ul>
+</section>
+{% end %}
+<br>
+[ <a href="#top">Back to top</a> ]
+<br><br>
+{{{ include("community/help/footer") }}}

@@ -15,7 +15,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_fight.lua` |
-| Forum, help | `app/routes/community.lua`, `app/community/*` | `templates/community/{forum,help}/*`, `public/css/community.css` | `tests/e2e/community.sh` |
+| Forum, help, changelog | `app/routes/community.lua`, `app/community/*` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
 | Install / CLI | `app/install.lua`, `app/cli/user.lua`, `app/sql/*` | | `tests/run.sh` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
@@ -306,3 +306,11 @@ Edits to `app/**/*.lua`, `templates/**/*.html` and the app-level keys of the con
 apply on the next request. To build and test several checkouts side by side (or in CI),
 give each its own object dir and binary: `make BUILD=build/x BIN=build/x/dk` and
 `BIN=build/x/dk tests/run.sh`.
+
+## Releases
+
+The version shown in the footer is `view.GAME_VERSION` (`app/lib/view.lua`); it links to
+`/changelog`. For a release, bump it and add an entry at the top of
+`changelog.RELEASES` in `app/community/changelog.lua`, in the original changelog's style
+(`m.d.yyyy` dates, one short past-tense line per change). Entries up to 1.1.11 are the
+original `changelog.txt` and stay verbatim.

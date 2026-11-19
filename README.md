@@ -129,6 +129,9 @@ PLAN.md         design notes: engine API, URL map, data model
 
 ## Differences from the original
 
+The full version history, including the original 2003–2006 changelog, is on the
+in-game `/changelog` page (also linked from the version number in the footer).
+
 - Clean URLs (`/inn`, `/shop/buy/3`, `/forum/thread/7`, …) and HTML5/CSS markup with the
 	original images and layout.
 - PBKDF2 password hashes, server-side sessions and CSRF tokens instead of the original
