@@ -41,19 +41,23 @@ src/                  C engine
   vmpool.[ch]         warm spare VMs, warmer/reaper thread
   bind.h              dk Lua API (bind_dk.c), SQLite binding (bind_db.c), db.c
   app.c               dk_hooks glue: worker_init opens DB; handle = acquire VM → bind_handle → release
-  main.c              CLI: `dk serve`, `dk install`, `dk migrate`, `dk user`, `dk check`, `dk version`
+  main.c              CLI: `dk serve`, `dk install`, `dk migrate`, `dk content`, `dk user`, `dk check`,
+                      `dk version`
 app/                  Lua application (hot-reloaded)
   main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
   routes.lua          route table assembly (requires the route modules listed in it)
   routes/             thin route modules: auth, home, town, fight, community, admin
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
-                      news, paging, migrations (schema versions)
+                      news, paging, migrations (schema versions), leveling, classes,
+                      content/ (content loader, schemas, sync)
+  content/            content files: classes/<key>.lua (synced into the DB)
   town/               inn, shop, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, levels, generic CRUD editor)
+  admin/              admin control panel (settings, news, classes, generic CRUD editor)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
+  cli/content.lua     `dk content sync|status`; cli/check.lua: content part of `dk check`
   install.lua         `dk install`: schema + seed data + admin user
   sql/schema.sql      SQLite schema
   sql/seed.sql        default game data ported 1:1 from legacy install.php
@@ -65,8 +69,8 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, fight, migrate,
                       news, playthrough, town)
-tests/fixtures/       schema_v0.sql (pre-versioning), schema_v1.sql: frozen old schemas for
-                      the migration test
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v3.sql, seed_v3.sql: frozen old
+                      schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
 
@@ -132,7 +136,8 @@ Global `dk` table installed in every VM:
 | `dk.request_start` | `dk.clock()` value when the request began (page timing) |
 | `dk.log(level, msg)` | level: `"info"|"warn"|"error"` |
 | `dk.config` | the table returned by config.lua (re-read per VM build → hot) |
-| `dk.vmstats()` | table of vmpool stats (debug page) |
+| `dk.vmstats()` | table of vmpool stats, `generation` (code cache) and `boot_id` (random per process) |
+| `dk.list_modules(prefix)` | sorted module names of the `*.lua` files directly under `app/<prefix as path>` (`"content.classes"` → `{"content.classes.mage", ...}`); read live, so new files count at once |
 | `require(name)` | loads `app/<name with . → />.lua` from codecache; `package.path`/`cpath` disabled |
 
 DB value mapping: `nil`→NULL, boolean→0/1, integer→INTEGER, float→REAL, string→TEXT;
@@ -232,7 +237,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,spells,levels,users}[/:id]`, `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,spells,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -242,8 +247,8 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 ## Data model
 
 - Port every legacy table to SQLite without the `dk_` prefix: `babble, control, drops,
-	forum, items, levels, monsters, news, spells, towns, users`, keeping column names so
-	porting is mechanical. Add `sessions`.
+	forum, items, monsters, news, spells, towns, users` (and `levels`, until schema
+	version 4), keeping column names so porting is mechanical. Add `sessions`.
 - Forum boards: `forums(id, name, description, position, admin_threads)`, seeded with
 	1 General and 2 News (`admin_threads = 1`: only admins start threads). `forum` gains
 	`board` (→ `forums.id`, replies copy their thread's) and `author_id` (→ `users.id`,
@@ -253,11 +258,19 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	are `ON DELETE SET NULL`; foreign keys are enforced.
 - No difficulty levels: `control.diff1name`…`diff3mod` and `users.difficulty` are dropped
 	(schema version 2); everyone plays at the original Easy difficulty (no scaling).
-- `levels` holds per-class gains only (`"<class>_hp"`, `_mp`, `_strength`, `_dexterity`,
-	`_spells`; row 1 = starting values, row 100 = the cap). Experience per level, TP gains
-	and the milestone HP bonus (added to `_hp`, which is 0 at levels 10, 20, …, 90 and 99)
-	are formulas in `app/lib/leveling.lua`, fitted to the original table (schema version 3
-	dropped the `_exp`/`_tp` columns).
+- Content (schema version 4, `docs/APP.md` "Content"): character classes are Lua data
+	files `app/content/classes/<key>.lua`, synced into `classes(id, key UNIQUE, name,
+	description, sort, playable, start_hp, start_mp, start_tp, start_strength,
+	start_dexterity, exp_base, exp_stages, retired)`, `class_levels(class_id, level, hp, mp,
+	strength, dexterity)` (levels 2-100) and `class_spells(class_id, level, spell_id)`.
+	`users.charclass` holds `classes.id` (1-3 are the original Mage, Warrior, Paladin).
+	Rows are never deleted (a missing file retires its row). `content_overrides(kind, key,
+	field, value)` are admin values that win over the files; `content_adopt` carries values
+	of a migration into overrides; `meta(key, value)` holds the content fingerprint, the
+	last check (`content_seen`) and error. Experience, TP gains and the milestone HP bonus
+	are formulas in `app/lib/leveling.lua` (per-class experience parameters from the class
+	files); version 3 dropped the old levels table's `_exp`/`_tp` columns, version 4 the
+	table and `control.class1name..class3name`.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -273,9 +286,10 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
 	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
-- Seed data in `app/sql/seed.sql` matches the original install.php "complete setup"
-	exactly (all rows of drops, items, levels, monsters, spells, towns, control), minus
-	the difficulty settings and the levels values that became formulas.
+- Seed data in `app/sql/seed.sql` plus the class content files match the original
+	install.php "complete setup" exactly (all rows of drops, items, levels, monsters,
+	spells, towns, control), minus the difficulty settings and the levels values that
+	became formulas.
 - Email (registration verification, lost password) is written to
 	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 

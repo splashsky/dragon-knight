@@ -1,5 +1,6 @@
 -- routes/auth.lua :: accounts (port of legacy login.php + users.php).
 local auth = require("lib.auth")
+local classes = require("lib.classes")
 local game = require("lib.game")
 local mail = require("lib.mail")
 local php = require("lib.php")
@@ -69,7 +70,7 @@ local function register_ctx(values, errors)
 		v = values or {},
 		errors = errors,
 		verifyemail = c.verifyemail == 1,
-		classes = { c.class1name, c.class2name, c.class3name },
+		classes = classes.playable(),
 	}
 end
 
@@ -133,17 +134,24 @@ local function register_post(req)
 	if #password1 > MAX_PASSWORD then err("Password is too long.") end
 	if password1 ~= password2 then err("Passwords don't match.") end
 
-	local charclass = math.tointeger(tonumber(v.charclass))
-	if not charclass or charclass < 1 or charclass > 3 then err("Character Class is invalid.") end
+	local class
+	for _, cl in ipairs(classes.playable()) do
+		if tostring(cl.id) == v.charclass then class = cl end
+	end
+	if not class then err("Character Class is invalid.") end
 
 	if #errors > 0 then
 		return view.page(req, "Register", "auth/register", register_ctx(v, errors), PAGE)
 	end
 
 	local verifycode = c.verifyemail == 1 and auth.random_letters(8) or "1"
-	dk.db:exec("INSERT INTO users (regdate, verify, username, password, email, charname, charclass) " ..
-						 "VALUES (?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode, v.username,
-						 auth.hash_password(password1), v.email1, v.charname, charclass)
+	local st = classes.start_stats(class)
+	dk.db:exec("INSERT INTO users (regdate, verify, username, password, email, charname, charclass, " ..
+						 "currenthp, maxhp, currentmp, maxmp, currenttp, maxtp, strength, dexterity, attackpower, " ..
+						 "defensepower) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode,
+						 v.username, auth.hash_password(password1), v.email1, v.charname, class.id,
+						 st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp, st.strength,
+						 st.dexterity, st.attackpower, st.defensepower)
 
 	local msg
 	if c.verifyemail == 1 then

@@ -2,7 +2,7 @@
 -- (legacy admin.php items/edititem, drops, towns, monsters, spells, users). See
 -- admin/editor.lua for the spec format. Column lists here are the UPDATE whitelists.
 local auth = require("lib.auth")
-local game = require("lib.game")
+local classes = require("lib.classes")
 
 local tables = {}
 
@@ -148,7 +148,10 @@ end
 -- legacy edituser: every column except id/username/password/regdate/onlinetime is editable.
 -- The password hash is never shown; "New Password" (optional) sets a new one.
 tables.users = function()
-	local c = game.control()
+	local class_options = {}
+	for _, c in ipairs(classes.all()) do
+		class_options[#class_options + 1] = { c.id, c.name .. (c.retired ~= 0 and " (retired)" or "") }
+	end
 	return {
 		table = "users", path = "/admin/users", column = "username",
 		heading = "Edit Users", saved = "User updated.",
@@ -185,7 +188,7 @@ tables.users = function()
 			num("longitude", "Longitude", 5, 6),
 			{ name = "charclass", label = "Character Class", kind = "select", int = true,
 				required = "Character Class is required.", numeric = "Character Class must be a number.",
-				options = { { 1, c.class1name }, { 2, c.class2name }, { 3, c.class3name } } },
+				options = class_options },
 			SEP,
 			text("currentaction", "Current Action", 30, 30),
 			num("currentfight", "Current Fight", 5, 4),

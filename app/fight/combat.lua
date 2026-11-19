@@ -212,13 +212,14 @@ function combat.rewards(user, monster, rand)
 end
 
 -- Level ups for `newexp` experience: one level at a time while the experience covers the
--- next level (leveling.exp_for), up to MAX_LEVEL. `gains(level)` returns the levels table's
--- gains for the user's class (game.level_gains; nil stops the loop); TP and the HP
+-- next level (leveling.exp_for with the class `cls`'s curve), up to MAX_LEVEL.
+-- `gains(level)` returns the class's gains for that level ({ hp, mp, strength, dexterity,
+-- spells = { spell id, ... } }, classes.levels; nil stops the loop); TP and the HP
 -- milestone bonus are added from lib/leveling.lua. Returns nil (no level gained) or the
 -- summed gains (hp, mp, tp, strength, dexterity), `levels` (how many), `learned` (spells
 -- learned) and the new stats.
 -- fixed: legacy granted at most one level per victory.
-function combat.level_up(user, newexp, gains)
+function combat.level_up(user, cls, newexp, gains)
 	local g = {
 		level = user.level, levels = 0, learned = 0,
 		hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0,
@@ -228,7 +229,7 @@ function combat.level_up(user, newexp, gains)
 	-- missing levels row, wiping the character; those victories now just don't level.
 	while g.level < combat.MAX_LEVEL do
 		local level = g.level + 1
-		local need = leveling.exp_for(user.charclass, level)
+		local need = leveling.exp_for(cls, level)
 		if not need or newexp < need then break end
 		local row = gains(level)
 		if not row then break end
@@ -239,8 +240,8 @@ function combat.level_up(user, newexp, gains)
 		g.tp = g.tp + leveling.tp_gain(level)
 		g.strength = g.strength + row.strength
 		g.dexterity = g.dexterity + row.dexterity
-		if row.spells ~= 0 then
-			spells = spells .. "," .. row.spells
+		for _, spell in ipairs(row.spells or {}) do
+			spells = spells .. "," .. spell
 			g.learned = g.learned + 1
 		end
 	end

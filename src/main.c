@@ -28,11 +28,15 @@ static void usage(FILE *f)
 			"  migrate [--status] upgrade the database schema (runs app/cli/migrate.lua)\n"
 			"  backup [OUTPUT]    copy the database safely, even while serving (default:\n"
 			"                     <db dir>/backups/<name>-YYYYMMDD-HHMMSS.db); prints the path\n"
+			"  content sync|status\n"
+			"                     sync the content files (app/content/) into the database now,\n"
+			"                     or show whether it is in sync (runs app/cli/content.lua)\n"
 			"  user [args...]     user administration (runs app/cli/user.lua)\n"
-			"  check              compile all modules/templates and build a VM; nonzero on error\n"
+			"  check              compile all modules/templates, build a VM and validate the\n"
+			"                     content files; nonzero on error\n"
 			"  version            print version information\n"
 			"\n"
-			"The config file defaults to ./config.lua. migrate, user and backup exit with\n"
+			"The config file defaults to ./config.lua. migrate, content, user and backup exit with\n"
 			"status %d when the database does not exist (they never create it).\n", DK_EXIT_NO_DB);
 }
 
@@ -148,6 +152,9 @@ int main(int argc, char **argv)
 		if (!rc) rc = app_cli(&cfg, "cli.migrate", nrest, rest);
 	} else if (!strcmp(cmd, "backup")) {
 		rc = backup_cli(&cfg, nrest, rest);
+	} else if (!strcmp(cmd, "content")) {
+		rc = need_db(&cfg, cmd);
+		if (!rc) rc = app_cli(&cfg, "cli.content", nrest, rest);
 	} else if (!strcmp(cmd, "user")) {
 		rc = need_db(&cfg, cmd);
 		if (!rc) rc = app_cli(&cfg, "cli.user", nrest, rest);

@@ -40,50 +40,19 @@ Once again, thanks for playing!<br><br>
 <br><br><hr>
 
 <h3 id="classes">Character Classes</h3>
-There are three character classes in the game. The main differences between the classes are what spells you get
+There are {{ class_count }} character classes in the game. The main differences between the classes are what spells you get
 access to, the speed with which you level up, and the amount of HP/MP/strength/dexterity you gain per level. Below
 is a basic outline of each of the character classes. For more detailed information about the characters, please
 view the Levels table at the bottom of this page. Also, note that the outline below refers to the stock class setup
 for the game. If your administrator has used his/her own class setup, this information may not be accurate.<br><br>
-<b>{{ classes[1] }}</b>
+{%- for _, c in ipairs(classes) do %}
+<b>{{ c.name }}</b>
 <ul>
-<li>Fast level-ups</li>
-<li>High hit points</li>
-<li>High magic points</li>
-<li>Low strength</li>
-<li>Low dexterity</li>
-<li>5 heal spells</li>
-<li>5 hurt spells</li>
-<li>3 sleep spells</li>
-<li>3 +defense spells</li>
-<li>0 +attack spells</li>
+{%- for _, p in ipairs(c.points) do %}
+<li>{{ p }}</li>
+{%- end %}
 </ul>
-<b>{{ classes[2] }}</b>
-<ul>
-<li>Medium level-ups</li>
-<li>Medium hit points</li>
-<li>Low magic points</li>
-<li>High strength</li>
-<li>Low dexterity</li>
-<li>3 heal spells</li>
-<li>3 hurt spells</li>
-<li>2 sleep spells</li>
-<li>3 +defense spells</li>
-<li>3 +attack spells</li>
-</ul>
-<b>{{ classes[3] }}</b>
-<ul>
-<li>Slow level-ups</li>
-<li>Medium hit points</li>
-<li>Medium magic points</li>
-<li>Low strength</li>
-<li>High dexterity</li>
-<li>4 heal spells</li>
-<li>4 hurt spells</li>
-<li>3 sleep spells</li>
-<li>2 +defense spells</li>
-<li>2 +attack spells</li>
-</ul>
+{%- end %}
 [ <a href="#top">Top</a> ]
 
 <br><br><hr>

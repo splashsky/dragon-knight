@@ -11,7 +11,7 @@
 </thead>
 <tbody>
 {%- for _, r in ipairs(c.rows) do %}
-<tr><td>{{ r.level }}</td><td>{{ r.exp }}</td>{% for _, v in ipairs(r.stats) do %}<td>{{ v }}</td>{% end %}<td>{% if r.has_spell then %}{{ r.spell }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+<tr><td>{{ r.level }}</td><td>{{ r.exp }}</td>{% for _, v in ipairs(r.stats) do %}<td>{{ v }}</td>{% end %}<td>{% if #r.spells > 0 then %}{{ table.concat(r.spells, ", ") }}{% else %}<span class="light">None</span>{% end %}</td></tr>
 {%- end %}
 </tbody>
 </table>

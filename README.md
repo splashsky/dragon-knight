@@ -72,19 +72,21 @@ date; it does nothing when it already is. To run the game on a server, see
 ## Command line
 
 Every command accepts `--config PATH` (default `./config.lua`). Only `dk install` and
-`dk serve` create the database; `dk migrate`, `dk user` and `dk backup` exit with status 3
-when it doesn't exist.
+`dk serve` create the database; `dk migrate`, `dk content`, `dk user` and `dk backup` exit
+with status 3 when it doesn't exist.
 
 | Command | |
 |---|---|
 | `dk serve [--port N] [--bind ADDR]` | run the HTTP server; `--port` (1–65535, or 0 for any free port) and `--bind` (an IPv4 or IPv6 address) override the config |
-| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class 1-3] [--partial] [--force]` | create the schema, load the default game data and create the administrator (`--partial`: no game data; `--force`: drop existing tables first) |
-| `dk migrate [--status]` | upgrade an existing database to the current schema, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
+| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class ID\|KEY] [--partial] [--force]` | create the schema, load the default game data, sync the content files and create the administrator (`--class`: by id or key, default 1 / `mage`; `--partial`: no game data except the classes; `--force`: drop existing tables first) |
+| `dk migrate [--status]` | upgrade an existing database to the current schema and sync the content files, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
+| `dk content sync` | load and validate the content files (`app/content/`) and update the database now (the running game does this by itself on the next request after a file changes); fails, changing nothing, when a file is invalid |
+| `dk content status` | content files, database rows (and retired ones) and admin overrides per kind, whether the database is in sync, and any errors |
 | `dk backup [OUTPUT]` | copy the database, safely while `dk serve` runs (SQLite backup API, one consistent snapshot), check the copy with `PRAGMA integrity_check` and print its path. OUTPUT defaults to `<db dir>/backups/<db name>-YYYYMMDD-HHMMSS.db` (UTC); an existing file is never overwritten. Exit status 3 if the database does not exist |
 | `dk user list` | list accounts |
 | `dk user passwd USER NEWPASS` | set a password (ends the user's sessions) |
 | `dk user admin USER` | make a user an administrator |
-| `dk check` | compile every Lua module and template and build a VM; non-zero exit on error |
+| `dk check` | compile every Lua module and template, build a VM and validate the content files; non-zero exit on error (naming the file) |
 | `dk version` | print the version and the Lua/SQLite versions |
 
 ## Configuration
@@ -92,8 +94,10 @@ when it doesn't exist.
 `config.example.lua` documents every key. Server keys (`bind`, `port`, `workers`,
 `spares`, paths, request limits) are read at startup. App keys (`dev`, `secret`,
 `pbkdf2_iterations`, `cookie_secure`) are re-read for every fresh VM, so they apply on the
-next request. Game settings (game name, map size, forum, email verification, class
-names, …) live in the database and are edited in the admin panel at `/admin`.
+next request. Game settings (game name, map size, forum, email verification, …) live in
+the database and are edited in the admin panel at `/admin`. Character classes are content
+files (see [Adding a class](#adding-a-class)); the admin panel can override their names,
+descriptions and starting stats per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -178,7 +182,8 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 ## Development
 
 - Edit `app/**/*.lua` or `templates/**/*.html` and refresh the browser.
-- `./dk check` catches syntax errors in every module and template.
+- `./dk check` catches syntax errors in every module and template, and invalid content
+	files.
 - `make test` builds and runs the C unit tests, then `tests/run.sh`: a temporary copy of
 	the app on a random port, Lua unit tests (`tests/lua/`), core end-to-end checks and the
 	feature scripts in `tests/e2e/` (including a full playthrough and a concurrency check).
@@ -196,6 +201,17 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 - The C code builds warning-free with `-Wall -Wextra`. Lua code uses no globals (in Lua
 	5.5 `global` is a reserved word). The project indents with tabs.
 
+## Adding a class
+
+Character classes are data files, `app/content/classes/<key>.lua` (Mage, Warrior and
+Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (the file
+name is the class's permanent key: lowercase letters, digits and `_`), change the name,
+description, starting stats, experience curve and per-level gains, and run `./dk check`.
+The running game picks the file up on the next page load and offers the class at
+registration; on another server, deploy it like any code change. Deleting a file retires
+the class (no longer offered; its characters keep it). The format, the sync and the admin
+overrides are described in `docs/APP.md` ("Content").
+
 ## Project layout
 
 ```
@@ -205,7 +221,8 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, schema and seed data
+  content/        content files: classes/ (one Lua data file per class), synced into the DB
+  install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
 scripts/        run.sh (`make run`), deploy.sh (`make deploy`)
@@ -251,6 +268,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 - The experience needed per level, the TP gained per level and the HP bonus every tenth
 	level (and at 99) are formulas fitted to the original level table (`app/lib/leveling.lua`;
 	experience within 0.44% of it, TP and HP exactly), no longer columns of the levels table.
+- Character classes are content files (`app/content/classes/`) instead of the levels table
+	and the class names in the settings: classes can be added without code changes, and
+	administrators override names, descriptions, availability and starting stats per
+	server (`/admin/classes`).
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

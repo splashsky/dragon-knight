@@ -1,5 +1,6 @@
 -- town/character.lua :: legacy index.php showchar() (own sheet, popup), onlinechar($id)
 -- (anyone's sheet, from Who's Online) and showmap().
+local classes = require("lib.classes")
 local common = require("town.common")
 local game = require("lib.game")
 local leveling = require("lib.leveling")
@@ -15,10 +16,10 @@ local function bonus(n)
 end
 
 local function sheet(user)
-	local class = math.tointeger(user.charclass)
+	local class = classes.get(user.charclass)
 	local nextlevel
 	-- fixed: legacy showed "Next Level: None" already at level 99.
-	if user.level < leveling.MAX_LEVEL and class and leveling.EXP[class] then
+	if user.level < leveling.MAX_LEVEL and class then
 		nextlevel = php.number_format(leveling.exp_for(class, user.level + 1) or 0)
 	end
 	local spells = {}
@@ -30,7 +31,7 @@ local function sheet(user)
 		plusexp = bonus(user.expbonus),
 		plusgold = bonus(user.goldbonus),
 		nextlevel = nextlevel,
-		charclass = game.class_name(user.charclass),
+		charclass = class and class.name,
 		spells = spells,
 	}
 end

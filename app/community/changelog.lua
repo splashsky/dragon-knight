@@ -12,6 +12,9 @@ changelog.RELEASES = {
 		changes = {
 			"Removed difficulty levels; everyone plays at the original Easy difficulty.",
 			"Experience needed per level, TP gains and HP milestones now follow formulas fitted to the original level table.",
+			"Classes are now content files that can be edited and added without code changes; admins can override names, descriptions and starting stats per server.",
+			"Replaced the levels editor and the class name settings with a Classes page in the admin panel.",
+			"Added dk content sync and dk content status; dk check also validates the content files.",
 		},
 	},
 	{

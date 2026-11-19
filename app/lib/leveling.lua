@@ -3,11 +3,11 @@
 -- The original game (1.1.11) listed every level's total experience, TP gain and HP gain
 -- per class in its levels table. Those columns follow simple rules, fitted here to the
 -- original table: the experience totals come within 0.44% of it (the rest is hand-tweaked
--- noise), and the TP and HP milestone gains match it exactly. The other per-level gains
--- (base HP, MP, strength, dexterity, spells) stay data in the `levels` table, editable in
--- the admin panel. Pure module (no DB access): edit the parameters below and the game
--- picks them up on the next request; tests/lua/test_leveling.lua compares them with a
--- frozen copy of the original table.
+-- noise), and the TP and HP milestone gains match it exactly. The experience curve's
+-- parameters and the other per-level gains (base HP, MP, strength, dexterity, spells) are
+-- per class, in the class content files (app/content/classes/*.lua). Pure module (no DB
+-- access): edit the rules below and the game picks them up on the next request;
+-- tests/lua/test_leveling.lua compares them with a frozen copy of the original table.
 local leveling = {}
 
 leveling.MAX_LEVEL = 100
@@ -15,32 +15,38 @@ leveling.MAX_LEVEL = 100
 -- Rewards stop just below it, so level MAX_LEVEL is never reached by fighting.
 leveling.MAX_EXPERIENCE = 16777215
 
--- Experience curve per class (1 Mage, 2 Warrior, 3 Paladin). step(n) is the experience
--- from level n to level n + 1: step(1) = base, then each step is the previous one times
--- the stage's factor, rounded down (step(n) = floor(step(n - 1) * factor)). Stages apply
--- in order to steps 2, 3, ...; after the last stage the steps stay flat. exp_for(level) is
--- the sum of the steps below it (0 at level 1), except exp_for(MAX_LEVEL) = MAX_EXPERIENCE.
-leveling.EXP = {
-	[1] = { base = 15, stages = {
-		{ factor = 2, steps = 2 }, { factor = 1.5, steps = 8 },
-		{ factor = 1.25, steps = 5 }, { factor = 1.125, steps = 28 },
-	} },
-	[2] = { base = 18, stages = {
-		{ factor = 2, steps = 2 }, { factor = 1.5, steps = 8 },
-		{ factor = 1.25, steps = 5 }, { factor = 1.125, steps = 27 },
-	} },
-	[3] = { base = 20, stages = {
-		{ factor = 2, steps = 2 }, { factor = 1.5, steps = 8 },
-		{ factor = 1.25, steps = 6 }, { factor = 1.125, steps = 25 },
-	} },
-}
+-- Experience curve: per class, from the class's content file (app/content/classes/
+-- <key>.lua, synced into the classes table): `exp_base` and `exp_stages`. step(n) is the
+-- experience from level n to level n + 1: step(1) = base, then each step is the previous
+-- one times the stage's factor, rounded down (step(n) = floor(step(n - 1) * factor)).
+-- Stages ("2x2,1.5x8,1.25x5,1.125x28": factor x steps) apply in order to steps 2, 3, ...;
+-- after the last stage the steps stay flat. exp_for(level) is the sum of the steps below
+-- it (0 at level 1), except exp_for(MAX_LEVEL) = MAX_EXPERIENCE. `class` arguments below
+-- are tables with those two fields (a classes row or a content entity).
+
+-- "2x2,1.5x8" -> { { factor = 2, steps = 2 }, { factor = 1.5, steps = 8 } }, or nil and
+-- an error message. "" means no stages (flat from the start).
+function leveling.parse_stages(s)
+	if type(s) ~= "string" then return nil, "must be a string like \"2x2,1.5x8\"" end
+	local stages = {}
+	if s == "" then return stages end
+	for part in (s .. ","):gmatch("([^,]*),") do
+		local f, n = part:match("^%s*([%d%.]+)x(%d+)%s*$")
+		local factor, steps = tonumber(f), math.tointeger(tonumber(n))
+		if not factor or not steps or factor < 1 or steps < 1 then
+			return nil, "bad stage \"" .. part .. "\" (want factor x steps, e.g. \"1.5x8\", factor >= 1)"
+		end
+		stages[#stages + 1] = { factor = factor, steps = steps }
+	end
+	return stages
+end
 
 -- TP gained on reaching a level: base + floor(level / every), with exceptions. `start` is
--- the level 1 entry of the help page (the original table's; new characters get the users
--- table defaults). Nothing is gained at MAX_LEVEL.
+-- the level 1 entry of the help page (the original table's; new characters get their
+-- class's start_tp). Nothing is gained at MAX_LEVEL.
 leveling.TP = { start = 5, base = 2, every = 30, exceptions = { [2] = 1 } }
 
--- HP bonus on reaching a milestone level, added to the levels table's per-class HP gain
+-- HP bonus on reaching a milestone level, added to the class's per-level HP gain
 -- (which is 0 at these levels): every 10th level gets the bonus of the first band it falls
 -- in (none past the last band), plus the extra levels listed.
 leveling.HP_MILESTONES = {
@@ -49,22 +55,20 @@ leveling.HP_MILESTONES = {
 	extra = { [99] = 50 },
 }
 
-local function params(class)
-	local p = leveling.EXP[math.tointeger(tonumber(class))]
-	assert(p, "bad class")
-	return p
-end
-
--- Per class (computed once per VM): the steps, steps[n] for n = 1 .. MAX_LEVEL - 2 (at
+-- Per curve (computed once per VM): the steps, steps[n] for n = 1 .. MAX_LEVEL - 2 (at
 -- least), and the experience totals, totals[level] for level = 1 .. MAX_LEVEL.
 local curves = {}
 
 local function curve(class)
-	local p = params(class)
-	local c = curves[p]
+	assert(type(class) == "table", "bad class")
+	local base = math.tointeger(class.exp_base)
+	local stages = leveling.parse_stages(class.exp_stages)
+	assert(base and base >= 1 and stages, "bad class experience parameters")
+	local id = base .. "|" .. class.exp_stages
+	local c = curves[id]
 	if c then return c end
-	local steps = { p.base }
-	for _, stage in ipairs(p.stages) do
+	local steps = { base }
+	for _, stage in ipairs(stages) do
 		for _ = 1, stage.steps do steps[#steps + 1] = math.floor(steps[#steps] * stage.factor) end
 	end
 	while #steps < leveling.MAX_LEVEL - 2 do steps[#steps + 1] = steps[#steps] end
@@ -72,7 +76,7 @@ local function curve(class)
 	for level = 2, leveling.MAX_LEVEL - 1 do totals[level] = totals[level - 1] + steps[level - 1] end
 	totals[leveling.MAX_LEVEL] = leveling.MAX_EXPERIENCE
 	c = { steps = steps, totals = totals }
-	curves[p] = c
+	curves[id] = c
 	return c
 end
 

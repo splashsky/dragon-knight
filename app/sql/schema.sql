@@ -11,6 +11,72 @@ CREATE TABLE babble (
 	babble    TEXT    NOT NULL DEFAULT ''
 );
 
+-- Character classes: content files app/content/classes/<key>.lua synced into these tables
+-- (app/lib/content/sync.lua). Rows are never deleted: a class whose file is gone is
+-- retired (existing characters keep it). users.charclass holds classes.id.
+CREATE TABLE classes (
+	id               INTEGER PRIMARY KEY,
+	key              TEXT    NOT NULL UNIQUE,
+	name             TEXT    NOT NULL DEFAULT '',
+	description      TEXT    NOT NULL DEFAULT '',
+	sort             INTEGER NOT NULL DEFAULT 0,
+	playable         INTEGER NOT NULL DEFAULT 1,
+	start_hp         INTEGER NOT NULL DEFAULT 15,
+	start_mp         INTEGER NOT NULL DEFAULT 0,
+	start_tp         INTEGER NOT NULL DEFAULT 10,
+	start_strength   INTEGER NOT NULL DEFAULT 5,
+	start_dexterity  INTEGER NOT NULL DEFAULT 5,
+	exp_base         INTEGER NOT NULL DEFAULT 15,
+	exp_stages       TEXT    NOT NULL DEFAULT '',
+	retired          INTEGER NOT NULL DEFAULT 0
+);
+
+-- Gains on reaching a level (2 .. 100) per class; hp is without the milestone bonus, and
+-- experience and TP are formulas (app/lib/leveling.lua).
+CREATE TABLE class_levels (
+	class_id   INTEGER NOT NULL REFERENCES classes (id),
+	level      INTEGER NOT NULL,
+	hp         INTEGER NOT NULL DEFAULT 0,
+	mp         INTEGER NOT NULL DEFAULT 0,
+	strength   INTEGER NOT NULL DEFAULT 0,
+	dexterity  INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (class_id, level)
+) WITHOUT ROWID;
+
+-- Spells a class learns on reaching a level (spells.id).
+CREATE TABLE class_spells (
+	class_id  INTEGER NOT NULL REFERENCES classes (id),
+	level     INTEGER NOT NULL,
+	spell_id  INTEGER NOT NULL,
+	PRIMARY KEY (class_id, level, spell_id)
+) WITHOUT ROWID;
+
+-- Admin overrides of content values (field: a content field like "name" or
+-- "levels.17.hp"; value as text). They survive syncs; deleting one resets to the file.
+CREATE TABLE content_overrides (
+	kind   TEXT NOT NULL,
+	key    TEXT NOT NULL,
+	field  TEXT NOT NULL,
+	value  TEXT NOT NULL,
+	PRIMARY KEY (kind, key, field)
+) WITHOUT ROWID;
+
+-- Values a migration carried over from the old schema; the next sync turns those that
+-- differ from the content file into overrides and deletes the rows.
+CREATE TABLE content_adopt (
+	kind   TEXT NOT NULL,
+	key    TEXT NOT NULL,
+	field  TEXT NOT NULL,
+	value  TEXT NOT NULL,
+	PRIMARY KEY (kind, key, field)
+) WITHOUT ROWID;
+
+-- Small key/value store: content_fingerprint, content_seen, content_error.
+CREATE TABLE meta (
+	key    TEXT PRIMARY KEY,
+	value  TEXT NOT NULL
+) WITHOUT ROWID;
+
 CREATE TABLE control (
 	id            INTEGER PRIMARY KEY,
 	gamename      TEXT    NOT NULL DEFAULT '',
@@ -20,9 +86,6 @@ CREATE TABLE control (
 	adminemail    TEXT    NOT NULL DEFAULT '',
 	forumtype     INTEGER NOT NULL DEFAULT 0,
 	forumaddress  TEXT    NOT NULL DEFAULT '',
-	class1name    TEXT    NOT NULL DEFAULT '',
-	class2name    TEXT    NOT NULL DEFAULT '',
-	class3name    TEXT    NOT NULL DEFAULT '',
 	compression   INTEGER NOT NULL DEFAULT 0,
 	verifyemail   INTEGER NOT NULL DEFAULT 0,
 	shownews      INTEGER NOT NULL DEFAULT 0,
@@ -72,29 +135,6 @@ CREATE TABLE items (
 	buycost    INTEGER NOT NULL DEFAULT 0,
 	attribute  INTEGER NOT NULL DEFAULT 0,
 	special    TEXT    NOT NULL DEFAULT ''
-);
-
--- Per-level gains per class "<class>_<stat>"; row 1 holds the starting values, row 100
--- (the last level) gains nothing. Experience, TP and the HP bonus at milestone levels
--- are formulas (app/lib/leveling.lua); hp is the gain without that bonus.
--- Column names start with a digit: quote them in SQL ("1_hp").
-CREATE TABLE levels (
-	id             INTEGER PRIMARY KEY AUTOINCREMENT,
-	"1_hp"         INTEGER NOT NULL DEFAULT 0,
-	"1_mp"         INTEGER NOT NULL DEFAULT 0,
-	"1_strength"   INTEGER NOT NULL DEFAULT 0,
-	"1_dexterity"  INTEGER NOT NULL DEFAULT 0,
-	"1_spells"     INTEGER NOT NULL DEFAULT 0,
-	"2_hp"         INTEGER NOT NULL DEFAULT 0,
-	"2_mp"         INTEGER NOT NULL DEFAULT 0,
-	"2_strength"   INTEGER NOT NULL DEFAULT 0,
-	"2_dexterity"  INTEGER NOT NULL DEFAULT 0,
-	"2_spells"     INTEGER NOT NULL DEFAULT 0,
-	"3_hp"         INTEGER NOT NULL DEFAULT 0,
-	"3_mp"         INTEGER NOT NULL DEFAULT 0,
-	"3_strength"   INTEGER NOT NULL DEFAULT 0,
-	"3_dexterity"  INTEGER NOT NULL DEFAULT 0,
-	"3_spells"     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE monsters (

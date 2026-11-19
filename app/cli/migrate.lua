@@ -1,13 +1,15 @@
 -- cli/migrate.lua :: `dk migrate` -- upgrade an existing database to the current schema
 -- (steps in app/lib/migrations.lua). Runs in the CLI's transaction: on any error nothing
 -- is changed.
+local content = require("cli.content")
 local migrations = require("lib.migrations")
 
 local USAGE = [[
 usage: dk migrate [--status]
 
-	Upgrades the database to the schema of this version of the game. All steps run in
-	one transaction: if one fails, the database is left as it was.
+	Upgrades the database to the schema of this version of the game, then syncs the
+	content files (dk content sync). All steps run in one transaction: if one fails, the
+	database is left as it was.
 	--status   print the database's and the game's schema versions; change nothing
 ]]
 
@@ -42,6 +44,7 @@ local function run(...)
 	end
 	if from == to then
 		print(string.format("Database schema is up to date (version %d).", to))
+		content.sync_or_fail("dk migrate")
 		return 0
 	end
 	for v = from + 1, to do
@@ -56,6 +59,7 @@ local function run(...)
 												#bad, tostring(bad[1].table)), 0)
 	end
 	print(string.format("Database schema is now version %d.", to))
+	content.sync_or_fail("dk migrate")
 	return 0
 end
 

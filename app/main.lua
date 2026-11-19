@@ -1,5 +1,6 @@
 -- main.lua :: request entry point. Loaded once per VM (at warm-up); the returned function
 -- handles exactly one request.
+local content_sync = require("lib.content.sync")
 local csrf = require("lib.csrf")
 local dbcount = require("lib.dbcount")
 local migrations = require("lib.migrations")
@@ -28,6 +29,8 @@ end
 local function dispatch(req)
 	local res = schema_check(req)
 	if res then return res end
+	-- content files changed since the last check (one query when not): sync them
+	content_sync.check()
 	session.load(req)
 	local route, params, allowed = routes:match(req.method, req.path)
 	if not route then

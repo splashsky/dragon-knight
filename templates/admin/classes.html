@@ -1,0 +1,34 @@
+{#- Class list (admin/classes.lua). ctx: rows { c (classes row), users, overrides, file },
+		status (content_sync.status()). -#}
+<h1 class="admin-heading">Classes</h1>
+<p>Character classes are content files, <code>app/content/classes/&lt;key&gt;.lua</code>; the game
+picks up a new or edited file on the next page load. Click a class to override its name,
+description, order, availability and starting stats on this server.</p>
+<table class="admin-list admin-classes">
+<tr><th>ID</th><th>Class</th><th>Key</th><th>Sort</th><th>Playable</th><th>Characters</th><th>Overrides</th></tr>
+{%- for _, r in ipairs(rows) do %}
+<tr><td class="admin-id">{{ r.c.id }}</td><td><a href="/admin/classes/{{ r.c.id }}">{{ r.c.name }}</a>
+{%- if r.c.retired ~= 0 then %} <span class="highlight">(retired)</span>{% end %}</td>
+<td>{{ r.c.key }}</td><td>{{ r.c.sort }}</td><td>{% if r.c.playable ~= 0 then %}Yes{% else %}No{% end %}</td>
+<td>{{ r.users }}</td><td>{{ r.overrides }}</td></tr>
+{%- end %}
+</table>
+<h2 class="admin-subheading">Content sync</h2>
+{%- for _, k in ipairs(status.kinds) do %}
+<p>{{ k.name }}: {{ k.files }} files, {{ k.active + k.retired }} in the database ({{ k.retired }} retired), {{ k.overrides }} overrides.</p>
+{%- end %}
+{%- if #status.errors > 0 then %}
+<div class="admin-errors"><b>Content errors</b> (the game keeps the last good content):
+<pre class="error">{% for _, e in ipairs(status.errors) do %}{{ e }}
+{% end %}</pre></div>
+{%- elseif status.in_sync then %}
+<p>The database is in sync with the content files.</p>
+{%- else %}
+<p>The database is not in sync with the content files yet; the next page load (or <code>dk content sync</code>) updates it.</p>
+{%- end %}
+<h2 class="admin-subheading">Adding a class</h2>
+<p>Copy one of the files in <code>app/content/classes/</code> to a new name (the file name is the
+class's key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it.
+The class appears on the registration page on the next page load. Deleting a file retires
+its class: it is no longer offered, but characters of that class keep playing it. Run
+<code>dk check</code> to validate the files.</p>

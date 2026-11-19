@@ -1,0 +1,209 @@
+-- Unit tests for the content infrastructure (app/lib/content/): loading and validating
+-- the class files, the canonical serialization and fingerprint, and the sync (inside a
+-- savepoint that is rolled back, so the test database is unchanged).
+local kind = require("lib.content.kinds.classes")
+local load = require("lib.content.load")
+local schema = require("lib.content.schema")
+local sync = require("lib.content.sync")
+local T = {}
+
+local function eq(a, b, what)
+	if a ~= b then error((what or "value") .. ": expected " .. tostring(b) .. ", got " .. tostring(a), 2) end
+end
+
+local function has(list, text)
+	for _, s in ipairs(list or {}) do
+		if s:find(text, 1, true) then return true end
+	end
+	error("no message containing '" .. text .. "' in: " .. table.concat(list or {}, " | "), 2)
+end
+
+-- A minimal valid class file table.
+local function class_data(over)
+	local levels = {}
+	for level = 2, 100 do levels[level] = {} end
+	local d = {
+		name = "Tester", start_hp = 20, start_mp = 1, start_tp = 3, start_strength = 4, start_dexterity = 6,
+		exp_base = 10, exp_stages = "2x3", levels = levels,
+	}
+	for k, v in pairs(over or {}) do d[k] = v end
+	return d
+end
+
+function T.load_classes()
+	local k = load.kind("classes")
+	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
+	eq(#k.entities, 3)
+	eq(k.entities[1].key, "mage"); eq(k.entities[2].key, "paladin"); eq(k.entities[3].key, "warrior")
+	local m = k.by_key.mage
+	eq(m.name, "Mage"); eq(m.sort, 1); eq(m.playable, 1); eq(m.start_hp, 15); eq(m.start_tp, 10)
+	eq(m.exp_base, 15); eq(m.exp_stages, "2x2,1.5x8,1.25x5,1.125x28")
+	eq(m["levels.2.hp"], 2); eq(m["levels.2.spells"], "1"); eq(m["levels.3.spells"], "")
+	eq(m["levels.100.mp"], 0)
+	assert(m.description:find("Fast level%-ups\nHigh hit points"), "description lines")
+	eq(k.by_key.warrior.exp_base, 18); eq(k.by_key.paladin.exp_stages, "2x2,1.5x8,1.25x6,1.125x25")
+end
+
+function T.validate_defaults_and_flat_form()
+	local flat, errs = schema.validate(kind, class_data({ levels = (function()
+		local l = {}
+		for level = 2, 100 do l[level] = {} end
+		l[5] = { hp = 3, spells = { 12, 2.0, 7 } }
+		return l
+	end)() }))
+	assert(flat, errs and table.concat(errs, "; "))
+	eq(flat.description, ""); eq(flat.sort, 0); eq(flat.playable, 1)
+	eq(flat["levels.5.hp"], 3); eq(flat["levels.5.mp"], 0); eq(flat["levels.5.spells"], "2,7,12")
+	eq(flat["levels.2.spells"], "")
+end
+
+function T.validate_errors()
+	local function errors(over)
+		local flat, errs = schema.validate(kind, class_data(over))
+		assert(not flat, "expected errors")
+		return errs
+	end
+	has(errors({ name = false }), "field 'name' must be a one-line string")
+	has(errors({ name = "" }), "not empty")
+	has(errors({ name = "two\nlines" }), "field 'name'")
+	has(errors({ start_hp = 0 }), "field 'start_hp' must be an integer from 1")
+	has(errors({ start_mp = 1.5 }), "field 'start_mp' must be an integer")
+	has(errors({ playable = "yes" }), "field 'playable' must be true or false")
+	has(errors({ exp_stages = "fast" }), 'bad stage "fast"')
+	has(errors({ colour = "red" }), "unknown field 'colour'")
+	has(errors({ levels = "none" }), "missing field 'levels'")
+	local l = {}
+	for level = 2, 99 do l[level] = {} end
+	l[101] = {}
+	l[7] = { hp = "lots", str = 1, spells = { "heal" } }
+	local errs = errors({ levels = l })
+	has(errs, "levels: missing level 100"); has(errs, "unexpected key [101]")
+	has(errs, "levels[7]: unknown field 'str'"); has(errs, "levels[7].hp must be an integer")
+	has(errs, "levels[7].spells must be a list of positive integers")
+	local _, e = schema.validate(kind, "nope")
+	has(e, "must return a table")
+	local missing = class_data()
+	missing.exp_base = nil
+	_, e = schema.validate(kind, missing)
+	has(e, "missing field 'exp_base'")
+end
+
+function T.keys_and_override_parsing()
+	assert(schema.valid_key("mage") and schema.valid_key("dark_knight2"))
+	assert(not schema.valid_key("Mage") and not schema.valid_key("dark-knight") and not schema.valid_key(""))
+	eq(kind.field("name").type, "string"); eq(kind.field("levels.17.hp").type, "int")
+	eq(kind.field("levels.17.spells").type, "ids")
+	eq(kind.field("levels.1.hp"), nil); eq(kind.field("levels.101.hp"), nil); eq(kind.field("nope"), nil)
+	eq(schema.parse(kind.field("start_hp"), "25"), 25); eq(schema.parse(kind.field("start_hp"), "0"), nil)
+	eq(schema.parse(kind.field("playable"), "0"), 0); eq(schema.parse(kind.field("playable"), "maybe"), nil)
+	eq(schema.parse(kind.field("levels.2.spells"), "6, 1"), "1,6"); eq(schema.parse(kind.field("levels.2.spells"), ""), "")
+	eq(schema.parse(kind.field("name"), "Wizard"), "Wizard")
+end
+
+local function all_of(entities)
+	local k = { kind = kind, entities = {}, by_key = {}, errors = {} }
+	for _, e in ipairs(entities) do
+		k.entities[#k.entities + 1] = e
+		k.by_key[e.key] = e.flat
+	end
+	table.sort(k.entities, function(a, b) return a.key < b.key end)
+	return { kinds = { classes = k }, errors = {} }
+end
+
+function T.fingerprint_stability()
+	local a = load.fingerprint(load.all())
+	eq(a, load.fingerprint(load.all()), "same files, same fingerprint")
+	eq(#a, 64)
+	eq(sync.meta("content_fingerprint"), a, "install synced these files")
+	-- the same data built in a different order serializes the same
+	local d1 = class_data({ name = "Same", sort = 4 })
+	local d2 = {}
+	local keys = {}
+	for k in pairs(d1) do keys[#keys + 1] = k end
+	table.sort(keys, function(x, y) return x > y end)
+	for _, k in ipairs(keys) do d2[k] = d1[k] end
+	local f1 = schema.validate(kind, d1)
+	local f2 = schema.validate(kind, d2)
+	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
+	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
+	assert(c1:find("^dk%-content%-1\n"), "format line first")
+	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
+	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
+	-- any change changes it
+	local f3 = schema.validate(kind, class_data({ name = "Same", sort = 5 }))
+	assert(load.canonical(all_of({ { key = "x", flat = f3 } })) ~= c1, "changed value, same canonical text")
+end
+
+-- Runs fn inside a savepoint that is always rolled back.
+local function scratch(fn)
+	dk.db:exec("SAVEPOINT test_content")
+	local ok, err = pcall(fn)
+	dk.db:exec("ROLLBACK TO test_content")
+	dk.db:exec("RELEASE test_content")
+	if not ok then error(err, 0) end
+end
+
+function T.sync_apply()
+	scratch(function()
+		local files = load.kind("classes").by_key
+		local function entities(extra, drop)
+			local list = {}
+			for key, flat in pairs(files) do
+				if key ~= drop then list[#list + 1] = { key = key, flat = flat } end
+			end
+			for _, e in ipairs(extra or {}) do list[#list + 1] = e end
+			return all_of(list)
+		end
+		local tester = schema.validate(kind, class_data({ sort = 9, levels = (function()
+			local l = {}
+			for level = 2, 100 do l[level] = { hp = 1, spells = level == 3 and { 1, 6 } or nil } end
+			return l
+		end)() }))
+		-- a new key gets the next id; existing ids are kept
+		local r = sync.apply(entities({ { key = "tester", flat = tester } }))
+		eq(r.classes.inserted, 1); eq(r.classes.retired, 0)
+		local row = dk.db:first("SELECT * FROM classes WHERE key = 'tester'")
+		eq(row.id, 4); eq(row.name, "Tester"); eq(row.start_hp, 20); eq(row.retired, 0)
+		eq(dk.db:value("SELECT id FROM classes WHERE key = 'paladin'"), 3)
+		eq(dk.db:value("SELECT count(*) FROM class_levels WHERE class_id = 4"), 99)
+		eq(dk.db:value("SELECT group_concat(spell_id) FROM class_spells WHERE class_id = 4 AND level = 3"), "1,6")
+		-- missing file: retired, rows kept
+		r = sync.apply(entities({}, "tester"))
+		eq(r.classes.retired, 1)
+		eq(dk.db:value("SELECT retired FROM classes WHERE id = 4"), 1)
+		eq(dk.db:value("SELECT count(*) FROM class_levels WHERE class_id = 4"), 99)
+		-- back: un-retired, same id
+		r = sync.apply(entities({ { key = "tester", flat = tester } }))
+		eq(r.classes.unretired, 1); eq(r.classes.inserted, 0)
+		eq(dk.db:value("SELECT retired || '|' || id FROM classes WHERE key = 'tester'"), "0|4")
+		-- overrides win over the file and survive syncs; invalid ones are skipped
+		sync.set_override("classes", "mage", "name", "Wizard")
+		sync.set_override("classes", "mage", "levels.2.hp", "9")
+		sync.set_override("classes", "mage", "start_hp", "-3")
+		sync.set_override("classes", "mage", "levels.0.hp", "1")
+		r = sync.apply(entities())
+		eq(#r.skipped, 2)
+		eq(dk.db:value("SELECT name || '|' || start_hp FROM classes WHERE id = 1"), "Wizard|15")
+		eq(dk.db:value("SELECT hp FROM class_levels WHERE class_id = 1 AND level = 2"), 9)
+		sync.reset_override("classes", "mage", "name")
+		sync.apply(entities())
+		eq(dk.db:value("SELECT name FROM classes WHERE id = 1"), "Mage")
+		-- adoption: carried-over values that differ from the file become overrides, once
+		dk.db:exec("DELETE FROM content_overrides")
+		dk.db:exec([[INSERT INTO content_adopt (kind, key, field, value) VALUES
+			('classes', 'warrior', 'name', 'Fighter'), ('classes', 'warrior', 'levels.5.mp', '3'),
+			('classes', 'warrior', 'levels.20.hp', '13'), ('classes', 'warrior', 'bogus', 'x')]])
+		local want_mp = files.warrior["levels.5.mp"]
+		dk.db:exec("UPDATE content_adopt SET value = ? WHERE field = 'levels.5.mp'", tostring(want_mp))
+		r = sync.apply(entities())
+		eq(r.classes.adopted, 2)
+		eq(dk.db:value("SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides ORDER BY field)"),
+			 "levels.20.hp=13;name=Fighter")
+		eq(dk.db:value("SELECT count(*) FROM content_adopt"), 0)
+		eq(dk.db:value("SELECT name FROM classes WHERE id = 2"), "Fighter")
+		eq(dk.db:value("SELECT hp FROM class_levels WHERE class_id = 2 AND level = 20"), 13)
+	end)
+	eq(dk.db:value("SELECT count(*) FROM classes"), 3, "rolled back")
+end
+
+return T

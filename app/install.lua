@@ -1,6 +1,8 @@
 -- install.lua :: `dk install` -- create the schema, load the default game data and
 -- create the administrator account (port of legacy install.php).
 local auth = require("lib.auth")
+local classes = require("lib.classes")
+local content = require("cli.content")
 local mail = require("lib.mail")
 local migrations = require("lib.migrations")
 local news = require("lib.news")
@@ -9,19 +11,22 @@ local php = require("lib.php")
 local USAGE = [[
 usage: dk install [--partial] [--force]
 									[--admin <username> <email> <password>] [--charname NAME]
-									[--class 1|2|3]
+									[--class ID|KEY]
 
 	--partial     create tables but load no game data except the control row, the
-								forum boards and the first news post (legacy "Partial Setup")
+								forum boards, the first news post and the classes (legacy
+								"Partial Setup")
 	--force       drop existing Dragon Knight tables first (DESTROYS ALL DATA)
 	--admin       administrator account; prompted for when omitted
 	--charname    administrator character name (default: the username)
-	--class       character class (default 1)
+	--class       character class, by id or key (default 1, mage)
 ]]
 
--- children before parents (foreign keys): sessions/news/forum before forum/forums/users
+-- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
+-- class_levels/class_spells before classes; "levels" is the table before schema version 4
 local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "items",
-								 "levels", "monsters", "spells", "towns", "users" }
+								 "levels", "monsters", "spells", "towns", "users", "class_levels", "class_spells",
+								 "classes", "content_overrides", "content_adopt", "meta" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")
@@ -74,9 +79,7 @@ local function admin_errors(o)
 	end
 	if not php.is_email(o.email) then errs[#errs + 1] = "email isn't valid" end
 	if php.trim(o.password) == "" then errs[#errs + 1] = "password is required" end
-	local class = math.tointeger(tonumber(o.class))
-	if not class or class < 1 or class > 3 then errs[#errs + 1] = "class must be 1, 2 or 3" end
-	o.class = class
+	if not o.class:find("^[%w_]+$") then errs[#errs + 1] = "class must be a class id or key" end
 	return errs
 end
 
@@ -91,13 +94,14 @@ local function existing_tables()
 end
 
 -- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
--- populated those two even for "Partial Setup") and the forum boards (structural).
+-- populated those two even for "Partial Setup"), the forum boards and the class ids
+-- (structural).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
 	for line in sql:gmatch("[^\n]+") do
 		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
-				line:find("^INSERT INTO forums ") then
+				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") then
 			keep[#keep + 1] = line
 		end
 	end
@@ -147,14 +151,25 @@ local function run(...)
 	for _, t in ipairs(found) do dk.db:exec_script('DROP TABLE "' .. t .. '"') end
 	dk.db:exec_script(schema)
 	dk.db:exec_script(seed_sql(not o.partial, seed))
+	migrations.stamp(migrations.VERSION)
+	content.sync_or_fail("dk install")
 
+	local class = classes.find(o.class)
+	if not class or class.retired ~= 0 then
+		local names = {}
+		for _, c in ipairs(classes.active()) do names[#names + 1] = c.id .. " " .. c.key end
+		error("dk install: no class '" .. o.class .. "' (classes: " .. table.concat(names, ", ") .. ")", 0)
+	end
+	local st = classes.start_stats(class)
 	local now = dk.now()
 	local _, id = dk.db:exec(
-		"INSERT INTO users (username, password, email, verify, charname, charclass, " ..
-		"regdate, onlinetime, authlevel) VALUES (?, ?, ?, '1', ?, ?, ?, ?, 1)",
-		o.username, auth.hash_password(o.password), o.email, o.charname, o.class, now, now)
+		"INSERT INTO users (username, password, email, verify, charname, charclass, regdate, onlinetime, " ..
+		"authlevel, currenthp, maxhp, currentmp, maxmp, currenttp, maxtp, strength, dexterity, attackpower, " ..
+		"defensepower) VALUES (?, ?, ?, '1', ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		o.username, auth.hash_password(o.password), o.email, o.charname, class.id, now, now,
+		st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp, st.strength, st.dexterity,
+		st.attackpower, st.defensepower)
 	news.adopt({ id = id })
-	migrations.stamp(migrations.VERSION)
 
 	print(string.format("Database %s created (%s setup).", dk.config.db_path or "data/dk.db",
 											o.partial and "partial" or "complete"))

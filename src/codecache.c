@@ -233,6 +233,82 @@ void codecache_invalidate(void)
 	pthread_mutex_unlock(&mu);
 }
 
+/* ---- module listing (dk.list_modules) ---- */
+
+static int valid_module_base(const char *s, size_t n)
+{
+	if (n == 0 || s[0] == '.') return 0;
+	for (size_t i = 0; i < n; i++) {
+		char c = s[i];
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			  c == '_' || c == '-'))
+			return 0;
+	}
+	return 1;
+}
+
+static int cmp_names(const void *a, const void *b)
+{
+	return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+void codecache_free_list(char **list, int n)
+{
+	if (!list) return;
+	for (int i = 0; i < n; i++) free(list[i]);
+	free(list);
+}
+
+int codecache_list_modules(const char *prefix, char ***out)
+{
+	*out = NULL;
+	if (!app_dir || !prefix) return -1;
+	char rel[PATH_MAX], dir[PATH_MAX];
+	size_t pn = strlen(prefix);
+	if (pn >= sizeof rel || strchr(prefix, '/')) return -1;
+	memcpy(rel, prefix, pn + 1);
+	for (char *s = rel; *s; s++) if (*s == '.') *s = '/';
+	if (pn > 0 && !valid_relpath(rel)) return -1;
+	int n = pn > 0 ? snprintf(dir, sizeof dir, "%s/%s", app_dir, rel)
+				   : snprintf(dir, sizeof dir, "%s", app_dir);
+	if (n < 0 || (size_t)n >= sizeof dir) return -1;
+
+	DIR *d = opendir(dir);
+	if (!d) return 0;
+	char **list = NULL;
+	int count = 0, cap = 0, rc = 0;
+	struct dirent *de;
+	while ((de = readdir(d))) {
+		size_t len = strlen(de->d_name);
+		if (len <= 4 || strcmp(de->d_name + len - 4, ".lua") != 0) continue;
+		if (!valid_module_base(de->d_name, len - 4)) continue;
+		char path[PATH_MAX];
+		struct stat st;
+		n = snprintf(path, sizeof path, "%s/%s", dir, de->d_name);
+		if (n < 0 || (size_t)n >= sizeof path || stat(path, &st) < 0 || !S_ISREG(st.st_mode)) continue;
+		if (count == cap) {
+			int nc = cap ? cap * 2 : 16;
+			char **nl = realloc(list, (size_t)nc * sizeof *nl);
+			if (!nl) { rc = -1; break; }
+			list = nl;
+			cap = nc;
+		}
+		size_t total = pn + (pn ? 1 : 0) + (len - 4) + 1;
+		char *name = malloc(total);
+		if (!name) { rc = -1; break; }
+		snprintf(name, total, "%s%s%.*s", prefix, pn ? "." : "", (int)(len - 4), de->d_name);
+		list[count++] = name;
+	}
+	closedir(d);
+	if (rc < 0) {
+		codecache_free_list(list, count);
+		return -1;
+	}
+	if (count > 1) qsort(list, (size_t)count, sizeof *list, cmp_names);
+	*out = list;
+	return count;
+}
+
 /* ---- tree walking (prewarm, polling fallback, inotify setup) ---- */
 
 typedef void (*walk_fn)(const char *path, const char *rel, int isdir, const struct stat *st, void *ud);

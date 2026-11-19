@@ -134,6 +134,8 @@ static const char *MAIN_LUA =
 	"    .. '|' .. math.type(dk.now()) .. '|' .. math.type(dk.clock()) .. '|' .. tostring(dk.config.custom_key)\n"
 	"end\n"
 	"M['/stats'] = function() local s = dk.vmstats() return s.built .. ',' .. s.generation end\n"
+	"M['/boot'] = function() local s = dk.vmstats() return s.boot_id end\n"
+	"M['/list'] = function(req) return table.concat(dk.list_modules(req.query.p or ''), ',') end\n"
 	"return function(req)\n"
 	"  local f = M[req.path]\n"
 	"  if not f then return {status = 404, body = 'nf'} end\n"
@@ -391,6 +393,52 @@ static void test_names(void)
 	lua_close(L);
 }
 
+static void test_list_modules(void)
+{
+	mkdirs("app/things/sub");
+	put("app/things/beta.lua", "return 2\n");
+	put("app/things/alpha.lua", "return 1\n");
+	put("app/things/my-mod_2.lua", "return 3\n");
+	put("app/things/two.dots.lua", "return 0\n");   /* not addressable by require */
+	put("app/things/.hidden.lua", "return 0\n");
+	put("app/things/notes.txt", "x");
+	put("app/things/sub/deep.lua", "return 0\n");    /* not recursive */
+	mkdirs("app/things/dir.lua");                    /* a directory, not a module */
+
+	char **list;
+	int n = codecache_list_modules("things", &list);
+	CHECK(n == 3);
+	if (n == 3) {
+		CHECK_STR_EQ(list[0], "things.alpha");
+		CHECK_STR_EQ(list[1], "things.beta");
+		CHECK_STR_EQ(list[2], "things.my-mod_2");
+	}
+	codecache_free_list(list, n);
+	CHECK(codecache_list_modules("things.sub", &list) == 1);
+	if (list) CHECK_STR_EQ(list[0], "things.sub.deep");
+	codecache_free_list(list, 1);
+	CHECK(codecache_list_modules("nothere.at_all", &list) == 0 && list == NULL);
+	CHECK(codecache_list_modules("../x", &list) == -1);
+	CHECK(codecache_list_modules("a..b", &list) == -1);
+	CHECK(codecache_list_modules("a/b", &list) == -1);
+	n = codecache_list_modules("", &list);           /* app root: main, dbtest, ... */
+	CHECK(n >= 3);
+	codecache_free_list(list, n);
+
+	CHECK_STR_EQ(get("/list?p=things"), "things.alpha,things.beta,things.my-mod_2");
+	/* a new file shows up on the next call, without a restart */
+	put("app/things/gamma.lua", "return 4\n");
+	CHECK_STR_EQ(get("/list?p=things"), "things.alpha,things.beta,things.gamma,things.my-mod_2");
+	CHECK_STR_EQ(get("/list?p=things.nope"), "");
+	get("/list?p=..%2Fetc");
+	CHECK(R.status == 500 && strstr(R.body, "invalid module prefix") != NULL);
+
+	char boot[64];
+	snprintf(boot, sizeof boot, "%s", get("/boot"));
+	CHECK(strlen(boot) == 32);
+	CHECK_STR_EQ(get("/boot"), boot);     /* same process, same id */
+}
+
 int main(void)
 {
 	setup();
@@ -404,6 +452,7 @@ int main(void)
 	test_request_response();
 	test_api();
 	test_cli();
+	test_list_modules();
 
 	vmpool_shutdown();
 	codecache_shutdown();

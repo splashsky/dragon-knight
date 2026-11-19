@@ -2,9 +2,11 @@
  * marshalling and the per-request transaction (see PLAN.md "Lua API"). */
 #include "bind.h"
 
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include "codecache.h"
 #include "crypto.h"
@@ -93,11 +95,29 @@ static void set_int(lua_State *L, const char *k, lua_Integer v)
 	lua_setfield(L, -2, k);
 }
 
+/* Random id of this process, fixed at the first call: the app tells "this server run"
+ * apart from earlier runs and CLI commands (content sync bookkeeping). */
+static pthread_once_t boot_once = PTHREAD_ONCE_INIT;
+static char boot_id[33];
+
+static void boot_id_init(void)
+{
+	uint8_t r[16];
+	if (random_bytes(r, sizeof r) < 0) {
+		uint64_t t = (uint64_t)now_unix() ^ ((uint64_t)getpid() << 32);
+		memcpy(r, &t, sizeof t);
+		memcpy(r + 8, &t, sizeof t);
+	}
+	hex_encode(r, sizeof r, boot_id);
+	boot_id[32] = '\0';
+}
+
 static int l_vmstats(lua_State *L)
 {
 	vmpool_stats s;
 	vmpool_get_stats(&s);
-	lua_createtable(L, 0, 7);
+	pthread_once(&boot_once, boot_id_init);
+	lua_createtable(L, 0, 8);
 	set_int(L, "built", (lua_Integer)s.built);
 	set_int(L, "reaped", (lua_Integer)s.reaped);
 	set_int(L, "hot_acquires", (lua_Integer)s.hot_acquires);
@@ -105,6 +125,24 @@ static int l_vmstats(lua_State *L)
 	set_int(L, "stale_discards", (lua_Integer)s.stale_discards);
 	set_int(L, "ready", s.ready);
 	set_int(L, "generation", (lua_Integer)codecache_generation());
+	lua_pushstring(L, boot_id);
+	lua_setfield(L, -2, "boot_id");
+	return 1;
+}
+
+/* dk.list_modules(prefix) -> sorted array of module names under app/<prefix as path>. */
+static int l_list_modules(lua_State *L)
+{
+	const char *prefix = luaL_checkstring(L, 1);
+	char **list;
+	int n = codecache_list_modules(prefix, &list);
+	if (n < 0) return luaL_error(L, "invalid module prefix '%s'", prefix);
+	lua_createtable(L, n, 0);
+	for (int i = 0; i < n; i++) {
+		lua_pushstring(L, list[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+	codecache_free_list(list, n);
 	return 1;
 }
 
@@ -337,6 +375,7 @@ int bind_install(lua_State *L, const dk_config *cfg)
 		{ "clock", l_clock },
 		{ "log", l_log },
 		{ "vmstats", l_vmstats },
+		{ "list_modules", l_list_modules },
 		{ NULL, NULL }
 	};
 	luaL_newlib(L, funcs);

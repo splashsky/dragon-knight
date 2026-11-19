@@ -107,11 +107,114 @@ local function v3_leveling_formulas()
 	end
 end
 
+-- 4: character classes become content (app/content/classes/*.lua, synced into classes,
+-- class_levels and class_spells; app/lib/content/). The original classes keep ids 1-3
+-- (users.charclass). Built here from the control row's class names, the levels table and
+-- the experience parameters lib/leveling.lua had at version 3; every value an admin could
+-- edit (class names, per-level gains and spells) is also recorded in content_adopt, so
+-- the sync at the end of `dk migrate` keeps the ones that differ from the content files
+-- as admin overrides. New characters keep the starting stats they got before (the users
+-- column defaults; the levels table's row 1 was only shown on the help page).
+local V4_CLASSES = {
+	{ key = "mage", name = "Mage", exp_base = 15, exp_stages = "2x2,1.5x8,1.25x5,1.125x28" },
+	{ key = "warrior", name = "Warrior", exp_base = 18, exp_stages = "2x2,1.5x8,1.25x5,1.125x27" },
+	{ key = "paladin", name = "Paladin", exp_base = 20, exp_stages = "2x2,1.5x8,1.25x6,1.125x25" },
+}
+
+local function v4_classes_content()
+	local db = dk.db
+	db:exec_script([[
+CREATE TABLE classes (
+	id               INTEGER PRIMARY KEY,
+	key              TEXT    NOT NULL UNIQUE,
+	name             TEXT    NOT NULL DEFAULT '',
+	description      TEXT    NOT NULL DEFAULT '',
+	sort             INTEGER NOT NULL DEFAULT 0,
+	playable         INTEGER NOT NULL DEFAULT 1,
+	start_hp         INTEGER NOT NULL DEFAULT 15,
+	start_mp         INTEGER NOT NULL DEFAULT 0,
+	start_tp         INTEGER NOT NULL DEFAULT 10,
+	start_strength   INTEGER NOT NULL DEFAULT 5,
+	start_dexterity  INTEGER NOT NULL DEFAULT 5,
+	exp_base         INTEGER NOT NULL DEFAULT 15,
+	exp_stages       TEXT    NOT NULL DEFAULT '',
+	retired          INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE class_levels (
+	class_id   INTEGER NOT NULL REFERENCES classes (id),
+	level      INTEGER NOT NULL,
+	hp         INTEGER NOT NULL DEFAULT 0,
+	mp         INTEGER NOT NULL DEFAULT 0,
+	strength   INTEGER NOT NULL DEFAULT 0,
+	dexterity  INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (class_id, level)
+) WITHOUT ROWID;
+CREATE TABLE class_spells (
+	class_id  INTEGER NOT NULL REFERENCES classes (id),
+	level     INTEGER NOT NULL,
+	spell_id  INTEGER NOT NULL,
+	PRIMARY KEY (class_id, level, spell_id)
+) WITHOUT ROWID;
+CREATE TABLE content_overrides (
+	kind   TEXT NOT NULL,
+	key    TEXT NOT NULL,
+	field  TEXT NOT NULL,
+	value  TEXT NOT NULL,
+	PRIMARY KEY (kind, key, field)
+) WITHOUT ROWID;
+CREATE TABLE content_adopt (
+	kind   TEXT NOT NULL,
+	key    TEXT NOT NULL,
+	field  TEXT NOT NULL,
+	value  TEXT NOT NULL,
+	PRIMARY KEY (kind, key, field)
+) WITHOUT ROWID;
+CREATE TABLE meta (
+	key    TEXT PRIMARY KEY,
+	value  TEXT NOT NULL
+) WITHOUT ROWID;
+]])
+	local control = db:first("SELECT class1name, class2name, class3name FROM control WHERE id = 1") or {}
+	local levels = db:query("SELECT * FROM levels WHERE id >= 2 AND id <= 100 ORDER BY id")
+	for id, c in ipairs(V4_CLASSES) do
+		local function adopt(field, value)
+			db:exec("INSERT INTO content_adopt (kind, key, field, value) VALUES ('classes', ?, ?, ?)",
+							c.key, field, tostring(value))
+		end
+		local name = control["class" .. id .. "name"]
+		if name == nil or name == "" then name = c.name end
+		db:exec("INSERT INTO classes (id, key, name, sort, exp_base, exp_stages) VALUES (?, ?, ?, ?, ?, ?)",
+						id, c.key, name, id, c.exp_base, c.exp_stages)
+		adopt("name", name)
+		for _, row in ipairs(levels) do
+			local function col(stat) return row[id .. "_" .. stat] end
+			db:exec("INSERT INTO class_levels (class_id, level, hp, mp, strength, dexterity) VALUES (?, ?, ?, ?, ?, ?)",
+							id, row.id, col("hp"), col("mp"), col("strength"), col("dexterity"))
+			for _, stat in ipairs({ "hp", "mp", "strength", "dexterity" }) do
+				adopt("levels." .. row.id .. "." .. stat, col(stat))
+			end
+			local spell = col("spells")
+			if spell > 0 then
+				db:exec("INSERT INTO class_spells (class_id, level, spell_id) VALUES (?, ?, ?)", id, row.id, spell)
+			end
+			adopt("levels." .. row.id .. ".spells", spell > 0 and spell or "")
+		end
+	end
+	db:exec_script([[
+DROP TABLE levels;
+ALTER TABLE control DROP COLUMN class1name;
+ALTER TABLE control DROP COLUMN class2name;
+ALTER TABLE control DROP COLUMN class3name;
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
 	{ name = "experience, TP and HP milestones per level are formulas (edited exp/tp values are discarded)",
 		up = v3_leveling_formulas },
+	{ name = "character classes are content files (class names and level data become classes, " ..
+		"class_levels and class_spells; admin edits are kept as overrides)", up = v4_classes_content },
 }
 
 migrations.VERSION = #migrations.STEPS

@@ -80,7 +80,7 @@ if t_has_sql; then
 	t_section "make run: an old database is backed up and migrated"
 	rm -f "$QS/data/dk.db" "$QS/data/dk.db-wal" "$QS/data/dk.db-shm"
 	t_sql_script "$QS/data/dk.db" "$ROOT/tests/fixtures/schema_v0.sql"
-	grep -v '^INSERT INTO forums ' "$ROOT/app/sql/seed.sql" > "$QS/seed_v0.sql"
+	grep -v '^INSERT INTO forums ' "$ROOT/tests/fixtures/seed_v3.sql" > "$QS/seed_v0.sql"
 	t_sql_script "$QS/data/dk.db" "$QS/seed_v0.sql"
 	qs_start
 	if qs_wait "http://127.0.0.1:$QS_PORT/login" "$QS_PID"; then t_ok; else t_fail "run on an old database: $(cat "$QS/run.out")"; fi

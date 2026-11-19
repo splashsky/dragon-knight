@@ -5,6 +5,7 @@
 --   GET      /dead    dead()
 -- The dice and formulas live in fight/combat.lua; this module loads and saves state.
 local auth = require("lib.auth")
+local classes = require("lib.classes")
 local combat = require("fight.combat")
 local game = require("lib.game")
 local php = require("lib.php")
@@ -166,8 +167,13 @@ local function victory(req)
 
 	local r = combat.rewards(user, monster, rand)
 	local ctx = { monster = monster, r = r }
-	local gains = function(level) return game.level_gains(user.charclass, level) end
-	local up = combat.level_up(user, r.newexp, gains)
+	-- a character of an unknown class gains experience but no levels
+	local cls = classes.get(user.charclass)
+	local up
+	if cls then
+		local levels = classes.levels(cls)
+		up = combat.level_up(user, cls, r.newexp, function(level) return levels[level] end)
+	end
 	local title
 	local s = {
 		level = user.level, maxhp = user.maxhp, maxmp = user.maxmp, maxtp = user.maxtp,

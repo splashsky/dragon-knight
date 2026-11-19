@@ -232,7 +232,11 @@ echo "e2e: server on $BASE (dir $T)"
 t_section "install"
 grep -qF "Administrator 'admin' created" "$T/install.log" && t_ok || t_fail "install output"
 if t_has_sql; then
-	[ "$(t_sql 'SELECT count(*) FROM levels')" = 100 ] && t_ok || t_fail "levels seeded"
+	[ "$(t_sql "SELECT group_concat(id || ':' || key || ':' || name, ',') FROM classes")" = "1:mage:Mage,2:warrior:Warrior,3:paladin:Paladin" ] \
+		&& t_ok || t_fail "classes synced at install"
+	[ "$(t_sql 'SELECT count(*) FROM class_levels')" = 297 ] && t_ok || t_fail "class levels synced"
+	[ "$(t_sql "SELECT charclass || ',' || maxhp || ',' || currenttp || ',' || attackpower FROM users WHERE username = 'admin'")" = "1,15,10,5" ] \
+		&& t_ok || t_fail "admin's starting stats"
 	[ "$(t_sql 'SELECT count(*) FROM monsters')" = 151 ] && t_ok || t_fail "monsters seeded"
 	[ "$(t_sql 'SELECT verifyemail FROM control')" = 0 ] && t_ok || t_fail "verifyemail default 0"
 fi

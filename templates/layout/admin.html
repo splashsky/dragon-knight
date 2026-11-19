@@ -20,10 +20,14 @@
 		<a href="/admin/drops">Edit Drops</a><br>
 		<a href="/admin/towns">Edit Towns</a><br>
 		<a href="/admin/monsters">Edit Monsters</a><br>
-		<a href="/admin/levels">Edit Levels</a><br>
+		<a href="/admin/classes">Classes</a><br>
 		<a href="/admin/spells">Edit Spells</a><br>
 	</nav>
 	<main class="admin-content">
+{%- if content_error then %}
+<div class="admin-errors"><b>Content files have errors</b> (the game keeps the last good content; see <a href="/admin/classes">Classes</a>):
+<pre class="error">{{ content_error }}</pre></div>
+{%- end %}
 {{{ content }}}
 	</main>
 </div>

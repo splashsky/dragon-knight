@@ -1,5 +1,6 @@
 -- game.lua :: shared game data helpers (control row, towns, spells, nav data, ...).
 -- Module state lives for one request only (fresh VM per request).
+local classes = require("lib.classes")
 local php = require("lib.php")
 
 local game = {}
@@ -14,8 +15,7 @@ function game.control()
 	if not cache.control then
 		cache.control = dk.db:first("SELECT * FROM control WHERE id = 1") or
 			{ id = 1, gamename = "Dragon Knight", gamesize = 250, gameopen = 1, forumtype = 0,
-				forumaddress = "", class1name = "Mage", class2name = "Warrior", class3name = "Paladin",
-				verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "",
+				forumaddress = "", verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "",
 				adminemail = "" }
 	end
 	return cache.control
@@ -41,10 +41,9 @@ function game.current_town(user)
 	return game.town_at(user.latitude, user.longitude)
 end
 
--- Class name from control (nil for out-of-range values, like legacy).
+-- Class name for a users.charclass value (nil for an unknown class, like legacy).
 function game.class_name(n)
-	local c = game.control()
-	return ({ c.class1name, c.class2name, c.class3name })[tonumber(n)]
+	return classes.name(n)
 end
 
 -- Spells the user knows (users.spells comma list), ordered by id; optional type filter
@@ -66,28 +65,6 @@ function game.user_towns(user)
 		if php.in_list(user.towns, t.id) then out[#out + 1] = t end
 	end
 	return out
-end
-
--- levels table columns are "<class>_<stat>" (the per-level gains that are data; experience
--- and TP come from lib/leveling.lua). Whitelist them before putting one in SQL.
-game.LEVEL_STATS = { "hp", "mp", "strength", "dexterity", "spells" }
-local LEVEL_STATS = {}
-for _, stat in ipairs(game.LEVEL_STATS) do LEVEL_STATS[stat] = true end
-
-function game.level_key(charclass, stat)
-	local c = math.tointeger(tonumber(charclass))
-	assert(c and c >= 1 and c <= 3 and LEVEL_STATS[stat], "bad level column")
-	return c .. "_" .. stat
-end
-
--- The levels table's gains for `charclass` at `level` ({ hp, mp, strength, dexterity,
--- spells }; hp without the milestone bonus), or nil when there is no such row.
-function game.level_gains(charclass, level)
-	local row = dk.db:first("SELECT * FROM levels WHERE id = ?", level)
-	if not row then return nil end
-	local g = {}
-	for _, stat in ipairs(game.LEVEL_STATS) do g[stat] = row[game.level_key(charclass, stat)] end
-	return g
 end
 
 -- 5 -> "5N", -5 -> "5S"; longitude: "E"/"W" (legacy display()).

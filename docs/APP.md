@@ -15,10 +15,11 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
+| Content (classes) | `app/content/classes/*.lua`, `app/lib/content/*`, `app/lib/classes.lua`, `app/cli/{content,check}.lua`, `app/admin/classes.lua` | `templates/admin/class{,es}.html` | `tests/e2e/content.sh`, `tests/lua/test_content.lua` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/schema_v*.sql`) |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3}.sql`) |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -35,16 +36,18 @@ for one request only):
 
 1. The database's schema version (`PRAGMA user_version`) must be `migrations.VERSION`;
 	 otherwise every request gets a 503 page saying to run `dk migrate` (or `dk install`).
-2. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
+2. `content_sync.check()` syncs the content files into the database when they changed
+	 (one query when they didn't; see [Content](#content)).
+3. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
 	 row) and `req.session`, and updates `users.onlinetime`.
-3. The router matches the method and path. No match gives a 404 page; the wrong method
+4. The router matches the method and path. No match gives a 404 page; the wrong method
 	 gives a 405 page with an `Allow` header.
-4. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
+5. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
 	 runs before any guard or handler.
-5. Guards run, then the handler runs. The handler returns a response table (or an HTML
+6. Guards run, then the handler runs. The handler returns a response table (or an HTML
 	 string).
-6. HEAD requests: the transaction is rolled back and queued cookies are dropped.
-7. Cookies queued on `req.out_headers` are added to the response.
+7. HEAD requests: the transaction is rolled back and queued cookies are dropped.
+8. Cookies queued on `req.out_headers` are added to the response.
 
 The whole request runs in one SQLite transaction (`BEGIN IMMEDIATE`). If a Lua error
 escapes, `main.lua` rolls the transaction back, logs the traceback and renders a 500 page
@@ -179,11 +182,9 @@ starting with `__` are reserved.
 | `game.control()` | control row (id 1), cached per request; `game.reload_control()` after updating it |
 | `game.user(id)` | fresh users row |
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
-| `game.class_name(n)` | from control (nil if out of range) |
+| `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
 | `game.user_spells(user [, type])` | spell rows in `users.spells`, ordered by id (type 1 heal, 2 hurt, 3 sleep, 4 uber damage, 5 uber defense) |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
-| `game.level_gains(class, level)` | the levels table's gains `{hp, mp, strength, dexterity, spells}` for a class (hp without the milestone bonus), or nil |
-| `game.level_key(class, stat)` | whitelisted levels column name, e.g. `"2_hp"` (stats in `game.LEVEL_STATS`) |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
@@ -191,31 +192,114 @@ starting with `__` are reserved.
 | `game.online_users()` | users seen in the last 10 minutes (`id, charname`) |
 | `game.nav(user)` | the table the side columns render |
 
+## Classes (`lib/classes.lua`)
+
+Rows of the `classes` table (synced from `app/content/classes/*.lua`, see
+[Content](#content)), cached per request. `users.charclass` holds a `classes.id`.
+
+| Function | Returns |
+|---|---|
+| `classes.playable()` | playable, non-retired classes in `sort` order (registration) |
+| `classes.active()` | non-retired classes in `sort` order (help pages) |
+| `classes.all()` | every class, retired ones too (admin) |
+| `classes.get(id)`, `classes.find(id_or_key)`, `classes.name(id)` | a class row / its name, or nil |
+| `classes.start_stats(c)` | the `users` columns of a new character of class `c` |
+| `classes.levels(c)` | `{ [level] = { hp, mp, strength, dexterity, spells = { id, ... } } }` for levels 2-100 |
+| `classes.reload()` | forget the cache (after a sync in the same request) |
+
 ## Leveling (`lib/leveling.lua`)
 
 The experience needed per level, the TP gained per level and the HP bonus at milestone
-levels are formulas, fitted to the original 1.1.11 levels table. The other per-level gains
-(base HP, MP, strength, dexterity, spells; row 1 = starting values) stay data in the
-`levels` table, edited at `/admin/levels`, which shows the computed values read-only.
+levels are formulas, fitted to the original 1.1.11 levels table. The experience curve's
+parameters and the other per-level gains (base HP, MP, strength, dexterity, spells) are
+per class, in the class content files; the admin panel shows them read-only per class.
 
-- **Experience**, per class (1 Mage, 2 Warrior, 3 Paladin): `step(n)`, the experience from
-	level n to n + 1, starts at `base` (15 / 18 / 20); every later step is the previous one
-	times a stage factor, rounded down: ×2 for 2 steps, ×1.5 for 8, ×1.25 for 5 (Paladin 6),
-	×1.125 for 28 / 27 / 25, then flat. `exp_for(class, level)` is the sum of the steps below
-	the level (0 at level 1); level 100 is the cap, 16777215 (rewards stop just below it).
-	Within 0.44% of the original table at every level.
+- **Experience**, per class: `step(n)`, the experience from level n to n + 1, starts at the
+	class's `exp_base` (Mage 15, Warrior 18, Paladin 20); every later step is the previous
+	one times a stage factor, rounded down, per `exp_stages` (`"2x2,1.5x8,1.25x5,1.125x28"`:
+	×2 for 2 steps, ×1.5 for 8, ×1.25 for 5 (Paladin 6), ×1.125 for 28 / 27 / 25), then
+	flat. `exp_for(class, level)` (`class`: a classes row or anything with `exp_base` and
+	`exp_stages`) is the sum of the steps below the level (0 at level 1); level 100 is the
+	cap, 16777215 (rewards stop just below it). Within 0.44% of the original table at
+	every level.
 - **TP** gained on reaching a level: `floor(level / 30) + 2`, except +1 at level 2 (level 1
-	shows the table's starting 5, level 100 gains nothing). Exactly the original.
-- **HP**: the levels table's gain plus `hp_bonus(level)`: +10 at levels 10/20/30, +15 at
-	40/50/60, +20 at 70/80/90, +50 at 99 (the table holds 0 there). Exactly the original.
+	shows the table's starting 5, level 100 gains nothing). Exactly the original. The same
+	for every class.
+- **HP**: the class's gain plus `hp_bonus(level)`: +10 at levels 10/20/30, +15 at
+	40/50/60, +20 at 70/80/90, +50 at 99 (the class files hold 0 there). Exactly the
+	original. The same for every class.
 
-The parameters are plain data at the top of the module (`leveling.EXP`, `leveling.TP`,
+The global rules are plain data at the top of the module (`leveling.TP`,
 `leveling.HP_MILESTONES`); edit them and the next request uses them (hot reload): victory
 level-ups (`combat.level_up`), "Next Level" on the character sheets, `/help/levels` and
-the admin editor. `tests/lua/test_leveling.lua` pins them against a frozen copy of the
-original table (`tests/lua/levels_original.lua`), so update its expectations with them.
-Moving thresholds needs no data fixup: a player whose experience already covers the next
-level gets it (or several) on the next victory.
+the admin class pages. `tests/lua/test_leveling.lua` pins them and the stock class files
+against a frozen copy of the original table (`tests/lua/levels_original.lua`), so update
+its expectations with them. Moving thresholds needs no data fixup: a player whose
+experience already covers the next level gets it (or several) on the next victory.
+
+## Content
+
+Classes (and, later, spells and items) are **content**: Lua data files in git, one per
+entity, hot-reloaded like the code and synced into the database, where players' rows
+reference them by id.
+
+```lua
+-- app/content/classes/knight.lua: the file name is the key ("knight")
+local levels = {}
+for level = 2, 100 do levels[level] = { hp = 3, mp = 1, strength = 2, dexterity = 1 } end
+levels[4].spells = { 1 }                 -- spell ids learned on reaching that level
+return {
+	name = "Knight",
+	description = [[
+Slow level-ups
+High hit points]],                       -- one line per point on the help page
+	sort = 4,                                -- registration/help order (default 0)
+	playable = true,                         -- offered when registering (default true)
+	start_hp = 20, start_mp = 0, start_tp = 10, start_strength = 6, start_dexterity = 4,
+	exp_base = 22, exp_stages = "2x2,1.5x8,1.25x6,1.125x25",
+	levels = levels,                         -- every level 2-100: hp, mp, strength, dexterity
+}                                          -- (default 0), spells (default none)
+```
+
+- **Files** `app/content/<kind>/<key>.lua` return a table. The key (file name) is
+	`[a-z0-9_]+` and never changes once players may reference it: renaming means a new
+	entity plus retiring the old one. A file runs in an empty environment (no globals, no
+	`require`, no DB); loops and locals are fine. `lib/content/load.lua` lists files with
+	`dk.list_modules("content.classes")` (new files count without a restart) and validates
+	them with the kind's schema (`lib/content/kinds/<kind>.lua`, field validators in
+	`lib/content/schema.lua`): wrong types, missing or unknown fields and missing levels
+	are errors naming the file. `./dk check` validates every content file.
+- **Sync** (`lib/content/sync.lua`): upsert every file entity by key (a new key gets the
+	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
+	deleted: players keep their class), un-retire keys whose file is back, then apply the
+	admin overrides. The original classes keep ids 1-3 (seeded in `seed.sql`).
+- **When**: every request (`main.lua`) compares `meta.content_seen` with
+	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
+	After a restart or any app file change, the files are loaded and fingerprinted (sha256
+	of a canonical serialization, `meta.content_fingerprint`); only a different
+	fingerprint runs the sync, inside the request's transaction (a savepoint). `dk install`,
+	`dk migrate` and `dk content sync` sync directly; `dk content status` reports.
+- **Invalid content** never breaks the game: the database keeps the last good content,
+	the error is logged (warn), stored in `meta.content_error` and shown on every admin
+	page, and the next file change checks again. `dk content sync`, `dk migrate` and
+	`dk install` fail (and change nothing) instead.
+- **Overrides**: `content_overrides(kind, key, field, value)` hold per-server values that
+	win over the file and survive syncs. The admin class page (`/admin/classes/#id`)
+	writes them for the fields marked `admin` in the kind (name, description, sort,
+	playable, starting stats; a value equal to the file's deletes the override) and
+	offers "reset to file". Field names are those of the flat form: `name`,
+	`levels.17.hp`, `levels.17.spells` (`"1,6"`).
+- **Migrations into content**: a migration that turns old rows into content writes the
+	old values into `content_adopt(kind, key, field, value)`; the next sync turns those
+	that differ from the file into overrides (that is how schema version 4 kept edited
+	class names and levels data).
+
+Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
+edit it, run `./dk check`; the class shows up on the registration page on the next page
+load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` module
+(`fields` with types, `field(name)`, optional `validate_extra`/`write_children`), its
+table (`id`, `key` UNIQUE, the field columns, `retired`) and an entry in `schema.KINDS`
+(in sync order).
 
 ## Forum and news
 
@@ -266,8 +350,8 @@ in a comment.
 
 - `dk.db:query(sql, ...)` returns rows, `:first` one row or nil, `:value` a scalar,
 	`:exec` returns `changes, last_id`. Always use `?` parameters and **never concatenate
-	user input**. Column identifiers come from whitelists only (`game.level_key`, or a
-	table of allowed `slotN` names).
+	user input**. Column identifiers come from whitelists only (a content kind's `fields`,
+	or a table of allowed `slotN` names).
 - Always call `dk.db` at call time. Don't cache it in a module-level local: it's attached
 	per request and wrapped to count queries.
 - Times are unix seconds (`dk.now()`): `regdate`, `onlinetime`, `postdate`,
@@ -276,7 +360,8 @@ in a comment.
 	MySQL). `users.verify` is TEXT: `'1'` means verified, anything else is the pending code.
 - Store user text raw and escape it on output. Legacy HTML-escaped on input; we don't, so
 	never put DB text in `{{{ }}}`.
-- Schema: `app/sql/schema.sql`. Default data: `app/sql/seed.sql`.
+- Schema: `app/sql/schema.sql`. Default data: `app/sql/seed.sql` and the content files
+	(`app/content/`).
 - Foreign keys are on (`PRAGMA foreign_keys=ON` per connection): delete children before
 	parents, and reference users with `ON DELETE SET NULL` where the row should outlive them.
 
@@ -286,7 +371,7 @@ in a comment.
 with `PRAGMA user_version = migrations.VERSION` (`app/lib/migrations.lua`). Databases from
 before versioning are version 0. `dk migrate` runs the missing steps of
 `migrations.STEPS` in order, stamping each version, all in the CLI's one transaction, then
-runs `PRAGMA foreign_key_check`. `main.lua` compares the version on every request and
+runs `PRAGMA foreign_key_check` and the content sync. `main.lua` compares the version on every request and
 serves a 503 page until the database matches.
 
 Upgrade a server with `make migrate` (`dk check`, then `dk backup`, then `dk migrate`;
@@ -308,10 +393,11 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0), `schema_v1.sql` (version 1) and
-	 `schema_v2.sql` (version 2), migrates them, checks the data and compares the column,
-	 foreign key and index layout with a fresh install. Never edit the fixtures; add a
-	 `schema_vN.sql` copy of the old schema when a test needs to start from version N.
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v3.sql` (version 3) with the
+	 game data of that time (`seed_v3.sql`), migrates them, checks the data and compares
+	 the column, foreign key and index layout with a fresh install. Never edit the
+	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
+	 from version N.
 
 ## Sessions, CSRF, accounts
 
@@ -384,12 +470,13 @@ return { port = 8081, db_path = "/tmp/dk-dev/dk.db",
 EOF
 ./dk install --config /tmp/dk-dev/config.lua --admin admin admin@example.com secret
 ./dk serve   --config /tmp/dk-dev/config.lua
-./dk check   --config /tmp/dk-dev/config.lua   # compiles every module + template
+./dk check   --config /tmp/dk-dev/config.lua   # compiles every module + template, validates content
+./dk content --config /tmp/dk-dev/config.lua status
 ./dk user    --config /tmp/dk-dev/config.lua list
 ```
 
-Edits to `app/**/*.lua`, `templates/**/*.html` and the app-level keys of the config file
-apply on the next request. To build and test several checkouts side by side (or in CI),
+Edits to `app/**/*.lua` (content files included), `templates/**/*.html` and the app-level
+keys of the config file apply on the next request. To build and test several checkouts side by side (or in CI),
 give each its own object dir and binary: `make BUILD=build/x BIN=build/x/dk` and
 `BIN=build/x/dk tests/run.sh`.
 

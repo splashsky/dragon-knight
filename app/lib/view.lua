@@ -81,7 +81,7 @@ end
 -- Wraps already-rendered HTML in a layout.
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
 --       body_class (extra class(es) on <body>, for page-specific CSS),
---       status, headers (extra {name, value} pairs).
+--       status, headers (extra {name, value} pairs), vars (extra layout ctx values).
 function view.layout(req, title, content, opts)
 	opts = opts or {}
 	local user = req.user
@@ -104,6 +104,7 @@ function view.layout(req, title, content, opts)
 		elapsed = view.elapsed,
 		queries = dbcount.count,
 	}
+	for k, v in pairs(opts.vars or {}) do ctx[k] = v end
 	local body = view.render("layout/" .. (opts.layout or "main"), ctx, req)
 	return html_response(body, opts.status, opts.headers)
 end

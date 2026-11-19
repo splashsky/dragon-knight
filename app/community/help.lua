@@ -2,6 +2,7 @@
 -- help_spells.php, help_monsters.php, help_levels.php). Legacy printed these as
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
+local classes = require("lib.classes")
 local game = require("lib.game")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
@@ -37,10 +38,21 @@ local function page(req, subtitle, template, ctx)
 									 { layout = "minimal", nav = false, body_class = "help" })
 end
 
+local NUMBER_WORDS = { "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten" }
+
+-- Playable classes with their description lines (one bullet each).
 function help.index(req)
-	local c = game.control()
+	local list = {}
+	for _, c in ipairs(classes.playable()) do
+		local points = {}
+		for line in (c.description .. "\n"):gmatch("([^\n]*)\n") do
+			local point = php.trim(line)
+			if point ~= "" then points[#points + 1] = point end
+		end
+		list[#list + 1] = { name = c.name, points = points }
+	end
 	return page(req, nil, "community/help/index", {
-		classes = { c.class1name, c.class2name, c.class3name },
+		classes = list, class_count = NUMBER_WORDS[#list] or tostring(#list),
 	})
 end
 
@@ -78,35 +90,35 @@ function help.monsters(req)
 	return page(req, "Monsters", "community/help/monsters", { monsters = monsters })
 end
 
--- Columns per class: HP (table gain + milestone bonus), MP, TP (formula), Strength, Dexterity.
+-- Columns per class: HP (gain + milestone bonus), MP, TP (formula), Strength, Dexterity.
+-- Level 1 shows the starting values (TP: the original table's, see leveling.TP).
 function help.levels(req)
 	local spell_names = {}
 	for _, s in ipairs(dk.db:query("SELECT id, name FROM spells")) do spell_names[s.id] = s.name end
-	local levels = dk.db:query("SELECT * FROM levels ORDER BY id")
-	local classes = {}
-	for class = 1, 3 do
-		local rows = {}
-		for _, lv in ipairs(levels) do
-			-- legacy hides level 100 (the level cap: exp 16777215, no stat gains)
-			if lv.id ~= leveling.MAX_LEVEL then
-				local function gain(stat) return lv[game.level_key(class, stat)] end
-				local spell = gain("spells")
-				local exp = leveling.exp_for(class, lv.id)
+	local list = {}
+	for _, c in ipairs(classes.active()) do
+		local gains = classes.levels(c)
+		local rows = {
+			{ level = 1, exp = php.number_format(0), spells = {},
+				stats = { c.start_hp, c.start_mp, leveling.tp_gain(1), c.start_strength, c.start_dexterity } },
+		}
+		-- legacy hides level 100 (the level cap: exp 16777215, no stat gains)
+		for level = 2, leveling.MAX_LEVEL - 1 do
+			local g = gains[level]
+			if g then
+				local spells = {}
+				for _, id in ipairs(g.spells) do spells[#spells + 1] = spell_names[id] end
 				rows[#rows + 1] = {
-					level = lv.id,
-					exp = exp and php.number_format(exp),
-					stats = {
-						gain("hp") + leveling.hp_bonus(lv.id), gain("mp"), leveling.tp_gain(lv.id),
-						gain("strength"), gain("dexterity"),
-					},
-					has_spell = spell ~= 0,
-					spell = spell_names[spell],
+					level = level,
+					exp = php.number_format(leveling.exp_for(c, level)),
+					stats = { g.hp + leveling.hp_bonus(level), g.mp, leveling.tp_gain(level), g.strength, g.dexterity },
+					spells = spells,
 				}
 			end
 		end
-		classes[class] = { name = game.class_name(class), rows = rows }
+		list[#list + 1] = { name = c.name, rows = rows }
 	end
-	return page(req, "Levels", "community/help/levels", { classes = classes })
+	return page(req, "Levels", "community/help/levels", { classes = list })
 end
 
 return help

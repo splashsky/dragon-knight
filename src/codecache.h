@@ -47,4 +47,12 @@ int      codecache_prewarm_ex(void (*on_error)(const char *what, const char *msg
 /* Drop everything and bump the generation (also used by tests). */
 void     codecache_invalidate(void);
 
+/* Module names of the *.lua files directly under <app_dir>/<prefix with dots as slashes>
+ * ("content.classes" -> "content.classes.mage", ...), sorted, only names require accepts.
+ * Reads the directory on every call (no caching). Returns the count (0 when the directory
+ * does not exist) and a malloc'd array in *out (free each name, then the array; NULL when
+ * empty), or -1 for an invalid prefix or out of memory. An empty prefix lists app_dir. */
+int      codecache_list_modules(const char *prefix, char ***out);
+void     codecache_free_list(char **list, int n);
+
 #endif

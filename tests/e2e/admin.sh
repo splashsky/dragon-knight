@@ -20,8 +20,7 @@ t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
 			 CREATE TABLE adm_snap_drops AS SELECT * FROM drops WHERE id = 1;
 			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
 			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;
-			 CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;
-			 CREATE TABLE adm_snap_levels AS SELECT * FROM levels WHERE id = 5;"
+			 CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
 
@@ -43,7 +42,7 @@ t_get /;                   expect_no_body 'href="/admin"'
 t_jar admadmin
 t_login "$ADMIN_USER" "$ADMIN_PASS"
 t_get /admin;              expect_status 200; expect_body 'Welcome to the Dragon Knight Administration section.'
-expect_body 'href="/admin/settings"'; expect_body 'href="/admin/levels"'; expect_body '<a href="/">Game Home</a>'
+expect_body 'href="/admin/settings"'; expect_body 'href="/admin/classes"'; expect_body '<a href="/">Game Home</a>'
 expect_body '<title>Admin Home</title>'; expect_body 'Queries'
 
 t_section "admin: csrf"
@@ -56,13 +55,12 @@ admin_eq "SELECT count(*) FROM news WHERE content = 'forged'" "0" "news untouche
 
 t_section "admin: settings"
 t_get /admin/settings;     expect_status 200; expect_body 'Main Settings'; expect_body 'name="gamesize" size="3" maxlength="3" value="250"'
-expect_body 'name="class1name" size="20" maxlength="50" value="Mage"'; expect_no_body 'name="diff'; expect_no_body 'Difficulty'
+expect_no_body 'name="class1name"'; expect_no_body 'name="diff'; expect_no_body 'Difficulty'
 expect_no_body 'name="compression"'
-t_form_submit /admin/settings gamename= gamesize=252 forumtype=2 forumaddress= class2name= class3name=
+t_form_submit /admin/settings gamename= gamesize=252 forumtype=2 forumaddress=
 expect_status 200
 expect_body 'Game name is required.'; expect_body 'Map size must be divisible by five.'
 expect_body 'You must specify a forum address when using the External setting.'
-expect_body 'Class 2 name is required.'; expect_body 'Class 3 name is required.'; expect_no_body 'Class 1 name'
 expect_no_body 'Map size must be a number.'
 t_form_submit /admin/settings gamesize=abc
 expect_body 'Map size must be a number.'; expect_no_body 'divisible by five'
@@ -76,9 +74,10 @@ t_form_submit /admin/settings "gamename=Realm <&> Test" gameopen=0 gamesize=200 
 expect_redirect '/admin/settings\?saved=1'
 t_get '/admin/settings?saved=1'; expect_body 'Settings updated.'
 expect_body 'value="Realm &lt;&amp;&gt; Test"'; expect_body 'name="gamesize" size="3" maxlength="3" value="200"'
-admin_eq "SELECT id || '|' || gamename || '|' || gameopen || '|' || gamesize || '|' || class1name || '|' || shownews || '|' || compression FROM control" \
-	"1|Realm <&> Test|0|200|Sorcerer|1|1" "settings saved (compression untouched)"
-admin_eq "SELECT typeof(gamesize) || typeof(gameopen) || typeof(class1name) FROM control" "integerintegertext" "settings types"
+admin_eq "SELECT id || '|' || gamename || '|' || gameopen || '|' || gamesize || '|' || shownews || '|' || compression FROM control" \
+	"1|Realm <&> Test|0|200|1|1" "settings saved (compression untouched)"
+admin_eq "SELECT typeof(gamesize) || typeof(gameopen) || typeof(gamename) FROM control" "integerintegertext" "settings types"
+admin_eq "SELECT name FROM classes WHERE id = 1" "Mage" "no class names in the settings"
 t_get /login;              expect_body 'alt="Realm &lt;&amp;&gt; Test"'
 t_jar admtester
 t_get /;                   expect_body 'The game is currently closed for maintanence.'
@@ -87,7 +86,7 @@ t_get /admin;              expect_status 200   # admin works while the game is c
 t_get /admin/monsters
 expect_body 'Highest monster level should be 40, yours is 50.'
 t_get /admin/settings
-t_form_submit /admin/settings gameopen=1 gamesize=250 class1name=Mage
+t_form_submit /admin/settings gameopen=1 gamesize=250
 t_jar admtester
 t_get /;                   expect_no_body 'The game is currently closed'
 t_jar admadmin
@@ -152,28 +151,78 @@ expect_redirect '/admin/spells/1\?saved=1'
 admin_eq "SELECT name || '|' || mp || '|' || attribute || '|' || type FROM spells WHERE id = 1" \
 	"Mend|4|12|4" "spell saved"
 
-t_section "admin: levels"
-t_get /admin/levels;       expect_body '<option value="2">2</option>'; expect_body '<option value="99">99</option>'
-expect_no_body '<option value="1">1</option>'; expect_no_body '<option value="100">100</option>'
-t_get '/admin/levels?level=5'; expect_redirect /admin/levels/5
-t_get /admin/levels/5;     expect_body 'Mage Experience:'; expect_body 'Paladin Spells:'
-# experience, TP and the HP bonus come from lib/leveling.lua, read-only
-expect_body 'app/lib/leveling.lua'; expect_no_body 'name="one_exp"'; expect_no_body 'name="three_tp"'
-adm_body 'Warrior Experience:</td><td>234</td>'; adm_body 'Paladin TP:</td><td>2</td>'
-expect_body 'name="one_hp" size="5" maxlength="5" value="2"'
-t_get /admin/levels/10;    adm_body 'Mage HP Bonus:</td><td>10</td>'; adm_body 'Mage TP:</td><td>2</td>'
-expect_body 'name="two_hp" size="5" maxlength="5" value="0"'
-t_get /admin/levels/5
-t_form_submit /admin/levels/5 one_hp= two_mp=lots
-expect_body 'Class 1 HP is required.'; expect_body 'Class 1 HP must be a number.'
-expect_body 'Class 2 MP must be a number.'; adm_body 'Mage Experience:</td><td>195</td>'
-t_get /admin/levels/5
-t_form_submit /admin/levels/5 one_exp=111 one_tp=9 two_hp=22 three_spells=7 '1_mp=99' "id=6"
-expect_redirect '/admin/levels/5\?saved=1'
-admin_eq "SELECT \"2_hp\" || '|' || \"3_spells\" FROM levels WHERE id = 5" "22|7" "level saved"
-admin_eq "SELECT \"1_mp\" FROM levels WHERE id = 5" "$(t_sql 'SELECT "1_mp" FROM adm_snap_levels')" "level column not mass-assigned"
-t_get /admin/levels/5?saved=1; expect_body 'Level updated.'
-t_get /admin/levels/1000;  expect_status 404; expect_body 'No level to edit.'
+t_section "admin: classes"
+# class files app/content/classes/*.lua; admins override some fields (tests/e2e/content.sh
+# covers the files themselves)
+t_get /admin/levels;       expect_redirect /admin/classes
+t_get /admin/classes;      expect_status 200; expect_body '<a href="/admin/classes/1">Mage</a>'
+expect_body '<a href="/admin/classes/3">Paladin</a>'; expect_body 'The database is in sync with the content files.'
+expect_body 'classes: 3 files, 3 in the database (0 retired), 0 overrides.'
+t_get /admin/classes/2;    expect_status 200; expect_body 'Edit Class: Warrior'
+expect_body 'name="name" size="30" value="Warrior"'; expect_body 'app/content/classes/warrior.lua'
+expect_body '<option value="1" selected>Yes</option>'; expect_body 'name="start_hp" size="6" value="15"'
+expect_body '<textarea name="description" rows="6" cols="40">Medium level-ups'
+# experience and level gains are read-only (level 2: exp 18, HP 2, bonus 0, MP 4, TP 1,
+# strength 2, dexterity 1, Heal; level 10: the milestone bonus)
+expect_body 'Experience base 18, stages 2x2,1.5x8,1.25x5,1.125x27'
+expect_body "<tr><td>2</td><td>18</td><td>2</td><td>0</td><td>4</td><td>1</td><td>2</td><td>1</td><td>$(t_sql "SELECT name FROM spells WHERE id = 1")</td></tr>"
+expect_body '<tr><td>10</td><td>2,368</td><td>0</td><td>10</td>'
+expect_no_body 'name="exp_base"'; expect_no_body 'name="levels'
+t_get /admin/classes/99;   expect_status 404
+t_post /admin/classes/2 "name=NoToken"; expect_status 403
+adm_class_post() {  # adm_class_post ID 'field=value&...' (other fields: the current values)
+	local id=$1 over=$2 data f v
+	t_get "/admin/classes/$id"
+	data="csrf=$(t_csrf)"
+	for f in name description sort playable start_hp start_mp start_tp start_strength start_dexterity; do
+		case "&$over" in *"&$f="*) continue ;; esac
+		v=$(t_sql "SELECT $f FROM classes WHERE id = $id")
+		data+="&$f=$(t_enc "$v")"
+	done
+	t_post "/admin/classes/$id" "$data&$over"
+}
+adm_class_post 2 "name=&playable=7&start_hp=0&start_tp=x"
+expect_status 200
+expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
+expect_body 'Playable must be 0 or 1.'; expect_body 'Starting HP must be an integer from 1 to 100000.'
+expect_body 'Starting TP must be an integer from 0 to 100000.'
+admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid class form not saved"
+adm_class_post 2 "name=$(t_enc 'Fighter <b>')&playable=0&start_hp=20&id=7&exp_base=1&key=x"
+expect_redirect '/admin/classes/2\?saved=1'
+admin_eq "SELECT id || '|' || key || '|' || name || '|' || playable || '|' || start_hp || '|' || exp_base FROM classes WHERE id = 2" \
+	"2|warrior|Fighter <b>|0|20|18" "class overrides applied"
+admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'classes' AND key = 'warrior' ORDER BY field)" \
+	"name=Fighter <b>;playable=0;start_hp=20" "only the changed fields are overridden"
+t_get '/admin/classes/2?saved=1'; expect_body 'Class updated.'; expect_body 'File value: Warrior'
+expect_body 'value="Fighter &lt;b&gt;"'; expect_body 'Reset Name to file'; expect_no_body 'Reset Description to file'
+t_get /admin/classes;      expect_body 'Fighter &lt;b&gt;</a>'
+t_jar admreg; t_get /register
+expect_no_body 'Fighter'; expect_body '<option value="1">Mage</option>'; expect_body '<option value="3">Paladin</option>'
+t_register admwarrior pw1 admwarrior@example.com AdmWarrior 2
+expect_body 'Character Class is invalid.'
+t_jar admadmin
+adm_class_post 2 "playable=1"
+t_jar admreg
+t_register admwarrior pw1 admwarrior@example.com AdmWarrior 2
+expect_body 'Your account was created succesfully'
+admin_eq "SELECT charclass || '|' || currenthp || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || strength || '|' || attackpower FROM users WHERE username = 'admwarrior'" \
+	"2|20|20|0|10|5|5" "new character gets the overridden starting stats"
+t_login admwarrior pw1
+t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
+t_jar admadmin
+# overrides survive a sync
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+grep -qF 'Content synced (classes: 3, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
+t_get /admin/classes/2
+t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"
+expect_redirect '/admin/classes/2\?saved=1'
+admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Warrior|20" "name reset to file"
+t_get /admin/classes/2
+t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=*"
+admin_eq "SELECT name || '|' || start_hp || '|' || playable FROM classes WHERE id = 2" "Warrior|15|1" "all reset to file"
+admin_eq "SELECT count(*) FROM content_overrides" "0" "no overrides left"
+t_sql "DELETE FROM users WHERE username = 'admwarrior'"
 
 t_section "admin: users"
 ADM_UID=$(t_sql "SELECT id FROM users WHERE username = 'admtester'")
@@ -181,6 +230,7 @@ ADM_HASH=$(t_sql "SELECT password FROM users WHERE id = $ADM_UID")
 t_get /admin/users;        expect_body "<a href=\"/admin/users/$ADM_UID\">admtester</a>"
 t_get /admin/users/$ADM_UID; expect_body 'Username:'; expect_body 'Current Monster Sleep:'; expect_no_body 'pbkdf2$'
 expect_body 'name="charclass"'; expect_no_body 'name="difficulty"'
+expect_body '<option value="2">Warrior</option>'; expect_body '<option value="1" selected>Mage</option>'
 t_form_submit /admin/users/$ADM_UID email= gold=lots
 expect_body 'Email is required.'; expect_body 'Gold must be a number.'
 t_get /admin/users/$ADM_UID
@@ -241,6 +291,5 @@ t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; 
 			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
 			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
 			 DELETE FROM spells WHERE id = 1; INSERT INTO spells SELECT * FROM adm_snap_spells; DROP TABLE adm_snap_spells;
-			 DELETE FROM levels WHERE id = 5; INSERT INTO levels SELECT * FROM adm_snap_levels; DROP TABLE adm_snap_levels;
 			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

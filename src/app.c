@@ -123,6 +123,8 @@ int app_check(const dk_config *cfg)
 	if (!vm) {
 		fprintf(stderr, "FAIL building VM (config + require \"main\")\n  %s\n", err);
 		fails++;
+	} else if (bind_run_cli(vm_state(vm), cfg, NULL, "cli.check", 0, NULL) != 0) {
+		fails++;     /* app/cli/check.lua: content files (reported by the module) */
 	}
 	vm_destroy(vm);
 	codecache_shutdown();

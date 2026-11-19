@@ -12,10 +12,7 @@ local function yesno(name, label, help, no, yes)
 					 options = { { 0, no or "No" }, { 1, yes or "Yes" } }, help = help }
 end
 
-local function name_field(name, label)
-	return { name = name, label = label, size = 20, maxlength = 50 }
-end
-
+-- Class names moved to the classes (content files + overrides, /admin/classes).
 -- Legacy's "Page Compression" switch is not offered: the C server doesn't gzip, so it
 -- would do nothing. The control.compression column is left untouched.
 local function spec()
@@ -57,9 +54,6 @@ local function spec()
 			yesno("shownews", "Show News", "Toggle display of the Latest News box in towns."),
 			yesno("showonline", "Show Who's Online", "Toggle display of the Who's Online box in towns."),
 			yesno("showbabble", "Show Babblebox", "Toggle display of the Babble Box in towns."),
-			name_field("class1name", "Class 1 Name"),
-			name_field("class2name", "Class 2 Name"),
-			name_field("class3name", "Class 3 Name"),
 		},
 		-- legacy main() checks, in its order
 		validate = function(v, errors)
@@ -70,9 +64,6 @@ local function spec()
 			if not common.is_numeric(v.gamesize) then err("Map size must be a number.") end
 			if v.forumtype == "2" and v.forumaddress == "" then
 				err("You must specify a forum address when using the External setting.")
-			end
-			for i = 1, 3 do
-				if v["class" .. i .. "name"] == "" then err("Class " .. i .. " name is required.") end
 			end
 		end,
 	}

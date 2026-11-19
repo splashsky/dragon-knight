@@ -20,7 +20,7 @@
 <br><br><br></td></tr>
 <tr><td>Character Name:</td><td><input type="text" name="charname" size="30" maxlength="30" value="{{ v.charname }}" required></td></tr>
 <tr><td>Character Class:</td><td><select name="charclass">
-{%- for i, name in ipairs(classes) do %}<option value="{{ i }}"{% if v.charclass == tostring(i) then %} selected{% end %}>{{ name }}</option>{% end -%}
+{%- for _, c in ipairs(classes) do %}<option value="{{ c.id }}"{% if v.charclass == tostring(c.id) then %} selected{% end %}>{{ c.name }}</option>{% end -%}
 </select></td></tr>
 <tr><td colspan="2">See <a href="/help">Help</a> for more information about character classes.<br><br></td></tr>
 <tr><td colspan="2"><input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset"></td></tr>

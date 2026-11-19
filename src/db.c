@@ -44,8 +44,16 @@ sqlite3 *db_open(const char *path, char *err, size_t errlen)
 	}
 	sqlite3_busy_timeout(db, 5000);
 	char *msg = NULL;
-	rc = sqlite3_exec(db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; "
-						  "PRAGMA foreign_keys=ON;", NULL, NULL, &msg);
+	/* Switching a new database to WAL can fail with SQLITE_BUSY without consulting the
+	 * busy handler when several workers open it at the same moment: retry for a while. */
+	for (int tries = 0;; tries++) {
+		rc = sqlite3_exec(db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; "
+							  "PRAGMA foreign_keys=ON;", NULL, NULL, &msg);
+		if ((rc != SQLITE_BUSY && rc != SQLITE_LOCKED) || tries >= 200) break;
+		sqlite3_free(msg);
+		msg = NULL;
+		sqlite3_sleep(25);
+	}
 	if (rc != SQLITE_OK) {
 		snprintf(err, errlen, "%s: %s", path, msg ? msg : sqlite3_errstr(rc));
 		sqlite3_free(msg);

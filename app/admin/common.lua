@@ -1,6 +1,7 @@
 -- admin/common.lua :: shared pieces of the control panel (port of legacy admin.php header
 -- and admindisplay()).
 local auth = require("lib.auth")
+local content_sync = require("lib.content.sync")
 local php = require("lib.php")
 local view = require("lib.view")
 
@@ -19,20 +20,24 @@ function common.guard(req)
 	return auth.admin(req)
 end
 
+-- Layout options; every admin page shows the last content sync error, if any.
+local function layout(status)
+	return { layout = "admin", nav = false, status = status,
+					 vars = { content_error = content_sync.error() } }
+end
+
 -- Renders templates/<template>.html inside the admin layout (legacy admindisplay()).
 function common.page(req, title, template, ctx, status)
-	return view.page(req, title, template, ctx,
-									 { layout = "admin", nav = false, status = status })
+	return view.page(req, title, template, ctx, layout(status))
 end
 
 -- Trusted-HTML message page in the admin layout.
 function common.message(req, title, html, status)
-	return view.message(req, title, html, { layout = "admin", nav = false, status = status })
+	return view.message(req, title, html, layout(status))
 end
 
 function common.not_found(req, what)
-	return view.error(req, 404, "Not Found", "No such " .. what .. ".",
-										{ layout = "admin", nav = false })
+	return view.error(req, 404, "Not Found", "No such " .. what .. ".", layout())
 end
 
 -- Raw form value as a string ("" when absent, like PHP extract() of a missing key).
