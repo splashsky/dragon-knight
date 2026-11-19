@@ -329,8 +329,12 @@ INSERT INTO monsters VALUES (149, 'Titan', 360, 340, 270, 50, 2400, 800, 0);
 INSERT INTO monsters VALUES (150, 'Black Daemon', 400, 400, 280, 50, 3000, 1000, 1);
 INSERT INTO monsters VALUES (151, 'Lucifuge', 600, 600, 400, 50, 10000, 10000, 2);
 
--- news
-INSERT INTO news VALUES (1, 1072958400, 'This is the first news post. Please use the admin control panel to add another one and make this one go away.');
+-- news (dk install adds the author, a title and the discussion thread)
+INSERT INTO news (id, postdate, content) VALUES (1, 1072958400, 'This is the first news post. Please use the admin control panel to add another one and make this one go away.');
+
+-- forum boards (new; structural, loaded by partial setups too)
+INSERT INTO forums (id, name, description, position, admin_threads) VALUES (1, 'General', 'Talk about anything.', 1, 0);
+INSERT INTO forums (id, name, description, position, admin_threads) VALUES (2, 'News', 'Game news and announcements. Reply to discuss.', 2, 1);
 
 -- spells
 INSERT INTO spells VALUES (1, 'Heal', 5, 10, 1);

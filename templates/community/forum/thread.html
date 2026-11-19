@@ -1,7 +1,7 @@
 {#- One thread (legacy forum.php showthread()) + the reply form. -#}
 <table class="forum">
 <thead>
-<tr><th colspan="2" class="forum-thread-title"><a href="/forum">Forum</a> :: {{ thread.title }}</th></tr>
+<tr><th colspan="2" class="forum-thread-title"><a href="/forum">Forum</a> &rsaquo; {% if board then %}<a href="/forum/{{ board.id }}">{{ board.name }}</a> &rsaquo; {% end %}{{ thread.title }}</th></tr>
 </thead>
 <tbody>
 {%- for _, p in ipairs(posts) do %}

@@ -1,4 +1,4 @@
-/* community.css :: forum and help pages. Linked by every layout. */
+/* community.css :: forum, news and help pages. Linked by every layout. */
 
 /* ---- forum (legacy: black 1px grid, #dddddd headers, white/#eeeeee rows) ---- */
 table.forum {
@@ -21,8 +21,14 @@ table.forum .forum-col-thread { width: 50%; }
 table.forum .forum-col-replies { width: 10%; }
 table.forum .forum-author { width: 25%; }
 table.forum td { overflow-wrap: anywhere; }
+.forum-crumbs { margin: 0 0 6px; }
 .forum-pages { margin: 6px 0; }
 .forum-pages a, .forum-pages b { margin-right: 4px; }
+
+/* ---- news (archive pages and the town news box) ---- */
+.news-heading { margin-bottom: 12px; }
+.news-crumbs { margin: 0 0 6px; }
+.news-links { margin: 6px 0 0; }
 
 /* ---- help pages (legacy standalone pages: minimal layout, body_class "help") ---- */
 body.minimal.help { text-align: left; }

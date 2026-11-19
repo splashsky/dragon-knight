@@ -13,7 +13,11 @@
 {%- if news then %}
 <section class="panel">
 <div class="title">Latest News</div>
-<div class="box-body"><span class="light">[{{ date(news.postdate) }}]</span><br>{{{ nl2br(news.content) }}}</div>
+<div class="box-body"><a href="/news/{{ news.id }}"><b>{{ news.title }}</b></a> <span class="light">[{{ date(news.postdate) }} by {{ news.author }}]</span><br>{{{ nl2br(news.excerpt) }}}
+{%- if news.more then %} <a href="/news/{{ news.id }}">Read more</a>{% end %}
+<p class="news-links">
+{%- if news.thread_url then %}<a href="{{ news.thread_url }}">{{ news.thread_label }}</a> &middot; {% end -%}
+<a href="/news">All news</a></p></div>
 </section>
 {%- end %}
 <div class="panel-row">

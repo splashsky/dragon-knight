@@ -13,7 +13,10 @@ Please try again.</div>
 {%- end %}
 <form action="/admin/news" method="post">
 {{{ csrf_field() }}}
-Type your post below and then click Submit to add it.<br>
+Type your post below and then click Submit to add it. It also starts a discussion thread in the forum's News board.<br>
+Title (optional, defaults to the first line):<br>
+<input type="text" name="title" size="50" maxlength="{{ title_max }}" value="{{ title }}"><br>
+Content (the first paragraph shows in town):<br>
 <textarea name="content" rows="5" cols="50">{{ content }}</textarea><br>
 <input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
 </form>

@@ -1,4 +1,5 @@
 {#- New thread form (legacy forum.php newthread()). -#}
+<p class="forum-crumbs"><a href="/forum">Forum</a> &rsaquo; <a href="/forum/{{ board.id }}">{{ board.name }}</a></p>
 <b>Make A New Post:</b><br><br>
 {%- if errors then %}
 <p class="error">
@@ -7,7 +8,7 @@
 {%- end %}
 </p>
 {%- end %}
-<form action="/forum/new" method="post">
+<form action="/forum/{{ board.id }}/new" method="post">
 {{{ csrf_field() }}}
 Title:<br>
 <input type="text" name="title" size="50" maxlength="{{ title_max }}" value="{{ draft.title }}" required><br><br>

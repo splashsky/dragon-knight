@@ -1,6 +1,8 @@
 -- Dragon Knight schema (SQLite). Port of the original install.php: same tables (no dk_ prefix)
 -- and column names. Dates are unix seconds (INTEGER). Text comparisons on username,
 -- charname and email are case-insensitive like the original MySQL collation.
+-- This is the latest schema (`dk install` sets PRAGMA user_version to
+-- migrations.VERSION); change it together with a new migration in app/lib/migrations.lua.
 
 CREATE TABLE babble (
 	id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +45,17 @@ CREATE TABLE drops (
 	attribute2  TEXT    NOT NULL DEFAULT ''
 );
 
+-- Forum boards. admin_threads = 1: only administrators start threads (replies are open).
+CREATE TABLE forums (
+	id             INTEGER PRIMARY KEY,
+	name           TEXT    NOT NULL,
+	description    TEXT    NOT NULL DEFAULT '',
+	position       INTEGER NOT NULL DEFAULT 0,
+	admin_threads  INTEGER NOT NULL DEFAULT 0
+);
+
+-- Threads (parent = 0) and replies (parent = thread id); replies share the thread's board.
+-- author is the charname at posting time (shown); author_id links the account.
 CREATE TABLE forum (
 	id           INTEGER PRIMARY KEY AUTOINCREMENT,
 	postdate     INTEGER NOT NULL DEFAULT 0,
@@ -51,9 +64,12 @@ CREATE TABLE forum (
 	parent       INTEGER NOT NULL DEFAULT 0,
 	replies      INTEGER NOT NULL DEFAULT 0,
 	title        TEXT    NOT NULL DEFAULT '',
-	content      TEXT    NOT NULL DEFAULT ''
+	content      TEXT    NOT NULL DEFAULT '',
+	board        INTEGER NOT NULL DEFAULT 1 REFERENCES forums (id),
+	author_id    INTEGER REFERENCES users (id) ON DELETE SET NULL
 );
 CREATE INDEX forum_parent ON forum (parent, newpostdate);
+CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 
 CREATE TABLE items (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,10 +119,14 @@ CREATE TABLE monsters (
 );
 CREATE INDEX monsters_level ON monsters (level);
 
+-- thread_id: the post's discussion thread in the News board (app/lib/news.lua).
 CREATE TABLE news (
-	id        INTEGER PRIMARY KEY AUTOINCREMENT,
-	postdate  INTEGER NOT NULL DEFAULT 0,
-	content   TEXT    NOT NULL DEFAULT ''
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	postdate   INTEGER NOT NULL DEFAULT 0,
+	content    TEXT    NOT NULL DEFAULT '',
+	title      TEXT    NOT NULL DEFAULT '',
+	author_id  INTEGER REFERENCES users (id) ON DELETE SET NULL,
+	thread_id  INTEGER REFERENCES forum (id) ON DELETE SET NULL
 );
 
 CREATE TABLE spells (

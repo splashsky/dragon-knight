@@ -1,0 +1,11 @@
+{#- Board list (GET /forum). -#}
+<table class="forum">
+<thead>
+<tr><th class="forum-col-thread">Board</th><th class="forum-col-replies">Threads</th><th class="forum-col-replies">Posts</th><th>Last Post</th></tr>
+</thead>
+<tbody>
+{%- for _, b in ipairs(boards) do %}
+<tr><td><a href="/forum/{{ b.id }}"><b>{{ b.name }}</b></a><br><span class="small">{{ b.description }}</span></td><td>{{ b.threads }}</td><td>{{ b.posts }}</td><td>{% if b.lastpost then %}{{ datetime(b.lastpost) }}{% else %}None{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>

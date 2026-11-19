@@ -1,0 +1,11 @@
+{#- One news post; ctx.post from lib/news.lua (news.get / news.page). -#}
+<section class="box news-post">
+<div class="title"><a href="/news/{{ post.id }}">{{ post.title }}</a></div>
+<div class="box-body">
+<span class="light">[{{ date(post.postdate) }} by {{ post.author }}]</span><br>
+{{{ nl2br(post.content) }}}
+{%- if post.thread_url then %}
+<p class="news-links"><a href="{{ post.thread_url }}">{{ post.thread_label }}</a></p>
+{%- end %}
+</div>
+</section>

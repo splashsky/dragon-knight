@@ -137,13 +137,23 @@ t_get /babble;   expect_status 200
 t_post /babble "csrf=$TC&babble=$(t_enc 'Hello from the playthrough')"; expect_redirect /babble
 t_get /babble;   expect_body '[<b>Wanderer</b>] Hello from the playthrough'
 t_get /forum;    expect_status 200
-t_get /forum/new; expect_body 'Make A New Post'
-t_post /forum/new "csrf=$TC&title=$(t_enc 'Journey log')&content=$(t_enc 'Found a Stick.')"; expect_redirect /forum
-t_get /forum
+t_get /forum/1/new; expect_body 'Make A New Post'
+t_post /forum/1/new "csrf=$TC&title=$(t_enc 'Journey log')&content=$(t_enc 'Found a Stick.')"; expect_redirect /forum/1
+t_get /forum/1
 THREAD=$(grep -o 'href="/forum/thread/[0-9]*">Journey log<' "$BODY" | grep -o '[0-9][0-9]*')
 [ -n "$THREAD" ] && t_ok || t_fail "new thread not listed"
 t_post "/forum/reply/$THREAD" "csrf=$TC&content=$(t_enc 'And a Life Pebble.')"; expect_redirect "/forum/thread/$THREAD"
 t_get "/forum/thread/$THREAD"; expect_body 'Found a Stick.'; expect_body 'And a Life Pebble.'
+
+t_section "playthrough: news"
+t_get /;         expect_body 'href="/news">News</a>'
+t_get /news;     expect_status 200; expect_body 'This is the first news post.'
+t_get /news/1;   expect_status 200
+NEWS_THREAD=$(grep -o 'href="/forum/thread/[0-9]*"' "$BODY" | head -n1 | grep -o '[0-9][0-9]*')
+[ -n "$NEWS_THREAD" ] && t_ok || t_fail "no discussion link on the news post"
+t_post "/forum/reply/$NEWS_THREAD" "csrf=$TC&content=$(t_enc 'Welcome to me.')"; expect_redirect "/forum/thread/$NEWS_THREAD"
+t_get "/forum/thread/$NEWS_THREAD"; expect_body 'href="/forum/2">News</a>'; expect_body 'Welcome to me.'
+t_get /news/1;   expect_body "href=\"/forum/thread/$NEWS_THREAD\">$(t_sql "SELECT replies FROM forum WHERE id = $NEWS_THREAD") repl"
 
 t_section "playthrough: help pages"
 for p in /help /help/items /help/spells /help/monsters /help/levels; do

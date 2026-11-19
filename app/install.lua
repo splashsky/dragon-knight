@@ -2,6 +2,8 @@
 -- create the administrator account (port of legacy install.php).
 local auth = require("lib.auth")
 local mail = require("lib.mail")
+local migrations = require("lib.migrations")
+local news = require("lib.news")
 local php = require("lib.php")
 
 local USAGE = [[
@@ -9,8 +11,8 @@ usage: dk install [--partial] [--force]
 									[--admin <username> <email> <password>] [--charname NAME]
 									[--class 1|2|3] [--difficulty 1|2|3]
 
-	--partial     create tables but load no game data except the control row and the
-								first news post (legacy "Partial Setup")
+	--partial     create tables but load no game data except the control row, the
+								forum boards and the first news post (legacy "Partial Setup")
 	--force       drop existing Dragon Knight tables first (DESTROYS ALL DATA)
 	--admin       administrator account; prompted for when omitted
 	--charname    administrator character name (default: the username)
@@ -18,9 +20,9 @@ usage: dk install [--partial] [--force]
 	--difficulty  difficulty (default 1)
 ]]
 
--- sessions first: it references users
-local TABLES = { "sessions", "babble", "control", "drops", "forum", "items", "levels",
-								 "monsters", "news", "spells", "towns", "users" }
+-- children before parents (foreign keys): sessions/news/forum before forum/forums/users
+local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "items",
+								 "levels", "monsters", "spells", "towns", "users" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")
@@ -91,13 +93,14 @@ local function existing_tables()
 	return found
 end
 
--- seed.sql has one INSERT per line; partial setup keeps only control + news
--- (legacy populated those two even for "Partial Setup").
+-- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
+-- populated those two even for "Partial Setup") and the forum boards (structural).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
 	for line in sql:gmatch("[^\n]+") do
-		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") then
+		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
+				line:find("^INSERT INTO forums ") then
 			keep[#keep + 1] = line
 		end
 	end
@@ -154,6 +157,8 @@ local function run(...)
 		"INSERT INTO users (username, password, email, verify, charname, charclass, difficulty, " ..
 		"regdate, onlinetime, authlevel) VALUES (?, ?, ?, '1', ?, ?, ?, ?, ?, 1)",
 		o.username, auth.hash_password(o.password), o.email, o.charname, o.class, o.difficulty, now, now)
+	news.adopt({ id = id })
+	migrations.stamp(migrations.VERSION)
 
 	print(string.format("Database %s created (%s setup).", dk.config.db_path or "data/dk.db",
 											o.partial and "partial" or "complete"))

@@ -41,17 +41,19 @@ src/                  C engine
   vmpool.[ch]         warm spare VMs, warmer/reaper thread
   bind.h              dk Lua API (bind_dk.c), SQLite binding (bind_db.c), db.c
   app.c               dk_hooks glue: worker_init opens DB; handle = acquire VM → bind_handle → release
-  main.c              CLI: `dk serve`, `dk install`, `dk user`, `dk check`, `dk version`
+  main.c              CLI: `dk serve`, `dk install`, `dk migrate`, `dk user`, `dk check`, `dk version`
 app/                  Lua application (hot-reloaded)
   main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
   routes.lua          route table assembly (requires the route modules listed in it)
   routes/             thin route modules: auth, home, town, fight, community, admin
-  lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount
+  lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
+                      news, paging, migrations (schema versions)
   town/               inn, shop, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
-  community/          forum, help pages
+  community/          forum (boards), news archive, help pages, changelog
   admin/              admin control panel (settings, news, levels, generic CRUD editor)
   cli/user.lua        `dk user`
+  cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
   install.lua         `dk install`: schema + seed data + admin user
   sql/schema.sql      SQLite schema
   sql/seed.sql        default game data ported 1:1 from legacy install.php
@@ -61,8 +63,9 @@ public/               served at /static/ (images/, css/, js/)
 tests/c/              C unit tests (one main() per file, built by `make test`)
 tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
-tests/e2e/            feature scripts sourced by run.sh (admin, community, fight,
-                      playthrough, town)
+tests/e2e/            feature scripts sourced by run.sh (admin, community, fight, migrate,
+                      news, playthrough, town)
+tests/fixtures/       schema_v0.sql: the pre-versioning schema, for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
 
@@ -225,10 +228,11 @@ queued cookies), so HEAD never changes state.
 | `do=showmap` | `GET /map` |
 | `do=babblebox` | `GET/POST /babble` (iframe-able minimal page) |
 | `do=ninja` | `GET /ninja` → 302 to the original shirt-ninja URL (keep the easter egg) |
-| `forum.php` | `GET /forum`, `GET /forum/thread/:id[?start=n]`, `GET/POST /forum/new`, `POST /forum/reply/:id` |
+| `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
+| (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
 | `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,spells,levels,users}[/:id]`, `/admin/news` |
-| `install.php`, `upgrade_*.php` | `./dk install` CLI; upgrades dropped (fresh SQLite schema) |
+| `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
 game closed → closed page; `verifyemail` on and not verified → `/verify`; banned
@@ -239,6 +243,16 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 - Port every legacy table to SQLite without the `dk_` prefix: `babble, control, drops,
 	forum, items, levels, monsters, news, spells, towns, users`, keeping column names so
 	porting is mechanical. Add `sessions`.
+- Forum boards: `forums(id, name, description, position, admin_threads)`, seeded with
+	1 General and 2 News (`admin_threads = 1`: only admins start threads). `forum` gains
+	`board` (→ `forums.id`, replies copy their thread's) and `author_id` (→ `users.id`,
+	`author` keeps the charname for display). Index `forum (board, parent, newpostdate)`.
+- `news` gains `title`, `author_id` (→ `users.id`) and `thread_id` (→ `forum.id`, the
+	post's discussion thread in the News board, created with the post). References to users
+	are `ON DELETE SET NULL`; foreign keys are enforced.
+- Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
+	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
+	older databases, and the app answers 503 while the versions differ.
 - Times: store unix seconds INTEGER (`regdate`, `onlinetime`, `postdate`, `newpostdate`,
 	`posttime`). Format in Lua.
 - `users.password` = `pbkdf2$<iters>$<salt hex>$<hash hex>` (iters default 210000,

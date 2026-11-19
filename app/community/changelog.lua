@@ -38,6 +38,11 @@ changelog.RELEASES = {
 			"Spells of an unknown type are refused instead of doing nothing.",
 			"Strength/dexterity bonuses on items count toward attack/defense power in any slot.",
 			"Victory experience and gold can't go below zero.",
+			"The forum is split into boards, with a News board where only admins start threads.",
+			"News posts have titles and authors, and each one gets its own discussion thread.",
+			"Town news shows the first paragraph of the latest post, with Read more and its reply count.",
+			"Added a news archive page.",
+			"Added the dk migrate command to upgrade existing databases.",
 		},
 	},
 	{

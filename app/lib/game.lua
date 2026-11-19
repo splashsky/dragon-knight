@@ -134,10 +134,6 @@ function game.forum_link()
 	return nil
 end
 
-function game.latest_news()
-	return dk.db:first("SELECT * FROM news ORDER BY id DESC LIMIT 1")
-end
-
 function game.online_users()
 	return dk.db:query("SELECT id, charname FROM users WHERE onlinetime >= ? ORDER BY charname",
 										 dk.now() - game.ONLINE_SECONDS)

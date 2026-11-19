@@ -1,0 +1,9 @@
+{#- News archive (GET /news): every post, newest first. -#}
+<div class="title news-heading">News</div>
+{%- if #posts == 0 then %}
+<p><b>No news yet.</b></p>
+{%- end %}
+{%- for _, p in ipairs(posts) do %}
+{{{ include("community/news/post", { post = p }) }}}
+{%- end %}
+{{{ include("community/forum/pager") }}}

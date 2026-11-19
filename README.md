@@ -51,7 +51,8 @@ cp config.example.lua config.lua       # then edit: port, paths, secret, dev = f
 
 `dk install` prints a random `secret` if the config has none; paste it into `config.lua`.
 The database and the mail outbox go to `data/` by default. Serve over HTTPS through a
-reverse proxy in production and set `cookie_secure = true`.
+reverse proxy in production and set `cookie_secure = true`. After updating the game, run
+`./dk migrate` to bring an existing database up to date (it does nothing when it already is).
 
 ## Command line
 
@@ -61,6 +62,7 @@ Every command accepts `--config PATH` (default `./config.lua`).
 |---|---|
 | `dk serve` | run the HTTP server |
 | `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class 1-3] [--difficulty 1-3] [--partial] [--force]` | create the schema, load the default game data and create the administrator (`--partial`: no game data; `--force`: drop existing tables first) |
+| `dk migrate [--status]` | upgrade an existing database to the current schema, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
 | `dk user list` | list accounts |
 | `dk user passwd USER NEWPASS` | set a password (ends the user's sessions) |
 | `dk user admin USER` | make a user an administrator |
@@ -102,10 +104,10 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  install.lua, cli/, sql/          `dk install`, `dk user`, schema and seed data
+  install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
-tests/          c/ (C unit tests), lua/ (Lua unit tests), run.sh + e2e/ (end-to-end)
+tests/          c/ (C unit tests), lua/ (Lua unit tests), run.sh + e2e/ (end-to-end), fixtures/
 vendor/         Lua 5.5.1 and SQLite 3.54.1, unmodified (see vendor/VERSIONS)
 docs/APP.md     app developer guide
 PLAN.md         design notes: engine API, URL map, data model
@@ -138,9 +140,14 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	cookie scheme; escaping and parameterized SQL throughout.
 - Email (registration verification, lost password) is written as `.eml` files to the
 	outbox directory instead of being sent; email verification is off by default.
-- Installation and upgrades are the `dk install` command; there is no web installer.
+- Installation and upgrades are the `dk install` and `dk migrate` commands; there is no web
+	installer.
 - The admin "page compression" setting is gone (the server doesn't gzip).
-- The built-in forum is only available when the forum type is set to "Internal".
+- The built-in forum is only available when the forum type is set to "Internal". It has
+	boards (`/forum/1`, …): General, and News, where only administrators start threads.
+- News posts have a title and an author, and posting one also starts its discussion thread
+	in the News board. The town shows the first paragraph of the latest post with "Read
+	more" and the reply count; `/news` lists every post.
 - Gameplay fixes:
 	- Bris sells its full item list.
 	- In the shop, the sell-back value of the item you replace counts toward the price.

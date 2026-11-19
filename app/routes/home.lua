@@ -1,6 +1,7 @@
 -- routes/home.lua :: GET / (port of legacy index.php donothing/dotown/doexplore).
 local auth = require("lib.auth")
 local game = require("lib.game")
+local news = require("lib.news")
 local view = require("lib.view")
 
 local function town_page(req)
@@ -12,7 +13,7 @@ local function town_page(req)
 	end
 	local control = game.control()
 	local ctx = { town = town }
-	if control.shownews == 1 then ctx.news = game.latest_news() end
+	if control.shownews == 1 then ctx.news = news.latest() end
 	if control.showonline == 1 then ctx.online = game.online_users() end
 	ctx.babble = control.showbabble == 1
 	return view.page(req, "In Town", "home/town", ctx)

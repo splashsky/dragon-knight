@@ -20,6 +20,7 @@ t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
 			 CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;
 			 CREATE TABLE adm_snap_levels AS SELECT * FROM levels WHERE id = 5;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
+ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
 
 t_section "admin: access"
 t_jar admanon
@@ -202,14 +203,22 @@ t_get '/admin/users?start=100'; expect_body 'Showing 101'; expect_body '&laquo; 
 t_sql "DELETE FROM users WHERE username LIKE 'admbulk%' OR username = '<b>bold</b>'"
 
 t_section "admin: news"
-t_get /admin/news;         expect_body 'Add A News Post'
+t_get /admin/news;         expect_body 'Add A News Post'; expect_body 'name="title" size="50" maxlength="100" value=""'
 t_post /admin/news "csrf=$(t_csrf)&content="
 expect_body 'Content is required.'
-t_post /admin/news "csrf=$(t_csrf)&submit=Submit&content=$(t_enc 'Fresh <b>news</b> from the admin')"
+t_post /admin/news "csrf=$(t_csrf)&title=$(t_enc '<i>kept</i>')&content=+%0D%0A+"
+expect_body 'Content is required.'; expect_body 'name="title" size="50" maxlength="100" value="&lt;i&gt;kept&lt;/i&gt;"'
+t_post /admin/news "csrf=$(t_csrf)&title=$(printf 'y%.0s' $(seq 101))&content=x"
+expect_body 'Title must be 100 characters or less.'
+admin_eq "SELECT count(*) FROM news WHERE id > $ADM_NEWS_MAX" "0" "invalid news not saved"
+t_post /admin/news "csrf=$(t_csrf)&submit=Submit&title=&content=$(t_enc 'Fresh <b>news</b> from the admin')"
 expect_redirect '/admin/news\?saved=1'
 t_get /admin/news?saved=1; expect_body 'News post added.'
-admin_eq "SELECT content || '|' || (abs(postdate - strftime('%s','now')) < 60) FROM news ORDER BY id DESC LIMIT 1" \
-	"Fresh <b>news</b> from the admin|1" "news saved"
+ADM_ADMIN_ID=$(t_sql "SELECT id FROM users WHERE username = '$ADMIN_USER'")
+admin_eq "SELECT content || '|' || title || '|' || author_id || '|' || (abs(postdate - strftime('%s','now')) < 60) FROM news ORDER BY id DESC LIMIT 1" \
+	"Fresh <b>news</b> from the admin|Fresh <b>news</b> from the admin|$ADM_ADMIN_ID|1" "news saved"
+admin_eq "SELECT f.board || '|' || f.author || '|' || (f.title = n.title) FROM news n JOIN forum f ON f.id = n.thread_id ORDER BY n.id DESC LIMIT 1" \
+	"2|Admin|1" "news thread"
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 WHERE id = $ADM_UID"
 t_jar admtester
 t_get /;                   expect_body 'Fresh &lt;b&gt;news&lt;/b&gt; from the admin'
@@ -222,5 +231,5 @@ t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; 
 			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
 			 DELETE FROM spells WHERE id = 1; INSERT INTO spells SELECT * FROM adm_snap_spells; DROP TABLE adm_snap_spells;
 			 DELETE FROM levels WHERE id = 5; INSERT INTO levels SELECT * FROM adm_snap_levels; DROP TABLE adm_snap_levels;
-			 DELETE FROM news WHERE id > $ADM_NEWS_MAX;"
+			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

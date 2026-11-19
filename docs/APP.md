@@ -15,9 +15,10 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_fight.lua` |
-| Forum, help, changelog | `app/routes/community.lua`, `app/community/*` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
+| Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
+| News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI | `app/install.lua`, `app/cli/user.lua`, `app/sql/*` | | `tests/run.sh` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/schema_v0.sql`) |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -32,16 +33,18 @@ The project indents with tabs.
 `main.lua` handles each request (fresh Lua VM per request, so module-level state lives
 for one request only):
 
-1. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
+1. The database's schema version (`PRAGMA user_version`) must be `migrations.VERSION`;
+	 otherwise every request gets a 503 page saying to run `dk migrate` (or `dk install`).
+2. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
 	 row) and `req.session`, and updates `users.onlinetime`.
-2. The router matches the method and path. No match gives a 404 page; the wrong method
+3. The router matches the method and path. No match gives a 404 page; the wrong method
 	 gives a 405 page with an `Allow` header.
-3. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
+4. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
 	 runs before any guard or handler.
-4. Guards run, then the handler runs. The handler returns a response table (or an HTML
+5. Guards run, then the handler runs. The handler returns a response table (or an HTML
 	 string).
-5. HEAD requests: the transaction is rolled back and queued cookies are dropped.
-6. Cookies queued on `req.out_headers` are added to the response.
+6. HEAD requests: the transaction is rolled back and queued cookies are dropped.
+7. Cookies queued on `req.out_headers` are added to the response.
 
 The whole request runs in one SQLite transaction (`BEGIN IMMEDIATE`). If a Lua error
 escapes, `main.lua` rolls the transaction back, logs the traceback and renders a 500 page
@@ -86,7 +89,8 @@ end
 | `auth.game` | legacy index.php chain: not logged in → `/login`; `control.gameopen == 0` → "Game Closed" page; `verifyemail == 1` and not verified → `/verify`; `authlevel == 2` → 403 blocked page |
 | `auth.admin` | not logged in → `/login`; `authlevel ~= 1` → 403 |
 
-Use `auth.game` for every game page (town, fight, character, babble, forum).
+Use `auth.game` for every game page (town, fight, character, babble, news). The forum
+routes use `forum.guard`, which wraps it.
 
 ### Request table
 
@@ -104,6 +108,7 @@ Form and query values are raw strings. Validate them, and convert them with
 | `view.message(req, title, html [, opts])` | layout around a **trusted HTML** snippet (port of legacy `display("text…")`); escape interpolated data with `dk.html()` |
 | `view.error(req, status, title, text [, opts])` | error page; `text` is escaped |
 | `view.not_found(req)`, `view.csrf_failed(req)`, `view.method_not_allowed(req, allow)` | stock error pages |
+| `view.unavailable(req, text)` | standalone 503 page (no DB access; used for the schema check) |
 | `view.redirect(url [, status])` | 302 (legacy `header("Location: …")`) |
 | `view.text(body [, status])` | text/plain |
 | `view.render(name, ctx, req)` | a rendered template string (for building fragments) |
@@ -183,8 +188,28 @@ starting with `__` are reserved.
 | `game.statbar(cur, max)` | `{pct, height, color}` |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
 | `game.forum_link()` | `/forum`, the external address, or nil |
-| `game.latest_news()`, `game.online_users()` | news row, users seen in the last 10 minutes (`id, charname`) |
+| `game.online_users()` | users seen in the last 10 minutes (`id, charname`) |
 | `game.nav(user)` | the table the side columns render |
+
+## Forum and news
+
+- Boards are rows of `forums` (seeded: 1 General, 2 News). `forum` holds threads
+	(`parent = 0`) and replies (`parent` = thread id); a reply copies its thread's `board`.
+	Posts keep the charname in `author` (shown) and the account in `author_id`. Boards with
+	`admin_threads = 1` only take new threads from administrators; anyone can reply.
+- URLs: `/forum` (boards), `/forum/#board` (threads, `?start=N`), `/forum/#board/new`,
+	`/forum/thread/#id`, `POST /forum/reply/#id`. `/forum/new` redirects to `/forum/1/new`.
+	Every forum route uses `forum.guard` (logged out → message, `auth.game`, then
+	`forumtype ~= 1` → "disabled").
+- `lib/news.lua`: `news.post(user, title, content)` stores a post and starts its thread in
+	the News board (`news.BOARD`) whatever the forum setting, so the threads are there if the
+	forum is turned on later. An empty title becomes `news.default_title(content)`.
+	`news.latest()` (town box: `excerpt`/`more` from `news.first_paragraph`), `news.get(id)`
+	and `news.page(start, per)` return rows with `author` ("Unknown" when the account is gone)
+	and, when `forumtype == 1` and the thread exists, `thread_url` / `thread_label`
+	(`news.reply_label(n)`: "Reply", "1 reply", "N replies").
+- Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,
+	start, per, total)` builds the links that `include("community/forum/pager")` renders.
 
 ## PHP compatibility (`lib/php.lua`)
 
@@ -226,6 +251,31 @@ in a comment.
 - Store user text raw and escape it on output. Legacy HTML-escaped on input; we don't, so
 	never put DB text in `{{{ }}}`.
 - Schema: `app/sql/schema.sql`. Default data: `app/sql/seed.sql`.
+- Foreign keys are on (`PRAGMA foreign_keys=ON` per connection): delete children before
+	parents, and reference users with `ON DELETE SET NULL` where the row should outlive them.
+
+### Schema changes and migrations
+
+`app/sql/schema.sql` is always the latest schema, and `dk install` stamps new databases
+with `PRAGMA user_version = migrations.VERSION` (`app/lib/migrations.lua`). Databases from
+before versioning are version 0. `dk migrate` runs the missing steps of
+`migrations.STEPS` in order, stamping each version, all in the CLI's one transaction, then
+runs `PRAGMA foreign_key_check`. `main.lua` compares the version on every request and
+serves a 503 page until the database matches.
+
+To change the schema:
+
+1. Edit `schema.sql` (and `seed.sql` if new rows are needed; write `INSERT INTO t (cols)
+	 VALUES …` so seed lines survive later columns).
+2. Append a step to `migrations.STEPS` that makes the same change to an existing database
+	 plus any backfill. Write it in SQL against the schema of its time; don't call app
+	 modules that query tables, since they follow the latest schema (pure helpers are fine).
+	 SQLite can't `ADD COLUMN` with `REFERENCES` and a non-NULL default while foreign keys
+	 are on: rebuild the table (create `t_new`, copy, drop, rename, recreate indexes), as
+	 step 1 does for `forum`.
+3. Extend `tests/e2e/migrate.sh`: it builds a version-0 database from
+	 `tests/fixtures/schema_v0.sql`, migrates it, checks the data and compares the column,
+	 foreign key and index layout with a fresh install. Never edit the fixture.
 
 ## Sessions, CSRF, accounts
 
@@ -277,7 +327,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_register user pass email charname [class] [diff]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
-| `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS` | the server log is `$T/server.log` (one access line per request) |
+| `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.
 `run.sh` runs them inside a dk VM, where they can `require("lib.php")` and friends.

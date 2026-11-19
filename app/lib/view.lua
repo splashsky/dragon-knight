@@ -150,6 +150,16 @@ function view.text(body, status)
 					 body = body }
 end
 
+-- 503 page (database not ready); like the 500 page it doesn't touch the DB.
+function view.unavailable(req, message)
+	local ok, body = pcall(view.render, "errors/503", { message = message }, req)
+	if not ok then
+		body = "<!doctype html><title>Service Unavailable</title><h1>Service Unavailable</h1><p>" ..
+					 dk.html(message) .. "</p>"
+	end
+	return html_response(body, 503, { { "Retry-After", "60" } })
+end
+
 -- 500 page; must not depend on the DB or other templates working.
 function view.server_error(req, err)
 	local detail = dk.config.dev and err or nil

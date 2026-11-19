@@ -2,12 +2,32 @@
 -- handles exactly one request.
 local csrf = require("lib.csrf")
 local dbcount = require("lib.dbcount")
+local migrations = require("lib.migrations")
 local router = require("lib.router")
 local routes = require("routes")
 local session = require("lib.session")
 local view = require("lib.view")
 
+-- 503 unless the database has the schema this code expects (one PRAGMA per request).
+local function schema_check(req)
+	local version = migrations.current()
+	if version == migrations.VERSION then return nil end
+	local msg
+	if version > migrations.VERSION then
+		msg = string.format("The database schema (version %d) is newer than this version of the " ..
+												"game expects (version %d). Upgrade the game.", version, migrations.VERSION)
+	elseif version == 0 and not migrations.installed() then
+		msg = "The database is not installed — run `dk install`."
+	else
+		msg = "Database schema is out of date — run `dk migrate`."
+	end
+	dk.log("warn", msg)
+	return view.unavailable(req, msg)
+end
+
 local function dispatch(req)
+	local res = schema_check(req)
+	if res then return res end
 	session.load(req)
 	local route, params, allowed = routes:match(req.method, req.path)
 	if not route then

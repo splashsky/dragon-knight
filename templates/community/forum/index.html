@@ -1,12 +1,16 @@
-{#- Thread list (legacy forum.php donothing()). -#}
+{#- Thread list of one board (legacy forum.php donothing()). -#}
 <table class="forum">
 <thead>
-<tr><th colspan="3" class="forum-new"><a href="/forum/new">New Thread</a></th></tr>
+<tr><th colspan="3" class="forum-thread-title"><a href="/forum">Forum</a> &rsaquo; {{ board.name }}
+{%- if board.description ~= "" then %}<br><span class="small">{{ board.description }}</span>{% end %}</th></tr>
+{%- if can_post then %}
+<tr><th colspan="3" class="forum-new"><a href="/forum/{{ board.id }}/new">New Thread</a></th></tr>
+{%- end %}
 <tr><th class="forum-col-thread">Thread</th><th class="forum-col-replies">Replies</th><th>Last Post</th></tr>
 </thead>
 <tbody>
 {%- if #threads == 0 then %}
-<tr><td colspan="3"><b>No threads in forum.</b></td></tr>
+<tr><td colspan="3"><b>No threads in this board.</b></td></tr>
 {%- end %}
 {%- for _, t in ipairs(threads) do %}
 <tr><td><a href="/forum/thread/{{ t.id }}">{{ t.title }}</a></td><td>{{ t.replies }}</td><td>{{ datetime(t.newpostdate) }}</td></tr>

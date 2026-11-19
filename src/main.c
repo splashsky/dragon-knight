@@ -19,6 +19,7 @@ static void usage(FILE *f)
 			"commands:\n"
 			"  serve              run the HTTP server\n"
 			"  install [args...]  create schema + seed data (runs app/install.lua)\n"
+			"  migrate [--status] upgrade the database schema (runs app/cli/migrate.lua)\n"
 			"  user [args...]     user administration (runs app/cli/user.lua)\n"
 			"  check              compile all modules/templates and build a VM; nonzero on error\n"
 			"  version            print version information\n"
@@ -76,6 +77,8 @@ int main(int argc, char **argv)
 		rc = nrest ? (usage(stderr), 2) : app_serve(&cfg);
 	} else if (!strcmp(cmd, "install")) {
 		rc = app_cli(&cfg, "install", nrest, rest);
+	} else if (!strcmp(cmd, "migrate")) {
+		rc = app_cli(&cfg, "cli.migrate", nrest, rest);
 	} else if (!strcmp(cmd, "user")) {
 		rc = app_cli(&cfg, "cli.user", nrest, rest);
 	} else if (!strcmp(cmd, "check")) {

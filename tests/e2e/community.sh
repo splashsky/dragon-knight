@@ -1,4 +1,5 @@
-# tests/e2e/community.sh :: forum (legacy forum.php) and help pages (help*.php). F3.
+# tests/e2e/community.sh :: forum (legacy forum.php, now in boards) and help pages
+# (help*.php). News and the News board: tests/e2e/news.sh.
 # Sourced by tests/run.sh; see docs/APP.md for the helpers.
 
 t_section "help pages (logged out)"
@@ -24,42 +25,54 @@ t_get /static/css/community.css; expect_status 200; expect_body 'table.forum'
 
 t_section "forum: logged out"
 t_get /forum;              expect_status 200; expect_body 'The forum is for registered players only.'
-t_get /forum/new;          expect_body 'The forum is for registered players only.'
+t_get /forum/1;            expect_body 'The forum is for registered players only.'
+t_get /forum/1/new;        expect_body 'The forum is for registered players only.'
 t_get /forum/thread/1;     expect_body 'The forum is for registered players only.'
-t_get /login; t_post /forum/new "csrf=$(t_csrf)&title=x&content=y"; expect_body 'The forum is for registered players only.'
+t_get /login; t_post /forum/1/new "csrf=$(t_csrf)&title=x&content=y"; expect_body 'The forum is for registered players only.'
 
 t_section "forum: threads"
 t_jar f3user; t_reset_jar
 t_register forumer forumpw1 forumer@example.com Forumer
 t_login forumer forumpw1
-t_get /forum;              expect_status 200; expect_body 'No threads in forum.'; expect_body 'href="/forum/new"'
+t_get /forum;              expect_status 200; expect_body 'href="/forum/1"><b>General</b></a><br><span class="small">Talk about anything.</span></td><td>0</td><td>0</td><td>None</td>'
+expect_body 'href="/forum/2"><b>News</b>'
+t_get /forum/1;            expect_status 200; expect_body 'No threads in this board.'; expect_body 'href="/forum/1/new"'
+expect_body '<a href="/forum">Forum</a> &rsaquo; General'
 t_get /;                   expect_body 'href="/forum"'
-t_get /forum/new;          expect_status 200; expect_body 'Make A New Post'; expect_body 'action="/forum/new"'
+t_get /forum/new;          expect_redirect /forum/1/new
+t_get /forum/1/new;        expect_status 200; expect_body 'Make A New Post'; expect_body 'action="/forum/1/new"'
+expect_body '<a href="/forum/1">General</a>'
 TOKEN=$(t_csrf)
-t_post /forum/new "title=NoToken&content=x"; expect_status 403
-t_post /forum/new "csrf=$TOKEN&title=+++&content=$(t_enc 'keep me')"
+t_post /forum/1/new "title=NoToken&content=x"; expect_status 403
+t_post /forum/1/new "csrf=$TOKEN&title=+++&content=$(t_enc 'keep me')"
 expect_status 200; expect_body 'Title is required.'; expect_body 'keep me</textarea>'
-t_post /forum/new "csrf=$TOKEN&title=Hello&content=+%0A+"; expect_body 'Message is required.'
+t_post /forum/1/new "csrf=$TOKEN&title=Hello&content=+%0A+"; expect_body 'Message is required.'
 LONG=$(printf 'x%.0s' $(seq 101))
-t_post /forum/new "csrf=$TOKEN&title=$LONG&content=x"; expect_body 'Title must be 100 characters or less.'
-t_post /forum/new "csrf=$TOKEN&title=$(t_enc '<script>alert(1)</script>')&content=$(t_enc $'<b>bold</b> & co\nline two')"
-expect_redirect /forum
-t_get /forum;              expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
-expect_no_body 'NoToken'; expect_no_body 'No threads in forum.'
+t_post /forum/1/new "csrf=$TOKEN&title=$LONG&content=x"; expect_body 'Title must be 100 characters or less.'
+t_post /forum/1/new "csrf=$TOKEN&title=$(t_enc '<script>alert(1)</script>')&content=$(t_enc $'<b>bold</b> & co\nline two')"
+expect_redirect /forum/1
+t_get /forum/1;            expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
+expect_no_body 'NoToken'; expect_no_body 'No threads in this board.'
+t_get /forum;              expect_body 'Talk about anything.</span></td><td>1</td><td>1</td><td>20'
+t_get /forum/999;          expect_status 404; expect_body 'That board doesn&#39;t exist.'
+t_get /forum/999/new;      expect_status 404
+t_post /forum/999/new "csrf=$TOKEN&title=x&content=y"; expect_status 404
 if t_has_sql; then
-	[ "$(t_sql "SELECT count(*) FROM forum")" = 1 ] && t_ok || t_fail "exactly one thread stored"
-	[ "$(t_sql "SELECT author || '|' || parent || '|' || replies FROM forum")" = "Forumer|0|0" ] && t_ok || t_fail "thread row"
-	[ "$(t_sql "SELECT title FROM forum")" = '<script>alert(1)</script>' ] && t_ok || t_fail "title stored raw"
-	XSS=$(t_sql "SELECT id FROM forum WHERE parent = 0")
+	FUID=$(t_sql "SELECT id FROM users WHERE username = 'forumer'")
+	[ "$(t_sql "SELECT count(*) FROM forum WHERE board = 1")" = 1 ] && t_ok || t_fail "exactly one thread stored"
+	[ "$(t_sql "SELECT author || '|' || author_id || '|' || parent || '|' || replies FROM forum WHERE board = 1")" = "Forumer|$FUID|0|0" ] && t_ok || t_fail "thread row"
+	[ "$(t_sql "SELECT title FROM forum WHERE board = 1")" = '<script>alert(1)</script>' ] && t_ok || t_fail "title stored raw"
+	XSS=$(t_sql "SELECT id FROM forum WHERE parent = 0 AND board = 1")
 	t_get "/forum/thread/$XSS"; expect_status 200
-	expect_body 'Forum</a> :: &lt;script&gt;'; expect_body '&lt;b&gt;bold&lt;/b&gt; &amp; co<br />'; expect_no_body '<b>bold</b>'
+	expect_body '<a href="/forum">Forum</a> &rsaquo; <a href="/forum/1">General</a> &rsaquo; &lt;script&gt;'
+	expect_body '&lt;b&gt;bold&lt;/b&gt; &amp; co<br />'; expect_no_body '<b>bold</b>'
 	expect_body '<b>Forumer</b>'; expect_body "action=\"/forum/reply/$XSS\""
 
 	t_section "forum: replies"
 	t_sql "INSERT INTO forum (postdate, newpostdate, author, parent, replies, title, content) VALUES (100, 100, 'Old', 0, 0, 'Older thread', 'old')"
 	OLD=$(t_sql "SELECT id FROM forum WHERE title = 'Older thread'")
 	t_sql "UPDATE forum SET newpostdate = 200 WHERE id = $XSS"
-	t_get /forum
+	t_get /forum/1
 	[ "$(grep -n 'Older thread' "$BODY" | cut -d: -f1)" -gt "$(grep -n '&lt;script&gt;' "$BODY" | cut -d: -f1)" ] \
 		&& t_ok || t_fail "threads ordered by newpostdate"
 	t_get "/forum/thread/$OLD"; TOKEN=$(t_csrf)
@@ -69,9 +82,9 @@ if t_has_sql; then
 	expect_redirect "/forum/thread/$OLD"
 	[ "$(t_sql "SELECT replies FROM forum WHERE id = $OLD")" = 1 ] && t_ok || t_fail "replies bumped"
 	[ "$(t_sql "SELECT newpostdate > 200 FROM forum WHERE id = $OLD")" = 1 ] && t_ok || t_fail "newpostdate bumped"
-	[ "$(t_sql "SELECT title || '|' || author FROM forum WHERE parent = $OLD")" = "Re: Older thread|Forumer" ] && t_ok || t_fail "reply row"
+	[ "$(t_sql "SELECT title || '|' || author || '|' || author_id || '|' || board FROM forum WHERE parent = $OLD")" = "Re: Older thread|Forumer|$FUID|1" ] && t_ok || t_fail "reply row"
 	t_get "/forum/thread/$OLD"; expect_body 'First reply &lt;i&gt;'
-	t_get /forum
+	t_get /forum/1
 	[ "$(grep -n 'Older thread' "$BODY" | cut -d: -f1)" -lt "$(grep -n '&lt;script&gt;' "$BODY" | cut -d: -f1)" ] \
 		&& t_ok || t_fail "reply moves thread to the top"
 	REPLY=$(t_sql "SELECT id FROM forum WHERE parent = $OLD")
@@ -91,14 +104,15 @@ if t_has_sql; then
 	t_sql "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 25)
 				 INSERT INTO forum (postdate, newpostdate, author, parent, replies, title, content)
 				 SELECT 10, 10 + n, 'Bulk', 0, 0, 'Bulk thread ' || n, 'bulk' FROM c"
-	t_get /forum
+	t_get /forum/1
 	[ "$(grep -c 'href="/forum/thread/' "$BODY")" = 20 ] && t_ok || t_fail "20 threads on the first page"
-	expect_body 'href="/forum?start=20"'; expect_body '<b>[1]</b>'
-	t_get "/forum?start=20"
+	expect_body 'href="/forum/1?start=20"'; expect_body '<b>[1]</b>'
+	t_get "/forum/1?start=20"
 	[ "$(grep -c 'href="/forum/thread/' "$BODY")" = 8 ] && t_ok || t_fail "8 threads on the second page"
-	expect_body '<b>[2]</b>'; expect_body 'href="/forum">1</a>'
-	t_get "/forum?start=-5";  expect_status 200; expect_body '<b>[1]</b>'
-	t_get "/forum?start=abc"; expect_status 200; expect_body '<b>[1]</b>'
+	expect_body '<b>[2]</b>'; expect_body 'href="/forum/1">1</a>'
+	t_get "/forum/1?start=-5";  expect_status 200; expect_body '<b>[1]</b>'
+	t_get "/forum/1?start=abc"; expect_status 200; expect_body '<b>[1]</b>'
+	t_get /forum;             expect_body 'Talk about anything.</span></td><td>28</td><td>30</td>'
 	t_sql "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 20)
 				 INSERT INTO forum (postdate, newpostdate, author, parent, replies, title, content)
 				 SELECT 10, 10, 'Bulk', $OLD, 0, 'Re: Older thread', 'bulk reply ' || n || '.' FROM c"
@@ -113,8 +127,9 @@ if t_has_sql; then
 
 	t_section "forum: guards"
 	t_sql "UPDATE control SET forumtype = 0"
-	t_get /forum;              expect_body 'The forum is currently disabled.'; expect_no_body 'New Thread'
-	t_post /forum/new "csrf=$TOKEN&title=Off&content=off"; expect_body 'The forum is currently disabled.'
+	t_get /forum;              expect_body 'The forum is currently disabled.'
+	t_get /forum/1;            expect_body 'The forum is currently disabled.'; expect_no_body 'New Thread'
+	t_post /forum/1/new "csrf=$TOKEN&title=Off&content=off"; expect_body 'The forum is currently disabled.'
 	t_get /;                   expect_no_body 'href="/forum"'
 	t_sql "UPDATE control SET forumtype = 2, forumaddress = 'https://forum.example.com/'"
 	t_get /forum;              expect_body 'The forum is currently disabled.'

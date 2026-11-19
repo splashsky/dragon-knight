@@ -1,0 +1,196 @@
+# tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
+# (tests/fixtures/schema_v0.sql), the 503 page for an outdated database, and no-op runs.
+# Sourced by tests/run.sh. Uses its own database and a second server; the main test
+# database is only stamped with other versions for a moment.
+
+mig_sql() {  # mig_sql DB "SQL"
+	if command -v sqlite3 >/dev/null; then
+		sqlite3 "$1" "$2"
+	else
+		python3 - "$1" "$2" <<'PY'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+for row in con.execute(sys.argv[2]):
+		print("|".join("" if v is None else str(v) for v in row))
+con.commit()
+PY
+	fi
+}
+mig_script() {  # mig_script DB FILE
+	if command -v sqlite3 >/dev/null; then
+		sqlite3 "$1" < "$2"
+	else
+		python3 - "$1" "$2" <<'PY'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.executescript(open(sys.argv[2]).read())
+con.commit()
+PY
+	fi
+}
+mig_eq() {  # mig_eq "SQL" expected label   (on the migrated database)
+	local got
+	got=$(mig_sql "$MIG_DB" "$1")
+	if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: expected '$2', got '$got'"; fi
+}
+# Column, foreign key and index layout of a database (to compare schemas).
+mig_layout() {
+	mig_sql "$1" "SELECT m.name, p.cid, p.name, p.type, p.\"notnull\", p.dflt_value, p.pk
+		FROM sqlite_master m, pragma_table_info(m.name) p WHERE m.type = 'table' ORDER BY 1, 2;
+		SELECT m.name, f.id, f.seq, f.\"table\", f.\"from\", f.\"to\", f.on_delete
+		FROM sqlite_master m, pragma_foreign_key_list(m.name) f WHERE m.type = 'table' ORDER BY 1, 2, 3;
+		SELECT m.name, i.name, c.seqno, c.name FROM sqlite_master m, pragma_index_list(m.name) i,
+			pragma_index_info(i.name) c WHERE m.type = 'table' ORDER BY 1, 2, 3;"
+}
+
+if ! t_has_sql; then
+	t_section "migrate (skipped: needs sqlite3 or python3)"
+else
+
+t_section "migrate: fresh install is current"
+CUR_VERSION=$(t_sql "PRAGMA user_version")
+[ "$CUR_VERSION" -ge 1 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
+"$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
+grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
+[ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
+
+t_section "migrate: version checks on every request"
+t_jar migcheck
+t_sql "PRAGMA user_version = 0"
+t_get /login;  expect_status 503; expect_body 'Database schema is out of date — run `dk migrate`.'
+expect_header '^retry-after: 60'
+t_get /;       expect_status 503
+t_sql "PRAGMA user_version = $((CUR_VERSION + 1))"
+t_get /login;  expect_status 503; expect_body 'is newer than this version of the game'
+t_sql "PRAGMA user_version = $CUR_VERSION"
+t_get /login;  expect_status 200
+
+t_section "migrate: old database"
+MIG="$T/mig"
+mkdir -p "$MIG"
+MIG_DB="$MIG/dk.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG_DB\"#" "$CONFIG" > "$MIG/config.lua"
+"$BIN" serve --config "$MIG/config.lua" >"$MIG/server.log" 2>&1 &
+MIG_PID=$!
+MIG_PORT=
+for _ in $(seq 1 100); do
+	MIG_PORT=$(sed -n 's/.*http: listening on [^ ]*:\([0-9][0-9]*\)$/\1/p' "$MIG/server.log" | head -n1)
+	[ -n "$MIG_PORT" ] && break
+	sleep 0.05
+done
+[ -n "$MIG_PORT" ] && t_ok || t_fail "second server did not start"
+MAIN_BASE=$BASE
+BASE="http://127.0.0.1:$MIG_PORT"
+
+t_jar migold
+t_get /login;  expect_status 503; expect_body 'The database is not installed — run `dk install`.'
+"$BIN" migrate --config "$MIG/config.lua" >"$T/migrate.log" 2>&1 && t_fail "migrate without tables succeeded" || t_ok
+grep -qF 'run dk install' "$T/migrate.log" && t_ok || t_fail "no install hint: $(cat "$T/migrate.log")"
+
+# version 0 schema + the game data (seed lines that fit it) + some players, posts and news
+mig_script "$MIG_DB" "$ROOT/tests/fixtures/schema_v0.sql"
+grep -v '^INSERT INTO forums ' "$T/app/sql/seed.sql" > "$MIG/seed_v0.sql"
+mig_script "$MIG_DB" "$MIG/seed_v0.sql"
+mig_sql "$MIG_DB" "INSERT INTO users (id, username, email, charname, verify, authlevel) VALUES
+		(1, 'oldplayer', 'p@example.com', 'Oldplayer', '1', 0),
+		(2, 'oldadmin', 'a@example.com', 'Oldadmin', '1', 1),
+		(3, 'otheradmin', 'o@example.com', 'Otheradmin', '1', 1);
+	INSERT INTO forum (id, postdate, newpostdate, author, parent, replies, title, content) VALUES
+		(1, 100, 300, 'Oldplayer', 0, 2, 'Old thread', 'old body'),
+		(2, 200, 200, 'Gone', 1, 0, 'Re: Old thread', 'reply by a deleted player'),
+		(3, 300, 300, 'oldadmin', 1, 0, 'Re: Old thread', 'reply by the admin'),
+		(4, 400, 400, 'Oldplayer', 0, 0, 'Deleted thread', 'x');
+	DELETE FROM forum WHERE id = 4;
+	INSERT INTO news (id, postdate, content) VALUES (2, 500, 'Old news <b>title</b>
+second line
+
+Second paragraph.');"
+[ "$(mig_sql "$MIG_DB" "PRAGMA user_version")" = 0 ] && t_ok || t_fail "fixture is not version 0"
+t_get /login;  expect_status 503; expect_body 'Database schema is out of date — run `dk migrate`.'
+"$BIN" migrate --config "$MIG/config.lua" --status >"$T/migrate.log" 2>&1
+grep -qF "Database schema version 0; this game uses version $CUR_VERSION (run dk migrate)." "$T/migrate.log" \
+	&& t_ok || t_fail "status: $(cat "$T/migrate.log")"
+[ "$(mig_sql "$MIG_DB" "PRAGMA user_version")" = 0 ] && t_ok || t_fail "--status changed the db"
+
+"$BIN" migrate --config "$MIG/config.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate failed: $(cat "$T/migrate.log")"
+grep -qF 'Migrating to version 1: forum boards' "$T/migrate.log" && t_ok || t_fail "step not reported"
+grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
+"$BIN" install --config "$MIG/fresh.lua" --admin fresh fresh@example.com freshpw >/dev/null 2>&1 \
+	&& t_ok || t_fail "fresh install for comparison"
+mig_layout "$MIG_DB" | grep -q '^forum|8|board|INTEGER|1|1|0$' && t_ok || t_fail "no forum.board column"
+[ "$(mig_layout "$MIG_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated schema differs from a fresh install:"
+	diff <(mig_layout "$MIG_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
+# existing data kept; forum posts moved to General with author_id where the name matches
+mig_eq "SELECT count(*) || '|' || min(id) || '|' || max(id) FROM users" "3|1|3" "users kept"
+mig_eq "SELECT count(*) FROM towns" "$(t_sql "SELECT count(*) FROM towns")" "game data kept"
+mig_eq "SELECT id || ',' || board || ',' || coalesce(author_id, '-') || ',' || author || ',' || parent || ',' || replies || ',' || newpostdate || ',' || content FROM forum WHERE board = 1 ORDER BY id" \
+	"1,1,1,Oldplayer,0,2,300,old body
+2,1,-,Gone,1,0,200,reply by a deleted player
+3,1,2,oldadmin,1,0,300,reply by the admin" "forum posts kept"
+mig_eq "SELECT id || '|' || name || '|' || admin_threads FROM forums ORDER BY id" "1|General|0
+2|News|1" "boards seeded"
+# news: default titles, the lowest-id admin as author, a thread each (ids after the old
+# AUTOINCREMENT high-water mark: deleted post 4 is not reused)
+mig_eq "SELECT id || '|' || title || '|' || author_id || '|' || thread_id FROM news ORDER BY id" \
+	"1|This is the first news post. Please use the admin control pa...|2|5
+2|Old news <b>title</b>|2|6" "news backfilled"
+mig_eq "SELECT f.board || '|' || f.parent || '|' || f.author || '|' || f.author_id || '|' || (f.title = n.title) || '|' || (f.content = n.content) || '|' || f.postdate || '|' || f.newpostdate FROM news n JOIN forum f ON f.id = n.thread_id WHERE n.id = 2" \
+	"2|0|Oldadmin|2|1|1|500|500" "news thread"
+
+t_section "migrate: no-op on the migrated database"
+before=$(mig_sql "$MIG_DB" "SELECT * FROM forum; SELECT * FROM news; SELECT * FROM forums")
+"$BIN" migrate --config "$MIG/config.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "second migrate failed"
+grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate: $(cat "$T/migrate.log")"
+[ "$(mig_sql "$MIG_DB" "SELECT * FROM forum; SELECT * FROM news; SELECT * FROM forums")" = "$before" ] \
+	&& t_ok || t_fail "second migrate changed data"
+
+t_section "migrate: the game works on the migrated database"
+"$BIN" user --config "$MIG/config.lua" passwd oldadmin migpass1 >/dev/null && t_ok || t_fail "dk user passwd"
+"$BIN" user --config "$MIG/config.lua" passwd oldplayer migpass2 >/dev/null && t_ok || t_fail "dk user passwd"
+t_jar migadmin
+t_login oldadmin migpass1; expect_redirect /
+t_get /;              expect_status 200; expect_body '<b>Old news &lt;b&gt;title&lt;/b&gt;</b></a>'
+expect_body 'by Oldadmin]'; expect_body '>Read more</a>'; expect_body 'href="/forum/thread/6">Reply</a>'
+t_get /forum;         expect_status 200; expect_body 'href="/forum/1"><b>General</b>'; expect_body 'href="/forum/2"><b>News</b>'
+t_get /forum/1;       expect_body 'href="/forum/thread/1">Old thread</a>'
+t_get /forum/thread/1; expect_body 'reply by a deleted player'
+t_get /news/1;        expect_status 200; expect_body 'This is the first news post.'
+t_get /admin/news
+t_post /admin/news "csrf=$(t_csrf)&title=Post-migration&content=Fresh"
+expect_redirect '/admin/news\?saved=1'
+mig_eq "SELECT n.title || '|' || f.board || '|' || f.author FROM news n JOIN forum f ON f.id = n.thread_id ORDER BY n.id DESC LIMIT 1" \
+	"Post-migration|2|Oldadmin" "news after migrating"
+t_jar migplayer
+t_login oldplayer migpass2
+t_get /forum/thread/6; TOKEN=$(t_csrf)
+t_post /forum/reply/6 "csrf=$TOKEN&content=Nice"; expect_redirect /forum/thread/6
+t_get /news/2;        expect_body 'href="/forum/thread/6">1 reply</a>'
+mig_eq "SELECT board || '|' || author_id FROM forum WHERE parent = 6" "2|1" "reply row"
+
+BASE=$MAIN_BASE
+kill "$MIG_PID" 2>/dev/null && wait "$MIG_PID" 2>/dev/null
+if grep -q '\[error\]' "$MIG/server.log"; then
+	t_fail "errors in the second server's log:"; grep -A5 '\[error\]' "$MIG/server.log" | head -20 >&2
+fi
+t_jar default
+
+t_section "migrate: partial and forced installs are current"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"
+"$BIN" install --config "$MIG/partial.lua" --partial --admin part part@example.com partpw --charname Parter \
+	>/dev/null 2>&1 && t_ok || t_fail "partial install"
+MIG_DB="$MIG/partial.db"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "partial install stamped"
+mig_eq "SELECT count(*) FROM forums" "2" "partial install has the boards"
+mig_eq "SELECT count(*) FROM towns" "0" "partial install has no game data"
+mig_eq "SELECT f.board || '|' || f.author || '|' || (f.author_id = n.author_id) FROM news n JOIN forum f ON f.id = n.thread_id" \
+	"2|Parter|1" "partial install news thread"
+"$BIN" install --config "$MIG/partial.lua" --force --admin part part@example.com partpw \
+	>/dev/null 2>&1 && t_ok || t_fail "install --force over a current database"
+mig_eq "SELECT count(*) || '|' || (SELECT count(*) FROM forum) || '|' || (SELECT count(*) FROM towns) FROM news" "1|1|8" "forced install"
+
+fi
