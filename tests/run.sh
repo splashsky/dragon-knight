@@ -7,7 +7,7 @@
 # Builds nothing. Creates a temp dir with a COPY of app/ templates/ public/, a config
 # (port 0 = random free port, low pbkdf2_iterations, temp db + outbox), runs
 # `dk install --admin ...`, starts `dk serve`, runs the core checks below and then
-# sources every tests/e2e/*.sh (sorted) -- feature agents add their scripts there.
+# sources every tests/e2e/*.sh (sorted); feature tests go there.
 # See docs/APP.md "End-to-end tests" for the helper API.
 set -u
 
@@ -81,6 +81,11 @@ t_req() {
     -b "$JAR" -c "$JAR" "$@" "$BASE$path")
 }
 t_get() { local p=$1; shift; t_req GET "$p" "$@"; }
+# HEAD request (curl -I); $BODY gets the headers too
+t_head() {
+  LAST_REQ="HEAD $1"
+  STATUS=$(curl -s -I -o "$BODY" -D "$HEADERS" -w '%{http_code}' -b "$JAR" -c "$JAR" "$BASE$1")
+}
 # t_post PATH 'a=1&b=2' (urlencoded as given; use t_enc for values)
 t_post() { local p=$1 d=${2:-}; shift; [ $# -gt 0 ] && shift; t_req POST "$p" --data "$d" "$@"; }
 # urlencode one value
@@ -105,6 +110,39 @@ expect_redirect() {
   else t_fail "expected 302 to $1 (status $STATUS, $(grep -i '^location' "$HEADERS" | tr -d '\r'))"; fi
 }
 
+# Text inputs and selected <option>s of the form in $BODY, as name=value lines.
+t_form_fields() {
+  grep -o '<input type="text" name="[^"]*"[^>]*value="[^"]*"' "$BODY" |
+    sed 's/^<input type="text" name="\([^"]*\)".*value="\([^"]*\)"$/\1=\2/'
+  awk '/<select name="/ { match($0, /name="[^"]*"/); n = substr($0, RSTART + 6, RLENGTH - 7) }
+       /<option value="[^"]*" selected>/ { match($0, /value="[^"]*"/); print n "=" substr($0, RSTART + 7, RLENGTH - 8) }' "$BODY"
+}
+t_unhtml() {
+  local s=$1
+  s=${s//&lt;/<}; s=${s//&gt;/>}; s=${s//&quot;/\"}; s=${s//&#39;/\'}; s=${s//&amp;/&}
+  printf '%s' "$s"
+}
+# t_form_submit PATH [name=value ...]: POST the form currently in $BODY (text inputs and
+# selects, plus csrf and submit=Submit) back to PATH with the given fields overridden; names
+# not in the form are appended.
+t_form_submit() {
+  local path=$1 data k v o found fields
+  shift
+  fields=$(t_form_fields)
+  data="csrf=$(t_csrf)&submit=Submit"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    k=${line%%=*}; v=$(t_unhtml "${line#*=}")
+    for o in "$@"; do [ "${o%%=*}" = "$k" ] && v=${o#*=}; done
+    data+="&$k=$(t_enc "$v")"
+  done <<< "$fields"
+  for o in "$@"; do
+    k=${o%%=*}; found=0
+    while IFS= read -r line; do [ "${line%%=*}" = "$k" ] && found=1; done <<< "$fields"
+    [ $found = 0 ] && data+="&$k=$(t_enc "${o#*=}")"
+  done
+  t_post "$path" "$data"
+}
 # Run SQL against the test database (sqlite3 CLI or python3). Prints rows '|'-separated.
 t_sql() {
   if command -v sqlite3 >/dev/null; then
@@ -174,7 +212,7 @@ BASE="http://127.0.0.1:$PORT"
 echo "e2e: server on $BASE (dir $T)"
 
 # ---------------------------------------------------------------------------------
-# core checks (P2: install, accounts, sessions, CSRF, home, static, errors, hot reload)
+# core checks: install, accounts, sessions, CSRF, home, static, errors, HEAD, hot reload
 
 t_section "install"
 grep -qF "Administrator 'admin' created" "$T/install.log" && t_ok || t_fail "install output"
@@ -307,6 +345,30 @@ if t_has_sql; then
   t_sql "UPDATE users SET authlevel = 0 WHERE username = 'bob'"
   t_jar admin
   t_login admin "$ADMIN_PASS"; t_get /; expect_body 'href="/admin"'
+
+  t_section "HEAD is read-only"
+  # GET /fight and GET /victory change state by design; HEAD runs the same handler but
+  # main.lua rolls its writes back.
+  t_jar headuser
+  t_register headuser headpw head@example.com Header; t_login headuser headpw
+  head_snap() {
+    t_sql "SELECT currentaction, currentfight, currentmonster, currentmonsterhp, currenthp,
+           experience, gold, level, dropcode, onlinetime FROM users WHERE username = 'headuser'"
+  }
+  t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, currentmonster = 0,
+         currentmonsterhp = 0, onlinetime = 1 WHERE username = 'headuser'"
+  before=$(head_snap)
+  t_head /fight;   expect_status 200; expect_header '^content-length: [1-9]'
+  [ "$(head_snap)" = "$before" ] && t_ok || t_fail "HEAD /fight changed the user: $before -> $(head_snap)"
+  t_sql "UPDATE users SET currentfight = 3, currentmonster = 1, currentmonsterhp = 0
+         WHERE username = 'headuser'"
+  before=$(head_snap)
+  t_head /victory; expect_status 200
+  [ "$(head_snap)" = "$before" ] && t_ok || t_fail "HEAD /victory changed the user: $before -> $(head_snap)"
+  t_get /victory;  expect_status 200; expect_body 'You have defeated the Blue Slime'
+  [ "$(t_sql "SELECT currentfight || ',' || (experience > 0) FROM users WHERE username = 'headuser'")" = "0,1" ] \
+    && t_ok || t_fail "GET /victory (control) did not pay out"
+  t_head /victory; expect_redirect /
 fi
 
 t_section "hot reload"
@@ -326,6 +388,31 @@ if t_has_sql; then
   [ "$(t_sql 'SELECT gamename FROM control')" = "Dragon Knight" ] && t_ok || t_fail "write before error was not rolled back"
 fi
 
+t_section "hot reload: new files, template errors, config"
+# a module and a template in directories created after startup, used by a new route
+mkdir -p "$T/app/hotdir" "$T/templates/hotdir"
+echo 'return { who = function() return "new-module" end }' > "$T/app/hotdir/mod.lua"
+echo '<p>hot {{ who }}</p>' > "$T/templates/hotdir/page.html"
+sed -i 's#^  r:get("/", auth.game, home)#  r:get("/__test/hot", function(req) return view.render("hotdir/page", { who = require("hotdir.mod").who() }, req) end)\n&#' \
+  "$T/app/routes/home.lua"
+t_wait_for /__test/hot 'hot new-module' && t_ok || t_fail "new module/template not picked up"
+echo 'return { who = function() return "edited-module" end }' > "$T/app/hotdir/mod.lua"
+t_wait_for /__test/hot 'hot edited-module' && t_ok || t_fail "edit of new module not picked up"
+echo '{% if then %}' >> "$T/templates/hotdir/page.html"
+t_wait_for /__test/hot 'hotdir/page.html:2:' && t_ok || t_fail "template syntax error not reported with its line"
+expect_status 500
+echo '<p>hot {{ who }} fixed</p>' > "$T/templates/hotdir/page.html"
+t_wait_for /__test/hot 'hot edited-module fixed' && t_ok || t_fail "template fix not picked up"
+expect_status 200
+# app-level config keys apply without a restart (dev = false hides tracebacks)
+sed -i 's/^  dev = true,$/  dev = false,/' "$CONFIG"
+for _ in $(seq 1 50); do
+  t_get /__test/boom; grep -qF 'intentional test error' "$BODY" || break; sleep 0.1
+done
+expect_status 500; expect_body 'Something went wrong'; expect_no_body 'intentional test error'
+sed -i 's/^  dev = false,$/  dev = true,/' "$CONFIG"
+t_wait_for /__test/boom 'intentional test error' && t_ok || t_fail "config restore not picked up"
+
 # ---------------------------------------------------------------------------------
 # feature scripts (E2E_ONLY=town,fight runs just tests/e2e/{town,fight}.sh)
 for f in "$ROOT"/tests/e2e/*.sh; do
@@ -338,9 +425,15 @@ for f in "$ROOT"/tests/e2e/*.sh; do
   . "$f"
 done
 
-if grep '\[error\]' "$T/server.log" | grep -qv '__test/boom'; then
-  t_section "server log"
+# stop the server first so sanitizer exit reports (DEBUG=1 builds) land in the log
+kill "$SERVER_PID" 2>/dev/null && wait "$SERVER_PID" 2>/dev/null
+SERVER_PID=
+t_section "server log"
+if grep '\[error\]' "$T/server.log" | grep -qv '__test/'; then
   t_fail "errors in server log:"; grep -A5 '\[error\]' "$T/server.log" | head -40 >&2
+fi
+if grep -qE 'runtime error:|Sanitizer' "$T/server.log" "$T/install.log" "$T/unit.log"; then
+  t_fail "sanitizer reports:"; grep -hE -A20 'runtime error:|Sanitizer' "$T/server.log" "$T/install.log" "$T/unit.log" | head -60 >&2
 fi
 
 echo "e2e: $PASS passed, $FAILS failed"

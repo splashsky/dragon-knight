@@ -33,6 +33,13 @@ return function(req)
   req.out_headers = {}
   dbcount.install()
   local ok, res = xpcall(function() return normalize(dispatch(req)) end, debug.traceback)
+  if ok and req.method == "HEAD" then
+    -- HEAD runs the GET handler for accurate headers, but must not change state
+    -- (GET /fight and /victory advance the game): discard the request's writes.
+    -- Queued cookies go too: the session/CSRF state behind them was not saved.
+    dbcount.raw():exec("ROLLBACK")
+    req.out_headers = {}
+  end
   if not ok then
     -- undo this request's writes ourselves so we can still render a friendly page
     -- (the engine skips COMMIT when no transaction is open)

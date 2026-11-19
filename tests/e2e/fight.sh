@@ -1,4 +1,4 @@
-# tests/e2e/fight.sh :: fight / victory / drop / dead (F2). Sourced by tests/run.sh.
+# tests/e2e/fight.sh :: fight / victory / drop / dead. Sourced by tests/run.sh.
 if t_has_sql; then
 
 t_section "fight: setup + guards"
@@ -133,5 +133,13 @@ f_is slot1id 13; f_is slot1name "Demon's Sin"; f_is maxhp 0; f_is currenthp 0
 f_is strength 57; f_is attackpower 60
 f_sql "UPDATE users SET dropcode = 32"
 t_get /drop; t_post /drop "csrf=$CS&submit=Submit&slot=3"; f_is goldbonus 10; f_is slot3name 'Fortune Drop'
+
+t_section "fight: victory stores negative experience as 0 (MySQL UNSIGNED)"
+# Blue Slime: exp rand(0,1) -> at least 1; -500% bonus: 1 + ceil(-5) = -4; gold 1
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
+  currentmonsterhp = 0, experience = 0, gold = 0, expbonus = -500, goldbonus = 0, level = 2"
+t_get /victory; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
+f_is experience 0; f_is gold 1; f_is level 2
+f_sql "UPDATE users SET expbonus = 0"
 
 fi

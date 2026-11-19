@@ -8,7 +8,8 @@
 --
 -- A guard is function(req) -> nil (continue) or a response (stop).
 -- A handler is function(req, params) -> response table or HTML string; params are
--- also available as req.params. HEAD is routed like GET.
+-- also available as req.params. HEAD is routed like GET (main.lua then rolls back
+-- the request's writes, so HEAD never changes state).
 local router = {}
 router.__index = router
 

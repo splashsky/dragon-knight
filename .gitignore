@@ -2,3 +2,6 @@ build/
 /dk
 /config.lua
 data/
+*.db
+*.db-shm
+*.db-wal

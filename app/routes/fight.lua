@@ -29,7 +29,9 @@ end
 
 local function save_death(user, st)
   local d = combat.death(st)
-  -- legacy: currentuberdamage/currentuberdefense are not reset on death.
+  -- legacy: currentuberdamage/currentuberdefense are not reset on death (they carry into
+  -- the next fight), and currentmp is not written, so the MP of a spell cast on the
+  -- fatal turn is refunded.
   dk.db:exec([[UPDATE users SET currenthp = ?, currentaction = 'In Town', currentmonster = 0,
     currentmonsterhp = 0, currentmonstersleep = 0, currentmonsterimmune = 0, currentfight = 0,
     latitude = 0, longitude = 0, gold = ? WHERE id = ?]], d.currenthp, d.gold, user.id)
@@ -187,13 +189,16 @@ local function victory(req)
     title = "Victory!"
   end
 
+  -- experience/gold were MEDIUMINT UNSIGNED: a bonus below -100% made them negative and
+  -- MySQL stored 0.
   dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, maxhp = ?, maxmp = ?,
     maxtp = ?, strength = ?, dexterity = ?, attackpower = ?, defensepower = ?, spells = ?,
     currentfight = 0, currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0,
     currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0, dropcode = ?,
     experience = ?, gold = ? WHERE id = ?]],
     s.level, s.maxhp, s.maxmp, s.maxtp, s.strength, s.dexterity, s.attackpower,
-    s.defensepower, s.spells, s.dropcode, r.newexp, r.newgold, user.id)
+    s.defensepower, s.spells, s.dropcode, php.mysql_uint(r.newexp), php.mysql_uint(r.newgold),
+    user.id)
   return view.page(req, title, "fight/victory", ctx)
 end
 

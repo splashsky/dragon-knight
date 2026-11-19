@@ -1,4 +1,4 @@
-/* admin.css :: owned by F4 (admin). Linked by every layout; rules are scoped to
+/* admin.css :: admin panel. Linked by every layout; rules are scoped to
    body.admin (templates/layout/admin.html, port of legacy templates/admin.php). */
 
 body.admin {

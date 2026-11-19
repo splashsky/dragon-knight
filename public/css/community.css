@@ -1,4 +1,4 @@
-/* community.css :: owned by F3 (forum/help/news). Linked by every layout. */
+/* community.css :: forum and help pages. Linked by every layout. */
 
 /* ---- forum (legacy: black 1px grid, #dddddd headers, white/#eeeeee rows) ---- */
 table.forum {
@@ -24,10 +24,9 @@ table.forum td { overflow-wrap: anywhere; }
 .forum-pages { margin: 6px 0; }
 .forum-pages a, .forum-pages b { margin-right: 4px; }
 
-/* ---- help pages (legacy standalone pages, shown in the minimal layout) ---- */
-body.minimal .dk-content:has(.help-page) {
-  display: block;
-}
+/* ---- help pages (legacy standalone pages: minimal layout, body_class "help") ---- */
+body.minimal.help { text-align: left; }
+body.minimal.help .dk-content { display: block; }
 .help-page h3 { margin-top: 1em; }
 table.help-table {
   border: solid 1px black;

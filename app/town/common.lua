@@ -1,4 +1,4 @@
--- town/common.lua :: helpers shared by the town/explore/heal modules (F1).
+-- town/common.lua :: helpers shared by the town/explore/heal modules.
 local game = require("lib.game")
 local view = require("lib.view")
 

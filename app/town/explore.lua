@@ -24,7 +24,7 @@ function explore.move(req)
   if town then return travel.go(req, town.id, false) end
 
   if php.rand(1, 5) == 1 then
-    -- F2's /fight picks the monster when currentfight == 1
+    -- /fight picks the monster when currentfight == 1
     dk.db:exec("UPDATE users SET currentaction = 'Fighting', currentfight = 1, latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
                lat, lon, user.id)
     return view.redirect("/fight")

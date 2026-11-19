@@ -1,5 +1,5 @@
 -- routes/town.lua :: town, exploring, fast heal spells, character/map popups, babble box
--- (F1). Ports legacy towns.php, explore.php, heal.php and the misc index.php actions.
+-- Ports legacy towns.php, explore.php, heal.php and the misc index.php actions.
 -- The logic lives in app/town/*.lua.
 local auth = require("lib.auth")
 local babble = require("town.babble")

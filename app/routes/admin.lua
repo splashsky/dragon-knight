@@ -1,4 +1,4 @@
--- routes/admin.lua :: admin control panel (port of legacy admin.php). Owned by F4.
+-- routes/admin.lua :: admin control panel (port of legacy admin.php).
 -- Modules live in app/admin/; templates in templates/admin/ + templates/layout/admin.html.
 local common = require("admin.common")
 local crud = require("admin.crud")

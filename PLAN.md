@@ -1,7 +1,11 @@
 # Dragon Knight → C + Lua rewrite plan
 
-Branch: `c-lua-rewrite`. The original PHP 4 / MySQL game (v1.1.11) lives in `legacy/` as
-the reference implementation and is deleted in the final phase.
+Branch: `c-lua-rewrite`. The original PHP 4 / MySQL game (v1.1.11) lived in `legacy/` as
+the reference implementation during the rewrite and is deleted after the QA phase.
+
+**Status: all phases complete** (engine, app foundation, features, integration & QA).
+Developer documentation: `README.md` (overview, CLI, workflow) and `docs/APP.md` (app
+conventions).
 
 ## Goals
 
@@ -19,15 +23,15 @@ the reference implementation and is deleted in the final phase.
 - Fix the original's security problems: parameterized SQL everywhere, HTML escaping by
   default, PBKDF2 passwords, server-side sessions, CSRF tokens on every POST.
 
-## Repository layout (target)
+## Repository layout
 
 ```
-Makefile              builds ./dk; `make test`; BUILD=dir for isolated object dirs
-config.lua            runtime config (returned table); config.example.lua is committed
-vendor/lua/           Lua 5.5.1 src/ (+ doc/manual.html — read §8 for 5.4→5.5 changes)
+Makefile              builds ./dk; `make test`; BUILD=dir / BIN=path for isolated builds
+config.example.lua    runtime config template (copy to config.lua, gitignored)
+vendor/lua/           Lua 5.5.1 src/ (+ doc/manual.html — §8 lists 5.4→5.5 changes)
 vendor/sqlite/        sqlite3.c / sqlite3.h amalgamation
 vendor/VERSIONS       provenance + checksums
-src/                  C engine (headers already written = contracts; see below)
+src/                  C engine
   util.[ch]           sbuf, url/html encode, logging, time, read_file
   crypto.[ch]         sha256, hmac, pbkdf2, getrandom, ct_equal, hex
   tmpl.[ch]           template -> Lua source compiler
@@ -37,22 +41,29 @@ src/                  C engine (headers already written = contracts; see below)
   vmpool.[ch]         warm spare VMs, warmer/reaper thread
   bind.h              dk Lua API (bind_dk.c), SQLite binding (bind_db.c), db.c
   app.c               dk_hooks glue: worker_init opens DB; handle = acquire VM → bind_handle → release
-  main.c              CLI: `dk serve`, `dk install`, `dk user`, `dk check`
+  main.c              CLI: `dk serve`, `dk install`, `dk user`, `dk check`, `dk version`
 app/                  Lua application (hot-reloaded)
-  main.lua            returns handler(req) -> res
-  routes.lua          route table assembly (requires route modules listed in it)
-  lib/                router, session, auth, csrf, view, form, util, mail, game helpers
-  game/               feature modules (town, explore, fight, heal, character, babble, ...)
-  admin/              admin control panel modules
-  install.lua         CLI: schema + seed data + admin user
+  main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
+  routes.lua          route table assembly (requires the route modules listed in it)
+  routes/             thin route modules: auth, home, town, fight, community, admin
+  lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount
+  town/               inn, shop, maps, travel, explore, heal, character/map, babble
+  fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
+  community/          forum, help pages
+  admin/              admin control panel (settings, news, levels, generic CRUD editor)
+  cli/user.lua        `dk user`
+  install.lua         `dk install`: schema + seed data + admin user
   sql/schema.sql      SQLite schema
-  sql/seed.sql        default game data ported 1:1 from legacy/install.php
-templates/            *.html templates (hot-reloaded), organized by feature
-public/               served at /static/ (images/, css/)
+  sql/seed.sql        default game data ported 1:1 from legacy install.php
+templates/            *.html templates (hot-reloaded): layout/ (main, minimal, admin, head,
+                      nav), auth/, home/, town/, fight/, community/{forum,help}/, admin/, errors/
+public/               served at /static/ (images/, css/, js/)
 tests/c/              C unit tests (one main() per file, built by `make test`)
-tests/run.sh          end-to-end smoke tests (bash + curl against a temp server)
+tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
+tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
+tests/e2e/            feature scripts sourced by run.sh (admin, community, fight,
+                      playthrough, town)
 data/                 runtime (gitignored): dk.db, outbox/
-legacy/               original PHP (deleted at the end)
 ```
 
 ## Architecture
@@ -148,7 +159,8 @@ return {
 }
 ```
 
-The C side adds `Content-Length`, `Date`, `Server: dk`, `Connection`. Bodies other than
+The C side adds `Content-Length`, `Date`, `Server: dk`, `Connection`, and drops HEAD
+bodies. Bodies other than
 urlencoded (e.g. multipart) → the C side passes `form = {}`; the app doesn't need uploads.
 
 ## Template language (`templates/**/*.html`)
@@ -179,8 +191,17 @@ urlencoded (e.g. multipart) → the C side passes `form = {}`; the app doesn't n
 
 ## URL map (legacy → new)
 
-All state-changing actions are POST with a CSRF token; GETs never mutate except
-`onlinetime` touch on authenticated requests (original behavior).
+All player actions are POST with a CSRF token. GETs that change state by design (kept
+from the original; guarded by game state so a reload is harmless):
+
+- every authenticated request touches `users.onlinetime` and slides the session expiry;
+- `GET /fight` picks the monster when an encounter has just started (`currentfight = 1`),
+  runs the monster's first strike, and bumps the `currentfight` counter;
+- `GET /victory` pays the rewards (exp, gold, level-up or drop roll) once: it then resets
+  `currentfight`/`currentmonster`, so a reload redirects.
+
+HEAD is routed like GET, but `main.lua` rolls the request's transaction back (and drops
+queued cookies), so HEAD never changes state.
 
 | Legacy | New |
 |---|---|
@@ -222,11 +243,15 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
   `posttime`). Format in Lua.
 - `users.password` = `pbkdf2$<iters>$<salt hex>$<hash hex>` (iters default 210000,
   overridable via `dk.config.pbkdf2_iterations` so tests can use a low value).
+- CSRF: logged in, the token is the per-session random `sessions.csrf`; logged out
+  (login/register/verify/lostpassword forms), a signed double-submit: HttpOnly cookie
+  `dk_csrf` (random) plus `hmac_sha256(config.secret, "csrf:" .. cookie)` in the form.
+  `main.lua` verifies every POST (field `csrf` or header `X-CSRF-Token`) before guards run.
 - `sessions(token_hash TEXT PRIMARY KEY, user_id INTEGER, csrf TEXT, created INTEGER,
   expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
   `HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
   session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
-- Seed data in `app/sql/seed.sql` must match `legacy/install.php` "complete setup"
+- Seed data in `app/sql/seed.sql` matches the original install.php "complete setup"
   exactly (all rows of drops, items, levels, monsters, spells, towns, control).
 - Email (registration verification, lost password) is written to
   `<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
@@ -240,10 +265,16 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - `php.ceil`, `php.number_format(n)`, `php.nl2br`, `php.prettydate(ts)` ("F j, Y").
 - Preserve comma-list columns (`users.spells`, `users.towns`, `towns.itemslist`,
   `drops.attribute1/2` `"stat,value"` / `"X"`) and their semantics.
-- Re-read legacy code for each feature; when legacy has an obvious bug that affects
-  gameplay, keep the behavior unless it is a security hole, and note it in a comment.
+- When legacy has an obvious bug that affects gameplay, the behavior is kept unless it
+  is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
+  "fixed: …").
+- Deliberate gameplay changes (requested): Bris sells its full item list; in the shop the
+  sell-back value of the replaced item counts toward the price; heal spells do nothing
+  when HP is already at or above max.
+- Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
+  forum is only reachable when `control.forumtype = 1`.
 
-## Coding rules (all agents)
+## Coding rules
 
 - C11, `-Wall -Wextra` clean (warnings are bugs), no new dependencies, check every
   allocation and syscall result, no global mutable state without a mutex (except
@@ -253,32 +284,20 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - Never build SQL with string concatenation of user data. Always `?` params.
   (Identifiers like the level column `1_exp` may be chosen from a whitelist.)
 - Templates escape by default; use `{{{ }}}` only for HTML built by trusted code.
-- Do **not** `git commit` — the coordinator commits between phases.
-- Use your own object dir (`make BUILD=build/<you>`), your own port, your own DB file
-  and config (`./dk serve --config /tmp/opencode/<you>/config.lua`) to avoid colliding
-  with parallel agents. Only edit files you own (listed in your task). If you need a
-  change in someone else's file, say so in your final report.
+- Indent with tabs.
 
 ## Phases
 
-1. **Engine** (parallel):
-   - **E1 — base**: `util.c`, `crypto.c`, `tmpl.c` + `tests/c/test_util.c`,
-     `test_crypto.c` (NIST/RFC 4231/RFC 7914-style PBKDF2-SHA256 vectors),
-     `test_tmpl.c` (compile → load in Lua → render).
-   - **E2 — server**: `config.c`, `http.c` + `tests/c/test_http.c` (spins the server with
-     a C handler on a random port, exercises keep-alive, pipelining, POST bodies,
-     limits, static files, 304, traversal, slowloris timeout).
-   - **E3 — runtime**: `codecache.c`, `vmpool.c`, `bind_dk.c`, `bind_db.c`, `db.c`,
-     `app.c`, `main.c` + `tests/c/test_vmpool.c`, and a placeholder `app/main.lua` /
-     `templates/hello.html` proving hot reload end-to-end.
-2. **App foundation** (single agent): schema + seed, `dk install`, router, sessions,
-   CSRF, auth pages, layout/nav templates, CSS, static assets, `app/lib/php.lua`, home
-   dispatcher (town/explore views), stubs for phase-3 modules, `tests/run.sh`,
-   `docs/APP.md` (conventions for feature authors).
-3. **Features** (parallel): **F1 town/explore/heal/character/map/babble**, **F2 fight**,
-   **F3 forum/help/news**, **F4 admin**.
-4. **Integration & QA**: end-to-end playthrough script, mechanics review against legacy,
-   hot-reload check, load check, README rewrite, `.gitignore`, delete `legacy/`.
+1. ✅ **Engine**: E1 base (`util`, `crypto`, `tmpl` + tests), E2 server (`config`, `http`
+   + tests), E3 runtime (`codecache`, `vmpool`, `bind_*`, `db`, `app`, `main` + tests).
+2. ✅ **App foundation**: schema + seed, `dk install`, router, sessions, CSRF, auth pages,
+   layouts/nav, CSS, static assets, `lib/php.lua`, home dispatcher, `tests/run.sh`,
+   `docs/APP.md`.
+3. ✅ **Features**: F1 town/explore/heal/character/map/babble, F2 fight, F3 forum/help/news,
+   F4 admin.
+4. ✅ **Integration & QA**: playthrough + concurrency e2e, mechanics review against legacy,
+   HEAD made read-only, hot-reload checks, ASan/UBSan run, README rewrite, `.gitignore`;
+   `legacy/` deleted last.
 
 ## Definition of done
 

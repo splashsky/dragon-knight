@@ -1,23 +1,31 @@
-# App conventions (for feature authors)
+# App developer guide
 
 How the Lua app under `app/` and the templates under `templates/` fit together. Read
-`PLAN.md` first (engine API, URL map, data model, fidelity rules). The original PHP in
-`legacy/` is the reference for every message, formula and data change.
+`PLAN.md` for the engine API, URL map, data model and fidelity rules, and `README.md` for
+building and running. Game messages, formulas and data follow the original PHP game
+v1.1.11; where the port deliberately differs, the code says so in a comment
+(`legacy: …` for kept quirks, `fixed: …` for changes).
 
-## Ownership
+## Module layout
 
-| Files | Owner |
-|---|---|
-| `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/{auth,home}.lua`, `app/install.lua`, `app/cli/*`, `app/sql/*` | P2 (foundation) |
-| `templates/{layout,auth,home,errors}/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | P2 |
-| `app/routes/town.lua`, `templates/town/*`, `public/css/town.css`, `tests/e2e/town*.sh` | F1 |
-| `app/routes/fight.lua`, `templates/fight/*`, `public/css/fight.css`, `tests/e2e/fight*.sh` | F2 |
-| `app/routes/community.lua`, `templates/{forum,help}/*`, `public/css/community.css`, `tests/e2e/community*.sh` | F3 |
-| `app/routes/admin.lua`, `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css`, `tests/e2e/admin*.sh` | F4 |
+| Area | Lua | Templates / assets | Tests |
+|---|---|---|---|
+| Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
+| Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
+| Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
+| Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
+| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_fight.lua` |
+| Forum, help | `app/routes/community.lua`, `app/community/*` | `templates/community/{forum,help}/*`, `public/css/community.css` | `tests/e2e/community.sh` |
+| Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
+| Install / CLI | `app/install.lua`, `app/cli/user.lua`, `app/sql/*` | | `tests/run.sh` |
+| Whole game | | | `tests/e2e/playthrough.sh` |
 
-**Don't edit files you don't own.** Put feature code in your route module plus, if it
-grows, your own modules (`app/game/<feature>.lua`, `app/admin/*.lua`). Need a change in a
-shared file (a `lib/` helper, the layout, `dk.css`)? Ask for it in your report.
+Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
+into the feature's modules (`app/<feature>/*.lua`). Keep game rules that don't need the
+database in pure functions (like `fight/combat.lua`) so they can be unit-tested. Shared
+helpers belong in `app/lib/`: add one there rather than copying code between features.
+Every layout links all five stylesheets, so prefix feature CSS classes to avoid clashes.
+The project indents with tabs.
 
 ## Request lifecycle
 
@@ -32,7 +40,8 @@ for one request only):
    runs before any guard or handler.
 4. Guards run, then the handler runs. The handler returns a response table (or an HTML
    string).
-5. Cookies queued on `req.out_headers` are added to the response.
+5. HEAD requests: the transaction is rolled back and queued cookies are dropped.
+6. Cookies queued on `req.out_headers` are added to the response.
 
 The whole request runs in one SQLite transaction (`BEGIN IMMEDIATE`). If a Lua error
 escapes, `main.lua` rolls the transaction back, logs the traceback and renders a 500 page
@@ -42,23 +51,25 @@ issue `BEGIN`/`COMMIT` yourself.
 ## Routes
 
 ```lua
--- app/routes/town.lua
+-- app/routes/town.lua (excerpt)
 local auth = require("lib.auth")
-local game = require("lib.game")
-local php = require("lib.php")
-local view = require("lib.view")
-
-local function inn(req) ... end
+local common = require("town.common")
+local inn = require("town.inn")
+local shop = require("town.shop")
 
 return function(r)
-  r:get("/inn", auth.game, inn)
-  r:post("/inn", auth.game, inn_post)
-  r:get("/shop/buy/#id", auth.game, function(req, params) ... params.id ... end)
+  r:route({ "GET", "POST" }, "/inn", auth.game, common.not_fighting, inn.handle)
+  r:get("/shop/buy/#id", auth.game, common.not_fighting, shop.confirm)   -- params.id
+  r:post("/shop/buy/#id", auth.game, common.not_fighting, shop.buy)
 end
 ```
 
 - `r:get(pattern, guard..., handler)`, `r:post(...)`, `r:route({"GET","POST"}, ...)`.
-  HEAD requests are routed like GET. A trailing `/` is ignored.
+  A trailing `/` is ignored. HEAD requests run the GET route, then `main.lua` rolls the
+  transaction back and drops queued cookies, so HEAD never changes state.
+- GETs should not change state. The deliberate exceptions are guarded by game state, so
+  a reload is harmless: the `onlinetime`/session touch, `GET /fight` (monster pick, first
+  strike, `currentfight` counter) and `GET /victory` (pays out once).
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
   only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
   handler's second argument and also as `req.params`.
@@ -104,15 +115,19 @@ Form and query values are raw strings. Validate them, and convert them with
   in. Legacy pages called with `display(..., false, false, false)` pass `nav = false`.
 - `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup and iframe
   pages (`/character`, `/map`, `/babble`). Any other name uses
-  `templates/layout/<name>.html`; F4 adds `layout = "admin"`.
+  `templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
+- `body_class`: extra class(es) on `<body>` for page-specific CSS. The help pages pass
+  `{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
+  page (`body.minimal.help` in `community.css`).
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
 The layout re-reads `req.user` from the DB before drawing the nav, so stats changed by
 the handler show up straight away (legacy `display()` did the same).
 
-Layout ctx, if you write your own layout: `title`, `content` (HTML), `gamename`, `nav`
-(table or nil), `logged_in`, `version`, `build`, `elapsed()`, `queries()`. Include
+Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class`,
+`gamename`, `nav` (table or nil), `logged_in`, `version`, `build`, `elapsed()`,
+`queries()`. Include
 `{{{ include("layout/head") }}}` in `<head>` to get the CSS links (`dk.css` + the four
 feature stylesheets) and `dk.js`.
 
@@ -232,8 +247,11 @@ in a comment.
 
 `make test` runs `tests/run.sh`. It copies `app/`, `templates/` and `public/` into a
 temp dir, installs a fresh DB (admin `admin` / `adminpass1`), starts the server on a
-random port and runs the core checks. Then it **sources every `tests/e2e/*.sh`** in
-sorted order. Name yours after your feature (`tests/e2e/town.sh`, `fight.sh`, …).
+random port and runs the core checks (install, accounts, sessions, CSRF, HEAD, hot reload,
+error rollback). Then it **sources every `tests/e2e/*.sh`** in sorted order, and finally
+stops the server and fails on any `[error]` line or sanitizer report in its log.
+`E2E_ONLY=town,fight tests/run.sh` runs only those scripts (the core checks always run).
+Name a new script after its feature.
 
 ```bash
 # tests/e2e/town.sh
@@ -249,7 +267,8 @@ t_get /inn;   expect_body 'You do not have enough gold'
 |---|---|
 | `t_section name` | label for failure messages |
 | `t_jar name` | switch cookie jar (one per simulated browser); `t_reset_jar` |
-| `t_get path [curl args]`, `t_post path 'a=1&b=2'` | set `$STATUS`, `$BODY` (file), `$HEADERS` (file) |
+| `t_get path [curl args]`, `t_post path 'a=1&b=2'`, `t_head path` | set `$STATUS`, `$BODY` (file), `$HEADERS` (file) |
+| `t_form_submit path [name=value ...]` | re-POST the form in `$BODY` (text inputs + selects, csrf) with overrides |
 | `t_csrf` | CSRF token from the last body |
 | `t_enc value` | urlencode |
 | `expect_status N`, `expect_body text`, `expect_no_body text`, `expect_header regex`, `expect_redirect /path` | assertions; `expect_body` matches raw HTML, so write `'` as `&#39;` |
@@ -258,28 +277,32 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_register user pass email charname [class] [diff]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
-| `$BASE`, `$T` (temp dir), `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS` | |
+| `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS` | the server log is `$T/server.log` (one access line per request) |
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.
 `run.sh` runs them inside a dk VM, where they can `require("lib.php")` and friends.
 
-Keep scripts independent: use your own jar and your own users, and restore any control
+Keep scripts independent: use your own cookie jars and users, and restore any control
 settings you change. `tests/run.sh -k` keeps the temp dir for debugging.
 
-## Private dev server
+## Scratch dev server
+
+A throwaway config keeps experiments away from your main database:
 
 ```bash
-mkdir -p /tmp/opencode/<you>
-cat > /tmp/opencode/<you>/config.lua <<'EOF'
-return { port = 181xx, db_path = "/tmp/opencode/<you>/dk.db",
-         outbox_dir = "/tmp/opencode/<you>/outbox", secret = "dev", dev = true,
+mkdir -p /tmp/dk-dev
+cat > /tmp/dk-dev/config.lua <<'EOF'
+return { port = 8081, db_path = "/tmp/dk-dev/dk.db",
+         outbox_dir = "/tmp/dk-dev/outbox", secret = "dev", dev = true,
          pbkdf2_iterations = 1000 }
 EOF
-./dk install --config /tmp/opencode/<you>/config.lua --admin admin admin@example.com secret
-./dk serve   --config /tmp/opencode/<you>/config.lua
-./dk check   --config /tmp/opencode/<you>/config.lua   # compiles every module + template
-./dk user    --config /tmp/opencode/<you>/config.lua list
+./dk install --config /tmp/dk-dev/config.lua --admin admin admin@example.com secret
+./dk serve   --config /tmp/dk-dev/config.lua
+./dk check   --config /tmp/dk-dev/config.lua   # compiles every module + template
+./dk user    --config /tmp/dk-dev/config.lua list
 ```
 
-Edits to `app/**/*.lua` and `templates/**/*.html` apply on the next request. Build with
-your own object dir (`make BUILD=build/<you>`) when agents run in parallel.
+Edits to `app/**/*.lua`, `templates/**/*.html` and the app-level keys of the config file
+apply on the next request. To build and test several checkouts side by side (or in CI),
+give each its own object dir and binary: `make BUILD=build/x BIN=build/x/dk` and
+`BIN=build/x/dk tests/run.sh`.

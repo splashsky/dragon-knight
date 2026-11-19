@@ -80,6 +80,7 @@ end
 
 -- Wraps already-rendered HTML in a layout.
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
+--       body_class (extra class(es) on <body>, for page-specific CSS),
 --       status, headers (extra {name, value} pairs).
 function view.layout(req, title, content, opts)
   opts = opts or {}
@@ -94,6 +95,7 @@ function view.layout(req, title, content, opts)
   local ctx = {
     title = title,
     content = content,
+    body_class = opts.body_class,
     gamename = game.control().gamename,
     nav = (nav and user) and game.nav(user) or nil,
     logged_in = user ~= nil,

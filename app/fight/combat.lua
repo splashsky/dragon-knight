@@ -43,6 +43,8 @@ end
 
 -- New fight against `monster`: monster HP, sleep, immunity. Returns true when the player
 -- gets to swing first.
+-- legacy: currentuberdamage/currentuberdefense are not reset here, so a buff left over from
+-- a fight the player ran from or died in still applies to the next monster.
 function combat.start(st, monster, control, rand)
   st.currentmonster = monster.id
   st.currentmonsterhp = rand((monster.maxhp / 5) * 4, monster.maxhp)
@@ -130,6 +132,8 @@ function combat.cast(st, spell, rand)
   local lines = {}
   local t, name, attr = spell.type, spell.name, spell.attribute
   if t == 1 then -- Heal spell.
+    -- legacy: no "HP already full" check in combat (unlike heal.php): at full HP it heals 0
+    -- and still costs MP; above max HP (after a drop lowered maxhp) the heal is negative.
     local newhp = st.currenthp + attr
     if st.maxhp < newhp then
       attr = st.maxhp - st.currenthp

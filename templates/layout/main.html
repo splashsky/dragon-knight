@@ -4,7 +4,7 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body>
+<body{% if body_class then %} class="{{ body_class }}"{% end %}>
 <div class="dk-page">
 <header class="dk-top">
   <a href="/"><img src="/static/images/logo.gif" alt="{{ gamename }}" title="{{ gamename }}"></a>

@@ -1,6 +1,7 @@
 -- community/help.lua :: the public help pages (port of help.php, help_items.php,
 -- help_spells.php, help_monsters.php, help_levels.php). Legacy printed these as
--- standalone pages without the game frame, so they use the minimal layout.
+-- standalone pages without the game frame, so they use the minimal layout (full width
+-- via body.help, see community.css).
 local game = require("lib.game")
 local php = require("lib.php")
 local view = require("lib.view")
@@ -32,7 +33,7 @@ local function page(req, subtitle, template, ctx)
   ctx.gamename = control.gamename
   ctx.subtitle = subtitle
   return view.page(req, control.gamename .. " Help", template, ctx,
-                   { layout = "minimal", nav = false })
+                   { layout = "minimal", nav = false, body_class = "help" })
 end
 
 function help.index(req)

@@ -4,7 +4,7 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body class="admin">
+<body class="admin{% if body_class then %} {{ body_class }}{% end %}">
 <div class="admin-page">
   <nav class="admin-menu">
     <b><u>DK Administration</u></b><br><br>
