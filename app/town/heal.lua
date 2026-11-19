@@ -15,14 +15,13 @@ function heal.cast(req, params)
   if not spell or spell.type ~= 1 then return common.message(req, "Error", "spell_not_heal") end
   if user.currentmp < spell.mp then return common.message(req, "Error", "spell_no_mp") end
   if user.currentaction == "Fighting" then return common.message(req, "Error", "spell_fighting") end
-  if user.currenthp == user.maxhp then return common.message(req, "Error", "spell_full") end
+  if user.currenthp >= user.maxhp then return common.message(req, "Error", "spell_full") end
 
   local gained = spell.attribute
   local newhp = user.currenthp + gained
   if user.maxhp < newhp then
-    -- (if currenthp was above maxhp this "gains" a negative amount, like legacy)
     gained = user.maxhp - user.currenthp
-    newhp = user.currenthp + gained
+    newhp = user.maxhp
   end
   dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ? WHERE id = ?",
              php.mysql_uint(newhp), php.mysql_uint(user.currentmp - spell.mp), user.id)

@@ -44,7 +44,7 @@ function shop.sellback(item)
   return php.ceil(item.buycost / 2)
 end
 
--- Shared buy2/buy3 checks. Returns item, slot or nil, error response.
+-- Shared buy2/buy3 checks. Returns item, slot, old item, has_old or nil, error response.
 local function check(req, id)
   local user = req.user
   local town = common.town_here(req)
@@ -55,8 +55,13 @@ local function check(req, id)
   if not slot then return nil, common.cheat(req) end
   -- the list never links an item you already own (legacy let a crafted URL buy it again)
   if user[slot.id] == item.id then return nil, common.cheat(req) end
-  if user.gold < item.buycost then return nil, common.message(req, "Buy Items", "shop_poor") end
-  return item, slot
+  -- the old item is sold back in the same trade, so its value counts toward the price
+  -- (legacy compared gold alone against the full price)
+  local old, has_old = equipped(user, slot)
+  if user.gold + shop.sellback(old) < item.buycost then
+    return nil, common.message(req, "Buy Items", "shop_poor")
+  end
+  return item, slot, old, has_old
 end
 
 -- GET /shop
@@ -79,9 +84,8 @@ end
 
 -- GET /shop/buy/#id
 function shop.confirm(req, params)
-  local item, slot = check(req, params.id)
+  local item, slot, old, has_old = check(req, params.id)
   if not item then return slot end
-  local old, has_old = equipped(req.user, slot)
   return view.page(req, "Buy Items", "town/shop_buy", {
     item = item, old = has_old and old or nil, sellback = shop.sellback(old),
   })
@@ -90,10 +94,9 @@ end
 -- POST /shop/buy/#id
 function shop.buy(req, params)
   if req.form.cancel ~= nil then return view.redirect("/") end
-  local item, slot = check(req, params.id)
+  local item, slot, old = check(req, params.id)
   if not item then return slot end
   local user = req.user
-  local old = equipped(user, slot)
 
   local u, cols, seen = {}, {}, {}
   for k, v in pairs(user) do u[k] = v end

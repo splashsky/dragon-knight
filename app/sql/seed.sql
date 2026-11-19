@@ -356,7 +356,7 @@ INSERT INTO spells VALUES (19, 'Barrier', 30, 50, 5);
 -- towns
 INSERT INTO towns VALUES (1, 'Midworld', 0, 0, 5, 0, 0, '1,2,3,17,18,19,28,29');
 INSERT INTO towns VALUES (2, 'Roma', 30, 30, 10, 25, 5, '2,3,4,18,19,29');
-INSERT INTO towns VALUES (3, 'Bris', 70, -70, 25, 50, 15, '2,3,4,5,18,19,20,29.30');
+INSERT INTO towns VALUES (3, 'Bris', 70, -70, 25, 50, 15, '2,3,4,5,18,19,20,29,30');
 INSERT INTO towns VALUES (4, 'Kalle', -100, 100, 40, 100, 30, '5,6,8,10,12,21,22,23,29,30');
 INSERT INTO towns VALUES (5, 'Narcissa', -130, -130, 60, 500, 50, '4,7,9,11,13,21,22,23,29,30,31');
 INSERT INTO towns VALUES (6, 'Hambry', 170, 170, 90, 1000, 80, '10,11,12,13,14,23,24,30,31');

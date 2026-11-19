@@ -89,14 +89,23 @@ t_get /shop/buy/18;               expect_body 'Cheat attempt detected.'      # a
 t_get /shop/buy/19;               expect_body 'You do not have enough gold to buy this item.'
 t_post /shop/buy/19 "csrf=$TC&submit=Yes"; expect_body 'You do not have enough gold to buy this item.'
 expect_db "gold,armorid" "5|18" "shop too poor"
+# sell-back counts toward the price: 50 gold + 25 for the Clothes covers Leather Armor (75)
+tu "gold=50"
+t_get /shop/buy/19;               expect_body 'I will buy your Clothes for 25 gold'
+t_post /shop/buy/19 "csrf=$TC&submit=Yes"
+expect_db "gold,armorid" "0|19" "sell-back covers price"
+tu "gold=0, armorid=18, armorname='Clothes'"
+t_post /shop/buy/19 "csrf=$TC&submit=Yes"; expect_body 'You do not have enough gold to buy this item.'
+expect_db "gold,armorid" "0|18" "sell-back alone too little"
 
-t_section "town: shop at Endworld + Bris itemslist quirk"
+t_section "town: shop at Endworld + Bris"
 tu "currentaction='In Town', latitude=-250, longitude=-250, gold=30000, shieldid=0, shieldname='None', defensepower=10, maxhp=20, currenthp=20"
 t_post /shop/buy/33 "csrf=$TC&submit=Yes"
 expect_db "gold,defensepower,shieldid,maxhp,currenthp" "5000|110|33|70|20" "buy aegis"
 tu "latitude=70, longitude=-70, gold=1000"
-t_get /shop;                      expect_body 'Hard Leather Armor'; expect_no_body 'Buckler'; expect_no_body 'Small Shield'
-t_post /shop/buy/29 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'   # '29.30' matches neither (legacy)
+t_get /shop;                      expect_body 'Hard Leather Armor'; expect_body 'Buckler'; expect_body 'Small Shield'
+t_post /shop/buy/29 "csrf=$TC&submit=Yes"     # Buckler 100/4; sells Aegis (25000, 100, maxhp,50)
+expect_db "gold,shieldid,defensepower,maxhp,currenthp" "13400|29|14|20|20" "bris sells buckler"
 tu "latitude=5, longitude=5, currentaction='Exploring'"
 t_get /shop;                      expect_body 'Cheat attempt detected.'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
@@ -191,6 +200,9 @@ tu "currentmp=20, currentaction='Fighting'"
 t_post /spell/1 "csrf=$TC";       expect_body 'You cannot use the Quick Spells list during a fight.'
 tu "currentaction='In Town', currenthp=20"
 t_post /spell/1 "csrf=$TC";       expect_body 'Your Hit Points are already full.'
+tu "currenthp=25"                 # above max (e.g. after losing a maxhp item): no "negative heal"
+t_post /spell/1 "csrf=$TC";       expect_body 'Your Hit Points are already full.'
+expect_db "currenthp,currentmp" "25|20" "no heal above max"
 tu "currenthp=5"
 t_post /spell/1 "csrf=$TC";       expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 expect_db "currenthp,currentmp" "15|15" "heal 1"

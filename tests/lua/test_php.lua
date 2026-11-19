@@ -52,7 +52,7 @@ function T.explode_and_lists()
   assert(#t == 4 and t[3] == "")
   assert(#php.explode(",", "") == 1)
   assert(php.in_list("0,1,3", 3) and php.in_list("0,1,3", "1") and not php.in_list("0,1,3", 2))
-  assert(not php.in_list("2,29.30", 29) and not php.in_list("2,29.30", 30))   -- town 3 typo
+  assert(not php.in_list("2,29.30", 29) and not php.in_list("2,29.30", 30))   -- "29.30" is one entry
   assert(php.implode(",", { 1, "2", 3.0 }) == "1,2,3")
 end
 
