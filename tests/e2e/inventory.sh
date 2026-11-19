@@ -133,12 +133,11 @@ t_post "/inventory/use/$(iv_entry stick)" "csrf=$TC"; expect_body 'The Stick can
 iv_is "(SELECT qty FROM user_items WHERE id = $BOMB)" "2"
 
 t_section "inventory: a fight-only item in a fight"
-iv_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 2, currentmonsterhp = 1,
-	currentmonstersleep = 0, currentmonsterimmune = 0"
+t_fight invhero 2 1
 t_get /fight;                     expect_body '<option value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'">Bomb (x2)</option>'
 t_post /fight "csrf=$TC&item=Use+Item&useritem=$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"
 expect_redirect /victory
-iv_is "currentmonsterhp || '|' || (SELECT qty FROM user_items WHERE id = $BOMB)" "0|1"
+iv_is "($T_MONSTER_HP <= 0) || '|' || (SELECT qty FROM user_items WHERE id = $BOMB)" "1|1"
 t_get /victory;                   expect_body 'You have defeated the Red Slime.'
 
 t_section "inventory: discard"

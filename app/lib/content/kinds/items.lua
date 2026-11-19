@@ -12,10 +12,7 @@
 local scripted = require("lib.content.scripted")
 local stats = require("lib.stats")
 
-local items = {
-	name = "items", table = "items", dir = "content.items", label = "item",
-	extra_keys = { modifiers = true, messages = true, data = true, use = true, can_use = true },
-}
+local items = { name = "items", table = "items", dir = "content.items", label = "item" }
 
 items.CATEGORIES = { "weapon", "armor", "shield", "accessory", "consumable", "quest", "misc" }
 -- category -> equipment slot (nil: a bag item)
@@ -48,6 +45,7 @@ items.fields = {
 }
 
 items.FUNCTIONS = { { "use", true }, { "can_use", false } }
+items.extra_keys = scripted.extra_keys(items.FUNCTIONS, { modifiers = true })
 -- fields only consumables have
 local CONSUMABLE = { usable_in = true, target = true, power = true }
 

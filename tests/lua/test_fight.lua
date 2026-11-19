@@ -1,13 +1,17 @@
--- Unit tests for app/fight/combat.lua and the spell and item turns (fight/act.lua with the
--- spell and item content files): scripted dice, outcomes computed by hand from the
+-- Unit tests for app/fight/combat.lua and the turns of a round (fight/round.lua with the
+-- spell and item content files, on the fight model: tests/lua/fight_model.lua maps the
+-- original game's columns to it): scripted dice, outcomes computed by hand from the
 -- original fight.php (level-up thresholds and TP/HP bonuses: lib/leveling.lua). The fake
 -- rand applies PHP's argument casting (truncate, swap) and records the (min, max) it was
 -- called with, so tests also pin the exact legacy rolls.
 local act = require("fight.act")
 local combat = require("fight.combat")
+local fm = require("tests.fight_model")
 local items = require("lib.items")
 local php = require("lib.php")
+local round = require("fight.round")
 local spells = require("lib.spells")
+local state = require("fight.state")
 local T = {}
 
 -- rand that returns `values` in order and records the PHP-cast ranges.
@@ -68,29 +72,60 @@ function T.monster_level_band()
 	eq(band(-50, 7), "9-11")   -- floor(55/5) = 11
 end
 
+-- A new encounter (fight/round.lua round.start) on old-style row st: monster HP, then who
+-- swings first; st gets the fight's columns.
+local function start(st, monster, rand)
+	local f = state.new({ user_id = 1, round = 1, st = st })
+	f.rand = rand
+	state.add_monster(f, monster, 1)
+	local first = round.start(f)
+	for k, v in pairs(fm.flat(f)) do st[k] = v end
+	return first
+end
+
 function T.start_monster_hp_and_swing_first()
 	-- Creature: rand(8, 10) -> 9 HP, unscaled.
 	-- swing: rand(1,10)=2 + ceil(sqrt(5))=3 -> 5  vs  rand(1,7)=3 + ceil(sqrt(8))=3 -> 6: monster first.
 	local st, d = player(), dice({ 9, 2, 3 })
-	local first = combat.start(st, CREATURE, d.rand)
+	local first = start(st, CREATURE, d.rand)
 	d.done(); ranges(d, "8,10 1,10 1,7")
 	eq(st.currentmonsterhp, 9, "hp"); eq(math.type(st.currentmonsterhp), "integer", "hp type")
 	eq(st.currentmonster, 4); eq(st.currentmonstersleep, 0); eq(st.currentmonsterimmune, 0)
 	eq(first, false, "swing first")
 	-- 6 vs 6 is not "greater": still the monster. 7 vs 6: player.
-	d = dice({ 9, 3, 3 }); eq(combat.start(player(), CREATURE, d.rand), false)
-	d = dice({ 9, 4, 3 }); eq(combat.start(player(), CREATURE, d.rand), true)
+	d = dice({ 9, 3, 3 }); eq(start(player(), CREATURE, d.rand), false)
+	d = dice({ 9, 4, 3 }); eq(start(player(), CREATURE, d.rand), true)
 	-- Blue Slime: (4/5)*4 = 3.2 -> rand(3, 4)
 	st, d = player(), dice({ 3, 1, 1 })
-	combat.start(st, BLUE_SLIME, d.rand)
+	start(st, BLUE_SLIME, d.rand)
 	ranges(d, "3,4 1,10 1,7"); eq(st.currentmonsterhp, 3)
 	-- immunity copied from the monster
 	st, d = player(), dice({ 8, 1, 1 })
-	combat.start(st, SHADOW, d.rand); eq(st.currentmonsterimmune, 1)
-	-- buffs left over from an earlier fight are cleared
+	start(st, SHADOW, d.rand); eq(st.currentmonsterimmune, 1)
+	-- a new fight has no buffs (the statuses of an earlier fight ended with it)
 	st = player({ currentuberdamage = 25, currentuberdefense = 10 })
-	combat.start(st, SHADOW, dice({ 8, 1, 1 }).rand)
+	start(st, SHADOW, dice({ 8, 1, 1 }).rand)
 	eq(st.currentuberdamage, 0); eq(st.currentuberdefense, 0)
+end
+
+-- One round (fight/round.lua) on old-style row st against `monster`: the player's action
+-- a. Returns the round (its lines: r.player, r.enemies); st gets the result.
+local function play(st, monster, a, rand)
+	local f = fm.model(st, monster, rand)
+	local r = round.play(f, a)
+	if r.f then
+		for k, v in pairs(fm.flat(r.f)) do st[k] = v end
+	end
+	return r
+end
+
+-- The player's attack alone (fight/act.lua): lines, killed.
+local function attack(st, monster, rand)
+	local f = fm.model(st, monster, rand)
+	f.out = {}
+	act.run(f, { kind = "attack" })
+	for k, v in pairs(fm.flat(f)) do st[k] = v end
+	return f.out, st.currentmonsterhp <= 0
 end
 
 function T.player_attack()
@@ -99,7 +134,7 @@ function T.player_attack()
 	-- damage 2 - 1 = 1
 	local st = player({ currentmonsterhp = 11 })
 	local d = dice({ 5, 150, 2, 200 })
-	local lines, killed = combat.attack(st, CREATURE, d.rand)
+	local lines, killed = attack(st, CREATURE, d.rand)
 	d.done(); ranges(d, "3,5 1,150 1,2 1,200")
 	eq(lines[1], "You attack the monster for 1 damage."); eq(#lines, 1)
 	eq(st.currentmonsterhp, 10); eq(killed, false)
@@ -107,71 +142,84 @@ function T.player_attack()
 	-- uber damage 25%: 3 + ceil(0.75) = 4
 	st = player({ currentmonsterhp = 4, currentuberdamage = 25 })
 	d = dice({ 5, 2, 2, 200 })
-	lines, killed = combat.attack(st, CREATURE, d.rand)
+	lines, killed = attack(st, CREATURE, d.rand)
 	eq(lines[1], "Excellent hit!"); eq(lines[2], "You attack the monster for 4 damage.")
 	eq(st.currentmonsterhp, 0); eq(killed, true)
 	-- the monster dodges: roll 1 <= sqrt(2); no damage, uber not applied
 	st = player({ currentmonsterhp = 4, currentuberdamage = 25 })
 	d = dice({ 5, 150, 1, 1 })
-	lines = combat.attack(st, CREATURE, d.rand)
+	lines = attack(st, CREATURE, d.rand)
 	eq(lines[1], "The monster is dodging. No damage has been scored.")
 	eq(lines[2], "You attack the monster for 0 damage."); eq(st.currentmonsterhp, 4)
 	-- damage floor of 1 when the block exceeds the hit
 	st = player({ currentmonsterhp = 50, attackpower = 1 })
 	d = dice({ 1, 150, 3, 200 })    -- ceil(1/3)=1; armor 3: rand(2,3)=3 -> 1; 1-1=0 -> 1
-	combat.attack(st, SHADOW, d.rand); ranges(d, "0,1 1,150 2,3 1,200"); eq(st.currentmonsterhp, 49)
+	attack(st, SHADOW, d.rand); ranges(d, "0,1 1,150 2,3 1,200"); eq(st.currentmonsterhp, 49)
+end
+
+-- The monster's turn: a round in which the player does nothing.
+local function monster_turn(st, monster, rand)
+	local r = play(st, monster, { kind = "continue" }, rand)
+	return r.enemies, r.died == true
 end
 
 function T.monster_turn()
 	-- Creature maxdam 8: rand(4, 8) = 8, unscaled
 	-- defense 5: rand(3, 5) = 5 -> ceil(5/4) = 2; dodge rand(1,150)=100 > sqrt(5): hit for 6
-	local st = player({ currenthp = 15 })
+	local st = player({ currenthp = 15, currentmonsterhp = 10 })
 	local d = dice({ 8, 5, 100 })
-	local lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
+	local lines, died = monster_turn(st, CREATURE, d.rand)
 	d.done(); ranges(d, "4,8 3,5 1,150")
 	eq(lines[1], "The monster attacks you for 6 damage."); eq(st.currenthp, 9); eq(died, false)
 	-- uber defense 50%: 6 - ceil(3) = 3
-	st = player({ currenthp = 15, currentuberdefense = 50 })
+	st = player({ currenthp = 15, currentuberdefense = 50, currentmonsterhp = 10 })
 	d = dice({ 8, 5, 100 })
-	combat.monster_turn(st, CREATURE, d.rand, false); eq(st.currenthp, 12)
+	monster_turn(st, CREATURE, d.rand); eq(st.currenthp, 12)
 	-- dodge: roll 2 <= sqrt(5)
-	st = player({ currenthp = 3 })
+	st = player({ currenthp = 3, currentmonsterhp = 10 })
 	d = dice({ 8, 5, 2 })
-	lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
+	lines, died = monster_turn(st, CREATURE, d.rand)
 	eq(lines[1], "You dodge the monster's attack. No damage has been scored.")
 	eq(lines[2], "The monster attacks you for 0 damage."); eq(st.currenthp, 3); eq(died, false)
 	-- fatal: 8 - 2 = 6 >= 3 hp
-	st = player({ currenthp = 3 })
+	st = player({ currenthp = 3, currentmonsterhp = 10 })
 	d = dice({ 8, 5, 100 })
-	lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
+	lines, died = monster_turn(st, CREATURE, d.rand)
 	eq(st.currenthp, -3); eq(died, true)
-	-- block >= hit: damage 1 in both variants; uber defense can't take it below 1
-	for _, after_spell in ipairs({ false, true }) do
-		st = player({ defensepower = 40, currentuberdefense = 50 })   -- rand(30,40)=40 -> 10
-		d = dice({ 2, 40, 100 })                                       -- Blue Slime: rand(1,3)
-		combat.monster_turn(st, BLUE_SLIME, d.rand, after_spell)
-		ranges(d, "1,3 30,40 1,150"); eq(st.currenthp, 14)
-	end
+	-- block >= hit: damage 1 (after a spell too: the original's two variants agree); uber
+	-- defense can't take it below 1
+	st = player({ defensepower = 40, currentuberdefense = 50, currentmonsterhp = 10 })   -- rand(30,40)=40 -> 10
+	d = dice({ 2, 40, 100 })                                       -- Blue Slime: rand(1,3)
+	monster_turn(st, BLUE_SLIME, d.rand)
+	ranges(d, "1,3 30,40 1,150"); eq(st.currenthp, 14)
+	local lines2 = combat.monster_attack(3, { defense = 40, dexterity = 5, is_player = true }, dice({ 2, 40, 100 }).rand,
+		function(dmg) return dmg - php.ceil(dmg * 0.5) end)
+	eq(lines2[1], "The monster attacks you for 1 damage.")
 end
 
 function T.monster_sleep_and_wake()
-	-- still asleep: rand(1,15)=5 is not > 5: no attack rolls at all
-	local st = player({ currentmonstersleep = 5 })
+	-- still asleep: rand(1,15)=5 is not > 5: no attack rolls at all (sleep is a status:
+	-- its roll at the start of the monster's turn)
+	local st = player({ currentmonstersleep = 5, currentmonsterhp = 10 })
 	local d = dice({ 5 })
-	local lines = combat.monster_turn(st, CREATURE, d.rand, false)
+	local lines = monster_turn(st, CREATURE, d.rand)
 	d.done(); eq(lines[1], "The monster is still asleep."); eq(#lines, 1); eq(st.currentmonstersleep, 5)
 	-- wakes up (6 > 5) and attacks in the same turn
-	st = player({ currentmonstersleep = 5 })
+	st = player({ currentmonstersleep = 5, currentmonsterhp = 10 })
 	d = dice({ 6, 4, 3, 100 })     -- tohit 4, block ceil(3/4) = 1 -> 3
-	lines = combat.monster_turn(st, CREATURE, d.rand, false)
+	lines = monster_turn(st, CREATURE, d.rand)
 	d.done(); eq(lines[1], "The monster has woken up.")
 	eq(lines[2], "The monster attacks you for 3 damage."); eq(st.currentmonstersleep, 0); eq(st.currenthp, 12)
 end
 
 -- A spell turn (fight/act.lua): lines, killed, or the refusal.
 local function cast(st, s, rand)
-	local r = act.run({ st = st, monster = CREATURE, rand = rand }, { kind = "spell", spell = s })
-	return r.lines or r.refused, r.killed, r
+	local f = fm.model(st, CREATURE, rand)
+	f.out = {}
+	local r = act.run(f, { kind = "spell", spell = s })
+	if r.refused then return r.refused, nil, r end
+	for k, v in pairs(fm.flat(f)) do st[k] = v end
+	return f.out, st.currentmonsterhp <= 0, r
 end
 
 function T.spells()
@@ -364,8 +412,12 @@ end
 -- Using a consumable (fight/act.lua with the item's content file).
 function T.use_item()
 	local function use(st, it, rand)
-		local r = act.run({ st = st, monster = CREATURE, rand = rand }, { kind = "item", item = it })
-		return r.lines or r.refused, r.killed
+		local f = fm.model(st, CREATURE, rand)
+		f.out = {}
+		local r = act.run(f, { kind = "item", item = it })
+		if r.refused then return r.refused end
+		for k, v in pairs(fm.flat(f)) do st[k] = v end
+		return f.out, st.currentmonsterhp <= 0
 	end
 	local herb = items.by_key("herb")
 	local st = player({ currenthp = 5, maxhp = 100, currentmonsterhp = 20 })

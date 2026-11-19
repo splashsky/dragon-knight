@@ -24,10 +24,11 @@ usage: dk install [--partial] [--force]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
 -- user_spells/user_items/town_items/class_levels/class_spells before users/spells/items/
--- towns/classes; "levels" (before schema version 4) and "drops" (before 6) are old tables
+-- towns/classes, the fight tables and user_statuses before users/statuses; "levels" (before schema version 4) and "drops" (before 6) are old tables
 local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items",
 								 "town_items", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
-								 "spells", "towns", "users", "classes", "content_overrides", "content_adopt", "meta" }
+								 "spells", "towns", "fight_statuses", "fight_combatants", "fights", "user_statuses", "users",
+								 "classes", "statuses", "summons", "content_overrides", "content_adopt", "meta" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")
@@ -95,15 +96,16 @@ local function existing_tables()
 end
 
 -- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
--- populated those two even for "Partial Setup"), the forum boards and the class, spell and
--- item ids (structural: content keeps the original ids).
+-- populated those two even for "Partial Setup"), the forum boards and the class, spell,
+-- item and status ids (structural: content keeps the original ids).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
 	for line in sql:gmatch("[^\n]+") do
 		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
 				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") or
-				line:find("^INSERT INTO spells ") or line:find("^INSERT INTO items ") then
+				line:find("^INSERT INTO spells ") or line:find("^INSERT INTO items ") or
+				line:find("^INSERT INTO statuses ") then
 			keep[#keep + 1] = line
 		end
 	end

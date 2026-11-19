@@ -3,15 +3,15 @@
 -- Files are app/<kind dir>/<key>.lua (listed with dk.list_modules, so new files count
 -- without a restart). Each runs in a restricted environment (lib/content/sandbox.lua:
 -- math, string, table and a few safe functions; no dk, require, io, os, no DB). A file
--- returns a table of data, plus functions for the scripted kinds (spells and items:
--- lib/content/scripted.lua). Errors name the file.
+-- returns a table of data, plus functions for the scripted kinds (spells, items, statuses,
+-- summons: lib/content/scripted.lua). Errors name the file.
 local sandbox = require("lib.content.sandbox")
 local schema = require("lib.content.schema")
 
 local load = {}
 
 -- Bumped when the flat form or the sync changes meaning, to force a resync.
-load.FORMAT = "dk-content-4"
+load.FORMAT = "dk-content-5"
 
 function load.path(kind, key)
 	return (dk.config.app_dir or "app") .. "/" .. kind.dir:gsub("%.", "/") .. "/" .. key .. ".lua"
@@ -120,6 +120,13 @@ function load.module(kind_name, key)
 	end
 	modules[kind_name][key] = { data = data, err = err and (load.path(kind, key) .. ": " .. err) }
 	return data, modules[kind_name][key].err
+end
+
+-- Primes (or with nil clears) the loaded module of an entity for this VM, as if its file
+-- returned `data`: unit tests run statuses and summons without files.
+function load.preload(kind_name, key, data)
+	modules[kind_name] = modules[kind_name] or {}
+	modules[kind_name][key] = data ~= nil and { data = data } or nil
 end
 
 -- Every kind: { kinds = { name -> load.kind(name) }, errors = { ... } }.

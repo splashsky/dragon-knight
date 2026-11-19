@@ -27,7 +27,7 @@ pt_explore() {
 		expect_redirect /
 		if [ $((i % 2)) = 1 ]; then dir=east; else dir=west; fi
 	done
-	pu "currentaction = 'Fighting', currentfight = 1"
+	t_fight_new pthero
 }
 # Walk back into Midworld (entering a town adds its map), fighting whatever turns up.
 pt_walk_home() {
@@ -56,7 +56,7 @@ pt_fight() {
 	done
 	expect_redirect /victory
 	t_get /victory; expect_status 200; expect_body 'Congratulations. You have defeated the'
-	pt_is "currentaction,currentfight" "Exploring|0" "after victory"
+	pt_is "currentaction,$T_ROUND" "Exploring|0" "after victory"
 }
 
 t_section "playthrough: admin turns on email verification"

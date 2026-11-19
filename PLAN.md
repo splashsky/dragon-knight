@@ -50,14 +50,19 @@ app/                  Lua application (hot-reloaded)
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
                       news, paging, migrations (schema versions), leveling, classes,
                       spells, items, inventory, stats (derived stats, gear modifiers),
-                      action + actors (the API scripted spells and items run against),
+                      action (the API scripted spells, items, statuses and summons run
+                      against), statuses, summons, world (world statuses on map moves),
                       content/ (content loader, sandbox, schemas, scripted kinds, sync)
-  content/            content files: classes/, spells/, items/ <key>.lua (synced into the DB)
+  content/            content files: classes/, spells/, items/, statuses/, summons/ <key>.lua
+                      (synced into the DB)
   town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested);
-                      act.lua: the one entry point for a fight action (attack, spell, item)
+                      state.lua: the fight model and its tables; round.lua: the round
+                      pipeline; engine.lua: handles, events, statuses, summons; ai.lua:
+                      weighted choices; act.lua: the actions of a turn (attack, spell, item)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, classes, spells, items, generic CRUD editor)
+  admin/              admin control panel (settings, news, classes, spells, items, statuses and
+                      summons, generic CRUD editor)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
   cli/content.lua     `dk content sync|status`; cli/check.lua: content part of `dk check`
@@ -72,8 +77,8 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v5.sql, seed_v3/v4/v5.sql: frozen
-                      old schemas and data for the migration test
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v7.sql, seed_v3 .. seed_v7.sql:
+                      frozen old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
 
@@ -207,10 +212,10 @@ All player actions are POST with a CSRF token. GETs that change state by design 
 from the original; guarded by game state so a reload is harmless):
 
 - every authenticated request touches `users.onlinetime` and slides the session expiry;
-- `GET /fight` picks the monster when an encounter has just started (`currentfight = 1`),
-	runs the monster's first strike, and bumps the `currentfight` counter;
-- `GET /victory` pays the rewards (exp, gold, level-up or drop roll) once: it then resets
-	`currentfight`/`currentmonster`, so a reload redirects.
+- `GET /fight` picks the monster when an encounter has just started (the fight's round
+	is 1), runs the monster's first strike, and bumps the fight's round counter;
+- `GET /victory` pays the rewards (exp, gold, level-up or drop roll) once: it then ends
+	the fight (its rows go), so a reload redirects.
 
 HEAD is routed like GET, but `main.lua` rolls the request's transaction back (and drops
 queued cookies), so HEAD never changes state.
@@ -231,7 +236,7 @@ queued cookies), so HEAD never changes state.
 | `do=maps` / `maps2:id` / `maps3:id` | `GET /maps`, `GET /maps/buy/:id`, `POST /maps/buy/:id` |
 | `do=gotown:id` | `POST /travel/:id` |
 | `do=move` | `POST /move` (button name north/south/east/west) |
-| `do=fight` / `victory` / `drop` / `dead` | `GET/POST /fight` (fight, spell, item, run), `GET /victory`, `GET/POST /drop` (take, leave), `GET /dead` |
+| `do=fight` / `victory` / `drop` / `dead` | `GET/POST /fight` (fight, spell, item, run; continue: a turn a status blocks), `GET /victory`, `GET/POST /drop` (take, leave), `GET /dead` |
 | `do=spell:id` | `POST /spell/:id` (heal spells out of combat) |
 | `do=showchar` | `GET /character` (minimal layout, popup-friendly) |
 | `do=onlinechar:id` | `GET /character/:id` |
@@ -241,7 +246,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/{statuses,summons}[/:id]` (new), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -302,6 +307,24 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	`base_attack`, `base_defense`, `base_exp_bonus`, `base_gold_bonus` (attackpower,
 	defensepower, expbonus, goldbonus are gone: derived from the equipment, `lib/stats.lua`).
 	`users.dropcode` holds a pending drop's item id.
+- Fights (schema version 8, `docs/APP.md` "Fight engine"): a fight in progress is
+	`fights(user_id → users ON DELETE CASCADE, round, wave, data)` (`round`: the original
+	`currentfight` counter), `fight_combatants(user_id → fights, id, side ('player' | 'ally'
+	| 'enemy'), kind ('player' | 'monster' | 'summon'), entity_id (monsters.id /
+	summons.id), wave, hp, maxhp (NULL for the player: users.currenthp), turns_left, data)`
+	(id 1..n per fight; the player is 1) and `fight_statuses(user_id, combatant_id →
+	fight_combatants, status_id → statuses, position, turns_left, data, applied_round,
+	source)` (one instance per status and bearer), replacing the users columns
+	currentfight, currentmonster, currentmonsterhp, currentmonstersleep,
+	currentmonsterimmune, currentuberdamage and currentuberdefense; the monster's sleep and
+	the uber buffs are statuses 1-3 (`sleep`, `uber_damage`, `uber_defense`). Content kinds
+	`statuses(id, key UNIQUE, name, description, kind, tick_on, scope, turns, blocks_action,
+	retired, messages, data)` and `summons(id, key UNIQUE, name, description, hp, attack,
+	defense, dexterity, turns, retired, messages, data)` (files
+	`app/content/{statuses,summons}/<key>.lua`, scripted like spells). World statuses:
+	`user_statuses(user_id → users ON DELETE CASCADE, status_id, position, turns_left,
+	data)`. `control.max_allies` (1) caps the summons per fight. Data columns hold
+	"name=value" lines of plain values (never code).
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -345,8 +368,8 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 		cost, no monster turn).
 	- Running away can fail ("blocked in front": monster turn, damage saved, normal death
 		handling); a successful run clears the fight state.
-	- `currentuberdamage`/`currentuberdefense` reset on a new fight, a successful run and
-		death (as on victory).
+	- The damage/defense buffs (statuses since schema version 8) end with the fight: on a
+		new fight, a successful run and death (as on victory).
 	- `goldbonus` is a percentage of the gold gained; the gold cap warning mentions gold.
 	- Death saves `currentmp` (no refund for a spell cast on the fatal turn).
 	- A victory grants several levels when the experience covers them (up to 100).
@@ -389,8 +412,11 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 `legacy/` deleted last.
 5. **2.1 content** (`docs/plans/`): ✅ A classes, ✅ B spells, ✅ C items and inventory
 	 (`content-and-inventory.md`), ✅ D scripted spells and items (`spell-scripting.md`,
-	 schema version 7). Next, 2.2: E multi-turn effects, monster AI and loadouts
-	 (`turn-effects.md`).
+	 schema version 7).
+6. **2.2 fights** (`docs/plans/turn-effects.md`): ✅ E1 the fight engine (round pipeline,
+	 statuses, multi-stage actions, summons, weighted AI, encounters; schema version 8).
+	 Next: E2 monsters as content with MP, equipment, items, spells and weighted loadouts
+	 (schema version 9).
 
 ## Definition of done
 

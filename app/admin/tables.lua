@@ -28,6 +28,36 @@ end
 
 local ID = { name = "id", label = "ID", kind = "static" }
 
+-- "round 3; Blue Slime 4/4 HP (Asleep); you: Damage Up" for the user editor.
+local function statuses_text(sql, ...)
+	local names = {}
+	for _, r in ipairs(dk.db:query(sql, ...)) do
+		names[#names + 1] = r.name .. (r.turns_left and (" (" .. r.turns_left .. ")") or "")
+	end
+	return table.concat(names, ", ")
+end
+
+local function fight_summary(user_id)
+	local f = dk.db:first("SELECT round, wave FROM fights WHERE user_id = ?", user_id)
+	if not f then return "None" end
+	local parts = { "round " .. f.round }
+	for _, c in ipairs(dk.db:query("SELECT c.*, coalesce(m.name, s.name) AS name FROM fight_combatants c " ..
+			"LEFT JOIN monsters m ON c.kind = 'monster' AND m.id = c.entity_id " ..
+			"LEFT JOIN summons s ON c.kind = 'summon' AND s.id = c.entity_id WHERE c.user_id = ? ORDER BY c.id", user_id)) do
+		local st = statuses_text("SELECT s.name, fs.turns_left FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id " ..
+			"WHERE fs.user_id = ? AND fs.combatant_id = ? ORDER BY fs.position", user_id, c.id)
+		local who = c.side == "player" and "you" or (tostring(c.name) .. " " .. tostring(c.hp) .. "/" .. tostring(c.maxhp) .. " HP")
+		if c.side ~= "player" or st ~= "" then parts[#parts + 1] = who .. (st ~= "" and (" (" .. st .. ")") or "") end
+	end
+	return table.concat(parts, "; ")
+end
+
+local function world_summary(user_id)
+	local st = statuses_text("SELECT s.name, us.turns_left FROM user_statuses us JOIN statuses s ON s.id = us.status_id " ..
+		"WHERE us.user_id = ? ORDER BY us.position", user_id)
+	return st ~= "" and st or "None"
+end
+
 -- Item keys typed in the town editor -> item ids, or nil and the unknown key.
 local function item_ids(text)
 	local ids = {}
@@ -154,14 +184,13 @@ tables.users = function()
 				options = class_options },
 			SEP,
 			text("currentaction", "Current Action", 30, 30),
-			num("currentfight", "Current Fight", 5, 4),
-			num("currentmonster", "Current Monster", 5, 6),
-			num("currentmonsterhp", "Current Monster HP", 5, 6),
-			-- legacy swapped the Sleep/Immune labels on these two inputs; fixed here.
-			num("currentmonstersleep", "Current Monster Sleep", 5, 3),
-			num("currentmonsterimmune", "Current Monster Immune", 5, 3),
-			num("currentuberdamage", "Current Uber Damage", 5, 3),
-			num("currentuberdefense", "Current Uber Defense", 5, 3),
+			{ name = "fight", label = "Fight", kind = "static", virtual = true,
+				get = function(row) return fight_summary(row.id) end,
+				help = "The fight in progress (since schema version 8 in its own tables); read-only. " ..
+					"Setting the action to anything but Fighting doesn't end it: the next encounter replaces it." },
+			{ name = "world_statuses", label = "Statuses", kind = "static", virtual = true,
+				get = function(row) return world_summary(row.id) end,
+				help = "Statuses outside fights (they tick on map moves); read-only." },
 			SEP,
 			num("currenthp", "Current HP", 5, 6),
 			num("currentmp", "Current MP", 5, 6),

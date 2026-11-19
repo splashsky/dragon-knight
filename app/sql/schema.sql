@@ -91,7 +91,8 @@ CREATE TABLE control (
 	shownews      INTEGER NOT NULL DEFAULT 0,
 	showbabble    INTEGER NOT NULL DEFAULT 0,
 	showonline    INTEGER NOT NULL DEFAULT 0,
-	inventory_size INTEGER NOT NULL DEFAULT 12
+	inventory_size INTEGER NOT NULL DEFAULT 12,
+	max_allies    INTEGER NOT NULL DEFAULT 1
 );
 
 -- Forum boards. admin_threads = 1: only administrators start threads (replies are open).
@@ -192,6 +193,44 @@ CREATE TABLE spells (
 	data         TEXT    NOT NULL DEFAULT ''
 );
 
+-- Statuses: content files app/content/statuses/<key>.lua (like spells; never deleted, a
+-- status whose file is gone is retired). Timed effects on a combatant, scripted
+-- (app/fight/engine.lua): the hooks are the file's code; kind ('harmful', 'helpful',
+-- 'neutral'), tick_on ('turn_start', 'turn_end'), scope ('fight', 'world', 'both'), turns
+-- (default duration; 0: no limit), blocks_action, messages and data are data. Ids 1-3 are
+-- the original game's mechanics (sleep, uber_damage, uber_defense; seed.sql).
+CREATE TABLE statuses (
+	id             INTEGER PRIMARY KEY,
+	key            TEXT    NOT NULL UNIQUE,
+	name           TEXT    NOT NULL DEFAULT '',
+	description    TEXT    NOT NULL DEFAULT '',
+	kind           TEXT    NOT NULL DEFAULT 'neutral',
+	tick_on        TEXT    NOT NULL DEFAULT 'turn_end',
+	scope          TEXT    NOT NULL DEFAULT 'fight',
+	turns          INTEGER NOT NULL DEFAULT 0,
+	blocks_action  INTEGER NOT NULL DEFAULT 0,
+	retired        INTEGER NOT NULL DEFAULT 0,
+	messages       TEXT    NOT NULL DEFAULT '',
+	data           TEXT    NOT NULL DEFAULT ''
+);
+
+-- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
+-- player (app/fight/engine.lua); act is the file's code, the numbers are data.
+CREATE TABLE summons (
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	hp           INTEGER NOT NULL DEFAULT 1,
+	attack       INTEGER NOT NULL DEFAULT 0,
+	defense      INTEGER NOT NULL DEFAULT 0,
+	dexterity    INTEGER NOT NULL DEFAULT 0,
+	turns        INTEGER NOT NULL DEFAULT 0,
+	retired      INTEGER NOT NULL DEFAULT 0,
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT ''
+);
+
 CREATE TABLE towns (
 	id            INTEGER PRIMARY KEY AUTOINCREMENT,
 	name          TEXT    NOT NULL DEFAULT '',
@@ -214,7 +253,7 @@ CREATE TABLE town_items (
 -- verify: '1' when verified, otherwise the 8-letter code that was emailed.
 -- base_maxhp .. base_gold_bonus, strength, dexterity: the base stats (app/lib/stats.lua);
 -- the effective ones add the equipped items (user_items). dropcode: the item a monster
--- just dropped (items.id; 0: none).
+-- just dropped (items.id; 0: none). A fight in progress is in the fights tables.
 CREATE TABLE users (
 	id                    INTEGER PRIMARY KEY AUTOINCREMENT,
 	username              TEXT    NOT NULL DEFAULT '' COLLATE NOCASE,
@@ -229,13 +268,6 @@ CREATE TABLE users (
 	longitude             INTEGER NOT NULL DEFAULT 0,
 	charclass             INTEGER NOT NULL DEFAULT 0,
 	currentaction         TEXT    NOT NULL DEFAULT 'In Town',
-	currentfight          INTEGER NOT NULL DEFAULT 0,
-	currentmonster        INTEGER NOT NULL DEFAULT 0,
-	currentmonsterhp      INTEGER NOT NULL DEFAULT 0,
-	currentmonstersleep   INTEGER NOT NULL DEFAULT 0,
-	currentmonsterimmune  INTEGER NOT NULL DEFAULT 0,
-	currentuberdamage     INTEGER NOT NULL DEFAULT 0,
-	currentuberdefense    INTEGER NOT NULL DEFAULT 0,
 	currenthp             INTEGER NOT NULL DEFAULT 15,
 	currentmp             INTEGER NOT NULL DEFAULT 0,
 	currenttp             INTEGER NOT NULL DEFAULT 10,
@@ -291,3 +323,61 @@ CREATE TABLE sessions (
 ) WITHOUT ROWID;
 CREATE INDEX sessions_user ON sessions (user_id);
 CREATE INDEX sessions_expires ON sessions (expires);
+
+-- A fight in progress (app/fight/state.lua), one per player, loaded and saved once per
+-- request. round: the fight's counter (1: the encounter just began, no monster picked
+-- yet; +1 per fight page, at most 255, like the original currentfight); wave: the enemies'
+-- wave on the field; data: fight-level values ("name=value" lines, typed).
+CREATE TABLE fights (
+	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+	round    INTEGER NOT NULL DEFAULT 1,
+	wave     INTEGER NOT NULL DEFAULT 1,
+	data     TEXT    NOT NULL DEFAULT ''
+);
+
+-- The combatants of a fight, numbered from 1 within it (1: the player). side: player,
+-- ally, enemy; kind: player, monster (entity_id: monsters.id), summon (summons.id). wave:
+-- an enemy's wave (0 otherwise). hp, maxhp: NULL for the player (users.currenthp and the
+-- effective stats hold them). turns_left: rounds a summon stays (NULL: no limit). data:
+-- per-combatant values (a monster's immunity), "name=value" lines.
+CREATE TABLE fight_combatants (
+	user_id     INTEGER NOT NULL REFERENCES fights (user_id) ON DELETE CASCADE,
+	id          INTEGER NOT NULL,
+	side        TEXT    NOT NULL,
+	kind        TEXT    NOT NULL,
+	entity_id   INTEGER,
+	wave        INTEGER NOT NULL DEFAULT 0,
+	hp          INTEGER,
+	maxhp       INTEGER,
+	turns_left  INTEGER,
+	data        TEXT    NOT NULL DEFAULT '',
+	PRIMARY KEY (user_id, id)
+) WITHOUT ROWID;
+
+-- Statuses on the combatants of a fight: one instance per status and bearer (applying it
+-- again replaces it), in the order applied (position). turns_left: the bearer's turns left
+-- (NULL: until removed or the fight ends); data: the params it was applied with (names and
+-- values only, never code); source: the combatant who applied it.
+CREATE TABLE fight_statuses (
+	user_id        INTEGER NOT NULL,
+	combatant_id   INTEGER NOT NULL,
+	status_id      INTEGER NOT NULL REFERENCES statuses (id),
+	position       INTEGER NOT NULL,
+	turns_left     INTEGER,
+	data           TEXT    NOT NULL DEFAULT '',
+	applied_round  INTEGER NOT NULL DEFAULT 0,
+	source         INTEGER,
+	PRIMARY KEY (user_id, combatant_id, status_id),
+	FOREIGN KEY (user_id, combatant_id) REFERENCES fight_combatants (user_id, id) ON DELETE CASCADE
+) WITHOUT ROWID;
+
+-- World statuses of a character (scope 'world' or 'both', applied outside fights): they
+-- tick on map moves (turns_left: moves left; NULL: until removed) and outlast fights.
+CREATE TABLE user_statuses (
+	user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	status_id   INTEGER NOT NULL REFERENCES statuses (id),
+	position    INTEGER NOT NULL,
+	turns_left  INTEGER,
+	data        TEXT    NOT NULL DEFAULT '',
+	PRIMARY KEY (user_id, status_id)
+) WITHOUT ROWID;

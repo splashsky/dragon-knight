@@ -25,6 +25,11 @@ function spells.get(id)
 	return decode(dk.db:first("SELECT * FROM spells WHERE id = ?", id))
 end
 
+-- The spell with key `key` (retired or not), or nil.
+function spells.by_key(key)
+	return decode(dk.db:first("SELECT * FROM spells WHERE key = ?", key))
+end
+
 -- Spells that aren't retired, by id (help pages).
 function spells.active()
 	local out = dk.db:query("SELECT * FROM spells WHERE retired = 0 ORDER BY id")

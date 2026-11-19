@@ -8,6 +8,8 @@ local items = require("lib.items")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 local spells = require("lib.spells")
+local statuses = require("lib.statuses")
+local summons = require("lib.summons")
 local view = require("lib.view")
 
 local help = {}
@@ -68,9 +70,11 @@ function help.items(req)
 end
 
 -- Name and description, MP cost and power (what a spell does is its file's code; the
--- description says it).
+-- description says it); then the statuses spells and items cause and the allies they call.
 function help.spells(req)
-	return page(req, "Spells", "community/help/spells", { spells = spells.active() })
+	return page(req, "Spells", "community/help/spells", {
+		spells = spells.active(), statuses = statuses.active(), summons = summons.active(),
+	})
 end
 
 function help.monsters(req)

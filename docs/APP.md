@@ -16,12 +16,13 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Town, shop, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
-| Content (classes, spells, items) | `app/content/{classes,spells,items}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
-| Scripted spells and items (what they do) | `app/lib/{action,actors}.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/act.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
+| Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
+| Content (statuses, summons, classes, spells, items) | `app/content/{statuses,summons,classes,spells,items}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
+| Scripted spells and items (what they do) | `app/lib/action.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/{act,engine}.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4,seed_v5,seed_v6}.sql`), `tests/lua/test_db.lua` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,...,seed_v7}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -77,7 +78,7 @@ end
 	transaction back and drops queued cookies, so HEAD never changes state.
 - GETs should not change state. The deliberate exceptions are guarded by game state, so
 	a reload is harmless: the `onlinetime`/session touch, `GET /fight` (monster pick, first
-	strike, `currentfight` counter) and `GET /victory` (pays out once).
+	strike, the fight's `round` counter) and `GET /victory` (pays out once).
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
 	only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
 	handler's second argument and also as `req.params`.
@@ -187,7 +188,7 @@ starting with `__` are reserved.
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
 | `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
 | `game.stats(user)` | the effective stats of a users row: `{ maxhp, maxmp, maxtp, strength, dexterity, attack, defense, exp_bonus_pct, gold_bonus_pct }` (see [Derived stats](#derived-stats)) |
-| `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the spell and item actions (`lib/actors.lua`) take |
+| `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the spell and item actions (`fight/engine.lua` handles) take |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
@@ -247,10 +248,11 @@ experience already covers the next level gets it (or several) on the next victor
 
 ## Content
 
-Classes, spells and items are **content**: Lua files in git, one per entity, hot-reloaded
-like the code and synced into the database, where players' rows reference them by id.
-Spells and consumables also carry code: what they do (see
-[Scripting spells and items](#scripting-spells-and-items)).
+Classes, spells, items, statuses and summons are **content**: Lua files in git, one per
+entity, hot-reloaded like the code and synced into the database, where players' rows
+reference them by id. Spells, consumables, statuses and summons also carry code: what they
+do (see [Scripting spells and items](#scripting-spells-and-items) and
+[Fight engine](#fight-engine)).
 
 ```lua
 -- app/content/classes/knight.lua: the file name is the key ("knight")
@@ -286,9 +288,11 @@ High hit points]],                       -- one line per point on the help page
 - **Sync** (`lib/content/sync.lua`): upsert every file entity by key (a new key gets the
 	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
 	deleted: players keep their class), un-retire keys whose file is back, then apply the
-	admin overrides. Kinds sync in `schema.KINDS` order (spells, classes, items: spells
-	before classes, whose `class_spells` rows need the spell ids). The original classes
-	keep ids 1-3, the original spells 1-19 and the items 1-68 (seeded in `seed.sql`).
+	admin overrides. Kinds sync in `schema.KINDS` order (statuses, summons, spells,
+	classes, items: kinds others reference first; spells before classes, whose
+	`class_spells` rows need the spell ids). The original classes keep ids 1-3, the
+	original spells 1-19, the items 1-68 and the statuses of the original mechanics
+	(`sleep`, `uber_damage`, `uber_defense`) 1-3 (seeded in `seed.sql`).
 - **When**: every request (`main.lua`) compares `meta.content_seen` with
 	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
 	After a restart or any app file change, the files are loaded and fingerprinted (sha256
@@ -474,18 +478,23 @@ optional. Only consumables have these fields; gear stays declarative (modifiers,
 | `s:say(msg, ...)` | adds a line: `msg` is a message key (`"hit"`: uses the overridable text), a format text or a function; the rest are `string.format` arguments (`%s`, `%d`, `%%`) |
 | `s:refuse(msg, ...)` | a refusal (same arguments): `return` it from `can_cast`/`can_use` (or from `cast`/`use`) and nothing happens, nothing is spent |
 
-**Combatants** (`s.caster`, `s.target`; the player and, from Phase E, monsters and summons
-alike) have read-only fields `name`, `is_player`, `level`, `hp`, `maxhp`, `mp`, `maxmp`,
-`tp`, `maxtp`, `attack`, `defense`, `strength`, `dexterity`, `immune` (0, 1: hurt spells,
-2: hurt and sleep), `asleep`, `sleep_chance`, `uber_damage`, `uber_defense`, and methods:
+**Combatants** (`s.caster`, `s.target`; the player, monsters and summons alike) have
+read-only fields `id` (the combatant's number in the fight), `side` (`"player"`, `"ally"`,
+`"enemy"`), `name`, `is_player`, `level`, `hp`, `maxhp`, `mp`, `maxmp`, `tp`, `maxtp`,
+`attack`, `defense`, `strength`, `dexterity`, `immune` (0, 1: hurt spells, 2: hurt and
+sleep), and, from its statuses, `asleep`, `sleep_chance`, `uber_damage`, `uber_defense`;
+and methods:
 
 | | |
 |---|---|
 | `:heal(stat, n)` | restores up to `n` of `"hp"`, `"mp"` or `"tp"`, never above the maximum (and never lowering a value above it); returns what it restored |
 | `:hurt(n)` | takes `n` HP (may go below 0; the fight decides who died); returns `n` |
 | `:spend(stat, n)` | uses up `n` of a stat (a cost) |
-| `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the player only, for now) |
-| `:sleep(chance)` | asleep; stays asleep while `rand(1, 15) <= chance` on each of its turns (monsters only, for now) |
+| `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the statuses `uber_damage` / `uber_defense`; 0 ends it) |
+| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance` at the start of each of its turns (0 wakes it) |
+| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`turns`: how long; the rest is the status's `t.data`); replaces an instance it has |
+| `:cure(key or kind)` | removes a status, or all of a kind (`"harmful"`, `"helpful"`, `"neutral"`); returns how many |
+| `:has_status(key)`, `:status(key)`, `:statuses([kind])` | what it has: `{ key, name, kind, turns_left, data }` copies |
 
 Amounts are whole numbers >= 0; anything else is an error. The handle's numbers follow its
 own changes during the action (heal, then read `hp`).
@@ -494,20 +503,25 @@ own changes during the action (heal, then read `hp`).
 retired; the caller's message), runs `can_cast`/`can_use` (which may only decide: changing
 anything there is an error), then `cast`/`use`, then deducts a spell's MP from the caster.
 Nothing touches the game state meanwhile: the handles record an ordered list of events
-(`heal`, `hurt`, `spend`, `buff`, `sleep`, `say`), and the caller applies them
-(`lib/actors.lua` maps the player and the monster to the users row's fight columns) and
-saves. A refusal, or an error, returns no events, so nothing changes and no MP, item or
-turn is spent. Fights go through one entry point, `fight/act.lua` `act.run(state, action)`
-(attack, spell or item: Phase E's round pipeline grows from it); town casting
-(`town/heal.lua`) and the inventory's Use (`town/inventory.lua`) call `action.perform`
-directly.
+(`heal`, `hurt`, `spend`, `buff`, `sleep`, `afflict`, `cure`, `summon`, `say`), and the
+caller applies them (`fight/engine.lua` `engine.apply` on the fight model; outside fights
+`lib/world.lua`) and saves. A refusal, or an error, returns no events, so nothing changes
+and no MP, item or turn is spent. In fights the player's action is step 2 of the round
+pipeline (`fight/act.lua` `act.run(f, action)`, see [Fight engine](#fight-engine)); town
+casting (`town/heal.lua`) and the inventory's Use (`town/inventory.lua`) call
+`action.perform` and `world.apply`.
+
+More context methods: `s:summon(key, params)` (an ally joins, in fights; `s.summon_room`
+says how many more may), `s:charge(turns, step)` and `s:recharge(turns)` (multi-stage
+actions), and the file's `stages = { release = fn }` (named steps; see
+[Fight engine](#fight-engine)).
 
 **Monsters acting.** Messages are worded for the player. When a monster is the caster,
 `s:say("hit", ...)` uses `messages.enemy.hit` if there is one (same arguments); otherwise
 the line becomes a generic "The Dragon casts Hurt." (items: "The Dragon uses the Potion.")
 followed by what changed since the previous line ("You take 13 damage.", "The Dragon
-recovers 10 Hit Points.", ...). No monster casts yet (Phase E); `tests/lua/test_action.lua`
-covers both forms with monster casters.
+recovers 10 Hit Points.", "You are now Poisoned.", ...). No monster casts yet (Phase E2);
+`tests/lua/test_action.lua` covers both forms with monster casters.
 
 **Errors** in content code (a typo, a bad format, `error(...)`, more than
 `sandbox.BUDGET` instructions) are caught: logged as a warning with the traceback, the
@@ -536,6 +550,212 @@ and through their files over many seeded states, in fights and in town, and comp
 rolls (arguments and order), numbers, messages and refusals; it also covers the API with
 fake modules (inline and free-standing functions, refusals, errors, runaway code, monster
 casters).
+
+## Fight engine
+
+A fight is a model of combatants loaded and saved once per request (`fight/state.lua`), a
+request plays at most one **round** of a deterministic pipeline (`fight/round.lua`), and
+what happens to combatants (handles for content code, applying events, statuses, summons)
+is `fight/engine.lua`. Monsters choose by weight (`fight/ai.lua`). The dice and formulas of
+the original game stay in `fight/combat.lua`; `routes/fight.lua` picks the monster, checks
+the player's choice (known spell, MP, item in the bag) and saves.
+
+**The model** (`fight/state.lua`; tables `fights`, `fight_combatants`, `fight_statuses`):
+
+| | |
+|---|---|
+| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id }`. `round` is the original `currentfight` counter (1: the encounter just began, no monster picked; +1 per fight page, at most 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`) |
+| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the monsters / summons row |
+| status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
+
+`state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (victory, escape, death)
+and `state.begin(user_id)` (a new encounter: explore). Saved values are **names and plain
+data only** (whole numbers, text, booleans: `state.encode`, "name=i:5" lines;
+`action.params` refuses functions and tables), so a fight in progress never holds code: a
+charged spell's release step is saved by name.
+
+**Encounters and waves.** A fight is an ordered list of waves of enemies (`c.wave`); today
+every encounter is one wave with one monster (the original random pick). The pipeline
+already acts with every enemy of the current wave; when the wave is defeated the next one
+enters ("Another monster appears: ..."), and the victory is "no enemy left". `/victory`
+pays each defeated enemy's rewards (summed) and rolls for a drop once (at the highest
+level). The player's actions aim at "the current target" (`engine.target`: the first
+living enemy of the wave, `s.target` in spells), so a target picker can come later without
+changing spell files.
+
+**The round** (`round.play(f, a)`; `a.kind`: `attack`, `spell`, `item`, `run`, `continue`,
+or `ambush`: the monster swung first):
+
+1. the player's turn starts: statuses with `tick_on = "turn_start"` tick; a status that
+	 blocks the action makes the turn a skip (with its `blocked` message);
+2. the player's action. A refused spell or item (or one whose code fails) leaves the fight
+	 exactly as it was: the round runs on a copy (`state.copy`), so even the turn-start
+	 ticks are undone;
+3. each ally (summon), in the order summoned: turn-start ticks, then its `act` unless
+	 blocked;
+4. each enemy of the current wave: turn-start ticks (the monster's sleep is a status: its
+	 wake-up roll), then, unless blocked, an action and a target chosen by `fight/ai.lua`;
+5. turn ends for the player, the allies and the enemies: `turn_end` ticks, then the
+	 statuses count down and expire; allies count their rounds down and leave.
+
+After each step that changed HP the round checks the outcome: the player dead is the
+death (as before), the last enemy defeated the victory, an ally at 0 HP leaves ("Your Wolf
+has been defeated.", or its `on_death`). The result `r` has the lines of each part
+(`player`, `allies`, `enemies`, `ending`; the fight page shows them in that order), the
+model after the round (`r.f`) and `escaped`, `victory`, `died` or `refused`.
+`round.start(f)` rolls a new encounter (each enemy's HP, then who swings first).
+`round.locked(f)`: the player has a blocking status, so the page offers only "Continue"
+and the route turns any command into `continue`.
+
+**Equivalence.** Fights without summons or new statuses roll exactly the original's dice,
+in the same order, with the same messages and results: no AI roll with one action and one
+target, sleep and the damage/defense buffs as statuses with the original formulas.
+`tests/lua/test_round.lua` plays 1,000 seeded fights through the pipeline and through a
+frozen copy of the 2.1 fight (`tests/lua/fight_original.lua`) and compares every roll,
+line and state.
+
+### Statuses
+
+A status (`app/content/statuses/<key>.lua`, table `statuses`) is a named, timed effect on
+a combatant: poison, a buff, sleep, "recharging".
+
+```lua
+-- app/content/statuses/poison.lua
+local function tick(t)                       -- t: the status context
+	local damage = t:roll(t.data.min, t.data.max)
+	t.bearer:hurt(damage)
+	if t.bearer.is_player then t:say("hurt_you", damage) else t:say("hurt", t.bearer.name, damage) end
+end
+
+return {
+	name = "Poisoned",
+	description = "Loses hit points at the end of every turn.",
+	kind = "harmful",            -- harmful | helpful | neutral (an antidote cures "harmful")
+	tick_on = "turn_end",        -- turn_start | turn_end: when on_tick runs
+	turns = 3,                   -- default duration (0: until removed or the fight ends)
+	data = { min = 2, max = 5 }, -- defaults of t.data (admin-overridable)
+	messages = { hurt = "The %s takes %d poison damage.", hurt_you = "You take %d poison damage." },
+	on_tick = tick,              -- or inline: on_tick = function(t) ... end
+}
+```
+
+- Fields: `name`, `description`, `kind`, `tick_on`, `scope` (`"fight"`, the default: ends
+	with the fight; `"world"`: outside fights only; `"both"`), `turns`, `blocks_action`
+	(`true`, or a `function(t)` returning true while it blocks), `data`, `messages`
+	(`blocked`: said when it blocks the player's turn; `blocked_other`: anyone else's, `%s`
+	the name). Hooks, all optional: `on_apply(t)`, `on_tick(t)`, `on_expire(t)` (ran out),
+	`on_remove(t)` (cured or replaced), `modify_damage_dealt(t, damage)` and
+	`modify_damage_taken(t, damage)` (return the new damage, a whole number >= 0; they only
+	decide, like `can_cast`).
+- The context `t`: `t.bearer` and `t.source` (handles; `source` may be nil),
+	`t.turns_left` (nil: no limit), `t.data` (the status's data under the params it was
+	applied with), `t.name`, `t.messages`, `t.round`, `t.in_fight`, `t:roll`, `t:say`,
+	`t:expire()` / `t:remove()` (end it, once the hook returns), `t:release()` (charging:
+	run the charged action's stage).
+- Applying: `s.target:afflict("poison", { turns = 2, min = 1, max = 3 })` from any
+	context. **Re-applying replaces** the instance: the old one's `on_remove` runs (not
+	`on_expire`), then the new one's `on_apply`, with the new duration and params even when
+	shorter; there is no stacking.
+- Timing: a status counts the bearer's turns that begin after it was applied (a poison the
+	player casts ticks at the end of the monster's turn in the same round; a regen the
+	player casts on itself first ticks in the next round). It counts down at the end of the
+	bearer's turn and expires at 0.
+- The original mechanics are statuses 1-3: `sleep` (blocks; at the start of each turn
+	`rand(1, 15) > chance` wakes it: "The monster has woken up."), `uber_damage` and
+	`uber_defense` (damage modifiers with the original formulas). `:buff` and `:sleep`
+	apply them; anyone can be put to sleep or buffed now.
+- Robustness: an error in a hook is logged as a warning and removes that status (without
+	its hooks); the round goes on. At most `engine.MAX_STATUSES` (10) per combatant (more
+	are not applied, logged); at most `engine.MAX_TICKS` (100) runs of status and summon
+	code per round (the rest is skipped, logged). A status whose file is gone (retired) ends
+	when the fight loads.
+- **World statuses** (`scope = "world"` or `"both"`, applied outside a fight, like the
+	Regen Potion's) live in `user_statuses`, tick on map moves (one move is one turn:
+	`lib/world.lua` `world.move`; they can't take the last hit point), outlast fights and
+	take no part in them; the character page lists them. Their lines aren't shown yet (the
+	move redirects to the map). In a fight a "world" status isn't applied, and outside one a
+	"fight" status isn't (logged).
+
+### Multi-stage actions
+
+- **Recharge** (Hyper Beam): `cast` hits, then `s:recharge(1)` puts the caster in
+	`recharging` (blocks): its next turn is skipped ("You must recharge this turn."; the page
+	offers only "Continue") and the monster still acts.
+- **Charge** (Solar Beam): `cast` calls `s:charge(1, "release")`: the caster is `charging`
+	(blocks) with the params `{ entity = "solar_beam", from = "spell", release = "release" }`
+	(names only). At the start of its next turn the status runs out and its `on_expire`
+	calls `t:release()`, which runs the file's `stages.release(s)` with the caster and its
+	current target: that turn's action.
+
+```lua
+-- app/content/spells/solar_beam.lua (excerpt)
+local function release(s)
+	local damage = s:roll((s.power / 6) * 5, s.power)
+	s.target:hurt(damage)
+	s:say("hit", s.name, damage)
+end
+
+return {
+	-- name, mp, power, messages ...
+	uses = { statuses = { "charging" } },     -- declared: dk check knows the key
+	cast = function(s)
+		s:charge(1, "release")
+		s:say("charge", s.name)
+	end,
+	stages = { release = release },
+}
+```
+
+### Summons
+
+A summon (`app/content/summons/<key>.lua`, table `summons`) is an ally on the player's
+side, called by `s:summon("wolf", { turns = 5 })` (in fights; a file refuses in `can_cast`
+when `s.summon_room` is 0: at most `control.max_allies` allies, default 1, "Allies" in the
+main settings).
+
+```lua
+-- app/content/summons/wolf.lua
+local function act(a)                        -- a: the summon's context
+	local damage = a:roll(a.self.attack // 2, a.self.attack)
+	a.target:hurt(damage)
+	a:say("bite", a.self.name, damage)
+end
+
+return {
+	name = "Wolf", hp = 30, attack = 12, defense = 5, dexterity = 4,
+	turns = 5,                                 -- rounds it stays (0: the whole fight)
+	messages = { bite = "Your %s bites the monster for %d damage.", gone = "Your %s runs off into the wild." },
+	act = act,                                 -- once per round, after the player
+	on_expire = function(a) a:say("gone", a.self.name) end,   -- optional; on_summon, on_death too
+}
+```
+
+The context `a`: `a.self` (its handle), `a.target` (chosen by the AI), `a.data` (its
+params), `a.turns_left`, `a:roll`, `a:say`. Monsters may attack an ally instead of the
+player; the original formula then uses the ally's defense and dexterity. An ally leaves at
+0 HP, when its rounds run out or when the fight ends; an error in its code removes it.
+
+### Monster AI
+
+`fight/ai.lua`: `ai.pick(list, rand)` picks by `weight` (default 1, `rand(1, total)`; a
+single candidate is taken **without a roll**). `ai.choose(f, c)` picks an action among
+`ai.actions(f, c)`, then a target among `ai.targets(f, c)` (every living opponent weighs
+1: with one summon a monster attacks the player or the summon 50/50; alone with the
+player there is no roll). Actions come from providers (`ai.PROVIDERS`, `ai.provide(fn)`):
+functions `(f, c)` returning candidates `{ kind, weight, target = "opponent" | "self",
+perform = function(f, c, target) }`. Today they are a monster's attack (weight
+`row.attack_weight or 1`, `act.enemy_attack`) and an ally's `act`; Phase E2 adds
+providers for a monster's spells and items.
+
+### Adding a status or a summon
+
+Copy `app/content/statuses/poison.lua` (or `regen.lua`, `recharging.lua`) or
+`app/content/summons/wolf.lua` to `<key>.lua`, edit it, and use the key from a spell or an
+item (`s.target:afflict("<key>", ...)`, `s:summon("<key>", ...)`; declare it with `uses =
+{ statuses = { "<key>" } }` so `./dk check` catches typos), then run `./dk check`. The
+admin pages `/admin/statuses` and `/admin/summons` override names, descriptions, numbers
+and messages per server. Unit tests can run statuses and summons without files:
+`load.preload(kind, key, module)` primes the loaded module (see `tests/lua/test_round.lua`).
 
 ## Items
 
@@ -787,8 +1007,8 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v6.sql` (version 6) with the
-	 game data of that time (`seed_v3.sql` to `seed_v6.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v7.sql` (version 7) with the
+	 game data of that time (`seed_v3.sql` to `seed_v7.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -843,6 +1063,8 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
 | `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
+| `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_clear username`, `t_fight_status username who key [data [turns]]` | a fight in progress against a monster (round 2 by default); an encounter that just began; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
+| `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight (0 when there is none) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |

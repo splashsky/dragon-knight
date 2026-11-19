@@ -6,7 +6,8 @@
 -- `st` is a mutable copy of the users row with the effective stats under the original
 -- column names (game.player: maxhp, strength, attackpower, expbonus, ...; the legacy
 -- in-memory $userrow); messages are returned as lists of plain-text lines (escaped by the
--- templates). Spells and items are scripted content run by fight/act.lua.
+-- templates). The round (fight/round.lua) applies the damage; spells and items are
+-- scripted content run by fight/act.lua.
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 
@@ -17,7 +18,6 @@ local sqrt = math.sqrt
 combat.MAX_EXPERIENCE = leveling.MAX_EXPERIENCE   -- MEDIUMINT UNSIGNED ceiling legacy checked against
 combat.MAX_GOLD = 16777215
 combat.MAX_LEVEL = leveling.MAX_LEVEL
-combat.MAX_FIGHT = 255             -- users.currentfight was TINYINT UNSIGNED (MySQL clamps)
 
 -- Monster level band from the distance to the origin (one mlevel per five spaces).
 function combat.monster_levels(latitude, longitude)
@@ -36,16 +36,14 @@ function combat.pick(rows, rand)
 	return rows[rand(1, #rows)]
 end
 
--- New fight against `monster`: monster HP, sleep, immunity, buffs. Returns true when the
--- player gets to swing first.
-function combat.start(st, monster, rand)
-	st.currentmonster = monster.id
-	st.currentmonsterhp = rand((monster.maxhp / 5) * 4, monster.maxhp)
-	st.currentmonstersleep = 0
-	st.currentmonsterimmune = monster.immune
-	-- fixed: legacy kept the uber buffs of a fight the player ran from or died in.
-	st.currentuberdamage = 0
-	st.currentuberdefense = 0
+-- A monster's HP at the start of an encounter: rand(maxhp * 4/5, maxhp).
+function combat.start_hp(monster, rand)
+	return rand((monster.maxhp / 5) * 4, monster.maxhp)
+end
+
+-- Who swings first in a new encounter: true when the player (dexterity) beats the first
+-- monster (its maximum damage).
+function combat.swing_first(st, monster, rand)
 	local chance = rand(1, 10) + php.ceil(sqrt(st.dexterity))
 	return chance > (rand(1, 7) + php.ceil(sqrt(monster.maxdam)))
 end
@@ -56,68 +54,55 @@ function combat.run_chance(st, monster, rand)
 	return chance > (rand(1, 5) + php.ceil(sqrt(monster.maxdam)))
 end
 
--- The monster's turn. `after_spell` selects the variant legacy used after casting a spell
--- (tohit raised to toblock + 1 instead of clamping the damage; same outcome).
--- Returns lines, player_died.
-function combat.monster_turn(st, monster, rand, after_spell)
+-- A monster's attack (`maxdam`: its maximum damage) on `target` (a combatant handle: the
+-- player, or an ally in the player's place: defense, dexterity, is_player, name).
+-- `modify(damage)` applies the statuses' damage modifiers (fight/engine.lua; the original
+-- uber defense buff is one). Returns lines, damage (the caller takes it off the target).
+-- legacy: after a spell the original raised tohit to toblock + 1 instead of clamping the
+-- damage to 1; the outcome is the same, so there is one formula.
+function combat.monster_attack(maxdam, target, rand, modify)
 	local lines = {}
-	if st.currentmonstersleep ~= 0 then -- Check to wake up.
-		if rand(1, 15) > st.currentmonstersleep then
-			st.currentmonstersleep = 0
-			lines[#lines + 1] = "The monster has woken up."
-		else
-			lines[#lines + 1] = "The monster is still asleep."
-		end
-	end
-	if st.currentmonstersleep ~= 0 then return lines, false end
-
-	local tohit = php.ceil(rand(monster.maxdam * .5, monster.maxdam))
-	local toblock = php.ceil(rand(st.defensepower * .75, st.defensepower) / 4)
+	local tohit = php.ceil(rand(maxdam * .5, maxdam))
+	local toblock = php.ceil(rand(target.defense * .75, target.defense) / 4)
 	local damage
-	if rand(1, 150) <= sqrt(st.dexterity) then
-		lines[#lines + 1] = "You dodge the monster's attack. No damage has been scored."
+	if rand(1, 150) <= sqrt(target.dexterity) then
+		lines[#lines + 1] = target.is_player and "You dodge the monster's attack. No damage has been scored." or
+			("Your " .. tostring(target.name) .. " dodges the monster's attack. No damage has been scored.")
 		damage = 0
 	else
-		if after_spell then
-			if tohit <= toblock then tohit = toblock + 1 end
-			damage = tohit - toblock
-		else
-			damage = tohit - toblock
-			if damage < 1 then damage = 1 end
-		end
-		if st.currentuberdefense ~= 0 then
-			damage = damage - php.ceil(damage * (st.currentuberdefense / 100))
-		end
+		damage = tohit - toblock
+		if damage < 1 then damage = 1 end
+		if modify then damage = modify(damage) end
 		if damage < 1 then damage = 1 end
 	end
-	lines[#lines + 1] = "The monster attacks you for " .. damage .. " damage."
-	st.currenthp = st.currenthp - damage
-	return lines, st.currenthp <= 0
+	lines[#lines + 1] = target.is_player and ("The monster attacks you for " .. damage .. " damage.") or
+		("The monster attacks your " .. tostring(target.name) .. " for " .. damage .. " damage.")
+	return lines, damage
 end
 
--- The player's melee attack. Returns lines, monster_killed.
-function combat.attack(st, monster, rand)
+-- The player's melee attack: `attacker` (attack, strength) on `target` (defense: a
+-- monster's armor). `modify(damage)` applies the statuses' damage modifiers (the uber
+-- damage buff is one). Returns lines, damage.
+function combat.attack(attacker, target, rand, modify)
 	local lines = {}
-	local tohit = php.ceil(rand(st.attackpower * .75, st.attackpower) / 3)
-	if rand(1, 150) <= sqrt(st.strength) then
+	local tohit = php.ceil(rand(attacker.attack * .75, attacker.attack) / 3)
+	if rand(1, 150) <= sqrt(attacker.strength) then
 		tohit = tohit * 2
 		lines[#lines + 1] = "Excellent hit!"
 	end
-	local toblock = php.ceil(rand(monster.armor * .75, monster.armor) / 3)
+	local toblock = php.ceil(rand(target.defense * .75, target.defense) / 3)
 	local damage
-	if rand(1, 200) <= sqrt(monster.armor) then
+	if rand(1, 200) <= sqrt(target.defense) then
 		lines[#lines + 1] = "The monster is dodging. No damage has been scored."
 		damage = 0
 	else
 		damage = tohit - toblock
 		if damage < 1 then damage = 1 end
-		if st.currentuberdamage ~= 0 then
-			damage = damage + php.ceil(damage * (st.currentuberdamage / 100))
-		end
+		if modify then damage = modify(damage) end
+		if damage < 1 then damage = 1 end
 	end
 	lines[#lines + 1] = "You attack the monster for " .. damage .. " damage."
-	st.currentmonsterhp = st.currentmonsterhp - damage
-	return lines, st.currentmonsterhp <= 0
+	return lines, damage
 end
 
 -- Death penalty: half the gold (rounded up) and a quarter of max HP (rounded up).

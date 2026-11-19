@@ -1,0 +1,16 @@
+{#- One status or summon (admin/effects.lua). ctx: k, e (row: effective values), the
+		override form (see admin/content_form), facts, used, saved. -#}
+<h1 class="admin-heading">Edit {{ k.one }}: {{ e.name }}</h1>
+{%- if saved then %}
+<p class="admin-saved">{{ k.one }} updated.</p>
+{%- end %}
+{{{ include("admin/content_form") }}}
+<h2 class="admin-subheading">Behaviour</h2>
+<p>Read-only here: what it does is its code ({{ k.code }}); edit <code>{{ form.file_path }}</code>
+(the game picks the change up on the next page load).</p>
+<table class="admin-form">
+{%- for _, f in ipairs(facts) do %}
+<tr><td class="admin-label">{{ f.label }}:</td><td>{{ f.value }}</td></tr>
+{%- end %}
+<tr><td class="admin-label">In use:</td><td>{{ used }}</td></tr>
+</table>

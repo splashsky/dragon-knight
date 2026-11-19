@@ -85,7 +85,7 @@ end
 function T.item_files_are_the_original_items_and_drops()
 	local k = load.kind("items")
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
-	eq(#k.entities, 68)
+	eq(#k.entities, 70, "the originals, the 2.1 consumables and the 2.2 examples")
 	for id, o in ipairs(ITEMS) do
 		local f = assert(k.by_key[o[1]], "no item file " .. o[1])
 		eq(f.name, o[3], o[1]); eq(f.category, CATEGORY[o[2]], o[1]); eq(f.slot, CATEGORY[o[2]], o[1])

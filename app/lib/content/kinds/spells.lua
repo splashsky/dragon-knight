@@ -6,14 +6,12 @@
 -- scripted parts.
 local scripted = require("lib.content.scripted")
 
-local spells = {
-	name = "spells", table = "spells", dir = "content.spells", label = "spell",
-	extra_keys = { messages = true, data = true, cast = true, can_cast = true },
-}
+local spells = { name = "spells", table = "spells", dir = "content.spells", label = "spell" }
 
 spells.USABLE_IN = { "town", "fight", "both" }
 spells.TARGETS = { "enemy", "self" }
 spells.FUNCTIONS = { { "cast", true }, { "can_cast", false } }
+spells.extra_keys = scripted.extra_keys(spells.FUNCTIONS)
 
 spells.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },

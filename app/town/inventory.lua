@@ -2,13 +2,13 @@
 -- and the actions on it (equip, unequip, use, discard). The rules are lib/inventory.lua's;
 -- every action is a POST (CSRF) that renders the page again with what happened.
 local action = require("lib.action")
-local actors = require("lib.actors")
 local common = require("town.common")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
 local view = require("lib.view")
+local world = require("lib.world")
 
 local inv = {}
 
@@ -98,7 +98,8 @@ function inv.unequip(req, params)
 end
 
 -- POST /inventory/use/#id: a consumable usable outside fights, run through its content
--- file's code (lib/action.lua) with the player as caster.
+-- file's code (lib/action.lua) with the player as caster (statuses it applies are world
+-- statuses, lib/world.lua).
 function inv.use(req, params)
 	local user = req.user
 	local e = bag_entry(req, params.id)
@@ -108,18 +109,15 @@ function inv.use(req, params)
 		local fight_only = item.category == "consumable" and item.retired == 0 and item.usable_in == "fight"
 		return page(req, { (fight_only and CANNOT.fight_only or CANNOT.cannot):format(item.name) })
 	end
-	local st = game.player(user)
-	local player = actors.player(st)
+	local f = world.load(user, game.player(user), php.rand)
+	local player = world.player(f)
 	local r = action.perform({
 		kind = "item", entity = item, caster = player, target = item.target == "self" and player or nil,
 		in_fight = false, rand = php.rand,
 	})
 	if not r.ok then return page(req, { r.reason == "cannot" and CANNOT.cannot:format(item.name) or r.refused }) end
-	actors.apply(st, r.events)
 	inventory.take(e, 1)
-	dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
-						 php.mysql_uint(st.currenthp), php.mysql_uint(st.currentmp), php.mysql_uint(st.currenttp), user.id)
-	return page(req, r.lines)
+	return page(req, world.apply(f, r))
 end
 
 -- GET /inventory/discard/#id: confirmation (how many, for a stack).

@@ -53,6 +53,8 @@ local function spec()
 				help = "Default is 12. How many stacks of items a character's bag holds (equipped items and " ..
 							 "quest items don't count; a stack of potions counts once). Lowering it never takes " ..
 							 "items away: a bag over the size just can't take new ones." },
+			{ name = "max_allies", label = "Allies", size = 3, maxlength = 2, int = true,
+				help = "Default is 1. How many summoned allies may fight alongside a player at once (0: none)." },
 			yesno("verifyemail", "Email Verification", "Make users verify their email address for " ..
 						"added security.", "Disabled", "Enabled"),
 			yesno("shownews", "Show News", "Toggle display of the Latest News box in towns."),
@@ -68,6 +70,8 @@ local function spec()
 			if not common.is_numeric(v.gamesize) then err("Map size must be a number.") end
 			local size = math.tointeger(tonumber(v.inventory_size))
 			if not size or size < 1 or size > 100 then err("Bag size must be a number from 1 to 100.") end
+			local allies = math.tointeger(tonumber(v.max_allies))
+			if not allies or allies < 0 or allies > 10 then err("Allies must be a number from 0 to 10.") end
 			if v.forumtype == "2" and v.forumaddress == "" then
 				err("You must specify a forum address when using the External setting.")
 			end

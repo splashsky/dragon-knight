@@ -1,4 +1,5 @@
-{#- Fight screen (legacy templates/fight.php + fight.php fight()). -#}
+{#- Fight screen (legacy templates/fight.php + fight.php fight()); statuses, allies and the
+		locked "Continue" turn are new (fight/round.lua). -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
@@ -6,14 +7,30 @@
 {%- if monsterhp then %}
 <p class="fight-monsterhp">Monster's HP: {{ monsterhp }}</p>
 {%- end %}
-{%- if #yourturn > 0 then %}
-<p class="fight-yourturn">{% for i, line in ipairs(yourturn) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- for _, e in ipairs(enemies) do %}
+{%- if #enemies > 1 or #e.statuses > 0 then %}
+<p class="fight-combatant fight-enemy"><b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>
 {%- end %}
-{%- if #monsterturn > 0 then %}
-<p class="fight-monsterturn">{% for i, line in ipairs(monsterturn) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- end %}
+{%- for _, al in ipairs(allies) do %}
+<p class="fight-combatant fight-ally">Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.turns then %} <span class="light">({{ al.turns }} {{ al.turns == 1 and "round" or "rounds" }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
+{%- end %}
+{%- if #player_statuses > 0 then %}
+<p class="fight-combatant fight-you"><b>You</b>{{{ include("fight/statuses", { statuses = player_statuses }) }}}</p>
+{%- end %}
+{%- for _, part in ipairs({ { "fight-yourturn", yourturn }, { "fight-allyturn", allyturn }, { "fight-monsterturn", monsterturn }, { "fight-roundend", roundend } }) do %}
+{%- if #part[2] > 0 then %}
+<p class="{{ part[1] }}">{% for i, line in ipairs(part[2]) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- end %}
 {%- end %}
 {%- if dead then %}
 {{{ include("fight/died") }}}
+{%- elseif locked then %}
+<p class="fight-locked">You can't act this turn.</p>
+<form class="fight-command" action="/fight" method="post">
+{{{ csrf_field() }}}
+<p><input type="submit" name="continue" value="Continue"></p>
+</form>
 {%- else %}
 <p>Command?</p>
 <form class="fight-command" action="/fight" method="post">

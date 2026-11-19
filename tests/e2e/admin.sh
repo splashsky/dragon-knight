@@ -120,7 +120,7 @@ t_section "admin: spells"
 t_get /admin/spells;       expect_status 200; expect_body '<a href="/admin/spells/1">Heal</a>'
 expect_body '<td>heal</td><td>5</td><td>10</td><td>both</td><td>self</td>'
 expect_body '<td>hurt</td><td>5</td><td>15</td><td>fight</td><td>enemy</td>'
-expect_body 'spells: 19 files, 19 in the database (0 retired), 0 overrides.'
+expect_body 'spells: 24 files, 24 in the database (0 retired), 0 overrides.'
 t_get /admin/spells/6;     expect_status 200; expect_body 'Edit Spell: Hurt'; expect_body 'app/content/spells/hurt.lua'
 expect_body 'name="power" size="6" value="15"'; expect_body 'name="mp" size="6" value="5"'
 expect_body 'Message hit:'; expect_body 'name="messages.hit" size="70" value="You have cast the %s spell for %d damage."'
@@ -166,7 +166,7 @@ t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items
 expect_body '<td>stick</td><td>weapon</td><td>10</td><td>Attack Power +2</td>'
 expect_body '<td>demons_sin</td><td>accessory</td><td>0</td><td>Max HP -50, Strength +50</td><td></td>'
 expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Power 30</td>'
-expect_body 'items: 68 files, 68 in the database (0 retired), 0 overrides.'
+expect_body 'items: 70 files, 70 in the database (0 retired), 0 overrides.'
 t_get /admin/drops;        expect_redirect /admin/items
 t_get /admin/items/46;     expect_status 200; expect_body 'Edit Item: Demon&#39;s Sin'; expect_body 'app/content/items/demons_sin.lua'
 expect_body 'name="modifiers.1.amount" size="6" value="-50"'; expect_body '<option value="maxhp" selected>maxhp</option>'
@@ -273,7 +273,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 68, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"
@@ -289,7 +289,14 @@ t_section "admin: users"
 ADM_UID=$(t_sql "SELECT id FROM users WHERE username = 'admtester'")
 ADM_HASH=$(t_sql "SELECT password FROM users WHERE id = $ADM_UID")
 t_get /admin/users;        expect_body "<a href=\"/admin/users/$ADM_UID\">admtester</a>"
-t_get /admin/users/$ADM_UID; expect_body 'Username:'; expect_body 'Current Monster Sleep:'; expect_no_body 'pbkdf2$'
+t_get /admin/users/$ADM_UID; expect_body 'Username:'; expect_body 'Fight:'; expect_no_body 'pbkdf2$'
+expect_no_body 'Current Monster'
+# the fight and world statuses, read-only (the fight tables)
+t_fight admtester 5 9; t_fight_status admtester 2 sleep 'chance=i:4'; t_fight_status admtester 1 uber_damage 'pct=i:10' 3
+t_sql "INSERT INTO user_statuses (user_id, status_id, position, turns_left) SELECT $ADM_UID, id, 1, 7 FROM statuses WHERE key = 'regen'"
+t_get /admin/users/$ADM_UID; expect_body 'round 2; you (Damage Up (3)); Shadow 9/10 HP (Asleep)'; expect_body 'Regenerating (7)'
+t_fight_clear admtester; t_sql "DELETE FROM user_statuses; UPDATE users SET currentaction = 'In Town' WHERE id = $ADM_UID"
+t_get /admin/users/$ADM_UID
 expect_body 'name="charclass"'; expect_no_body 'name="difficulty"'
 expect_body '<option value="2">Warrior</option>'; expect_body '<option value="1" selected>Mage</option>'
 t_form_submit /admin/users/$ADM_UID email= gold=lots

@@ -247,6 +247,13 @@ INSERT INTO news (id, postdate, content) VALUES (1, 1072958400, 'This is the fir
 INSERT INTO forums (id, name, description, position, admin_threads) VALUES (1, 'General', 'Talk about anything.', 1, 0);
 INSERT INTO forums (id, name, description, position, admin_threads) VALUES (2, 'News', 'Game news and announcements. Reply to discuss.', 2, 1);
 
+-- statuses: the original game's sleep and damage/defense buffs keep ids 1-3 (schema
+-- version 8 moved fights in progress onto them); the content sync fills in the rest from
+-- app/content/statuses/*.lua. Loaded by partial setups too.
+INSERT INTO statuses (id, key, name) VALUES (1, 'sleep', 'Asleep');
+INSERT INTO statuses (id, key, name) VALUES (2, 'uber_damage', 'Damage Up');
+INSERT INTO statuses (id, key, name) VALUES (3, 'uber_defense', 'Defense Up');
+
 -- spells: the original spells keep their ids; the content sync (end of dk install) fills
 -- in the rest from app/content/spells/*.lua. Loaded by partial setups too.
 INSERT INTO spells (id, key, name) VALUES (1, 'heal', 'Heal');

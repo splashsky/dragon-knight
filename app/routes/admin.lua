@@ -1,6 +1,7 @@
 -- routes/admin.lua :: admin control panel (port of legacy admin.php).
 -- Modules live in app/admin/; templates in templates/admin/ + templates/layout/admin.html.
 local classes = require("admin.classes")
+local effects = require("admin.effects")
 local common = require("admin.common")
 local crud = require("admin.crud")
 local items = require("admin.items")
@@ -28,6 +29,12 @@ return function(r)
 	r:get("/admin/spells/#id", guard, spells.edit)
 	r:post("/admin/spells/#id", guard, spells.save)
 	r:post("/admin/spells/#id/reset", guard, spells.reset)
+	for _, name in ipairs({ "statuses", "summons" }) do
+		r:get("/admin/" .. name, guard, effects.index(name))
+		r:get("/admin/" .. name .. "/#id", guard, effects.edit(name))
+		r:post("/admin/" .. name .. "/#id", guard, effects.save(name))
+		r:post("/admin/" .. name .. "/#id/reset", guard, effects.reset(name))
+	end
 	r:get("/admin/items", guard, items.index)
 	r:get("/admin/items/#id", guard, items.edit)
 	r:post("/admin/items/#id", guard, items.save)

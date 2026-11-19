@@ -114,7 +114,8 @@ local function all_of(entities)
 		k.by_key[e.key] = e.flat
 	end
 	table.sort(k.entities, function(a, b) return a.key < b.key end)
-	return { kinds = { classes = k, spells = load.kind("spells"), items = load.kind("items") }, errors = {} }
+	return { kinds = { classes = k, spells = load.kind("spells"), items = load.kind("items"),
+		statuses = load.kind("statuses"), summons = load.kind("summons") }, errors = {} }
 end
 
 function T.fingerprint_stability()
@@ -133,7 +134,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-4\n"), "format line first")
+	assert(c1:find("^dk%-content%-5\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it
@@ -229,7 +230,7 @@ local TYPE_TARGET = { "self", "enemy", "enemy", "self", "self" }
 function T.load_spells()
 	local k = load.kind("spells")
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
-	eq(#k.entities, #ORIGINAL_SPELLS)
+	eq(#k.entities, #ORIGINAL_SPELLS + 5, "the originals and the 2.2 examples")
 	for id, o in ipairs(ORIGINAL_SPELLS) do
 		local f = assert(k.by_key[o[1]], "no spell file " .. o[1])
 		eq(f.name, o[2], o[1]); eq(f.mp, o[3], o[1] .. " mp"); eq(f.power, o[4], o[1] .. " power")

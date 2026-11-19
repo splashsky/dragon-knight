@@ -1,0 +1,2 @@
+{#- A combatant's statuses on the fight page: " — Poisoned (2 turns), Damage Up". -#}
+{%- if #statuses > 0 then %} <span class="fight-statuses">&mdash; {% for i, s in ipairs(statuses) do %}{% if i > 1 then %}, {% end %}{{ s.name }}{% if s.turns then %} <span class="light">({{ s.turns }} {{ s.turns == 1 and "turn" or "turns" }})</span>{% end %}{% end %}</span>{% end -%}

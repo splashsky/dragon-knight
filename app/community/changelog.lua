@@ -8,6 +8,24 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "2.2.0", date = "unreleased",
+		changes = {
+			"New fight engine: a fight is a round of turns (yours, your allies', each monster's) with effects that last several turns.",
+			"Added statuses, a new kind of content file: timed effects on anyone in a fight, like poison or regeneration, shown on the fight page with the turns they have left; casting one again replaces it.",
+			"Monster sleep and the damage and defense buffs are statuses now; fights without new effects play exactly as before, and the player can now be put to sleep and monsters buffed.",
+			"Added spells that act over two turns: Hyper Beam hits hard, then you must recharge; Solar Beam gathers sunlight for a turn, then fires. While you can't act the fight page offers only Continue.",
+			"Added summons, a new kind of content file: allies that fight alongside you for a few rounds; monsters may attack them instead of you. The Allies setting caps them (default 1).",
+			"Added the Poison, Regen, Hyper Beam, Solar Beam and Call Wolf spells (no class learns them by default) and the Antidote and Regen Potion items.",
+			"Some statuses also work outside fights and tick with every move on the map, like the Regen Potion's; the character page lists them.",
+			"Monsters choose their actions and targets by weight, ready for monsters with spells and items.",
+			"Fights are encounters of one or more waves of monsters (one monster for now), with rewards per monster.",
+			"A fight in progress is kept in its own tables; dk migrate moves fights in progress there, and they go on.",
+			"Errors in a status's or summon's code are logged and remove it; the fight goes on.",
+			"Admin pages for statuses and summons; the user editor shows the fight in progress and the statuses.",
+			"The help page on spells lists the statuses and allies.",
+		},
+	},
+	{
 		version = "2.1.0", date = "11.19.2026",
 		changes = {
 			"Removed difficulty levels; everyone plays at the original Easy difficulty.",

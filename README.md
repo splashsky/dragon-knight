@@ -219,8 +219,8 @@ Spells are content files too, `app/content/spells/<key>.lua`, and *scripted*: th
 and texts are data (name, description, MP cost, `power`, messages; synced into the
 database and overridable in the admin panel), and what the spell does is a Lua function,
 `cast`, written against a small action API (a `caster` and a `target` with `:heal`,
-`:hurt`, `:buff`, `:sleep`, dice with `s:roll`, lines with `s:say`). A copy of `hurt.lua`
-with other numbers is a new damage spell:
+`:hurt`, `:buff`, `:sleep`, `:afflict` for statuses, dice with `s:roll`, lines with
+`s:say`). A copy of `hurt.lua` with other numbers is a new damage spell:
 
 ```lua
 -- app/content/spells/firebolt.lua
@@ -263,6 +263,17 @@ items"). Give it a
 `drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
 in the admin town editor. `./dk check` validates it; the next page load picks it up.
 
+### Adding a status or a summon
+
+Effects that last several turns are **statuses**, `app/content/statuses/<key>.lua`: a
+name, a duration, when they tick, whether they keep the bearer from acting, and Lua hooks
+(`on_tick`, `on_apply`, `modify_damage_taken`, ...). Spells and items apply them by key
+(`s.target:afflict("poison", { turns = 3 })`); applying one again replaces it. Allies are
+**summons**, `app/content/summons/<key>.lua` (HP, attack, defense and an `act` function),
+called with `s:summon("wolf", { turns = 5 })`. Copy `poison.lua` or `wolf.lua` to start;
+`hyper_beam.lua` and `solar_beam.lua` show actions over two turns (recharge, charge). See
+`docs/APP.md`, "Fight engine".
+
 ## Project layout
 
 ```
@@ -272,7 +283,7 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  content/        content files: classes/, spells/, items/ (one Lua file each: data, plus code for spells and consumables), synced into the DB
+  content/        content files: classes/, spells/, items/, statuses/, summons/ (one Lua file each: data, plus code for spells, consumables, statuses and summons), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
@@ -335,6 +346,12 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	Herbs, Potions and Ethers, sold in towns and usable in town or in fights (taking the
 	turn). Administrators override names, prices, power, modifiers and drop levels per
 	server (`/admin/items`); the town editor lists a shop's items by key.
+- Fights are rounds (2.2): your turn, your allies', each monster's, then effects that last
+	several turns tick and run out. Spells and items can poison, regenerate, put anyone to
+	sleep, make you charge or recharge a powerful spell, or call an ally that fights at your
+	side (and that monsters may attack instead of you); the fight page shows them, and a
+	turn you can't act in offers only "Continue". Some effects (a Regen Potion) also last
+	outside fights, a few moves at a time. Fights without them play exactly as before.
 - An inventory: besides what is equipped, a bag of 12 slots (a stack counts once; quest
 	items don't count; size in the settings) with an Inventory page to equip, take off, use
 	and discard items. Buying a weapon, armor or shield offers to keep the old one in the bag

@@ -257,23 +257,23 @@ t_post /travel/1 "csrf=$TC";      expect_redirect /fight
 expect_db "latitude,currenttp" "30|15" "travel while fighting"
 
 t_section "town: move"
-tu "currentaction='Exploring', latitude=10, longitude=10, towns='0', dropcode=7, currentfight=0"
+tu "currentaction='Exploring', latitude=10, longitude=10, towns='0', dropcode=7"; t_fight_clear townie
 t_post /move "north=North";       expect_status 403
 t_post /move "csrf=$TC&north=North"
 expect_db "latitude,longitude,dropcode" "11|10|0" "move north"
 case $(tq currentaction) in
 	Exploring) expect_redirect / ;;
-	Fighting)  expect_redirect /fight; expect_db currentfight 1 "fight started" ;;
+	Fighting)  expect_redirect /fight; expect_db "$T_ROUND" 1 "fight started" ;;
 	*) t_fail "move set currentaction to $(tq currentaction)" ;;
 esac
 fights=0 explores=0
 for _ in $(seq 1 40); do
-	tu "currentaction='Exploring', latitude=10, longitude=10, currentfight=0"
+	tu "currentaction='Exploring', latitude=10, longitude=10"; t_fight_clear townie
 	t_post /move "csrf=$TC&east=East"
-	case $(tq "currentaction||','||currentfight||','||longitude") in
+	case $(tq "currentaction||','||$T_ROUND||','||longitude") in
 		Exploring,0,11) explores=$((explores + 1)) ;;
 		Fighting,1,11)  fights=$((fights + 1)) ;;
-		*) t_fail "unexpected move result $(tq "currentaction||','||currentfight||','||longitude")" ;;
+		*) t_fail "unexpected move result $(tq "currentaction||','||$T_ROUND||','||longitude")" ;;
 	esac
 done
 [ "$fights" -gt 0 ] && [ "$explores" -gt "$fights" ] && t_ok || t_fail "fight odds: $fights fights / $explores explores"

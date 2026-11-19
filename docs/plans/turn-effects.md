@@ -1,6 +1,9 @@
 # Plan: Phase E — multi-turn effects: statuses, multi-stage spells, summons (2.2)
 
-Status: approved direction, starts after Phase D (scripted spells and items).
+Status: **E1 done** (the fight engine, schema version 8; see "Phase E1 as implemented" at
+the end, with notes for E2). E2 (monsters as content with loadouts, schema version 9) is
+next. The developer documentation is docs/APP.md, "Fight engine"; changelog lines are in
+the top 2.2.0 entry.
 
 Version: Phase E is **2.2**. It starts by setting `view.GAME_VERSION = "2.2.0-dev"` (and
 `DK_VERSION` in src/main.c) and adding a new top changelog entry `version = "2.2.0",
@@ -249,3 +252,95 @@ schedules); tests use a test class.
 	`fight.act(state, action)`), the seed of the Phase E round pipeline.
 - Content loading supports functions in any kind and exposes the loaded module per key,
 	so statuses and summons can reuse it.
+
+## Phase E1 as implemented
+
+- **Modules**: `app/fight/state.lua` (the model and its tables; `state.load/save/clear/
+	begin`, `state.world` for the player outside fights; `state.encode/decode`: data as
+	typed "name=i:5" lines, functions refused), `app/fight/engine.lua` (handles for content
+	code, `engine.apply` for every event type, statuses, summons, damage modifiers, release
+	steps, caps), `app/fight/round.lua` (`round.start`, `round.play`, `round.locked`),
+	`app/fight/ai.lua` (`ai.pick`, `ai.targets`, `ai.actions`, `ai.choose`, providers),
+	`app/fight/act.lua` (now the actions of a turn: the player's attack/spell/item and
+	`act.enemy_attack`), `app/lib/{statuses,summons}.lua` (rows, cached per request),
+	`app/lib/world.lua` (world statuses: out-of-fight actions and map moves),
+	`app/admin/effects.lua` (`/admin/statuses`, `/admin/summons`). `lib/actors.lua` is gone
+	(the engine maps every combatant). The route keeps picking the monster and checking the
+	player's choice; the monster's turn moved into the pipeline.
+- **Tables (v8)**: `fights(user_id PK, round, wave, data)`, `fight_combatants(user_id,
+	id, side, kind, entity_id, wave, hp, maxhp, turns_left, data)` with ids 1..n per fight
+	(player 1; PK (user_id, id), so a save rewrites the rows with the same numbers),
+	`fight_statuses(user_id, combatant_id, status_id, position, turns_left, data,
+	applied_round, source)` with PK (user_id, combatant_id, status_id) (the override rule
+	in the schema), `user_statuses(user_id, status_id, position, turns_left, data)` for
+	world statuses (a separate table rather than NULL combatant ids), content tables
+	`statuses` and `summons`, `control.max_allies` (1). `fights.round` keeps the original
+	`currentfight` semantics (1: monster not picked yet; +1 per fight page, max 255), so
+	`GET /fight` and `/victory` behave as before. The player's HP stays in `users`
+	(`fight_combatants.hp` is NULL for the player).
+- **Statuses** have `kind` (harmful / helpful / **neutral**: recharging and charging aren't
+	cured by an antidote), `tick_on`, `scope` (fight / world / **both**: regen works in
+	fights and on the map), `turns` (default duration, 0 = none: sleep and the buffs),
+	`blocks_action` (bool data or a function), messages (`blocked` / `blocked_other` are
+	said for a blocked turn) and data. Timing: a status counts the bearer's turns that
+	begin after it was applied (marked at the bearer's turn start), ticks at `tick_on` of
+	those turns, counts down at their end and expires at 0. Override: `on_remove` of the
+	old instance, then `on_apply`. Hook errors remove the status; `MAX_STATUSES` 10 per
+	combatant, `MAX_TICKS` 100 code runs per round (on_apply chains included).
+- **Action API additions** (no content file changed): handles have `id`, `side` and their
+	statuses (`:afflict`, `:cure(key or kind)`, `:has_status`, `:status`, `:statuses`);
+	`:buff` / `:sleep` record the old events, applied as the statuses `uber_*` / `sleep`
+	(0 removes them), and work on anyone; contexts have `s:summon`, `s.summon_room`,
+	`s:charge(turns, step)`, `s:recharge(turns)`, and in status hooks `t:expire()`,
+	`t:remove()`, `t:release()`; `action.call` runs any content function (hooks, `act`,
+	stages) with a context; statuses' and summons' lines are never worded for a monster
+	(`plain`). Content files may declare `stages = { name = fn }` and `uses = { statuses =
+	{...}, summons = {...} }` (checked by `dk check` as references).
+- **Multi-stage**: `charging` ticks at turn start and, on its last turn, expires; its
+	`on_expire` calls `t:release()`, so the stage is the action of the turn after the cast
+	(the page showed only "Continue"). `recharging` simply blocks for its turns. Locked
+	turns: the route turns any command into `continue` while the player has a blocking
+	status; "Continue" without one only shows the page.
+- **Refusals** run on a copy of the model (`state.copy`), so a refused action undoes even
+	the turn-start ticks (nothing changes, as in 2.1).
+- **Summons** act after the player (also in the round they arrive), count their rounds
+	down at the round's end, leave at 0 HP ("Your X has been defeated." or `on_death`) or
+	when their rounds run out (`on_expire`, else "Your X leaves the fight."). Monsters
+	target them by weight 1 like the player (50/50), with the summon's defense and
+	dexterity in the original formula (lines "The monster attacks your Wolf for N
+	damage.").
+- **Waves**: enemies have a wave; the next one enters when the current one is defeated
+	("Another monster appears: the X."); `/victory` sums each defeated enemy's rewards and
+	rolls the drop once, at the highest enemy level. Encounters are still one monster.
+- **World statuses** tick on every map move before the roll for a fight (no extra dice
+	without world statuses), can't take the last HP, and their lines aren't shown (the move
+	redirects to the map).
+- **Equivalence**: `tests/lua/fight_original.lua` freezes the 2.1 fight (combat formulas and
+	the route's turn structure; verified against the 2.1 code before the refactoring);
+	`tests/lua/test_round.lua` plays 1,000 seeded fights (about 3,000 rounds: attacks,
+	runs, the 19 original spells through the frozen effects engine, the three consumables,
+	ambushes; with sleep and buffs) through both and compares every roll (arguments and
+	order), every line, the outcome and the state; `test_action.lua`'s 4,500 spell/item
+	cases now run through the fight model; the fight unit and e2e tests keep their dice and
+	expectations.
+- **Fixed** in passing: a won fight's page redirects to `/victory` (legacy showed the
+	defeated monster until then).
+
+### Notes for E2
+
+- Add monster actions as AI providers (`ai.provide(function(f, c) ... end)`) returning
+	candidates `{ kind = "spell" | "item", weight, target = "opponent" | "self", perform }`;
+	`perform` runs `action.perform` with `engine.handle(f, c)` as caster (enemy wording is
+	already automatic) and `engine.apply(f, r.events, c)`. Filter by `when` and
+	`can_cast`/`can_use` in the provider; with a single eligible candidate `ai.pick` makes
+	no roll. The attack candidate already reads `row.attack_weight`.
+- Monster MP: `engine.handle` gives monsters mp 0 and `engine.apply` ignores their MP/TP
+	(`add_stat`); store `mp`/`maxmp` in `fight_combatants` (columns or `data`) and handle
+	them there. Finite item stock per encounter fits `c.data` (saved with the fight).
+- Monster stats come from `c.row` (`maxdam`, `armor`, `name`, `level`); equipment
+	modifiers belong in `engine.handle` and `act.enemy_attack`.
+- `fight_combatants.entity_id` is the monster id (kept by E2's content kind, so fights in
+	progress survive v9). `state.add_monster(f, row, wave)` + `round.start(f)` start an
+	encounter of any size; only the route's monster pick is one monster.
+- Not done: showing world-status lines after a move, a target picker, multi-monster
+	encounter content, AI tuning.

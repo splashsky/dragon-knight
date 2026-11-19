@@ -806,6 +806,127 @@ ALTER TABLE items DROP COLUMN use_effects;
 ]])
 end
 
+-- 8: the fight engine (app/fight/: round pipeline, statuses, summons). A fight in progress
+-- moves from the users row's current* columns into fights, fight_combatants and
+-- fight_statuses: the player is combatant 1, the monster (when picked; a deleted one is
+-- left out, so the fight starts over as before) combatant 2 with its HP and immunity, the
+-- monster's sleep and the player's uber damage/defense buffs statuses 1-3 (sleep,
+-- uber_damage, uber_defense: rows created here, filled in by the content sync). Statuses
+-- and summons become content kinds; world statuses (user_statuses); control.max_allies.
+-- A player mid-fight goes on with the same fight.
+local function v8_fight_engine()
+	local db = dk.db
+	db:exec_script([[
+CREATE TABLE statuses (
+	id             INTEGER PRIMARY KEY,
+	key            TEXT    NOT NULL UNIQUE,
+	name           TEXT    NOT NULL DEFAULT '',
+	description    TEXT    NOT NULL DEFAULT '',
+	kind           TEXT    NOT NULL DEFAULT 'neutral',
+	tick_on        TEXT    NOT NULL DEFAULT 'turn_end',
+	scope          TEXT    NOT NULL DEFAULT 'fight',
+	turns          INTEGER NOT NULL DEFAULT 0,
+	blocks_action  INTEGER NOT NULL DEFAULT 0,
+	retired        INTEGER NOT NULL DEFAULT 0,
+	messages       TEXT    NOT NULL DEFAULT '',
+	data           TEXT    NOT NULL DEFAULT ''
+);
+CREATE TABLE summons (
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	hp           INTEGER NOT NULL DEFAULT 1,
+	attack       INTEGER NOT NULL DEFAULT 0,
+	defense      INTEGER NOT NULL DEFAULT 0,
+	dexterity    INTEGER NOT NULL DEFAULT 0,
+	turns        INTEGER NOT NULL DEFAULT 0,
+	retired      INTEGER NOT NULL DEFAULT 0,
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT ''
+);
+CREATE TABLE fights (
+	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+	round    INTEGER NOT NULL DEFAULT 1,
+	wave     INTEGER NOT NULL DEFAULT 1,
+	data     TEXT    NOT NULL DEFAULT ''
+);
+CREATE TABLE fight_combatants (
+	user_id     INTEGER NOT NULL REFERENCES fights (user_id) ON DELETE CASCADE,
+	id          INTEGER NOT NULL,
+	side        TEXT    NOT NULL,
+	kind        TEXT    NOT NULL,
+	entity_id   INTEGER,
+	wave        INTEGER NOT NULL DEFAULT 0,
+	hp          INTEGER,
+	maxhp       INTEGER,
+	turns_left  INTEGER,
+	data        TEXT    NOT NULL DEFAULT '',
+	PRIMARY KEY (user_id, id)
+) WITHOUT ROWID;
+CREATE TABLE fight_statuses (
+	user_id        INTEGER NOT NULL,
+	combatant_id   INTEGER NOT NULL,
+	status_id      INTEGER NOT NULL REFERENCES statuses (id),
+	position       INTEGER NOT NULL,
+	turns_left     INTEGER,
+	data           TEXT    NOT NULL DEFAULT '',
+	applied_round  INTEGER NOT NULL DEFAULT 0,
+	source         INTEGER,
+	PRIMARY KEY (user_id, combatant_id, status_id),
+	FOREIGN KEY (user_id, combatant_id) REFERENCES fight_combatants (user_id, id) ON DELETE CASCADE
+) WITHOUT ROWID;
+CREATE TABLE user_statuses (
+	user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	status_id   INTEGER NOT NULL REFERENCES statuses (id),
+	position    INTEGER NOT NULL,
+	turns_left  INTEGER,
+	data        TEXT    NOT NULL DEFAULT '',
+	PRIMARY KEY (user_id, status_id)
+) WITHOUT ROWID;
+ALTER TABLE control ADD COLUMN max_allies INTEGER NOT NULL DEFAULT 1;
+INSERT INTO statuses (id, key, name) VALUES (1, 'sleep', 'Asleep');
+INSERT INTO statuses (id, key, name) VALUES (2, 'uber_damage', 'Damage Up');
+INSERT INTO statuses (id, key, name) VALUES (3, 'uber_defense', 'Defense Up');
+]])
+	local moved = 0
+	for _, u in ipairs(db:query("SELECT id, currentfight, currentmonster, currentmonsterhp, currentmonstersleep, " ..
+			"currentmonsterimmune, currentuberdamage, currentuberdefense FROM users WHERE currentfight > 0 ORDER BY id")) do
+		db:exec("INSERT INTO fights (user_id, round, wave, data) VALUES (?, ?, 1, '')", u.id, u.currentfight)
+		db:exec("INSERT INTO fight_combatants (user_id, id, side, kind) VALUES (?, 1, 'player', 'player')", u.id)
+		local m = u.currentmonster ~= 0 and db:first("SELECT id, maxhp FROM monsters WHERE id = ?", u.currentmonster)
+		if m then
+			-- "name=i:value" lines: fight/state.lua state.encode
+			db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data) " ..
+				"VALUES (?, 2, 'enemy', 'monster', ?, 1, ?, ?, ?)", u.id, m.id, u.currentmonsterhp, m.maxhp,
+				"immune=i:" .. u.currentmonsterimmune)
+			if u.currentmonstersleep ~= 0 then
+				db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, data, applied_round) " ..
+					"VALUES (?, 2, 1, 1, ?, ?)", u.id, "chance=i:" .. u.currentmonstersleep, u.currentfight)
+			end
+		end
+		local pos = 0
+		for _, b in ipairs({ { 2, u.currentuberdamage }, { 3, u.currentuberdefense } }) do
+			if b[2] ~= 0 then
+				pos = pos + 1
+				db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, data, applied_round) " ..
+					"VALUES (?, 1, ?, ?, ?, ?)", u.id, b[1], pos, "pct=i:" .. b[2], u.currentfight)
+			end
+		end
+		moved = moved + 1
+	end
+	if moved > 0 then print(("Moved %d fight%s in progress to the new fight tables."):format(moved, moved == 1 and "" or "s")) end
+	db:exec_script([[
+ALTER TABLE users DROP COLUMN currentfight;
+ALTER TABLE users DROP COLUMN currentmonster;
+ALTER TABLE users DROP COLUMN currentmonsterhp;
+ALTER TABLE users DROP COLUMN currentmonstersleep;
+ALTER TABLE users DROP COLUMN currentmonsterimmune;
+ALTER TABLE users DROP COLUMN currentuberdamage;
+ALTER TABLE users DROP COLUMN currentuberdefense;
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -819,6 +940,8 @@ migrations.STEPS = {
 		"base stats (admin edits are kept as overrides)", up = v6_items_content, after_sync = v6_after_sync },
 	{ name = "spells and consumables are scripted content (their effects become code in the content files; " ..
 		"edited amounts are kept as power overrides)", up = v7_scripted },
+	{ name = "the fight engine: fights in progress move to their own tables (sleep and the damage/defense " ..
+		"buffs become statuses); statuses and summons are content files", up = v8_fight_engine },
 }
 
 migrations.VERSION = #migrations.STEPS

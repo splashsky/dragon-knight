@@ -19,4 +19,34 @@
 <li><b>Damage</b> spells (Craze, Rage, Fury) increase your total attack damage by their power in percent until the end of the fight.</li>
 <li><b>Defense</b> spells (Ward, Fend, Barrier) reduce the total damage you take from the monster by their power in percent until the end of the fight.</li>
 </ul>
+{%- if #statuses > 0 then %}
+
+<table class="help-table help-w50" id="statuses">
+<thead>
+<tr><th colspan="2" class="help-caption">Statuses</th></tr>
+<tr><th>Name</th><th>Lasts</th></tr>
+</thead>
+<tbody>
+{%- for _, s in ipairs(statuses) do %}
+<tr><td style="width: 75%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 25%">{% if s.turns > 0 then %}{{ s.turns }} {{ s.turns == 1 and "turn" or "turns" }}{% else %}until it ends{% end %}{% if s.scope ~= "fight" then %}<br><span class="small">also outside fights</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<p>Statuses last a number of the bearer's turns (outside fights: moves on the map). Casting the same status again replaces it, with its new duration.</p>
+{%- end %}
+{%- if #summons > 0 then %}
+
+<table class="help-table help-w50" id="summons">
+<thead>
+<tr><th colspan="4" class="help-caption">Allies</th></tr>
+<tr><th>Name</th><th>HP</th><th>Attack</th><th>Defense</th></tr>
+</thead>
+<tbody>
+{%- for _, s in ipairs(summons) do %}
+<tr><td style="width: 55%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 15%">{{ s.hp }}</td><td style="width: 15%">{{ s.attack }}</td><td style="width: 15%">{{ s.defense }}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<p>Allies fight alongside you after your turn. Monsters may attack them instead of you.</p>
+{%- end %}
 {{{ include("community/help/footer") }}}

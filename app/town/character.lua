@@ -27,6 +27,9 @@ local function sheet(user)
 	end
 	local names = {}
 	for _, s in ipairs(spells.known(user)) do names[#names + 1] = s.name end
+	-- world statuses (lib/world.lua): they tick on map moves
+	local statuses = dk.db:query("SELECT s.name, us.turns_left FROM user_statuses us JOIN statuses s ON s.id = us.status_id " ..
+		"WHERE us.user_id = ? ORDER BY us.position", user.id)
 	return {
 		u = user,
 		s = s,
@@ -38,6 +41,7 @@ local function sheet(user)
 		nextlevel = nextlevel,
 		charclass = class and class.name,
 		spells = names,
+		statuses = statuses,
 	}
 end
 

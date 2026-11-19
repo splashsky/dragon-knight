@@ -233,6 +233,54 @@ expect_stats() {  # expect_stats "maxhp maxmp maxtp strength dexterity attack de
 # SQL expression for a users row's known spell ids, "1,6" (in a SELECT ... FROM users).
 T_KNOWN="(SELECT group_concat(spell_id) FROM (SELECT spell_id FROM user_spells WHERE user_id = users.id ORDER BY spell_id))"
 
+# Fights (app/fight/state.lua). t_fight USER MONSTER_ID HP [ROUND]: USER is fighting the
+# monster (with HP; immunity from the monster) since round ROUND (default 2), no statuses.
+# t_fight_new USER: an encounter just began (round 1, no monster yet). t_fight_clear USER:
+# no fight (the action is left alone). t_fight_status USER WHO KEY [DATA [TURNS]]: a status
+# on the player (WHO 1) or the monster (2); DATA like 'chance=i:5'.
+# (the sqlite3 shell has foreign keys off: no cascade, so every table is cleared here)
+t_fight_clear() {
+	t_sql "DELETE FROM fight_statuses WHERE user_id = (SELECT id FROM users WHERE username = '$1');
+		DELETE FROM fight_combatants WHERE user_id = (SELECT id FROM users WHERE username = '$1');
+		DELETE FROM fights WHERE user_id = (SELECT id FROM users WHERE username = '$1')"
+}
+t_fight_new() {
+	t_fight_clear "$1"
+	t_sql "UPDATE users SET currentaction = 'Fighting' WHERE username = '$1';
+		INSERT INTO fights (user_id, round) SELECT id, 1 FROM users WHERE username = '$1'"
+}
+t_fight() {
+	t_fight_clear "$1"
+	t_sql "UPDATE users SET currentaction = 'Fighting' WHERE username = '$1';
+		INSERT INTO fights (user_id, round) SELECT id, ${4:-2} FROM users WHERE username = '$1';
+		INSERT INTO fight_combatants (user_id, id, side, kind) SELECT id, 1, 'player', 'player' FROM users WHERE username = '$1';
+		INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data)
+			SELECT u.id, 2, 'enemy', 'monster', m.id, 1, $3, m.maxhp, 'immune=i:' || m.immune FROM users u, monsters m
+			WHERE u.username = '$1' AND m.id = $2"
+}
+t_fight_status() {
+	t_sql "INSERT OR REPLACE INTO fight_statuses (user_id, combatant_id, status_id, position, turns_left, data, applied_round)
+		SELECT u.id, $2, s.id, 1 + (SELECT count(*) FROM fight_statuses x WHERE x.user_id = u.id AND x.combatant_id = $2),
+		${5:-NULL}, '${4:-}', 1 FROM users u, statuses s WHERE u.username = '$1' AND s.key = '$3'"
+}
+# SQL expressions for a users row's fight (in a SELECT ... FROM users): its round (0: none),
+# the monster's id and HP (0: none), its sleep chance, the player's buffs (0: none), and
+# every status as "player:key/turns,enemy:key" (turns: when limited).
+T_ROUND="coalesce((SELECT round FROM fights f WHERE f.user_id = users.id), 0)"
+T_MONSTER="coalesce((SELECT entity_id FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'enemy' ORDER BY c.id LIMIT 1), 0)"
+T_MONSTER_HP="coalesce((SELECT hp FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'enemy' ORDER BY c.id LIMIT 1), 0)"
+t_status_value() {  # t_status_value WHO KEY FIELD -> SQL expression (0 when absent)
+	printf "coalesce((SELECT CAST(substr(fs.data, instr(fs.data, '%s=i:') + %d) AS INTEGER) FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id JOIN fight_combatants c ON c.user_id = fs.user_id AND c.id = fs.combatant_id WHERE fs.user_id = users.id AND c.side = '%s' AND s.key = '%s'), 0)" "$3" $((${#3} + 3)) "$1" "$2"
+}
+T_SLEEP=$(t_status_value enemy sleep chance)
+T_UBER_DAMAGE=$(t_status_value player uber_damage pct)
+T_UBER_DEFENSE=$(t_status_value player uber_defense pct)
+T_STATUSES="coalesce((SELECT group_concat(k) FROM (SELECT c.side || ':' || s.key || coalesce('/' || fs.turns_left, '') AS k
+	FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id JOIN fight_combatants c ON c.user_id = fs.user_id AND c.id = fs.combatant_id
+	WHERE fs.user_id = users.id ORDER BY fs.combatant_id, fs.position)), '')"
+T_WORLD="coalesce((SELECT group_concat(k) FROM (SELECT s.key || coalesce('/' || us.turns_left, '') AS k
+	FROM user_statuses us JOIN statuses s ON s.id = us.status_id WHERE us.user_id = users.id ORDER BY us.position)), '')"
+
 # Wait (max ~5 s) until GET PATH contains TEXT; for hot-reload checks.
 t_wait_for() {
 	local i
@@ -414,21 +462,20 @@ if t_has_sql; then
 	t_jar headuser
 	t_register headuser headpw head@example.com Header; t_login headuser headpw
 	head_snap() {
-		t_sql "SELECT currentaction, currentfight, currentmonster, currentmonsterhp, currenthp,
+		t_sql "SELECT currentaction, $T_ROUND, $T_MONSTER, $T_MONSTER_HP, currenthp,
 					 experience, gold, level, dropcode, onlinetime FROM users WHERE username = 'headuser'"
 	}
-	t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, currentmonster = 0,
-				 currentmonsterhp = 0, onlinetime = 1 WHERE username = 'headuser'"
+	t_fight_new headuser
+	t_sql "UPDATE users SET onlinetime = 1 WHERE username = 'headuser'"
 	before=$(head_snap)
 	t_head /fight;   expect_status 200; expect_header '^content-length: [1-9]'
 	[ "$(head_snap)" = "$before" ] && t_ok || t_fail "HEAD /fight changed the user: $before -> $(head_snap)"
-	t_sql "UPDATE users SET currentfight = 3, currentmonster = 1, currentmonsterhp = 0
-				 WHERE username = 'headuser'"
+	t_fight headuser 1 0 3
 	before=$(head_snap)
 	t_head /victory; expect_status 200
 	[ "$(head_snap)" = "$before" ] && t_ok || t_fail "HEAD /victory changed the user: $before -> $(head_snap)"
 	t_get /victory;  expect_status 200; expect_body 'You have defeated the Blue Slime'
-	[ "$(t_sql "SELECT currentfight || ',' || (experience > 0) FROM users WHERE username = 'headuser'")" = "0,1" ] \
+	[ "$(t_sql "SELECT $T_ROUND || ',' || (experience > 0) FROM users WHERE username = 'headuser'")" = "0,1" ] \
 		&& t_ok || t_fail "GET /victory (control) did not pay out"
 	t_head /victory; expect_redirect /
 fi
