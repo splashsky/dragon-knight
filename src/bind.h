@@ -28,9 +28,18 @@ void bind_handle(lua_State *L, const dk_config *cfg, sqlite3 *db,
 int  bind_run_cli(lua_State *L, const dk_config *cfg, sqlite3 *db,
                   const char *module, int argc, char **argv);
 
+/* Replace resp with an HTML error page; msg (escaped) is shown only when cfg->dev. */
+void bind_error_page(dk_response *resp, const dk_config *cfg, int status, const char *msg);
+
 /* db.c — open a connection with the standard pragmas:
  * journal_mode=WAL, synchronous=NORMAL, foreign_keys=ON, busy_timeout=5000. */
 sqlite3 *db_open(const char *path, char *err, size_t errlen);
 void     db_close(sqlite3 *db);
+
+/* Per-connection prepared statement cache (keyed by exact SQL text). db_prepare returns
+ * a ready-to-bind statement (or NULL for empty SQL) and *tail like sqlite3_prepare;
+ * every non-NULL statement must be handed back with db_release (reset+clear or finalize). */
+int      db_prepare(sqlite3 *db, const char *sql, size_t len, sqlite3_stmt **st, const char **tail);
+void     db_release(sqlite3 *db, sqlite3_stmt *st);
 
 #endif

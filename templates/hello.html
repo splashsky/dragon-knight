@@ -1,0 +1,23 @@
+<!doctype html>{# PLACEHOLDER (phase 1): proves template rendering + hot reload. Phase 2 replaces this. #}
+<html>
+<head><meta charset="utf-8"><title>Dragon Knight engine</title></head>
+<body>
+<h1>Hello from dk</h1>
+<p>{{ req.method }} {{ req.target }} from {{ req.remote }} at {{ now }}</p>
+{%- if next(req.query) then %}
+<h2>Query</h2>
+<ul>
+  {%- for k, v in pairs(req.query) do %}
+  <li>{{ k }} = {{ v }}</li>
+  {%- end %}
+</ul>
+{%- end %}
+<h2>Headers</h2>
+<ul>
+  {%- for _, hd in ipairs(headers) do %}
+  <li>{{ hd.name }}: {{ hd.value }}</li>
+  {%- end %}
+</ul>
+<p><small>rendered in {{ elapsed }} ms</small></p>
+</body>
+</html>

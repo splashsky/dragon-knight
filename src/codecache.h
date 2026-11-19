@@ -39,6 +39,10 @@ int      codecache_load(lua_State *L, cc_kind kind, const char *name);
 /* Compile every *.lua under app_dir and *.html under template_dir into the cache
  * (used by the warmer after invalidation so the first request is hot). */
 void     codecache_prewarm(void);
+/* Same, reporting each compile failure (what = path relative to its root dir).
+ * Returns the number of failures (used by `dk check`). */
+int      codecache_prewarm_ex(void (*on_error)(const char *what, const char *msg, void *ud),
+                              void *ud);
 
 /* Drop everything and bump the generation (also used by tests). */
 void     codecache_invalidate(void);

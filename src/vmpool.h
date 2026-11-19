@@ -42,6 +42,11 @@ void       vmpool_get_stats(vmpool_stats *out);
 
 /* Build a VM synchronously without the pool (used by CLI commands like `dk install`). */
 dk_vm     *vm_build(const dk_config *cfg, char *err, size_t errlen);
+/* load_main = 0: skip `require "main"` (CLI commands that don't need the handler). */
+dk_vm     *vm_build_ex(const dk_config *cfg, int load_main, char *err, size_t errlen);
 void       vm_destroy(dk_vm *vm);
+
+/* codecache_watch_start() callback: wakes the warmer to rebuild spares right away. */
+void       vmpool_on_change(void *ud);
 
 #endif

@@ -62,4 +62,7 @@ int http_serve(const dk_config *cfg, const dk_hooks *hooks);
 /* Request a graceful stop from any thread (also triggered by SIGINT/SIGTERM). */
 void http_stop(void);
 
+/* Actual listening port while http_serve is running (useful with port 0), else 0. */
+int http_bound_port(void);
+
 #endif
