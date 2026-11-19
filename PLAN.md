@@ -49,11 +49,13 @@ app/                  Lua application (hot-reloaded)
   routes/             thin route modules: auth, home, town, fight, community, admin
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
                       news, paging, migrations (schema versions), leveling, classes,
-                      spells, items, inventory, stats (derived stats), effects (the
-                      effects engine), content/ (content loader, schemas, sync)
+                      spells, items, inventory, stats (derived stats, gear modifiers),
+                      action + actors (the API scripted spells and items run against),
+                      content/ (content loader, sandbox, schemas, scripted kinds, sync)
   content/            content files: classes/, spells/, items/ <key>.lua (synced into the DB)
   town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
-  fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
+  fight/              combat.lua: the dice and formulas (pure functions, unit-tested);
+                      act.lua: the one entry point for a fight action (attack, spell, item)
   community/          forum (boards), news archive, help pages, changelog
   admin/              admin control panel (settings, news, classes, spells, items, generic CRUD editor)
   cli/user.lua        `dk user`
@@ -274,18 +276,22 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	global unless a class file sets `exp_stages`; an empty value means global); version 3
 	dropped the old levels table's `_exp`/`_tp` columns, version 4 the table and
 	`control.class1name..class3name`.
-- Spells (schema version 5, `docs/APP.md` "Spells"): content files
-	`app/content/spells/<key>.lua` synced into `spells(id, key UNIQUE, name, description,
-	mp, usable_in ('town' | 'fight' | 'both'), effects, retired)`; `effects` is the spell's
-	effect list as text (`app/lib/effects.lua`, e.g. `heal_hp amount=10`), replacing the
-	old `type` and `attribute`. The original 19 spells keep ids 1-19. Class files list spell
+- Spells (schema version 5, scripted since version 7; `docs/APP.md` "Spells", "Scripting
+	spells and items"): content files `app/content/spells/<key>.lua` synced into
+	`spells(id, key UNIQUE, name, description, mp, usable_in ('town' | 'fight' | 'both'),
+	retired, power, target ('enemy' | 'self'), messages, data)`; what a spell does is its
+	file's `cast` function (never stored), its numbers and message strings are data
+	(`messages`/`data`: "key=value" lines), replacing the old `type` and `attribute`
+	(version 5 had an `effects` list instead). The original 19 spells keep ids 1-19. Class files list spell
 	keys; `class_spells.spell_id` references `spells.id`. The spells a character knows are
 	`user_spells(user_id → users ON DELETE CASCADE, spell_id → spells, learned_level)`
 	(NULL level: unknown), replacing the `users.spells` comma list.
 - Items (schema version 6, `docs/APP.md` "Items", "Inventory", "Derived stats"): content
 	files `app/content/items/<key>.lua` synced into `items(id, key UNIQUE, name, description,
-	category, slot, price, attack, defense, modifiers, use_effects, max_stack, drop_level,
-	sellable, droppable, retired)` (`modifiers`/`use_effects`: effect lists as text). Items
+	category, slot, price, attack, defense, modifiers, max_stack, drop_level, sellable,
+	droppable, retired, usable_in, target, power, messages, data)` (`modifiers`: gear's stat
+	bonuses as text; consumables are scripted like spells since version 7, which replaced
+	their `use_effects` list). Items
 	1-33 are the original items, 34-65 the original drops (accessories, `drop_level` = the
 	old mlevel), 66-68 Herb, Potion, Ether; the `drops` table is gone. `town_items(town_id,
 	item_id)` replaces `towns.itemslist`. `user_items(id, user_id → users ON DELETE CASCADE,
@@ -347,7 +353,9 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	- Any equipment change clamps current HP/MP/TP to the new maxima.
 	- The drop message only shows when a drop was picked.
 	- The character sheet shows the next level's experience at level 99.
-	- Unknown spell types are refused in fights (no MP cost, no monster turn).
+	- Unknown spell types are refused in fights (no MP cost, no monster turn); since
+		schema version 7 spells and consumables are scripted (`docs/APP.md`), and one that
+		has no code (its file deleted) or whose code fails is refused the same way.
 	- Strength/dexterity from items count toward attack/defense power in any slot (stats
 		are derived from base stats + equipment since schema version 6).
 	- Inventory (version 6): a 12-slot bag, keep-or-sell when buying gear, selling bag
@@ -379,6 +387,10 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 4. ✅ **Integration & QA**: playthrough + concurrency e2e, mechanics review against legacy,
 	 HEAD made read-only, hot-reload checks, ASan/UBSan run, README rewrite, `.gitignore`;
 	 `legacy/` deleted last.
+5. **2.1 content** (`docs/plans/`): ✅ A classes, ✅ B spells, ✅ C items and inventory
+	 (`content-and-inventory.md`), ✅ D scripted spells and items (`spell-scripting.md`,
+	 schema version 7). Next, 2.2: E multi-turn effects, monster AI and loadouts
+	 (`turn-effects.md`).
 
 ## Definition of done
 

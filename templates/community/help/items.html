@@ -1,5 +1,5 @@
 {#- Items & Drops spoilers (legacy help_items.php), one table per item category. ctx: groups
-		{ category, heading, rows { item, image, power, special (lines), effects (lines) } }. -#}
+		{ category, heading, rows { item, image, power, special (lines) } }. -#}
 {{{ include("community/help/header") }}}
 {%- for _, g in ipairs(groups) do %}
 {%- if g.category == "weapon" or g.category == "armor" or g.category == "shield" then %}
@@ -36,11 +36,11 @@
 <table class="help-table help-w60">
 <thead>
 <tr><th colspan="3" class="help-caption">{{ g.heading }}</th></tr>
-<tr><th>Name</th><th>Cost</th><th>Effect</th></tr>
+<tr><th>Name</th><th>Cost</th><th>Power</th></tr>
 </thead>
 <tbody>
 {%- for _, r in ipairs(g.rows) do %}
-<tr><td style="width: 35%">{{ r.item.name }}{% if r.item.description ~= "" then %}<br><span class="small">{{ r.item.description }}</span>{% end %}</td><td style="width: 20%">{% if r.item.price > 0 then %}{{ r.item.price }} Gold{% else %}<span class="light">-</span>{% end %}</td><td style="width: 45%">{% if #r.effects > 0 then %}{{ table.concat(r.effects, ", ") }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+<tr><td style="width: 35%">{{ r.item.name }}{% if r.item.description ~= "" then %}<br><span class="small">{{ r.item.description }}</span>{% end %}</td><td style="width: 20%">{% if r.item.price > 0 then %}{{ r.item.price }} Gold{% else %}<span class="light">-</span>{% end %}</td><td style="width: 45%">{% if r.item.category == "consumable" then %}{{ r.item.power }}{% else %}<span class="light">None</span>{% end %}</td></tr>
 {%- end %}
 </tbody>
 </table>

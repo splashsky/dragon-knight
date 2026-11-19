@@ -98,7 +98,7 @@ next request. Game settings (game name, map size, forum, email verification, …
 the database and are edited in the admin panel at `/admin`. Character classes, spells and
 items are content files (see [Adding a class, a spell or an item](#adding-a-class-a-spell-or-an-item));
 the admin panel can override their names, descriptions, starting stats, MP costs, prices,
-power and effect amounts per server.
+power and messages per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -213,11 +213,41 @@ global unless the class sets its own `exp_stages`) and per-level gains, and run
 at registration; on another server, deploy it like any code change. Deleting a file retires
 the class (no longer offered; its characters keep it).
 
-Spells work the same way: `app/content/spells/<key>.lua` holds a spell's name,
-description, MP cost, where it can be cast and its effects (heal, damage, sleep, attack or
-defense buffs), for example `effects = { { kind = "damage", max = 20 } }`. A class learns
-it when a class file lists its key in `levels[N].spells`. The formats, the sync and the
-admin overrides are described in `docs/APP.md` ("Content", "Spells", "Items").
+### Adding a spell
+
+Spells are content files too, `app/content/spells/<key>.lua`, and *scripted*: the numbers
+and texts are data (name, description, MP cost, `power`, messages; synced into the
+database and overridable in the admin panel), and what the spell does is a Lua function,
+`cast`, written against a small action API (a `caster` and a `target` with `:heal`,
+`:hurt`, `:buff`, `:sleep`, dice with `s:roll`, lines with `s:say`). A copy of `hurt.lua`
+with other numbers is a new damage spell:
+
+```lua
+-- app/content/spells/firebolt.lua
+local function cast(s)
+	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	local damage = s:roll(s.power // 2, s.power)
+	s.target:hurt(damage)
+	s:say("hit", s.name, damage)
+end
+
+return {
+	name = "Firebolt",
+	description = "Burns the monster. Some monsters are immune.",
+	mp = 8,
+	power = 24,
+	messages = {
+		hit = "You have cast the %s spell for %d damage.",
+		immune = "You have cast the %s spell, but the monster is immune to it.",
+	},
+	cast = cast,              -- or inline: cast = function(s) ... end
+}
+```
+
+A class learns it when a class file lists its key in `levels[N].spells`. `heal.lua` shows
+a self-targeted spell usable in town with a refusal (`can_cast`, "already full"). The
+formats, the action API, the sync and the admin overrides are described in `docs/APP.md`
+("Content", "Scripting spells and items", "Spells", "Items").
 
 ### Adding an item
 
@@ -226,8 +256,10 @@ shields, the monster drops as accessories, and the Herb, Potion and Ether). Copy
 (`herb.lua` for a potion-like item, `stick.lua` for a weapon, `life_pebble.lua` for a
 drop) and set its name, category (`weapon`, `armor`, `shield`, `accessory`, `consumable`,
 `quest` or `misc`), price, attack or defense, modifiers while equipped (for example
-`modifiers = { { kind = "stat", stat = "maxhp", amount = 50 } }`), what using it does
-(`use_effects`, consumables) and how many stack in one bag slot (`max_stack`). Give it a
+`modifiers = { { kind = "stat", stat = "maxhp", amount = 50 } }`) and how many stack in
+one bag slot (`max_stack`). A consumable is scripted like a spell: `power`, messages and a
+`use` function (see `herb.lua` and `potion.lua`, and `docs/APP.md`, "Scripting spells and
+items"). Give it a
 `drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
 in the admin town editor. `./dk check` validates it; the next page load picks it up.
 
@@ -240,7 +272,7 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  content/        content files: classes/, spells/, items/ (one Lua data file each), synced into the DB
+  content/        content files: classes/, spells/, items/ (one Lua file each: data, plus code for spells and consumables), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
@@ -294,10 +326,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	server (`/admin/classes`). All classes share the Mage's experience curve, scaled by
 	their own first step (Warrior and Paladin need up to about 10% more experience than in
 	the original from level 45 and 18 on); a class can define its own curve.
-- Spells are content files too (`app/content/spells/`), with a list of effects instead of
-	a type and an attribute; administrators override names, descriptions, MP costs and
-	effect amounts per server (`/admin/spells`). The spells a character knows are a table
-	(`user_spells`) instead of a list in the users row.
+- Spells are content files too (`app/content/spells/`), scripted in Lua instead of a type
+	and an attribute (the original 19 behave exactly as before); administrators override
+	names, descriptions, MP costs, power and messages per server (`/admin/spells`). The
+	spells a character knows are a table (`user_spells`) instead of a list in the users row.
 - Items and drops are content files (`app/content/items/`): the drops are accessories
 	(three accessory slots, as the three inventory slots were), and there are consumables:
 	Herbs, Potions and Ethers, sold in towns and usable in town or in fights (taking the

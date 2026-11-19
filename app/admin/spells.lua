@@ -1,12 +1,12 @@
 -- admin/spells.lua :: /admin/spells -- the spells (content files app/content/spells/<key>.lua,
--- synced into the spells table). Admins override name, description, MP and the effects'
--- amounts per server (lib/content/kinds/spells.lua admin_fields); "reset to file" deletes
--- an override. What a spell does (its effect kinds) and where it can be cast are edited in
--- the file. Replaces the legacy spells editor.
+-- synced into the spells table). Admins override name, description, MP, power, the
+-- named numbers and the message strings per server (lib/content/kinds/spells.lua
+-- admin_fields); "reset to file" deletes an override. What a spell does (its code), where
+-- it can be cast and its target are edited in the file. Replaces the legacy spells editor.
 local common = require("admin.common")
 local content = require("admin.content")
-local effects = require("lib.effects")
 local kind = require("lib.content.kinds.spells")
+local scripted = require("lib.content.scripted")
 local spells = require("lib.spells")
 local sync = require("lib.content.sync")
 local view = require("lib.view")
@@ -22,8 +22,7 @@ function admin_spells.index(req)
 	local overrides = content.override_counts(kind)
 	local rows = {}
 	for _, s in ipairs(spells.all()) do
-		rows[#rows + 1] = { s = s, effects = effects.encode(s.effects), users = counts[s.id] or 0,
-												overrides = overrides[s.key] or 0 }
+		rows[#rows + 1] = { s = s, users = counts[s.id] or 0, overrides = overrides[s.key] or 0 }
 	end
 	return common.page(req, "Spells", "admin/spells", { rows = rows, status = sync.status() })
 end
@@ -47,14 +46,14 @@ end
 local function detail(req, s, opts)
 	opts = opts or {}
 	-- the effective values, as flat fields
-	local current = effects.flatten(s.effects, "effects", {})
+	local current = scripted.flatten(s, {})
 	for _, f in ipairs(kind.fields) do current[f.name] = s[f.name] end
 	return common.page(req, "Edit Spell", "admin/spell", {
 		s = s, entity = s, action = "/admin/spells/" .. s.id,
 		form = content.form(kind, s.key, current, opts.values),
 		retired_note = "the file is gone, so no class learns it any more; characters who know it keep it.",
 		others_note = "Overrides of fields this page doesn't edit (the content file changed since they were made).",
-		effects = effects.encode(s.effects), learned_by = learned_by(s.id),
+		learned_by = learned_by(s.id),
 		users = dk.db:value("SELECT count(*) FROM user_spells WHERE spell_id = ?", s.id),
 		errors = opts.errors, saved = req.query.saved ~= nil, sync_error = opts.sync_error,
 	})

@@ -2,8 +2,9 @@
 # server: a new file becomes a playable class on the next request, edits sync, a deleted
 # file retires its class (its characters keep playing), a restored file brings it back,
 # overrides survive, invalid content fails `dk check` (naming the file) while the game
-# keeps the last good content, a full level-up of a new class, and a new spell learned
-# through a class file and cast (a class listing an unknown spell fails `dk check`).
+# keeps the last good content, a full level-up of a new class, and a new scripted spell
+# learned through a class file and cast, its overrides, a code-only edit and an error in
+# its code (a class listing an unknown spell fails `dk check`).
 # Sourced by tests/run.sh; works on the test server's copy of app/ and cleans up after itself.
 
 CT_DIR="$T/app/content/classes"
@@ -160,6 +161,10 @@ grep -qF 'content not synced, the game keeps the previous content' "$T/server.lo
 printf 'return {\n' > "$CT_DIR/broken.lua"
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with a syntax error" || t_ok
 grep -qF 'broken.lua:2:' "$T/content.log" && t_ok || t_fail "syntax error: $(cat "$T/content.log")"
+# content files run in a restricted environment: no dk, io, os, require
+printf 'local t = os.time()\nreturn {}\n' > "$CT_DIR/broken.lua"
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with os in a content file" || t_ok
+grep -qF "broken.lua:1: unknown global 'os' (content code can use" "$T/content.log" && t_ok || t_fail "restricted env: $(cat "$T/content.log")"
 # a bad file name
 rm "$CT_DIR/broken.lua"
 printf 'return {}\n' > "$CT_DIR/Bad-Name.lua"
@@ -173,18 +178,33 @@ grep -qF 'content: ok (19 spells, 4 classes, 68 items)' "$T/content.log" && t_ok
 
 t_section "content: a new spell, learned through a class file"
 cat > "$CT_SPELLS/zap.lua" <<'EOF'
+-- a test spell: two lines, its numbers as data (power, data.min, data.ward)
+local function cast(s)
+	local damage = s:roll(s.data.min, s.power)
+	s.target:hurt(damage)
+	s:say("hit", s.name, damage)
+	s.caster:buff("defense", s.data.ward)
+	s:say("ward", s.name, s.data.ward)
+end
+
 return {
 	name = "Zap",
 	description = "A test spell.",
 	mp = 3,
-	effects = { { kind = "damage", max = 6, min = 6 }, { kind = "buff_defense_pct", pct = 20 } },
+	power = 6,
+	data = { min = 6, ward = 20 },
+	messages = {
+		hit = "You have cast the %s spell for %d damage.",
+		ward = "You have cast the %s spell, and will gain %d%% defense until the end of this fight.",
+	},
+	cast = cast,
 }
 EOF
 t_jar ctnew
 t_wait_for /help/spells '>Zap<br>' && t_ok || t_fail "new spell not on the help page"
-expect_body '<td style="width: 25%">Hurt + +Defense (%)</td><td style="width: 25%">6-6, 20</td>'
-ct_eq "SELECT id || '|' || key || '|' || usable_in || '|' || effects || '|' || retired FROM spells WHERE key = 'zap'" \
-	"20|zap|fight|damage max=6 min=6; buff_defense_pct pct=20|0" "spell row"
+expect_body 'A test spell.</span></td><td style="width: 25%">3</td><td style="width: 25%">6</td>'
+ct_eq "SELECT id || '|' || key || '|' || usable_in || '|' || target || '|' || power || '|' || replace(data, char(10), ',') || '|' || retired FROM spells WHERE key = 'zap'" \
+	"20|zap|fight|enemy|6|min=6,ward=20|0" "spell row"
 # ctknight is level 11 (100 experience, 10 per level): Zap at level 12
 ct_knight Knight 30 'levels[12].spells = { "zap" }'
 for _ in $(seq 1 50); do
@@ -200,7 +220,7 @@ ct_eq "SELECT us.learned_level FROM user_spells us JOIN users u ON u.id = us.use
 	"12" "learned at level 12"
 t_get /;              expect_no_body 'action="/spell/20"'   # fight-only: not a Fast Spell
 t_post /spell/20 "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
-# cast in a fight: both effects, MP spent (Red Slime: no immunity)
+# cast in a fight: both lines, MP spent (Red Slime: no immunity)
 t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 2, currentmonsterhp = 50,
 	currentmonstersleep = 0, currentmonsterimmune = 0, currentuberdefense = 0, currentmp = 10, currenthp = 500,
 	base_maxhp = 500 WHERE username = 'ctknight'"
@@ -208,7 +228,51 @@ t_get /fight;         expect_body '<option value="20">Zap</option>'
 t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
 expect_body 'You have cast the Zap spell for 6 damage.<br>You have cast the Zap spell, and will gain 20% defense until the end of this fight.'
 ct_eq "SELECT currentmonsterhp || '|' || currentuberdefense || '|' || currentmp FROM users WHERE username = 'ctknight'" \
-	"44|20|7" "spell effects saved"
+	"44|20|7" "spell changes saved"
+
+t_section "content: a spell's numbers and messages overridden; a code-only edit; an error in the code"
+t_jar admin
+t_get /admin/spells/20; expect_body 'name="data.ward" size="6" value="20"'
+expect_body 'name="messages.hit" size="70" value="You have cast the %s spell for %d damage."'
+t_form_submit /admin/spells/20 "description=A test spell." "messages.hit=Zap! %d damage." data.ward=30
+expect_body 'Message hit must keep the placeholders of the file&#39;s message, in order (%s, %d).'
+t_form_submit /admin/spells/20 "description=A test spell." "messages.hit=Zap (%s): %d damage!" data.ward=30
+expect_redirect '/admin/spells/20\?saved=1'
+t_jar ctknight
+t_sql "UPDATE users SET currentmonsterhp = 50, currentmp = 10 WHERE username = 'ctknight'"
+t_get /fight
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
+expect_body 'Zap (Zap): 6 damage!<br>You have cast the Zap spell, and will gain 30% defense'
+# only the code changes: noticed all the same (the fingerprint covers the source)
+CT_FP=$(t_sql "SELECT value FROM meta WHERE key = 'content_fingerprint'")
+sed -i 's/s.caster:buff("defense", s.data.ward)/s.caster:buff("defense", s.data.ward + 1)/' "$CT_SPELLS/zap.lua"
+for _ in $(seq 1 50); do
+	[ "$(t_sql "SELECT value FROM meta WHERE key = 'content_fingerprint'")" != "$CT_FP" ] && break
+	t_get /login; sleep 0.1
+done
+[ "$(t_sql "SELECT value FROM meta WHERE key = 'content_fingerprint'")" != "$CT_FP" ] && t_ok || t_fail "code-only edit not noticed"
+t_sql "UPDATE users SET currentmonsterhp = 50, currentmp = 10 WHERE username = 'ctknight'"
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
+expect_body 'and will gain 30% defense'
+ct_eq "SELECT currentuberdefense FROM users WHERE username = 'ctknight'" "31" "the edited code runs"
+# an error in the code: nothing happens, nothing is spent, no turn (logged as a warning)
+sed -i 's/s.target:hurt(damage)$/s.target:hurt(damage) error("zap broke")/' "$CT_SPELLS/zap.lua"
+for _ in $(seq 1 50); do
+	t_sql "UPDATE users SET currentmonsterhp = 50, currentmp = 10, currentuberdefense = 0 WHERE username = 'ctknight'"
+	t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
+	grep -qF 'Something went wrong' "$BODY" && break
+	sleep 0.1
+done
+expect_body 'Something went wrong with the Zap spell. Please go back and try again.'
+ct_eq "SELECT currentmonsterhp || '|' || currentmp || '|' || currentuberdefense FROM users WHERE username = 'ctknight'" \
+	"50|10|0" "nothing changed"
+grep -qF '[lua] spell zap failed (nothing changed):' "$T/server.log" && t_ok || t_fail "content error not logged"
+grep -qF 'zap broke' "$T/server.log" && t_ok || t_fail "content error message not logged"
+sed -i 's/ error("zap broke")//; s/s.data.ward + 1)/s.data.ward)/' "$CT_SPELLS/zap.lua"
+t_jar admin
+t_get /admin/spells/20
+t_post /admin/spells/20/reset "csrf=$(t_csrf)&field=*"
+ct_eq "SELECT count(*) FROM content_overrides WHERE key = 'zap'" "0" "zap overrides reset"
 
 t_section "content: a class listing an unknown or deleted spell fails dk check"
 ct_knight Knight 30 'levels[12].spells = { "zap", "nope" }'
@@ -232,9 +296,11 @@ done
 ct_eq "SELECT retired || '|' || name FROM spells WHERE id = 20" "1|Zap" "retired, row kept"
 t_get /help/spells;   expect_no_body '>Zap<'
 t_get /character;     expect_body 'Zap<br>'
+# what it did was its file's code: still known, but no longer castable
 t_sql "UPDATE users SET currentmp = 10, currentmonsterhp = 50 WHERE username = 'ctknight'"
-t_get /fight;         expect_body '<option value="20">Zap</option>'
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'You have cast the Zap spell for 6 damage.'
+t_get /fight;         expect_no_body '<option value="20">Zap</option>'
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'This spell cannot be cast.'
+ct_eq "SELECT currentmp || '|' || currentmonsterhp FROM users WHERE username = 'ctknight'" "10|50" "nothing spent"
 t_jar admin
 t_get /admin/spells;  expect_body 'Zap</a> <span class="highlight">(retired)</span>'
 expect_body 'spells: 19 files, 20 in the database (1 retired), 0 overrides.'

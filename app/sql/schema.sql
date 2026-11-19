@@ -123,8 +123,10 @@ CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 -- Items: content files app/content/items/<key>.lua (like classes; never deleted, an item
 -- whose file is gone is retired and players keep it). category: weapon, armor, shield,
 -- accessory (gear: slot is the category), consumable, quest or misc (slot NULL).
--- modifiers: stat effects while equipped, use_effects: what using it does (effect lists
--- as text, app/lib/effects.lua). drop_level: monsters of that level and up drop it (NULL:
+-- modifiers: stat bonuses while equipped (as text, app/lib/stats.lua). Consumables are
+-- scripted (app/lib/action.lua; their code stays in the file): usable_in ('town', 'fight',
+-- 'both'), target ('enemy', 'self'), power, messages and data ("key=value" lines,
+-- app/lib/content/scripted.lua). drop_level: monsters of that level and up drop it (NULL:
 -- never). The original items keep ids 1-33 and the original drops are 34-65.
 CREATE TABLE items (
 	id           INTEGER PRIMARY KEY,
@@ -137,12 +139,16 @@ CREATE TABLE items (
 	attack       INTEGER NOT NULL DEFAULT 0,
 	defense      INTEGER NOT NULL DEFAULT 0,
 	modifiers    TEXT    NOT NULL DEFAULT '',
-	use_effects  TEXT    NOT NULL DEFAULT '',
 	max_stack    INTEGER NOT NULL DEFAULT 1,
 	drop_level   INTEGER,
 	sellable     INTEGER NOT NULL DEFAULT 0,
 	droppable    INTEGER NOT NULL DEFAULT 1,
-	retired      INTEGER NOT NULL DEFAULT 0
+	retired      INTEGER NOT NULL DEFAULT 0,
+	usable_in    TEXT    NOT NULL DEFAULT 'fight',
+	target       TEXT    NOT NULL DEFAULT 'enemy',
+	power        INTEGER NOT NULL DEFAULT 0,
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE monsters (
@@ -169,8 +175,9 @@ CREATE TABLE news (
 );
 
 -- Spells: content files app/content/spells/<key>.lua (like classes; never deleted, a spell
--- whose file is gone is retired). usable_in: 'town', 'fight' or 'both'; effects: the
--- effects list as text (app/lib/effects.lua, "heal_hp amount=10").
+-- whose file is gone is retired). Scripted (app/lib/action.lua): what a spell does is its
+-- file's code; usable_in ('town', 'fight', 'both'), target ('enemy', 'self'), power,
+-- messages and data ("key=value" lines, app/lib/content/scripted.lua) are data.
 CREATE TABLE spells (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -178,8 +185,11 @@ CREATE TABLE spells (
 	description  TEXT    NOT NULL DEFAULT '',
 	mp           INTEGER NOT NULL DEFAULT 0,
 	usable_in    TEXT    NOT NULL DEFAULT 'fight',
-	effects      TEXT    NOT NULL DEFAULT '',
-	retired      INTEGER NOT NULL DEFAULT 0
+	retired      INTEGER NOT NULL DEFAULT 0,
+	power        INTEGER NOT NULL DEFAULT 0,
+	target       TEXT    NOT NULL DEFAULT 'enemy',
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE towns (

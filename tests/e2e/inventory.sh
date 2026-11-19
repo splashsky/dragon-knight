@@ -25,20 +25,28 @@ cat > "$IV_ITEMS/test_key.lua" <<'EOF'
 return { name = "Old Key", description = "Opens something, somewhere.", category = "quest" }
 EOF
 cat > "$IV_ITEMS/test_bomb.lua" <<'EOF'
-return { name = "Bomb", category = "consumable", price = 5, max_stack = 5, use_effects = { { kind = "damage", max = 12 } } }
+return {
+	name = "Bomb", category = "consumable", price = 5, max_stack = 5, power = 12,
+	messages = { hit = "You have used the %s for %d damage." },
+	use = function(u)
+		local damage = u:roll((u.power / 6) * 5, u.power)
+		u.target:hurt(damage)
+		u:say("hit", u.name, damage)
+	end,
+}
 EOF
 cat > "$IV_ITEMS/test_bad.lua" <<'EOF'
-return { name = "Bad Sword", category = "weapon", slot = "shield", max_stack = 3, use_effects = { { kind = "heal_hp", amount = 1 } } }
+return { name = "Bad Sword", category = "weapon", slot = "shield", max_stack = 3, use = function() end }
 EOF
 "$BIN" check --config "$CONFIG" >"$T/inv.log" 2>&1 && t_fail "dk check passed with an invalid item" || t_ok
 for msg in "test_bad.lua: field 'slot' must be \"weapon\" for category weapon" "test_bad.lua: max_stack must be 1 for gear (weapon)" \
-	"test_bad.lua: use_effects are for consumables; gear has modifiers"; do
+	"test_bad.lua: use/can_use/messages/data: for consumables, not weapon"; do
 	grep -qF "$msg" "$T/inv.log" && t_ok || t_fail "dk check: no '$msg' in $(cat "$T/inv.log")"
 done
 rm -f "$IV_ITEMS/test_bad.lua"
 t_jar invanon; t_reset_jar
 t_wait_for /help/items '>Old Key<br>' && t_ok || t_fail "test items not synced"
-expect_body 'Quest Items'; expect_body '>Bomb</td><td style="width: 20%">5 Gold</td><td style="width: 45%">Hurt 12</td>'
+expect_body 'Quest Items'; expect_body '>Bomb</td><td style="width: 20%">5 Gold</td><td style="width: 45%">12</td>'
 t_get /inventory;                 expect_redirect /login
 
 t_section "inventory: the page"

@@ -61,6 +61,12 @@ function content.save(req, kind, key)
 		if f.type == "text" then s = s:gsub("\r\n", "\n") end
 		values[f.name] = s
 		local v, msg = schema.parse(f, s)
+		if v ~= nil and f.type == "message" and not sync.same_placeholders(file[f.name], v) then
+			local list = {}
+			for c in (schema.placeholders(tostring(file[f.name])) or ""):gmatch("%a") do list[#list + 1] = "%" .. c end
+			v, msg = nil, "must keep the placeholders of the file's message, in order (" ..
+				(#list > 0 and table.concat(list, ", ") or "none") .. ")"
+		end
 		if v == nil then errors[#errors + 1] = f.label .. " " .. msg .. "." else parsed[f.name] = v end
 	end
 	if #errors > 0 then return { errors = errors, values = values } end

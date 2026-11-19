@@ -1,14 +1,16 @@
 -- admin/items.lua :: /admin/items -- the items (content files app/content/items/<key>.lua,
 -- synced into the items table). Admins override name, description, price, attack/defense,
--- the drop settings, sellable, the modifiers' stats and amounts and the use effects'
--- amounts per server (lib/content/kinds/items.lua admin_fields); "reset to file" deletes
--- an override. Category, slot and stack size are edited in the file. Replaces the legacy
--- items and drops editors.
+-- the drop settings, sellable, the modifiers' stats and amounts and the consumables'
+-- power, numbers and message strings per server (lib/content/kinds/items.lua
+-- admin_fields); "reset to file" deletes an override. Category, slot, stack size and what
+-- a consumable does (its code) are edited in the file. Replaces the legacy items and
+-- drops editors.
 local common = require("admin.common")
 local content = require("admin.content")
-local effects = require("lib.effects")
 local items = require("lib.items")
 local kind = require("lib.content.kinds.items")
+local scripted = require("lib.content.scripted")
+local stats = require("lib.stats")
 local sync = require("lib.content.sync")
 local view = require("lib.view")
 
@@ -24,7 +26,7 @@ function admin_items.index(req)
 	local rows = {}
 	for _, it in ipairs(items.all()) do
 		rows[#rows + 1] = { it = it, attributes = table.concat(items.attributes(it), ", "),
-												effects = table.concat(items.effect_lines(it), ", "), users = counts[it.id] or 0,
+												use = table.concat(items.use_lines(it), ", "), users = counts[it.id] or 0,
 												overrides = overrides[it.key] or 0 }
 	end
 	return common.page(req, "Items", "admin/items", { rows = rows, status = sync.status() })
@@ -39,8 +41,11 @@ end
 local function detail(req, it, opts)
 	opts = opts or {}
 	-- the effective values, as flat fields
-	local current = effects.flatten(it.modifiers, "modifiers", {})
-	effects.flatten(it.use_effects, "use_effects", current)
+	local current = scripted.flatten(it, {})
+	for i, m in ipairs(it.modifiers) do
+		current["modifiers." .. i .. ".stat"] = m.stat
+		current["modifiers." .. i .. ".amount"] = m.amount
+	end
 	for _, f in ipairs(kind.fields) do current[f.name] = it[f.name] end
 	local towns = {}
 	for _, t in ipairs(dk.db:query("SELECT t.name FROM town_items ti JOIN towns t ON t.id = ti.town_id " ..
@@ -52,7 +57,7 @@ local function detail(req, it, opts)
 		form = content.form(kind, it.key, current, opts.values),
 		retired_note = "the file is gone, so shops don't sell it and monsters don't drop it; characters keep theirs.",
 		others_note = "Overrides of fields this page doesn't edit (the content file changed since they were made).",
-		modifiers = effects.encode(it.modifiers), use_effects = effects.encode(it.use_effects), towns = towns,
+		modifiers = stats.encode_modifiers(it.modifiers), consumable = it.category == "consumable", towns = towns,
 		users = dk.db:value("SELECT count(DISTINCT user_id) FROM user_items WHERE item_id = ?", it.id),
 		errors = opts.errors, saved = req.query.saved ~= nil, sync_error = opts.sync_error,
 	})

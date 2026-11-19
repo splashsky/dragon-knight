@@ -4,19 +4,19 @@
 <table class="help-table help-w50">
 <thead>
 <tr><th colspan="4" class="help-caption">Spells</th></tr>
-<tr><th>Name</th><th>Cost</th><th>Type</th><th>Attribute</th></tr>
+<tr><th>Name</th><th>Cost</th><th>Power</th></tr>
 </thead>
 <tbody>
-{%- for _, r in ipairs(spells) do %}
-<tr><td style="width: 25%">{{ r.spell.name }}{% if r.spell.description ~= "" then %}<br><span class="small">{{ r.spell.description }}</span>{% end %}</td><td style="width: 25%">{{ r.spell.mp }}</td><td style="width: 25%">{{ r.type }}</td><td style="width: 25%">{{ r.attribute }}</td></tr>
+{%- for _, s in ipairs(spells) do %}
+<tr><td style="width: 50%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 25%">{{ s.mp }}</td><td style="width: 25%">{{ s.power }}</td></tr>
 {%- end %}
 </tbody>
 </table>
 <ul>
-<li><b>Heal</b> spells always give you the maximum amount possible, until your current HP is full.</li>
-<li><b>Hurt</b> spells deal X damage (not always the maximum) to the monster, regardless of the monster's armor.</li>
-<li><b>Sleep</b> spells put the monster to sleep. The monster has an X in 15 chance of remaining asleep each turn.</li>
-<li><b>+Damage</b> spells increase your total attack damage by X percent until the end of the fight.</li>
-<li><b>+Defense</b> spells reduce the total damage you take from the monster by X percent until the end of each fight.</li>
+<li><b>Healing</b> spells (Heal, Revive, Life, Breath, Gaia) restore up to their power in hit points, until your current HP is full.</li>
+<li><b>Hurt</b> spells (Hurt, Pain, Maim, Rend, Chaos) deal between five sixths of their power and their power in damage to the monster, regardless of the monster's armor.</li>
+<li><b>Sleep</b> spells (Sleep, Dream, Nightmare) put the monster to sleep. The monster has a power in 15 chance of remaining asleep each turn.</li>
+<li><b>Damage</b> spells (Craze, Rage, Fury) increase your total attack damage by their power in percent until the end of the fight.</li>
+<li><b>Defense</b> spells (Ward, Fend, Barrier) reduce the total damage you take from the monster by their power in percent until the end of the fight.</li>
 </ul>
 {{{ include("community/help/footer") }}}

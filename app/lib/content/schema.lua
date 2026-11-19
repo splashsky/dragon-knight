@@ -4,9 +4,11 @@
 -- (classes, spells, items): where its files live, its DB table and the
 -- fields of its files. Validating a file produces the entity's *flat* form: a table of
 -- field name -> value (integer or string) covering everything the file says, nested data
--- included ("levels.2.hp", "effects.1.amount"). The flat form is what gets fingerprinted,
+-- included ("levels.2.hp", "messages.hit"). The flat form is what gets fingerprinted,
 -- overridden by admins (content_overrides rows hold a field name and its value as text)
--- and written to the DB.
+-- and written to the DB. Functions in a file (a spell's cast, an item's use, message
+-- functions) are behaviour: they stay in the file and are not part of the flat form (see
+-- lib/content/scripted.lua and lib/action.lua).
 --
 -- Kind module fields:
 --   name, table        "classes", the DB table (id, key, <fields...>, retired)
@@ -24,7 +26,10 @@
 -- Field specs: type = "string" (one line; max), "text" (multi-line), "int" (min, max),
 -- "bool" (stored 0/1), "choice" (one of `values`, a list of strings), "stages"
 -- (leveling.parse_stages), "keys" (list of content keys, stored sorted "heal,hurt", ""
--- for none; refs = "spells": each must be a file of that kind, checked by load.all). required = true, or default = value.
+-- for none; refs = "spells": each must be a file of that kind, checked by load.all),
+-- "message" (a one-line text a spell or item shows, formatted with string.format: only
+-- the placeholders %s, %d and %% are allowed; an override must keep the file's
+-- placeholders, see schema.placeholders). required = true, or default = value.
 -- admin = true: editable as an override in the admin panel. label: shown there.
 local leveling = require("lib.leveling")
 
@@ -58,6 +63,8 @@ local function describe(spec)
 	elseif t == "stages" then return 'stages like "2x2,1.5x8" (factor x steps)'
 	elseif t == "keys" then return 'a list of keys, like { "heal", "hurt" }'
 	elseif t == "choice" then return "one of " .. table.concat(spec.values, ", ")
+	elseif t == "message" then return "a one-line message of at most " .. (spec.max or 500) ..
+		" characters (placeholders: %s, %d; %% for a percent sign)"
 	end
 	return t
 end
@@ -78,6 +85,11 @@ function schema.check(spec, v)
 		local bad = type(v) ~= "string" or (spec.required and v == "") or #v > (spec.max or 4000) or
 								(t == "string" and v:find("[\r\n]"))
 		if bad then return nil, "must be " .. describe(spec) .. (spec.required and ", not empty" or "") end
+		return v
+	elseif t == "message" then
+		if type(v) ~= "string" or v:find("[\r\n]") or #v > (spec.max or 500) or not schema.placeholders(v) then
+			return nil, "must be " .. describe(spec)
+		end
 		return v
 	elseif t == "stages" then
 		local ok, msg = leveling.parse_stages(v)
@@ -102,6 +114,25 @@ function schema.check(spec, v)
 		return nil, "must be " .. describe(spec)
 	end
 	error("unknown field type " .. tostring(t))
+end
+
+-- The placeholders of a message, in order ("s,d"), or nil when it has others than %s, %d
+-- and %% (string.format would fail or need other arguments).
+function schema.placeholders(s)
+	local out = {}
+	local i = 1
+	while true do
+		local at = s:find("%", i, true)
+		if not at then break end
+		local c = s:sub(at + 1, at + 1)
+		if c == "s" or c == "d" then
+			out[#out + 1] = c
+		elseif c ~= "%" then
+			return nil
+		end
+		i = at + 2
+	end
+	return table.concat(out, ",")
 end
 
 -- Parses an override/admin form value (text) for a field. Returns the flat value, or nil

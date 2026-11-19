@@ -37,7 +37,7 @@ override. "Reset to file" removes an override.</p>
 <option value="0"{% if f.value == "0" then %} selected{% end %}>No</option>
 </select>
 {%- else %}
-<input type="text" name="{{ f.spec.name }}" size="{{ f.spec.type == "int" and 6 or 30 }}" value="{{ f.value }}">
+<input type="text" name="{{ f.spec.name }}" size="{{ f.spec.type == "int" and 6 or f.spec.type == "message" and 70 or 30 }}" value="{{ f.value }}">
 {%- end %}
 {%- if f.override then %}
 <br><span class="small highlight">Overridden.</span> <span class="small">File value: {% if f.file then %}{{ f.file }}{% else %}(none){% end %}</span>

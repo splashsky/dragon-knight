@@ -119,12 +119,12 @@ f_is currentmp 10; f_is currentfight "$FIGHT"; f_is "currenthp = base_maxhp" 1
 f_sql "UPDATE users SET currenthp = base_maxhp + 5"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 f_is currentmp 10; f_is "currenthp = base_maxhp + 5" 1
-# a spell of an unknown type: refused the same way
-t_sql "UPDATE spells SET effects = 'fireball power=9' WHERE id = 1"
+# a retired spell (its file and so its code are gone): refused the same way
+t_sql "UPDATE spells SET retired = 1 WHERE id = 1"
 f_sql "UPDATE users SET currenthp = 100"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'This spell cannot be cast.'
 f_is currentmp 10; f_is currenthp 100; f_is currentfight "$FIGHT"
-t_sql "UPDATE spells SET effects = 'heal_hp amount=10' WHERE id = 1"
+t_sql "UPDATE spells SET retired = 0 WHERE id = 1"
 f_sql "UPDATE users SET currentmp = 4"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'You do not have enough Magic Points'
 f_is currentmp 4

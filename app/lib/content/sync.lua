@@ -96,14 +96,25 @@ function sync.effective(kind, key, flat, skipped)
 	for field, text in pairs(sync.overrides(kind.name, key)) do
 		local spec = kind.field(field)
 		local v = spec and schema.parse(spec, text)
+		local why = spec and "invalid value" or "unknown field"
+		-- a message override must fit the code that formats it: the file's placeholders
+		if v ~= nil and spec.type == "message" and not sync.same_placeholders(flat[field], v) then
+			v = nil
+			why = type(flat[field]) == "string" and "other placeholders than the file's message" or
+						"the file has no such message"
+		end
 		if v ~= nil then
 			out[field] = v
 		elseif skipped then
-			skipped[#skipped + 1] = ("%s %s: override of %s ignored (%s)"):format(kind.label, key, field,
-				spec and "invalid value" or "unknown field")
+			skipped[#skipped + 1] = ("%s %s: override of %s ignored (%s)"):format(kind.label, key, field, why)
 		end
 	end
 	return out
+end
+
+-- Whether message `v` has the placeholders of the file's message `file` (a string).
+function sync.same_placeholders(file, v)
+	return type(file) == "string" and schema.placeholders(file) == schema.placeholders(v)
 end
 
 local function write_row(kind, id, key, flat)

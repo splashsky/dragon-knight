@@ -1,18 +1,23 @@
 -- spells.lua :: spells as the game uses them (rows of the spells table, synced from
 -- app/content/spells/*.lua; see lib/content/) and the spells characters know
--- (user_spells). Rows come back with `effects` decoded into a list (lib/effects.lua).
-local effects = require("lib.effects")
+-- (user_spells). Rows come back with `messages` and `data` decoded into tables
+-- (lib/content/scripted.lua); what a spell does is its file's cast (lib/action.lua).
+local scripted = require("lib.content.scripted")
 
 local spells = {}
 
 local function decode(row)
-	if row then row.effects = effects.decode(row.effects) end
+	if row then
+		row.messages = scripted.decode_messages(row.messages)
+		row.data = scripted.decode_data(row.data)
+	end
 	return row
 end
 
--- Whether `spell` can be cast in `place` ("town" or "fight"), per its usable_in.
+-- Whether `spell` can be cast in `place` ("town" or "fight"), per its usable_in. A
+-- retired spell (its file is gone, and with it what it does) can't be cast any more.
 function spells.usable(spell, place)
-	return spell.usable_in == "both" or spell.usable_in == place
+	return (spell.retired or 0) == 0 and (spell.usable_in == "both" or spell.usable_in == place)
 end
 
 -- The spell with id `id` (retired or not), or nil.
@@ -35,7 +40,7 @@ function spells.all()
 end
 
 -- Spells `user` knows, by id; `place` ("town" or "fight") keeps those castable there.
--- A spell whose file was deleted (retired) stays known and castable.
+-- A spell whose file was deleted (retired) stays known, but can't be cast.
 function spells.known(user, place)
 	local out = {}
 	for _, s in ipairs(dk.db:query("SELECT s.*, us.learned_level FROM user_spells us JOIN spells s ON s.id = us.spell_id " ..

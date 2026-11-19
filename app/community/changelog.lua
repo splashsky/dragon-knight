@@ -26,6 +26,11 @@ changelog.RELEASES = {
 			"Monster drops go into the bag (or are left behind); with a full bag you can throw something away first.",
 			"Character stats are computed from base stats and the equipped items, so equipping and removing items is always exact.",
 			"The town editor lists the items a shop sells by key; the user editor shows the character's inventory and effective stats.",
+			"Spells and consumables are now scripted: their content files hold what they do as Lua code, and their power, MP cost and messages as data that admins can override per server; the original ones work exactly as before.",
+			"Spells and items are written for a caster and a target, with optional wording for monsters, ready for monsters that cast spells and use items.",
+			"Errors in a spell's or item's code are logged and cost nothing: no MP, item or turn is spent.",
+			"Spells and consumables whose content file was deleted are kept by their owners but can no longer be used.",
+			"The help pages show each spell's MP cost and power and each consumable's power.",
 		},
 	},
 	{

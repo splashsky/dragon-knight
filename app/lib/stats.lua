@@ -13,11 +13,20 @@
 -- Stats that were UNSIGNED columns in the original game (all but the bonuses) never go
 -- below 0, as MySQL clamped them. lib/inventory.lua computes them once per request
 -- (game.stats(user)).
-local effects = require("lib.effects")
-
+--
+-- Gear's passive modifiers are data: a list of { kind = "stat", stat = "strength",
+-- amount = 50 } in the item files (checked by stats.validate_modifiers), stored as text
+-- ("stat stat=strength amount=50; stat stat=maxhp amount=-50") and summed while equipped.
 local stats = {}
 
-stats.STATS = effects.STATS
+stats.STATS = {
+	"maxhp", "maxmp", "maxtp", "strength", "dexterity", "attack", "defense", "exp_bonus_pct", "gold_bonus_pct",
+}
+local STAT_SET = {}
+for _, s in ipairs(stats.STATS) do STAT_SET[s] = true end
+
+-- The range of a modifier's amount.
+stats.AMOUNT = { min = -1000000, max = 1000000 }
 
 -- stat -> the users column holding its base value
 stats.BASE = {
@@ -38,7 +47,7 @@ function stats.item_mods(items)
 	for _, it in ipairs(items) do
 		add("attack", it.attack)
 		add("defense", it.defense)
-		for stat, n in pairs(effects.modifiers(it.modifiers or {})) do add(stat, n) end
+		for stat, n in pairs(stats.modifiers(it.modifiers or {})) do add(stat, n) end
 	end
 	return sum
 end
@@ -94,7 +103,7 @@ function stats.diff(a, b)
 end
 
 -- A copy of the users row with the effective stats under the names the fight code and
--- the effects engine use (the original game's users columns): maxhp, maxmp, maxtp,
+-- the spell and item actions use (the original game's users columns): maxhp, maxmp, maxtp,
 -- strength, dexterity, attackpower, defensepower, expbonus, goldbonus.
 function stats.player(user, s)
 	local p = {}
@@ -113,6 +122,86 @@ function stats.clamped(user, s)
 		currentmp = math.min(user.currentmp, s.maxmp),
 		currenttp = math.min(user.currenttp, s.maxtp),
 	}
+end
+
+---------------------------------------------------------------------------------------
+-- Modifiers (gear's stat bonuses while equipped).
+
+-- Checks a list of modifiers from an item file. Returns a normalized copy, or nil and a
+-- list of messages ("[2].amount must be ...": the caller prefixes the field name).
+function stats.validate_modifiers(list)
+	if type(list) ~= "table" then
+		return nil, { "must be a list of modifiers, like { { kind = \"stat\", stat = \"strength\", amount = 5 } }" }
+	end
+	local errors, out = {}, {}
+	local function err(msg) errors[#errors + 1] = msg end
+	for i in pairs(list) do
+		if math.type(i) ~= "integer" or i < 1 or i > #list then
+			return nil, { "must be a list (unexpected key " .. tostring(i) .. ")" }
+		end
+	end
+	for i, m in ipairs(list) do
+		local at = "[" .. i .. "]"
+		if type(m) ~= "table" then
+			err(at .. " must be a table like { kind = \"stat\", stat = \"strength\", amount = 5 }")
+		elseif m.kind ~= "stat" then
+			err(at .. ".kind must be one of stat (got " .. tostring(m.kind) .. ")")
+		else
+			if not STAT_SET[m.stat] then err(at .. ".stat must be one of " .. table.concat(stats.STATS, ", ")) end
+			local n = math.type(m.amount) == "float" and math.tointeger(m.amount) or m.amount
+			if math.type(n) ~= "integer" or n < stats.AMOUNT.min or n > stats.AMOUNT.max then
+				err(at .. (m.amount == nil and ": missing amount" or
+					(".amount must be an integer from %d to %d"):format(stats.AMOUNT.min, stats.AMOUNT.max)))
+			end
+			local extra = {}
+			for k in pairs(m) do
+				if k ~= "kind" and k ~= "stat" and k ~= "amount" then extra[#extra + 1] = tostring(k) end
+			end
+			table.sort(extra)
+			for _, k in ipairs(extra) do err(at .. ": unknown parameter '" .. k .. "' for stat") end
+			out[i] = { kind = "stat", stat = m.stat, amount = n }
+		end
+	end
+	if #errors > 0 then return nil, errors end
+	return out
+end
+
+-- Stored text of a list of modifiers: "stat stat=strength amount=50; stat stat=maxhp amount=-50".
+function stats.encode_modifiers(list)
+	local parts = {}
+	for _, m in ipairs(list) do
+		parts[#parts + 1] = "stat stat=" .. tostring(m.stat) .. " amount=" .. tostring(m.amount)
+	end
+	return table.concat(parts, "; ")
+end
+
+-- The list stored by encode_modifiers().
+function stats.decode_modifiers(text)
+	local list = {}
+	for part in tostring(text or ""):gmatch("[^;]+") do
+		local m
+		for word in part:gmatch("%S+") do
+			if not m then
+				m = { kind = word }
+			else
+				local k, v = word:match("^([%w_]+)=(.*)$")
+				if k then m[k] = math.tointeger(tonumber(v)) or v end
+			end
+		end
+		if m then list[#list + 1] = m end
+	end
+	return list
+end
+
+-- Sum of the stat modifiers in `list`: { maxhp = 10, strength = -5, ... } (absent = 0).
+function stats.modifiers(list)
+	local sum = {}
+	for _, m in ipairs(list) do
+		if m.kind == "stat" and STAT_SET[m.stat] and math.type(m.amount) == "integer" then
+			sum[m.stat] = (sum[m.stat] or 0) + m.amount
+		end
+	end
+	return sum
 end
 
 return stats

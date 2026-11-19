@@ -115,59 +115,65 @@ admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune FROM mon
 t_get /admin/monsters/1;   expect_body '<option value="2" selected>Hurt &amp; Sleep Spells</option>'
 
 t_section "admin: spells"
-# spell files app/content/spells/*.lua; admins override name, description, MP and effect
-# amounts (tests/e2e/content.sh covers the files themselves)
+# spell files app/content/spells/*.lua; admins override name, description, MP, power,
+# numbers and message strings (tests/e2e/content.sh covers the files themselves)
 t_get /admin/spells;       expect_status 200; expect_body '<a href="/admin/spells/1">Heal</a>'
-expect_body '<td>heal</td><td>5</td><td>both</td><td>heal_hp amount=10</td>'
-expect_body '<td>hurt</td><td>5</td><td>fight</td><td>damage max=15</td>'
+expect_body '<td>heal</td><td>5</td><td>10</td><td>both</td><td>self</td>'
+expect_body '<td>hurt</td><td>5</td><td>15</td><td>fight</td><td>enemy</td>'
 expect_body 'spells: 19 files, 19 in the database (0 retired), 0 overrides.'
 t_get /admin/spells/6;     expect_status 200; expect_body 'Edit Spell: Hurt'; expect_body 'app/content/spells/hurt.lua'
-expect_body 'Effect 1 (Hurt): maximum damage:'; expect_body 'name="effects.1.max" size="6" value="15"'
-expect_body 'name="mp" size="6" value="5"'; expect_body '<code>damage max=15</code>'
+expect_body 'name="power" size="6" value="15"'; expect_body 'name="mp" size="6" value="5"'
+expect_body 'Message hit:'; expect_body 'name="messages.hit" size="70" value="You have cast the %s spell for %d damage."'
+expect_body 'Message hit (a monster acting):'; expect_body 'Target:</td><td>enemy</td>'
+expect_body 'what the spell does is its code'
 expect_body 'Mage (level 4), Warrior (level 5), Paladin (level 5)'
-expect_no_body 'name="usable_in"'; expect_no_body 'name="effects.1.kind"'
+expect_no_body 'name="usable_in"'; expect_no_body 'name="target"'; expect_no_body 'name="cast"'
 t_get /admin/spells/99;    expect_status 404
 t_post /admin/spells/6 "name=NoToken"; expect_status 403
 ADM_HURT_DESC=$(t_sql "SELECT description FROM spells WHERE id = 6")
 t_get /admin/spells/6
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" mp=-1 effects.1.max=x name=
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" mp=-1 power=x name= "messages.immune=100% %s"
 expect_status 200; expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
-expect_body 'MP must be an integer from 0 to 1000000.'; expect_body 'Effect 1 (Hurt): maximum damage must be an integer from 0 to 1000000.'
+expect_body 'MP must be an integer from 0 to 1000000.'; expect_body 'Power must be an integer from 0 to 1000000.'
+expect_body 'Message immune must be a one-line message of at most 500 characters'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid spell form not saved"
 t_get /admin/spells/6
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" name=Smite mp=4 effects.1.max=20 effects.1.kind=sleep usable_in=both
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" name=Smite mp=4 power=20 "messages.hit=Smite! %s hits for %d." \
+	usable_in=both target=self cast=x
 expect_redirect '/admin/spells/6\?saved=1'
-admin_eq "SELECT name || '|' || mp || '|' || usable_in || '|' || effects FROM spells WHERE id = 6" \
-	"Smite|4|fight|damage max=20" "spell overrides applied"
+admin_eq "SELECT name || '|' || mp || '|' || power || '|' || usable_in || '|' || target || '|' || (instr(messages, char(10) || 'hit=Smite! %s hits for %d.') > 0) FROM spells WHERE id = 6" \
+	"Smite|4|20|fight|enemy|1" "spell overrides applied"
 admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'spells' ORDER BY field)" \
-	"effects.1.max=20;mp=4;name=Smite" "only the changed fields are overridden"
+	"messages.hit=Smite! %s hits for %d.;mp=4;name=Smite;power=20" "only the changed fields are overridden"
 t_get '/admin/spells/6?saved=1'; expect_body 'Spell updated.'; expect_body 'File value: Hurt'; expect_body 'File value: 15'
-t_get /help/spells;        expect_body '<td style="width: 25%">Smite<br>'; expect_body '<td style="width: 25%">20</td>'
+t_get /help/spells;        expect_body '<td style="width: 50%">Smite<br>'; expect_body '<td style="width: 25%">20</td>'
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-admin_eq "SELECT effects FROM spells WHERE id = 6" "damage max=20" "spell overrides survive a sync"
+admin_eq "SELECT power FROM spells WHERE id = 6" "20" "spell overrides survive a sync"
 t_get /admin/spells/6
 t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=name"
 expect_redirect '/admin/spells/6\?saved=1'
 admin_eq "SELECT name || '|' || mp FROM spells WHERE id = 6" "Hurt|4" "name reset to file"
 t_get /admin/spells/6
 t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=*"
-admin_eq "SELECT name || '|' || mp || '|' || effects FROM spells WHERE id = 6" "Hurt|5|damage max=15" "all reset to file"
+admin_eq "SELECT name || '|' || mp || '|' || power || '|' || instr(messages, 'Smite') FROM spells WHERE id = 6" "Hurt|5|15|0" "all reset to file"
 admin_eq "SELECT count(*) FROM content_overrides" "0" "no spell overrides left"
 
 t_section "admin: items"
-# item files app/content/items/*.lua; admins override name, description, price, power,
-# drop settings, modifiers and use effect amounts (the files: tests/lua/test_items.lua)
+# item files app/content/items/*.lua; admins override name, description, price, attack and
+# defense, drop settings, modifiers and a consumable's power and messages (the files:
+# tests/lua/test_items.lua)
 t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items/1">Stick</a>'
 expect_body '<td>stick</td><td>weapon</td><td>10</td><td>Attack Power +2</td>'
 expect_body '<td>demons_sin</td><td>accessory</td><td>0</td><td>Max HP -50, Strength +50</td><td></td>'
-expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Heal 30</td>'
+expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Power 30</td>'
 expect_body 'items: 68 files, 68 in the database (0 retired), 0 overrides.'
 t_get /admin/drops;        expect_redirect /admin/items
 t_get /admin/items/46;     expect_status 200; expect_body 'Edit Item: Demon&#39;s Sin'; expect_body 'app/content/items/demons_sin.lua'
 expect_body 'name="modifiers.1.amount" size="6" value="-50"'; expect_body '<option value="maxhp" selected>maxhp</option>'
 expect_body 'name="drop_level" size="6" value="35"'; expect_body '<code>stat stat=maxhp amount=-50; stat stat=strength amount=50</code>'
 expect_no_body 'name="category"'; expect_no_body 'name="max_stack"'; expect_no_body 'name="modifiers.1.kind"'
-t_get /admin/items/66;     expect_body 'Use effect 1 (Heal): amount:'; expect_body 'name="use_effects.1.amount" size="6" value="30"'
+t_get /admin/items/66;     expect_body 'name="power" size="6" value="30"'; expect_body 'name="messages.used" size="70"'
+expect_body 'Usable in:</td><td>both</td>'; expect_body 'What the item does is its code'
 expect_body 'Sold in:</td><td>Midworld, Newtown, Bris'; expect_no_body 'name="attack"'
 t_get /admin/items/9999;   expect_status 404
 t_post /admin/items/46 "name=NoToken"; expect_status 403
@@ -190,9 +196,9 @@ t_get /help/items;         expect_body '>&lt;script&gt;alert(1)&lt;/script&gt;</
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
 admin_eq "SELECT price || '|' || modifiers FROM items WHERE id = 46" "123|stat stat=maxmp amount=-20; stat stat=strength amount=50" "item overrides survive a sync"
 t_get /admin/items/66
-t_form_submit /admin/items/66 "description=$(t_sql "SELECT description FROM items WHERE id = 66")" use_effects.1.amount=45 sellable=0
-admin_eq "SELECT use_effects || '|' || sellable || '|' || (SELECT count(*) FROM content_overrides WHERE key = 'herb') FROM items WHERE id = 66" \
-	"heal_hp amount=45|0|2" "use effect override"
+t_form_submit /admin/items/66 "description=$(t_sql "SELECT description FROM items WHERE id = 66")" power=45 sellable=0
+admin_eq "SELECT power || '|' || sellable || '|' || (SELECT count(*) FROM content_overrides WHERE key = 'herb') FROM items WHERE id = 66" \
+	"45|0|2" "power override"
 t_get /admin/items/66
 t_post /admin/items/66/reset "csrf=$(t_csrf)&field=*"
 t_get /admin/items/46
@@ -203,7 +209,7 @@ t_get /admin/items/46
 t_post /admin/items/46/reset "csrf=$(t_csrf)&field=*"
 admin_eq "SELECT name || '|' || price || '|' || drop_level || '|' || modifiers FROM items WHERE id = 46" \
 	"Demon's Sin|0|35|stat stat=maxhp amount=-50; stat stat=strength amount=50" "all reset to file"
-admin_eq "SELECT use_effects || '|' || sellable FROM items WHERE id = 66" "heal_hp amount=30|1" "herb reset"
+admin_eq "SELECT power || '|' || sellable FROM items WHERE id = 66" "30|1" "herb reset"
 admin_eq "SELECT count(*) FROM content_overrides" "0" "no item overrides left"
 
 t_section "admin: classes"

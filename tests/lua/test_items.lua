@@ -1,10 +1,10 @@
 -- Unit tests for the items: the item files against the original items and drops tables
 -- (ported values), the items kind's validation, and the display helpers.
-local effects = require("lib.effects")
 local items = require("lib.items")
 local kind = require("lib.content.kinds.items")
 local load = require("lib.content.load")
 local schema = require("lib.content.schema")
+local stats = require("lib.stats")
 local T = {}
 
 local function eq(a, b, what)
@@ -79,7 +79,7 @@ local function modifier_text(codes)
 			list[#list + 1] = { kind = "stat", stat = STAT[stat], amount = math.tointeger(tonumber(n)) }
 		end
 	end
-	return effects.encode(list)
+	return stats.encode_modifiers(list)
 end
 
 function T.item_files_are_the_original_items_and_drops()
@@ -92,22 +92,28 @@ function T.item_files_are_the_original_items_and_drops()
 		eq(f.price, o[4], o[1] .. " price")
 		eq(o[2] == 1 and f.attack or f.defense, o[5], o[1] .. " power")
 		eq(o[2] == 1 and f.defense or f.attack, 0, o[1] .. " other power")
-		eq(effects.encode(kind.modifiers(f)), modifier_text({ o[6] }), o[1] .. " modifiers")
+		eq(stats.encode_modifiers(kind.modifiers(f)), modifier_text({ o[6] }), o[1] .. " modifiers")
 		eq(f.max_stack, 1); eq(f.drop_level, nil); eq(f.sellable, 1)
 		eq(dk.db:value("SELECT id FROM items WHERE key = ?", o[1]), id, o[1] .. " id")
 	end
 	for n, o in ipairs(DROPS) do
 		local f = assert(k.by_key[o[1]], "no item file " .. o[1])
 		eq(f.name, o[2], o[1]); eq(f.category, "accessory"); eq(f.slot, "accessory"); eq(f.drop_level, o[3], o[1])
-		eq(effects.encode(kind.modifiers(f)), modifier_text({ o[4], o[5] }), o[1] .. " modifiers")
+		eq(stats.encode_modifiers(kind.modifiers(f)), modifier_text({ o[4], o[5] }), o[1] .. " modifiers")
 		eq(f.price, 0); eq(f.sellable, 0); eq(f.droppable, 1)
 		eq(dk.db:value("SELECT id FROM items WHERE key = ?", o[1]), 33 + n, o[1] .. " id")
 	end
 	local herb = k.by_key.herb
 	eq(herb.category, "consumable"); eq(herb.slot, nil); eq(herb.price, 15); eq(herb.max_stack, 10)
-	eq(effects.encode(kind.use_effects(herb)), "heal_hp amount=30")
-	eq(effects.encode(kind.use_effects(k.by_key.potion)), "heal_hp amount=100")
-	eq(effects.encode(kind.use_effects(k.by_key.ether)), "heal_mp amount=30")
+	eq(herb.power, 30); eq(herb.usable_in, "both"); eq(herb.target, "self")
+	eq(herb["messages.used"], "You have used the %s, and gained %d Hit Points.")
+	eq(k.by_key.potion.power, 100); eq(k.by_key.ether.power, 30)
+	eq(k.by_key.ether["messages.used"], "You have used the %s, and gained %d Magic Points.")
+	for _, key in ipairs({ "herb", "potion", "ether" }) do
+		eq(type(k.modules[key].use), "function", key .. " use"); eq(type(k.modules[key].can_use), "function", key .. " can_use")
+	end
+	-- gear has no consumable fields' values beyond the defaults
+	eq(k.by_key.stick.power, 0); eq(k.by_key.stick["messages.used"], nil)
 	eq(dk.db:value("SELECT group_concat(key) FROM (SELECT key FROM items WHERE id IN (66, 67, 68) ORDER BY id)"),
 		"herb,potion,ether")
 end
@@ -137,41 +143,51 @@ function T.validate_items()
 	f = assert(schema.validate(kind, item({ category = "accessory", attack = 0, drop_level = 3, slot = "accessory",
 		modifiers = { { kind = "stat", stat = "maxhp", amount = -5 } } })))
 	eq(f["modifiers.1.stat"], "maxhp"); eq(f["modifiers.1.amount"], -5); eq(f.drop_level, 3)
-	f = assert(schema.validate(kind, { name = "Elixir", category = "consumable", price = 5, max_stack = 3,
-		use_effects = { { kind = "heal_hp", amount = 9 }, { kind = "heal_mp", amount = 2 } } }))
-	eq(effects.encode(kind.use_effects(f)), "heal_hp amount=9; heal_mp amount=2")
-	-- category / slot / stacking / effects consistency
+	local use = function() end
+	f = assert(schema.validate(kind, { name = "Elixir", category = "consumable", price = 5, max_stack = 3, power = 9,
+		usable_in = "both", target = "self", data = { mp = 2 }, messages = { used = "Used %s." }, use = use }))
+	eq(f.power, 9); eq(f["data.mp"], 2); eq(f["messages.used"], "Used %s."); eq(f.use, nil)
+	f = assert(schema.validate(kind, { name = "Bomb", category = "consumable", use = use }))
+	eq(f.usable_in, "fight"); eq(f.target, "enemy"); eq(f.power, 0)
+	-- category / slot / stacking / consumable consistency
 	has(errors({ slot = "armor" }), "field 'slot' must be \"weapon\" for category weapon")
-	has(errors({ category = "consumable", slot = "weapon", attack = 0, use_effects = { { kind = "heal_hp", amount = 1 } } }),
+	has(errors({ category = "consumable", slot = "weapon", attack = 0, use = use }),
 		"field 'slot' must be absent for category consumable")
 	has(errors({ max_stack = 5 }), "max_stack must be 1 for gear")
-	has(errors({ use_effects = { { kind = "heal_hp", amount = 1 } } }), "use_effects are for consumables")
-	has(errors({ category = "consumable" }), "attack and defense are for gear")
-	has(errors({ category = "consumable", attack = 0 }), "missing field 'use_effects'")
+	has(errors({ use = use }), "use/can_use/messages/data: for consumables, not weapon (gear has attack, defense and modifiers)")
+	has(errors({ power = 3, usable_in = "both" }), "power, usable_in: for consumables, not weapon")
+	has(errors({ category = "consumable", use = use }), "attack and defense are for gear")
+	has(errors({ category = "consumable", attack = 0 }), "missing field 'use' (a function: what it does)")
+	has(errors({ category = "consumable", attack = 0, use = use, can_use = "x" }), "field 'can_use' must be a function")
+	has(errors({ category = "consumable", attack = 0, use = use, usable_in = "town" }),
+		'usable_in = "town" needs target = "self"')
 	has(errors({ category = "misc", attack = 0, modifiers = { { kind = "stat", stat = "maxhp", amount = 1 } } }),
 		"modifiers are for gear")
-	has(errors({ category = "misc", attack = 0, use_effects = { { kind = "heal_hp", amount = 1 } } }),
-		"use_effects are for consumables, not misc")
+	has(errors({ category = "misc", attack = 0, messages = { x = "y" } }),
+		"use/can_use/messages/data: for consumables, not misc")
+	has(errors({ use_effects = { { kind = "heal_hp", amount = 1 } } }), "unknown field 'use_effects'")
 	has(errors({ category = "quest", attack = 0, sellable = true }), "quest items can't be sellable")
 	has(errors({ price = 0, sellable = true }), "sellable = true needs a price")
 	has(errors({ category = "sword" }), "field 'category' must be one of weapon, armor, shield, accessory")
 	has(errors({ modifiers = { { kind = "heal_hp", amount = 1 } } }), "modifiers[1].kind must be one of stat")
 	has(errors({ modifiers = { { kind = "stat", stat = "luck", amount = 1 } } }), "modifiers[1].stat must be one of")
-	has(errors({ category = "consumable", attack = 0, use_effects = { { kind = "stat", stat = "maxhp", amount = 1 } } }),
-		"use_effects[1].kind must be one of")
+	has(errors({ modifiers = { { kind = "stat", stat = "maxhp" } } }), "modifiers[1]: missing amount")
+	has(errors({ modifiers = { { kind = "stat", stat = "maxhp", amount = 1, pct = 2 } } }),
+		"modifiers[1]: unknown parameter 'pct' for stat")
 	has(errors({ drop_level = 0 }), "field 'drop_level' must be an integer from 1")
 	has(errors({ weight = 3 }), "unknown field 'weight'")
 end
 
 function T.item_fields_and_overrides()
 	eq(kind.field("modifiers.1.stat").type, "choice"); eq(kind.field("modifiers.3.amount").min, -1000000)
-	eq(kind.field("modifiers.1.kind"), nil); eq(kind.field("use_effects.1.kind"), nil)
-	eq(kind.field("use_effects.2.amount").type, "int"); eq(kind.field("use_effects.1.power"), nil)
+	eq(kind.field("modifiers.1.kind"), nil); eq(kind.field("use_effects.1.amount"), nil)
+	eq(kind.field("power").admin, true); eq(kind.field("messages.used").type, "message"); eq(kind.field("data.x").type, "int")
+	eq(kind.field("usable_in").admin, nil); eq(kind.field("target").admin, nil)
 	eq(kind.field("category").admin, nil); eq(kind.field("max_stack").admin, nil); eq(kind.field("price").admin, true)
 	-- an override can add a modifier the file doesn't have (stat + amount)
 	local f = assert(schema.validate(kind, item()))
 	f["modifiers.1.stat"], f["modifiers.1.amount"] = "strength", 4
-	eq(effects.encode(kind.modifiers(f)), "stat stat=strength amount=4")
+	eq(stats.encode_modifiers(kind.modifiers(f)), "stat stat=strength amount=4")
 	f["modifiers.2.stat"] = "maxhp"   -- no amount: not a modifier
 	eq(#kind.modifiers(f), 1)
 	local names = {}
@@ -180,7 +196,7 @@ function T.item_fields_and_overrides()
 		"modifiers.1.stat,modifiers.1.amount,modifiers.2.stat,modifiers.2.amount")
 	names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.herb)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,price,sellable,use_effects.1.amount")
+	eq(table.concat(names, ","), "name,description,price,sellable,power,messages.full,messages.full_town,messages.used")
 end
 
 function T.display()
@@ -189,13 +205,16 @@ function T.display()
 	eq(table.concat(items.special_lines(blade), ", "), "Strength +50")
 	eq(table.concat(items.attributes(items.get(46)), ", "), "Max HP -50, Strength +50")
 	eq(table.concat(items.attributes(items.get(65)), ", "), "Gold Bonus +10%")
-	eq(table.concat(items.effect_lines(items.get(66)), ", "), "Heal 30")
+	eq(table.concat(items.use_lines(items.get(66)), ", "), "Power 30")
+	eq(#items.use_lines(items.get(1)), 0)
 	eq(items.sell_price(items.get(17)), 13)
 	assert(items.can_sell(items.get(1)) and not items.can_sell(items.get(34)), "sellable")
 	assert(items.usable(items.get(66), "town") and items.usable(items.get(66), "fight"), "herb usable")
 	assert(not items.usable(items.get(1), "fight"), "a stick is not usable")
-	local bomb = { category = "consumable", use_effects = { { kind = "damage", max = 5 } } }
+	local bomb = { category = "consumable", usable_in = "fight", retired = 0 }
 	assert(items.usable(bomb, "fight") and not items.usable(bomb, "town"), "fight-only consumable")
+	bomb.retired = 1
+	assert(not items.usable(bomb, "fight"), "a retired consumable has no code any more")
 end
 
 return T

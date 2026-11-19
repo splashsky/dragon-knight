@@ -3,7 +3,6 @@
 -- (inside a savepoint that is rolled back, so the test database is unchanged).
 local kind = require("lib.content.kinds.classes")
 local spell_kind = require("lib.content.kinds.spells")
-local effects = require("lib.effects")
 local load = require("lib.content.load")
 local schema = require("lib.content.schema")
 local sync = require("lib.content.sync")
@@ -134,7 +133,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-3\n"), "format line first")
+	assert(c1:find("^dk%-content%-4\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it
@@ -214,7 +213,8 @@ function T.sync_apply()
 	eq(dk.db:value("SELECT count(*) FROM classes"), 3, "rolled back")
 end
 
--- The spell files are the original spells table (id, name, MP, type, attribute), ported.
+-- The spell files are the original spells table (id, name, MP, type, attribute), ported:
+-- the attribute is the power; healing and buffs target the caster.
 local ORIGINAL_SPELLS = {
 	{ "heal", "Heal", 5, 10, 1 }, { "revive", "Revive", 10, 25, 1 }, { "life", "Life", 25, 50, 1 },
 	{ "breath", "Breath", 50, 100, 1 }, { "gaia", "Gaia", 75, 150, 1 }, { "hurt", "Hurt", 5, 15, 2 },
@@ -224,7 +224,7 @@ local ORIGINAL_SPELLS = {
 	{ "fury", "Fury", 30, 50, 4 }, { "ward", "Ward", 10, 10, 5 }, { "fend", "Fend", 20, 25, 5 },
 	{ "barrier", "Barrier", 30, 50, 5 },
 }
-local TYPE_EFFECT = { "heal_hp amount=", "damage max=", "sleep chance=", "buff_attack_pct pct=", "buff_defense_pct pct=" }
+local TYPE_TARGET = { "self", "enemy", "enemy", "self", "self" }
 
 function T.load_spells()
 	local k = load.kind("spells")
@@ -232,49 +232,120 @@ function T.load_spells()
 	eq(#k.entities, #ORIGINAL_SPELLS)
 	for id, o in ipairs(ORIGINAL_SPELLS) do
 		local f = assert(k.by_key[o[1]], "no spell file " .. o[1])
-		eq(f.name, o[2], o[1]); eq(f.mp, o[3], o[1] .. " mp")
-		eq(effects.encode(spell_kind.effects(f)), TYPE_EFFECT[o[5]] .. o[4], o[1] .. " effects")
+		eq(f.name, o[2], o[1]); eq(f.mp, o[3], o[1] .. " mp"); eq(f.power, o[4], o[1] .. " power")
 		eq(f.usable_in, o[5] == 1 and "both" or "fight", o[1] .. " usable_in")
+		eq(f.target, TYPE_TARGET[o[5]], o[1] .. " target")
 		assert(f.description ~= "", o[1] .. " description")
+		assert(f["messages.cast"] or f["messages.hit"] or f["messages.asleep"], o[1] .. " messages")
+		eq(type(k.modules[o[1]].cast), "function", o[1] .. " cast")
 		-- the installed database keeps the original ids
 		eq(dk.db:value("SELECT id FROM spells WHERE key = ?", o[1]), id, o[1] .. " id")
-		eq(dk.db:value("SELECT effects FROM spells WHERE key = ?", o[1]), TYPE_EFFECT[o[5]] .. o[4], o[1] .. " stored")
+		eq(dk.db:value("SELECT power || '|' || target FROM spells WHERE key = ?", o[1]), o[4] .. "|" .. TYPE_TARGET[o[5]],
+			o[1] .. " stored")
 	end
+	eq(k.by_key.hurt["messages.enemy.hit"], "The monster casts %s on you for %d damage.")
+	eq(dk.db:value("SELECT messages FROM spells WHERE key = 'sleep'"),
+		"asleep=You have cast the %s spell. The monster is asleep.\n" ..
+		"immune=You have cast the %s spell, but the monster is immune to it.")
+	-- both forms of functions are shipped: inline (heal) and free-standing (hurt)
+	local function source(key)
+		local f = assert(io.open(load.path(spell_kind, key), "rb"))
+		local text = f:read("a")
+		f:close()
+		return text
+	end
+	assert(source("heal"):find("cast = function(s)", 1, true), "heal: inline")
+	assert(source("hurt"):find("local function cast(s)", 1, true) and source("hurt"):find("cast = cast,", 1, true),
+		"hurt: free-standing")
 end
 
 function T.validate_spells()
 	local function spell(over)
-		local d = { name = "Zap", mp = 3, effects = { { kind = "damage", max = 9 } } }
+		local d = { name = "Zap", mp = 3, power = 9, cast = function() end }
 		for k, v in pairs(over or {}) do d[k] = v end
 		return d
 	end
 	local flat = assert(schema.validate(spell_kind, spell()))
-	eq(flat.usable_in, "fight"); eq(flat.description, "")
-	eq(flat["effects.1.kind"], "damage"); eq(flat["effects.1.max"], 9); eq(flat["effects.1.min"], nil)
-	flat = assert(schema.validate(spell_kind, spell({ usable_in = "both", effects = { { kind = "heal_mp", amount = 4 } } })))
+	eq(flat.usable_in, "fight"); eq(flat.target, "enemy"); eq(flat.description, ""); eq(flat.power, 9)
+	eq(flat.cast, nil, "functions are not data")
+	flat = assert(schema.validate(spell_kind, { name = "Zap", mp = 3, cast = function() end }))
+	eq(flat.power, 0, "power defaults to 0")
+	flat = assert(schema.validate(spell_kind, spell({ usable_in = "both", target = "self",
+		can_cast = function() end, data = { min = 4, chance = -2 },
+		messages = { hit = "Hit %s for %d (100%%).", other = function() return "" end, enemy = { hit = "Ouch %d." } } })))
 	eq(flat.usable_in, "both")
+	eq(flat["data.min"], 4); eq(flat["data.chance"], -2)
+	eq(flat["messages.hit"], "Hit %s for %d (100%%)."); eq(flat["messages.enemy.hit"], "Ouch %d.")
+	eq(flat["messages.other"], nil, "message functions are not data")
 	local function errors(over)
 		local ok, errs = schema.validate(spell_kind, spell(over))
 		assert(not ok, "expected errors")
 		return errs
 	end
-	has(errors({ usable_in = "town" }), 'usable_in = "town" needs effects that work outside fights')
+	has(errors({ usable_in = "town" }), 'usable_in = "town" needs target = "self"')
 	has(errors({ usable_in = "anywhere" }), "field 'usable_in' must be one of town, fight, both")
-	has(errors({ effects = {} }), "effects must list at least one effect")
-	local none = spell()
-	none.effects = nil
-	has(select(2, schema.validate(spell_kind, none)), "effects must be a list of effects")
-	has(errors({ effects = { { kind = "damage", max = -1 } } }), "effects[1].max must be an integer from 0")
-	has(errors({ effects = { { kind = "stat", stat = "maxhp", amount = 1 } } }), "effects[1].kind must be one of")
+	has(errors({ target = "all" }), "field 'target' must be one of enemy, self")
+	has(errors({ cast = false }), "field 'cast' must be a function (got boolean)")
+	has(errors({ cast = "zap" }), "field 'cast' must be a function (got string)")
+	has(errors({ can_cast = 1 }), "field 'can_cast' must be a function")
+	has(errors({ messages = "hit" }), "field 'messages' must be a table")
+	has(errors({ messages = { hit = "50% off" } }), "field 'messages.hit' must be a one-line message")
+	has(errors({ messages = { hit = "a %5.1f" } }), "placeholders: %s, %d")
+	has(errors({ messages = { hit = "two\nlines" } }), "field 'messages.hit' must be")
+	has(errors({ messages = { [1] = "x" } }), "field 'messages': bad key 1")
+	has(errors({ messages = { enemy = "x" } }), "field 'messages.enemy' must be a table")
+	has(errors({ data = { min = 1.5 } }), "field 'data.min' must be an integer")
+	has(errors({ data = { ["a-b"] = 1 } }), "field 'data': bad key a-b")
 	has(errors({ mp = -1 }), "field 'mp' must be an integer from 0")
-	has(errors({ power = 3 }), "unknown field 'power'")
-	-- overridable fields: name, description, MP and effect parameters (not the kinds)
-	eq(spell_kind.field("effects.1.max").type, "int"); eq(spell_kind.field("effects.2.chance").max, 15)
-	eq(spell_kind.field("effects.1.kind"), nil); eq(spell_kind.field("effects.1.power"), nil)
-	eq(spell_kind.field("usable_in").admin, nil)
+	has(errors({ power = -3 }), "field 'power' must be an integer from 0")
+	has(errors({ effects = {} }), "unknown field 'effects'")
+	local none = spell()
+	none.cast = nil
+	has(select(2, schema.validate(spell_kind, none)), "missing field 'cast' (a function: what it does)")
+	-- overridable: name, description, MP, power, numbers and message strings
+	eq(spell_kind.field("power").admin, true); eq(spell_kind.field("data.min").type, "int")
+	eq(spell_kind.field("messages.hit").type, "message"); eq(spell_kind.field("messages.enemy.hit").type, "message")
+	eq(spell_kind.field("messages.enemy"), nil); eq(spell_kind.field("cast"), nil)
+	eq(spell_kind.field("usable_in").admin, nil); eq(spell_kind.field("target").admin, nil)
 	local names = {}
 	for _, f in ipairs(spell_kind.admin_fields(load.kind("spells").by_key.hurt)) do names[#names + 1] = f.name end
-	eq(table.concat(names, ","), "name,description,mp,effects.1.max")
+	eq(table.concat(names, ","), "name,description,mp,power,messages.hit,messages.immune,messages.enemy.hit,messages.enemy.immune")
+end
+
+function T.message_placeholders()
+	eq(schema.placeholders("You hit %s for %d (%d%%)."), "s,d,d")
+	eq(schema.placeholders("plain"), "")
+	eq(schema.placeholders("bad %f"), nil); eq(schema.placeholders("bad %"), nil)
+	eq(sync.same_placeholders("A %s %d", "B %s and %d"), true)
+	eq(sync.same_placeholders("A %s %d", "B %d %s"), false)
+	eq(sync.same_placeholders(nil, "B"), false)
+	-- an override with other placeholders than the file's message is skipped by the sync
+	dk.db:exec("SAVEPOINT t")
+	local ok, err = pcall(function()
+		sync.set_override("spells", "hurt", "messages.hit", "Zap %d")
+		sync.set_override("spells", "hurt", "messages.immune", "Nope, %s.")
+		sync.set_override("spells", "hurt", "messages.gone", "x")
+		local skipped = {}
+		local out = sync.effective(spell_kind, "hurt", load.kind("spells").by_key.hurt, skipped)
+		eq(out["messages.hit"], "You have cast the %s spell for %d damage.")
+		eq(out["messages.immune"], "Nope, %s.")
+		eq(out["messages.gone"], nil)
+		table.sort(skipped)
+		eq(table.concat(skipped, "|"), "spell hurt: override of messages.gone ignored (the file has no such message)|" ..
+			"spell hurt: override of messages.hit ignored (other placeholders than the file's message)")
+	end)
+	dk.db:exec("ROLLBACK TO t")
+	dk.db:exec("RELEASE t")
+	assert(ok, err)
+end
+
+-- The fingerprint covers the files' source: an edit of behaviour alone is noticed.
+function T.fingerprint_covers_the_code()
+	local all = load.all()
+	local before = load.canonical(all)
+	assert(before:find("spells\thurt\t#source\t%x+"), "source hash line")
+	all.kinds.spells.entities[1].source = "changed"
+	assert(load.canonical(all) ~= before, "a code-only change changes the canonical text")
 end
 
 return T

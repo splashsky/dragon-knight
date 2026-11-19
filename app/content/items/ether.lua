@@ -5,5 +5,18 @@ return {
 	category = "consumable",
 	price = 80,
 	max_stack = 10,
-	use_effects = { { kind = "heal_mp", amount = 30 } },
+	usable_in = "both",
+	target = "self",
+	power = 30,                     -- the most MP it restores
+	messages = {
+		used = "You have used the %s, and gained %d Magic Points.",
+		full = "Your Magic Points are already full. Please go back and try again.",
+		full_town = "Your Magic Points are already full. You don't need to use the %s now.",
+	},
+	can_use = function(u)
+		if u.caster.mp >= u.caster.maxmp then return u:refuse(u.in_fight and "full" or "full_town", u.name) end
+	end,
+	use = function(u)
+		u:say("used", u.name, u.caster:heal("mp", u.power))
+	end,
 }

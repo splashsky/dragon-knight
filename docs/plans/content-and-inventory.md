@@ -3,8 +3,10 @@
 Status: **done**. Implemented in three phases, each one schema migration with tests, admin
 pages, help pages and changelog lines: A classes + content sync (schema v4) ✅, B spells +
 effects (v5) ✅, C items + inventory + derived stats (v6) ✅. The developer documentation is
-docs/APP.md ("Content", "Classes", "Spells", "Effects", "Items", "Inventory", "Derived stats");
-the Phase C section below notes where the implementation settled details.
+docs/APP.md ("Content", "Classes", "Spells", "Items", "Inventory", "Derived stats");
+the Phase C section below notes where the implementation settled details. Phase D
+(docs/plans/spell-scripting.md, schema v7) later replaced the effects engine of Phase B
+with scripted spells and items (docs/APP.md "Scripting spells and items").
 
 Version: all of this is **2.1** (in development until the project owner says otherwise),
 together with the earlier 2.1 work (difficulty removal, leveling formulas), which already

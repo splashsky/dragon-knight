@@ -1,4 +1,5 @@
--- Unit tests for lib/stats.lua: derived stats (base + equipped items) and their inverse.
+-- Unit tests for lib/stats.lua: derived stats (base + equipped items) and their inverse,
+-- and gear's modifiers (validation, storage, sums).
 local stats = require("lib.stats")
 local T = {}
 
@@ -73,6 +74,36 @@ function T.player_and_clamp()
 	eq(p.expbonus, 0); eq(p.goldbonus, 0); eq(u.attackpower, nil, "the row itself is untouched")
 	local c = stats.clamped(u, s)
 	eq(c.currenthp, 15); eq(c.currentmp, 0); eq(c.currenttp, 10)
+end
+
+function T.modifiers()
+	local list = assert(stats.validate_modifiers({ mod("maxhp", -50), { kind = "stat", stat = "gold_bonus_pct", amount = 10.0 } }))
+	eq(list[1].amount, -50); eq(list[2].amount, 10); eq(math.type(list[2].amount), "integer")
+	assert(stats.validate_modifiers({}), "may be empty")
+	local function errors(l)
+		local ok, errs = stats.validate_modifiers(l)
+		assert(not ok, "expected errors")
+		return table.concat(errs, " | ")
+	end
+	local function has(s, text) assert(s:find(text, 1, true), "no '" .. text .. "' in " .. s) end
+	has(errors("strength"), "must be a list of modifiers")
+	has(errors({ x = 1 }), "must be a list (unexpected key x)")
+	has(errors({ "maxhp" }), "[1] must be a table")
+	has(errors({ { kind = "heal_hp", amount = 5 } }), "[1].kind must be one of stat (got heal_hp)")
+	has(errors({ { kind = "stat", stat = "luck", amount = 1 } }), "[1].stat must be one of maxhp, maxmp")
+	has(errors({ { kind = "stat", stat = "maxhp" } }), "[1]: missing amount")
+	has(errors({ { kind = "stat", stat = "maxhp", amount = 2000000 } }), "[1].amount must be an integer from -1000000 to 1000000")
+	has(errors({ { kind = "stat", stat = "maxhp", amount = 1, max = 3 } }), "[1]: unknown parameter 'max' for stat")
+	-- stored as text, as schema version 6 wrote it
+	local text = stats.encode_modifiers({ mod("maxhp", -50), mod("strength", 50) })
+	eq(text, "stat stat=maxhp amount=-50; stat stat=strength amount=50")
+	local back = stats.decode_modifiers(text)
+	eq(#back, 2); eq(back[1].kind, "stat"); eq(back[1].stat, "maxhp"); eq(back[1].amount, -50); eq(back[2].amount, 50)
+	eq(#stats.decode_modifiers(""), 0)
+	-- sums (unknown kinds or stats don't count)
+	local sum = stats.modifiers({ mod("maxhp", 10), mod("maxhp", -50), mod("strength", 5), { kind = "odd", stat = "maxhp", amount = 1 },
+		mod("luck", 3) })
+	eq(sum.maxhp, -40); eq(sum.strength, 5); eq(sum.luck, nil); eq(sum.dexterity, nil)
 end
 
 return T

@@ -1,8 +1,9 @@
 -- town/inventory.lua :: /inventory -- what the character has equipped and in the bag,
 -- and the actions on it (equip, unequip, use, discard). The rules are lib/inventory.lua's;
 -- every action is a POST (CSRF) that renders the page again with what happened.
+local action = require("lib.action")
+local actors = require("lib.actors")
 local common = require("town.common")
-local effects = require("lib.effects")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
@@ -11,11 +12,8 @@ local view = require("lib.view")
 
 local inv = {}
 
--- effects.refusal() -> what the page says
-local FULL = {
-	hp_full = "Your Hit Points are already full. You don't need to use the %s now.",
-	mp_full = "Your Magic Points are already full. You don't need to use the %s now.",
-	tp_full = "Your Travel Points are already full. You don't need to use the %s now.",
+-- what the page says about an item that can't be used here at all
+local CANNOT = {
 	fight_only = "The %s can only be used in a fight.",
 	cannot = "The %s can't be used.",
 }
@@ -38,7 +36,7 @@ local function page(req, notice)
 		cells[#cells + 1] = {
 			entry = e, item = it, gear = items.is_gear(it), accessory = it.slot == "accessory",
 			quest = it.category == "quest", usable = items.usable(it, "town"),
-			lines = items.is_gear(it) and items.attributes(it) or items.effect_lines(it),
+			lines = items.is_gear(it) and items.attributes(it) or items.use_lines(it),
 		}
 	end
 	return view.page(req, "Inventory", "town/inventory", {
@@ -99,21 +97,29 @@ function inv.unequip(req, params)
 	return page(req, { "You took off the " .. e.item.name .. ". It is in your bag now." })
 end
 
--- POST /inventory/use/#id: a consumable whose effects work outside fights.
+-- POST /inventory/use/#id: a consumable usable outside fights, run through its content
+-- file's code (lib/action.lua) with the player as caster.
 function inv.use(req, params)
 	local user = req.user
 	local e = bag_entry(req, params.id)
 	if not e then return common.cheat(req) end
 	local item = e.item
+	if not items.usable(item, "town") then
+		local fight_only = item.category == "consumable" and item.retired == 0 and item.usable_in == "fight"
+		return page(req, { (fight_only and CANNOT.fight_only or CANNOT.cannot):format(item.name) })
+	end
 	local st = game.player(user)
-	local refused = not items.usable(item, "town") and (item.category == "consumable" and "fight_only" or "cannot") or
-									effects.refusal(item.use_effects, { player = st, in_fight = false })
-	if refused then return page(req, { (FULL[refused] or FULL.cannot):format(item.name) }) end
-	local lines = effects.apply(item.use_effects, { player = st, in_fight = false, intro = "You have used the " .. item.name })
+	local player = actors.player(st)
+	local r = action.perform({
+		kind = "item", entity = item, caster = player, target = item.target == "self" and player or nil,
+		in_fight = false, rand = php.rand,
+	})
+	if not r.ok then return page(req, { r.reason == "cannot" and CANNOT.cannot:format(item.name) or r.refused }) end
+	actors.apply(st, r.events)
 	inventory.take(e, 1)
 	dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
 						 php.mysql_uint(st.currenthp), php.mysql_uint(st.currentmp), php.mysql_uint(st.currenttp), user.id)
-	return page(req, lines)
+	return page(req, r.lines)
 end
 
 -- GET /inventory/discard/#id: confirmation (how many, for a stack).

@@ -52,7 +52,7 @@ function game.stats(user)
 end
 
 -- A copy of the users row with the effective stats under the original game's column
--- names (maxhp, attackpower, expbonus, ...): what the fight code and the effects engine use.
+-- names (maxhp, attackpower, expbonus, ...): what the fight code and the spell and item actions use.
 function game.player(user)
 	return stats.player(user, inventory.stats(user))
 end

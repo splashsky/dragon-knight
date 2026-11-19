@@ -211,8 +211,9 @@ ALTER TABLE control DROP COLUMN class3name;
 end
 
 -- 5: spells become content (app/content/spells/<key>.lua, synced into spells; what they do
--- is a list of effects, lib/effects.lua) and the spells a character knows move from the
--- users.spells comma list to user_spells. The original spells keep ids 1-19 and get their
+-- is a list of effects, the engine of the time, until version 7 scripted them) and the
+-- spells a character knows move from the users.spells comma list to user_spells. The
+-- original spells keep ids 1-19 and get their
 -- keys; type + attribute become one effect (1 heal_hp amount, 2 damage max, 3 sleep chance,
 -- 4 buff_attack_pct pct, 5 buff_defense_pct pct). Admin edits of the name, MP and attribute
 -- go to content_adopt (kept as overrides by the sync at the end of `dk migrate` where they
@@ -451,7 +452,6 @@ end
 
 local function v6_items_content()
 	local db = dk.db
-	local effects = require("lib.effects")
 	local php = require("lib.php")
 	local stats = require("lib.stats")
 	local old_items = db:query("SELECT * FROM items ORDER BY id")
@@ -503,7 +503,7 @@ CREATE TABLE items_new (
 	local function insert(id, key, name, r)
 		db:exec("INSERT INTO items_new (id, key, name, category, slot, price, attack, defense, modifiers, " ..
 						"drop_level, sellable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", id, key, name, r.category, r.slot,
-						r.price, r.attack, r.defense, effects.encode(r.modifiers), r.drop_level, r.price > 0 and 1 or 0)
+						r.price, r.attack, r.defense, stats.encode_modifiers(r.modifiers), r.drop_level, r.price > 0 and 1 or 0)
 		rows[id] = r
 	end
 	for _, it in ipairs(old_items) do
@@ -705,13 +705,12 @@ end
 local function v6_after_sync()
 	local db = dk.db
 	if not db:value("SELECT 1 FROM temp.sqlite_master WHERE name = 'v6_expected'") then return end
-	local effects = require("lib.effects")
 	local stats = require("lib.stats")
 	for _, e in ipairs(db:query("SELECT * FROM temp.v6_expected ORDER BY user_id")) do
 		local u = db:first("SELECT * FROM users WHERE id = ?", e.user_id)
 		local list = db:query("SELECT i.attack, i.defense, i.modifiers FROM user_items ui JOIN items i ON i.id = ui.item_id " ..
 													"WHERE ui.user_id = ? AND ui.equipped IS NOT NULL", e.user_id)
-		for _, it in ipairs(list) do it.modifiers = effects.decode(it.modifiers) end
+		for _, it in ipairs(list) do it.modifiers = stats.decode_modifiers(it.modifiers) end
 		local mods = stats.item_mods(list)
 		local diff = stats.diff(stats.derive(u, mods), e)
 		if #diff > 0 then
@@ -727,6 +726,86 @@ local function v6_after_sync()
 	db:exec("DROP TABLE temp.v6_expected")
 end
 
+-- 7: spells and consumables are scripted (lib/action.lua): what they do is their content
+-- file's code (cast / use); their numbers and texts are data. spells.effects and
+-- items.use_effects go; spells get power, target, messages and data, items usable_in,
+-- target, power, messages and data (the sync at the end of `dk migrate` fills them in from
+-- the files). Rows without a file (retired) keep their old first effect's amount as power
+-- and a target and usable_in that fit it, for display: they can't be cast or used any
+-- more (they have no code). Admin overrides and pending adoptions of an effect's amount
+-- ("effects.1.max", "use_effects.1.amount") become power overrides; those of other effect
+-- parameters can't be kept (reported).
+local V7_POWER = { heal_hp = "amount", heal_mp = "amount", heal_tp = "amount", damage = "max", sleep = "chance",
+	buff_attack_pct = "pct", buff_defense_pct = "pct" }
+local V7_SELF = { heal_hp = true, heal_mp = true, heal_tp = true, buff_attack_pct = true, buff_defense_pct = true }
+local V7_TOWN = { heal_hp = true, heal_mp = true, heal_tp = true }
+
+-- A stored effect list ("damage max=15; sleep chance=5") -> the first effect's kind, its
+-- amount (the new power) and whether every effect worked outside fights.
+local function v7_effects(text)
+	local kind, power, town, n = nil, 0, true, 0
+	for part in tostring(text or ""):gmatch("[^;]+") do
+		local words = {}
+		for w in part:gmatch("%S+") do words[#words + 1] = w end
+		if words[1] then
+			n = n + 1
+			if not V7_TOWN[words[1]] then town = false end
+			if n == 1 then
+				kind = words[1]
+				for i = 2, #words do
+					local k, v = words[i]:match("^([%w_]+)=(.*)$")
+					if k and k == V7_POWER[kind] then power = math.tointeger(tonumber(v)) or 0 end
+				end
+			end
+		end
+	end
+	return kind, power, town and n > 0
+end
+
+local function v7_scripted()
+	local db = dk.db
+	db:exec_script([[
+ALTER TABLE spells ADD COLUMN power INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE spells ADD COLUMN target TEXT NOT NULL DEFAULT 'enemy';
+ALTER TABLE spells ADD COLUMN messages TEXT NOT NULL DEFAULT '';
+ALTER TABLE spells ADD COLUMN data TEXT NOT NULL DEFAULT '';
+ALTER TABLE items ADD COLUMN usable_in TEXT NOT NULL DEFAULT 'fight';
+ALTER TABLE items ADD COLUMN target TEXT NOT NULL DEFAULT 'enemy';
+ALTER TABLE items ADD COLUMN power INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE items ADD COLUMN messages TEXT NOT NULL DEFAULT '';
+ALTER TABLE items ADD COLUMN data TEXT NOT NULL DEFAULT '';
+]])
+	for _, r in ipairs(db:query("SELECT id, effects FROM spells ORDER BY id")) do
+		local kind, power = v7_effects(r.effects)
+		db:exec("UPDATE spells SET power = ?, target = ? WHERE id = ?", power, V7_SELF[kind] and "self" or "enemy", r.id)
+	end
+	for _, r in ipairs(db:query("SELECT id, use_effects FROM items WHERE category = 'consumable' ORDER BY id")) do
+		local kind, power, town = v7_effects(r.use_effects)
+		db:exec("UPDATE items SET power = ?, target = ?, usable_in = ? WHERE id = ?", power,
+						V7_SELF[kind] and "self" or "enemy", town and "both" or "fight", r.id)
+	end
+	-- effect amounts -> power (fixed table names)
+	for _, tbl in ipairs({ "content_overrides", "content_adopt" }) do
+		local rows = db:query("SELECT kind, key, field, value FROM " .. tbl .. " WHERE (kind = 'spells' AND field LIKE " ..
+													"'effects.%') OR (kind = 'items' AND field LIKE 'use_effects.%') ORDER BY kind, key, field")
+		for _, r in ipairs(rows) do
+			db:exec("DELETE FROM " .. tbl .. " WHERE kind = ? AND key = ? AND field = ?", r.kind, r.key, r.field)
+			local i, param = r.field:match("^[%a_]+%.(%d+)%.([%a_]+)$")
+			if i == "1" and (param == "amount" or param == "max" or param == "chance" or param == "pct") then
+				db:exec("INSERT OR REPLACE INTO " .. tbl .. " (kind, key, field, value) VALUES (?, ?, 'power', ?)",
+								r.kind, r.key, r.value)
+			else
+				print(("warning: %s %s: the edit of %s (%s) can't be kept: spells and items are scripted now, " ..
+					"with one power"):format(r.kind == "spells" and "spell" or "item", r.key, r.field, r.value))
+			end
+		end
+	end
+	db:exec_script([[
+ALTER TABLE spells DROP COLUMN effects;
+ALTER TABLE items DROP COLUMN use_effects;
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -738,6 +817,8 @@ migrations.STEPS = {
 		"(admin edits are kept as overrides)", up = v5_spells_content },
 	{ name = "items and drops are content files; inventories (user_items), shop lists (town_items) and " ..
 		"base stats (admin edits are kept as overrides)", up = v6_items_content, after_sync = v6_after_sync },
+	{ name = "spells and consumables are scripted content (their effects become code in the content files; " ..
+		"edited amounts are kept as power overrides)", up = v7_scripted },
 }
 
 migrations.VERSION = #migrations.STEPS

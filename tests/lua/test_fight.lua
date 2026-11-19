@@ -1,9 +1,13 @@
--- Unit tests for app/fight/combat.lua: scripted dice, outcomes computed by hand from
--- the original fight.php (level-up thresholds and TP/HP bonuses: lib/leveling.lua). The
--- fake rand applies PHP's argument casting (truncate, swap) and records the (min, max) it
--- was called with, so tests also pin the exact legacy rolls.
+-- Unit tests for app/fight/combat.lua and the spell and item turns (fight/act.lua with the
+-- spell and item content files): scripted dice, outcomes computed by hand from the
+-- original fight.php (level-up thresholds and TP/HP bonuses: lib/leveling.lua). The fake
+-- rand applies PHP's argument casting (truncate, swap) and records the (min, max) it was
+-- called with, so tests also pin the exact legacy rolls.
+local act = require("fight.act")
 local combat = require("fight.combat")
+local items = require("lib.items")
 local php = require("lib.php")
+local spells = require("lib.spells")
 local T = {}
 
 -- rand that returns `values` in order and records the PHP-cast ranges.
@@ -43,9 +47,11 @@ local function player(over)
 	return p
 end
 
--- a spells row as lib/spells.lua returns it: one effect
-local function spell(name, mp, usable_in, kind, param, value)
-	return { name = name, mp = mp, usable_in = usable_in, effects = { { kind = kind, [param] = value } } }
+-- a spells row (lib/spells.lua) of a content file, with changed fields (as overrides would)
+local function spell(key, over)
+	local s = assert(spells.get(dk.db:value("SELECT id FROM spells WHERE key = ?", key)), key)
+	for k, v in pairs(over or {}) do s[k] = v end
+	return s
 end
 
 -- seed rows
@@ -162,69 +168,81 @@ function T.monster_sleep_and_wake()
 	eq(lines[2], "The monster attacks you for 3 damage."); eq(st.currentmonstersleep, 0); eq(st.currenthp, 12)
 end
 
+-- A spell turn (fight/act.lua): lines, killed, or the refusal.
+local function cast(st, s, rand)
+	local r = act.run({ st = st, monster = CREATURE, rand = rand }, { kind = "spell", spell = s })
+	return r.lines or r.refused, r.killed, r
+end
+
 function T.spells()
-	local heal = spell("Heal", 5, "both", "heal_hp", "amount", 10)
+	local heal = spell("heal")
 	local st = player({ currenthp = 10, maxhp = 15, currentmp = 9 })
 	local d = dice({})
-	local lines = combat.cast(st, heal, d.rand)
+	local lines = cast(st, heal, d.rand)
 	eq(lines[1], "You have cast the Heal spell, and gained 5 Hit Points.")
 	eq(st.currenthp, 15); eq(st.currentmp, 4)
 
 	-- Hurt 15: rand((15/6)*5 = 12.5 -> 12, 15)
-	local hurt = spell("Hurt", 5, "fight", "damage", "max", 15)
+	local hurt = spell("hurt")
 	st = player({ currentmonsterhp = 20, currentmp = 5 })
 	d = dice({ 13 })
 	local killed
-	lines, killed = combat.cast(st, hurt, d.rand)
+	lines, killed = cast(st, hurt, d.rand)
 	ranges(d, "12,15"); eq(lines[1], "You have cast the Hurt spell for 13 damage.")
 	eq(st.currentmonsterhp, 7); eq(st.currentmp, 0); eq(killed, false)
 	-- Pain 35: (35/6)*5 = 29.166.. -> 29
 	st = player({ currentmonsterhp = 20, currentmp = 12 })
 	d = dice({ 29 })
-	lines, killed = combat.cast(st, spell("Pain", 12, "fight", "damage", "max", 35), d.rand)
+	lines, killed = cast(st, spell("pain"), d.rand)
 	ranges(d, "29,35"); eq(killed, true)
 	-- immune (1 or 2) to hurt: no roll, MP still spent
 	st = player({ currentmonsterhp = 20, currentmp = 5, currentmonsterimmune = 1 })
 	d = dice({})
-	lines = combat.cast(st, hurt, d.rand)
+	lines = cast(st, hurt, d.rand)
 	eq(lines[1], "You have cast the Hurt spell, but the monster is immune to it.")
 	eq(st.currentmonsterhp, 20); eq(st.currentmp, 0)
+	-- an overridden power changes the roll
+	st = player({ currentmonsterhp = 50, currentmp = 5 })
+	d = dice({ 20 })
+	cast(st, spell("hurt", { power = 24 }), d.rand)
+	ranges(d, "20,24"); eq(st.currentmonsterhp, 30)
 
-	local sleep = spell("Sleep", 10, "fight", "sleep", "chance", 5)
+	local sleep = spell("sleep")
 	st = player({ currentmp = 10, currentmonsterimmune = 1 })   -- immune 1 doesn't stop sleep
-	lines = combat.cast(st, sleep, dice({}).rand)
+	lines = cast(st, sleep, dice({}).rand)
 	eq(lines[1], "You have cast the Sleep spell. The monster is asleep."); eq(st.currentmonstersleep, 5)
 	st = player({ currentmp = 10, currentmonsterimmune = 2 })
-	lines = combat.cast(st, sleep, dice({}).rand)
+	lines = cast(st, sleep, dice({}).rand)
 	eq(lines[1], "You have cast the Sleep spell, but the monster is immune to it.")
 	eq(st.currentmonstersleep, 0); eq(st.currentmp, 0)
 
 	st = player({ currentmp = 30 })
-	lines = combat.cast(st, spell("Rage", 20, "fight", "buff_attack_pct", "pct", 25), dice({}).rand)
+	lines = cast(st, spell("rage"), dice({}).rand)
 	eq(lines[1], "You have cast the Rage spell, and will gain 25% damage until the end of this fight.")
 	eq(st.currentuberdamage, 25); eq(st.currentmp, 10)
-	lines = combat.cast(st, spell("Ward", 10, "fight", "buff_defense_pct", "pct", 10), dice({}).rand)
+	lines = cast(st, spell("ward"), dice({}).rand)
 	eq(lines[1], "You have cast the Ward spell, and will gain 10% defense until the end of this fight.")
 	eq(st.currentuberdefense, 10); eq(st.currentmp, 0)
 end
 
 function T.cast_refusals()
-	local heal = spell("Heal", 5, "both", "heal_hp", "amount", 10)
+	local heal = spell("heal")
 	local full = "Your Hit Points are already full. Please go back and try again."
-	eq(combat.cast_error(player({ currenthp = 14, maxhp = 15 }), heal), nil)
-	eq(combat.cast_error(player({ currenthp = 15, maxhp = 15 }), heal), full)
-	eq(combat.cast_error(player({ currenthp = 20, maxhp = 15 }), heal), full)   -- above max (a drop)
-	for _, e in ipairs({ { "damage", "max" }, { "sleep", "chance" }, { "buff_attack_pct", "pct" },
-											 { "buff_defense_pct", "pct" } }) do
-		eq(combat.cast_error(player(), spell("X", 5, "fight", e[1], e[2], 1)), nil)
+	local function refused(st, s)
+		local before = st.currentmp
+		local _, _, r = cast(st, s, dice({}).rand)
+		if r.refused then eq(st.currentmp, before, "no MP spent") end
+		return r.refused
 	end
-	-- unknown effects, no effects, a passive effect or a town-only spell: refused
+	eq(refused(player({ currenthp = 14, maxhp = 15 }), heal), nil)
+	eq(refused(player({ currenthp = 15, maxhp = 15 }), heal), full)
+	eq(refused(player({ currenthp = 20, maxhp = 15 }), heal), full)   -- above max (a drop)
+	for _, key in ipairs({ "sleep", "craze", "ward" }) do eq(refused(player(), spell(key)), nil) end
+	-- not castable in fights, retired (the file and its code are gone) or without a file
 	local cannot = "This spell cannot be cast. Please go back and try again."
-	eq(combat.cast_error(player(), spell("Odd", 5, "fight", "fireball", "amount", 1)), cannot)
-	eq(combat.cast_error(player(), { name = "Empty", mp = 5, usable_in = "fight", effects = {} }), cannot)
-	eq(combat.cast_error(player(), { name = "Ring", mp = 5, usable_in = "fight",
-		effects = { { kind = "stat", stat = "maxhp", amount = 5 } } }), cannot)
-	eq(combat.cast_error(player({ currenthp = 1 }), spell("Mend", 5, "town", "heal_hp", "amount", 10)), cannot)
+	eq(refused(player({ currenthp = 1 }), spell("heal", { usable_in = "town" })), cannot)
+	eq(refused(player({ currenthp = 1 }), spell("heal", { retired = 1 })), cannot)
+	eq(refused(player({ currenthp = 1 }), spell("heal", { key = "gone" })), cannot)
 end
 
 function T.run_chance()
@@ -343,24 +361,24 @@ function T.drop_roll_and_pick()
 	eq(combat.pick({}, dice({}).rand), nil)
 end
 
--- Using a consumable (combat.use_error / combat.use): an items row with decoded effects.
+-- Using a consumable (fight/act.lua with the item's content file).
 function T.use_item()
-	local herb = { name = "Herb", category = "consumable", use_effects = { { kind = "heal_hp", amount = 30 } } }
+	local function use(st, it, rand)
+		local r = act.run({ st = st, monster = CREATURE, rand = rand }, { kind = "item", item = it })
+		return r.lines or r.refused, r.killed
+	end
+	local herb = items.by_key("herb")
 	local st = player({ currenthp = 5, maxhp = 100, currentmonsterhp = 20 })
-	eq(combat.use_error(st, herb), nil)
-	local lines, killed = combat.use(st, herb, dice({}).rand)
+	local lines, killed = use(st, herb, dice({}).rand)
 	eq(lines[1], "You have used the Herb, and gained 30 Hit Points."); eq(killed, false); eq(st.currenthp, 35)
-	-- refusals: full, not a consumable, nothing to do
-	eq(combat.use_error(player({ currenthp = 15, maxhp = 15 }), herb),
+	-- refusals: full, not a consumable
+	eq(use(player({ currenthp = 15, maxhp = 15 }), herb, dice({}).rand),
 		"Your Hit Points are already full. Please go back and try again.")
-	eq(combat.use_error(player(), { name = "Stick", category = "weapon", use_effects = {} }),
-		"This item cannot be used. Please go back and try again.")
-	-- a damaging item hurts the monster (rolls like a Hurt spell) and may kill it
-	local bomb = { name = "Bomb", category = "consumable", use_effects = { { kind = "damage", max = 12 } } }
-	st = player({ currentmonsterhp = 10 })
-	local d = dice({ 11 })
-	lines, killed = combat.use(st, bomb, d.rand)
-	ranges(d, "10,12"); eq(lines[1], "You have used the Bomb for 11 damage."); eq(killed, true)
+	eq(use(player(), items.by_key("stick"), dice({}).rand), "This item cannot be used. Please go back and try again.")
+	-- the Ether restores MP
+	st = player({ currentmp = 2, maxmp = 20 })
+	lines = use(st, items.by_key("ether"), dice({}).rand)
+	eq(lines[1], "You have used the Ether, and gained 18 Magic Points."); eq(st.currentmp, 20)
 end
 
 return T

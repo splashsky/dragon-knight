@@ -1,16 +1,17 @@
-{#- Item list (admin/items.lua). ctx: rows { it (items row, decoded), attributes, effects (as
-		text), users, overrides }, status (content_sync.status()). -#}
+{#- Item list (admin/items.lua). ctx: rows { it (items row, decoded), attributes, use (a
+		consumable's power), users, overrides }, status (content_sync.status()). -#}
 <h1 class="admin-heading">Items</h1>
 <p>Items are content files, <code>app/content/items/&lt;key&gt;.lua</code>; the game picks up a new
 or edited file on the next page load. Click an item to override its name, description,
-price, power, modifiers, drop settings and use effects on this server. What towns sell is
+price, attack and defense, modifiers, drop settings and a consumable's power and messages on
+this server. What towns sell is
 edited with the towns (<a href="/admin/towns">Edit Towns</a>).</p>
 <table class="admin-list admin-items">
-<tr><th>ID</th><th>Item</th><th>Key</th><th>Category</th><th>Price</th><th>Attributes</th><th>Use</th><th>Drop level</th><th>Characters</th><th>Overrides</th></tr>
+<tr><th>ID</th><th>Item</th><th>Key</th><th>Category</th><th>Price</th><th>Attributes</th><th>Power</th><th>Drop level</th><th>Characters</th><th>Overrides</th></tr>
 {%- for _, r in ipairs(rows) do %}
 <tr><td class="admin-id">{{ r.it.id }}</td><td><a href="/admin/items/{{ r.it.id }}">{{ r.it.name }}</a>
 {%- if r.it.retired ~= 0 then %} <span class="highlight">(retired)</span>{% end %}</td>
-<td>{{ r.it.key }}</td><td>{{ r.it.category }}</td><td>{{ r.it.price }}</td><td>{{ r.attributes }}</td><td>{{ r.effects }}</td>
+<td>{{ r.it.key }}</td><td>{{ r.it.category }}</td><td>{{ r.it.price }}</td><td>{{ r.attributes }}</td><td>{{ r.use }}</td>
 <td>{{ r.it.drop_level }}</td><td>{{ r.users }}</td><td>{{ r.overrides }}</td></tr>
 {%- end %}
 </table>
@@ -20,4 +21,6 @@ edited with the towns (<a href="/admin/towns">Edit Towns</a>).</p>
 item's key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it.
 Give it a <code>drop_level</code> for monsters to drop it, or add it to a town's shop in
 <a href="/admin/towns">Edit Towns</a>. Deleting a file retires its item: shops stop selling it and
-monsters stop dropping it, but characters keep theirs. Run <code>dk check</code> to validate the files.</p>
+monsters stop dropping it, but characters keep theirs (a retired consumable can't be used any
+more: what it does is its file's <code>use</code> function). Run <code>dk check</code> to validate
+the files.</p>

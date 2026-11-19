@@ -3,7 +3,9 @@
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
--- The dice and formulas live in fight/combat.lua; this module loads and saves state.
+-- The dice and formulas live in fight/combat.lua, the player's actions run through
+-- fight/act.lua; this module loads and saves state.
+local act = require("fight.act")
 local auth = require("lib.auth")
 local classes = require("lib.classes")
 local combat = require("fight.combat")
@@ -97,6 +99,7 @@ local function fight(req)
 
 	local page = { monstername = monster.name, yourturn = {}, monsterturn = {} }
 	local died = false
+	local state = { st = st, monster = monster, rand = rand }
 
 	if form.run ~= nil then
 		-- fixed: legacy always let the player escape (a failed run's damage was never saved,
@@ -113,10 +116,10 @@ local function fight(req)
 		page.monsterturn, died = monster_turn(user, st, monster, false)
 
 	elseif form.fight ~= nil then
-		local killed
-		page.yourturn, killed = combat.attack(st, monster, rand)
+		local r = act.run(state, { kind = "attack" })
+		page.yourturn = r.lines
 		page.monsterhp = st.currentmonsterhp
-		if killed then
+		if r.killed then
 			-- fixed: legacy saved only currentmonsterhp; currentmonster is saved too so a
 			-- first-turn kill (monster picked in this request) is credited to the right monster.
 			dk.db:exec("UPDATE users SET currentmonsterhp = 0, currentmonster = ? WHERE id = ?",
@@ -139,12 +142,12 @@ local function fight(req)
 		if st.currentmp < spell.mp then
 			return error_page(req, "You do not have enough Magic Points to cast this spell. Please go back and try again.")
 		end
-		local refused = combat.cast_error(st, spell)
-		if refused then return error_page(req, refused) end
-		local killed
-		page.yourturn, killed = combat.cast(st, spell, rand)
+		local r = act.run(state, { kind = "spell", spell = spell })
+		-- refusal texts may come from content files and admin overrides: escaped
+		if r.refused then return error_page(req, dk.html(r.refused)) end
+		page.yourturn = r.lines
 		page.monsterhp = st.currentmonsterhp
-		if killed then
+		if r.killed then
 			dk.db:exec([[UPDATE users SET currentmonsterhp = 0, currenthp = ?, currentmp = ?,
 				currentmonster = ? WHERE id = ?]], st.currenthp, st.currentmp, st.currentmonster, user.id)
 			return view.redirect("/victory")
@@ -163,13 +166,12 @@ local function fight(req)
 		if not entry then
 			return error_page(req, "You do not have this item. Please go back and try again.")
 		end
-		local refused = combat.use_error(st, entry.item)
-		if refused then return error_page(req, refused) end
+		local r = act.run(state, { kind = "item", item = entry.item })
+		if r.refused then return error_page(req, dk.html(r.refused)) end
 		inventory.take(entry, 1)
-		local killed
-		page.yourturn, killed = combat.use(st, entry.item, rand)
+		page.yourturn = r.lines
 		page.monsterhp = st.currentmonsterhp
-		if killed then
+		if r.killed then
 			dk.db:exec([[UPDATE users SET currentmonsterhp = 0, currenthp = ?, currentmp = ?, currenttp = ?,
 				currentmonster = ? WHERE id = ?]], st.currenthp, st.currentmp, st.currenttp, st.currentmonster, user.id)
 			return view.redirect("/victory")

@@ -6,12 +6,9 @@
 -- `st` is a mutable copy of the users row with the effective stats under the original
 -- column names (game.player: maxhp, strength, attackpower, expbonus, ...; the legacy
 -- in-memory $userrow); messages are returned as lists of plain-text lines (escaped by the
--- templates).
-local effects = require("lib.effects")
-local items = require("lib.items")
+-- templates). Spells and items are scripted content run by fight/act.lua.
 local leveling = require("lib.leveling")
 local php = require("lib.php")
-local spells = require("lib.spells")
 
 local combat = {}
 
@@ -120,51 +117,6 @@ function combat.attack(st, monster, rand)
 	end
 	lines[#lines + 1] = "You attack the monster for " .. damage .. " damage."
 	st.currentmonsterhp = st.currentmonsterhp - damage
-	return lines, st.currentmonsterhp <= 0
-end
-
--- Why `spell` (known and affordable; a spells row with decoded effects, lib/spells.lua)
--- can't be cast in combat, or nil when it can.
--- fixed: legacy let a heal spell cost MP at full HP (and heal a negative amount above max
--- HP), and spells of an unknown type were a free no-op turn.
-local FULL = {
-	hp_full = "Your Hit Points are already full. Please go back and try again.",
-	mp_full = "Your Magic Points are already full. Please go back and try again.",
-	tp_full = "Your Travel Points are already full. Please go back and try again.",
-}
-
-function combat.cast_error(st, spell)
-	local refused = not spells.usable(spell, "fight") and "cannot" or
-									effects.refusal(spell.effects, { player = st, in_fight = true })
-	if refused == nil then return nil end
-	return FULL[refused] or "This spell cannot be cast. Please go back and try again."
-end
-
--- Casting `spell` in combat (lib/effects.lua does the work); the caller has checked it is
--- known and affordable and that combat.cast_error allows it. Returns lines, monster_killed.
-function combat.cast(st, spell, rand)
-	local lines = effects.apply(spell.effects, {
-		player = st, in_fight = true, rand = rand, intro = "You have cast the " .. spell.name .. " spell",
-	})
-	st.currentmp = st.currentmp - spell.mp
-	return lines, st.currentmonsterhp <= 0
-end
-
--- Why the consumable `item` (an items row with decoded use effects, lib/items.lua) can't
--- be used in combat, or nil when it can. Like spells, a refused item costs nothing.
-function combat.use_error(st, item)
-	local refused = not items.usable(item, "fight") and "cannot" or
-									effects.refusal(item.use_effects, { player = st, in_fight = true })
-	if refused == nil then return nil end
-	return FULL[refused] or "This item cannot be used. Please go back and try again."
-end
-
--- Using a consumable in combat (its use effects; the caller takes it out of the bag).
--- Returns lines, monster_killed.
-function combat.use(st, item, rand)
-	local lines = effects.apply(item.use_effects, {
-		player = st, in_fight = true, rand = rand, intro = "You have used the " .. item.name,
-	})
 	return lines, st.currentmonsterhp <= 0
 end
 

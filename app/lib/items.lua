@@ -1,10 +1,12 @@
 -- items.lua :: items as the game uses them (rows of the items table, synced from
 -- app/content/items/*.lua; see lib/content/), what towns sell (town_items) and how items
--- are described. Rows come back with `modifiers` and `use_effects` decoded into lists
--- (lib/effects.lua).
-local effects = require("lib.effects")
+-- are described. Rows come back with `modifiers` decoded into a list (lib/stats.lua) and
+-- `messages` and `data` into tables (lib/content/scripted.lua); what a consumable does is
+-- its file's use (lib/action.lua).
 local kind = require("lib.content.kinds.items")
 local php = require("lib.php")
+local scripted = require("lib.content.scripted")
+local stats = require("lib.stats")
 
 local items = {}
 
@@ -26,8 +28,9 @@ items.STAT_LABELS = {
 
 function items.decode(row)
 	if row then
-		row.modifiers = effects.decode(row.modifiers)
-		row.use_effects = effects.decode(row.use_effects)
+		row.modifiers = stats.decode_modifiers(row.modifiers)
+		row.messages = scripted.decode_messages(row.messages)
+		row.data = scripted.decode_data(row.data)
 	end
 	return row
 end
@@ -98,11 +101,11 @@ function items.can_sell(item)
 	return item.sellable ~= 0 and item.category ~= "quest"
 end
 
--- Whether a bag item can be used in `place` ("town" or "fight"): consumables with use
--- effects; in town only when every effect works outside fights (heals).
+-- Whether a bag item can be used in `place` ("town" or "fight"): consumables, per their
+-- usable_in. A retired one (its file is gone, and with it what it does) can't be used.
 function items.usable(item, place)
-	if item.category ~= "consumable" or #item.use_effects == 0 then return false end
-	return place == "fight" or effects.town_usable(item.use_effects)
+	if item.category ~= "consumable" or (item.retired or 0) ~= 0 then return false end
+	return item.usable_in == "both" or item.usable_in == place
 end
 
 -- "Max HP +10", "Gold Bonus +10%", "Strength -5".
@@ -131,11 +134,10 @@ function items.special_lines(item)
 	return out
 end
 
--- What using it does: "Heal 30", "Heal MP 30".
-function items.effect_lines(item)
-	local out = {}
-	for _, e in ipairs(item.use_effects) do out[#out + 1] = effects.label(e) .. " " .. effects.attribute(e) end
-	return out
+-- A consumable's power, as a display line: { "Power 30" } (none when it has no power).
+function items.use_lines(item)
+	if item.category ~= "consumable" or (item.power or 0) == 0 then return {} end
+	return { "Power " .. item.power }
 end
 
 return items

@@ -34,12 +34,10 @@ This is not a healing spell. Please go back and try again.
 You do not have enough Magic Points to cast this spell. Please go back and try again.
 {%- elseif key == "spell_fighting" then %}
 You cannot use the Quick Spells list during a fight. Please go back and select the Healing Spell you wish to use from the Spells box on the main fighting screen to continue.
-{%- elseif key == "spell_full" then %}
-Your Hit Points are already full. You don't need to use a Healing spell now.
-{%- elseif key == "spell_full_mp" then %}
-Your Magic Points are already full. You don't need to use this spell now.
-{%- elseif key == "spell_full_tp" then %}
-Your Travel Points are already full. You don't need to use this spell now.
+{%- elseif key == "spell_cannot" then %}
+This spell cannot be cast. Please go back and try again.
+{%- elseif key == "refused" then %}
+{{ text }}
 {%- elseif key == "spell_done" then %}
 {% for _, line in ipairs(lines) do %}{{ line }} {% end %}You can now continue <a href="/">exploring</a>.
 {%- elseif key == "no_user" then %}

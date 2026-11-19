@@ -1,15 +1,19 @@
 -- content/kinds/spells.lua :: spells (app/content/spells/<key>.lua) -> the spells table.
--- What a spell does is a list of effects (lib/effects.lua), stored in spells.effects as
--- text; the flat form has them as "effects.1.kind", "effects.1.amount", ... See
--- lib/content/schema.lua for the kind interface and docs/APP.md "Spells" for the file format.
-local effects = require("lib.effects")
+-- A spell file is scripted (docs/APP.md "Scripting spells and items"): its numbers
+-- (mp, power, data) and message strings are data, synced and overridable; what it does is
+-- its cast function (and the optional can_cast), which stays in the file. See
+-- lib/content/schema.lua for the kind interface and lib/content/scripted.lua for the
+-- scripted parts.
+local scripted = require("lib.content.scripted")
 
 local spells = {
 	name = "spells", table = "spells", dir = "content.spells", label = "spell",
-	extra_keys = { effects = true },
+	extra_keys = { messages = true, data = true, cast = true, can_cast = true },
 }
 
 spells.USABLE_IN = { "town", "fight", "both" }
+spells.TARGETS = { "enemy", "self" }
+spells.FUNCTIONS = { { "cast", true }, { "can_cast", false } }
 
 spells.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
@@ -17,60 +21,40 @@ spells.fields = {
 		help = "Shown on the help page." },
 	{ name = "mp", type = "int", required = true, min = 0, max = 1000000, admin = true, label = "MP",
 		help = "Magic points it costs to cast." },
+	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",
+		help = "What the spell's code makes of it: the HP it heals, its maximum damage, ..." },
 	{ name = "usable_in", type = "choice", values = spells.USABLE_IN, default = "fight", label = "Usable in" },
+	{ name = "target", type = "choice", values = spells.TARGETS, default = "enemy", label = "Target" },
 }
 
 local by_name = {}
 for _, f in ipairs(spells.fields) do by_name[f.name] = f end
 
--- Effect parameters are overridable (amounts); an effect's kind is not.
+-- The top-level fields, the messages ("messages.hit", "messages.enemy.hit") and the named
+-- numbers ("data.min").
 function spells.field(name)
-	if by_name[name] then return by_name[name] end
-	local i, param = tostring(name):match("^effects%.(%d+)%.([%a_]+)$")
-	if not i or param == "kind" then return nil end
-	local spec = effects.param_spec(param)
-	if not spec then return nil end
-	return { name = name, type = spec.type, min = spec.min, max = spec.max, admin = true,
-					 label = "Effect " .. i .. " " .. spec.label }
+	return by_name[name] or scripted.field(name)
 end
 
 function spells.validate_extra(data, flat, err)
-	local list, errs = effects.validate(data.effects)
-	if not list then
-		for _, e in ipairs(errs) do err("effects" .. (e:sub(1, 1) == "[" and "" or " ") .. e) end
-		return
+	scripted.validate(data, flat, err, spells.FUNCTIONS)
+	if flat.usable_in and flat.usable_in ~= "fight" and flat.target == "enemy" then
+		err("usable_in = \"" .. flat.usable_in .. "\" needs target = \"self\" (outside fights there is no " ..
+			"enemy); use usable_in = \"fight\" for a spell cast at the enemy")
 	end
-	effects.flatten(list, "effects", flat)
-	if flat.usable_in and flat.usable_in ~= "fight" and not effects.town_usable(list) then
-		err("usable_in = \"" .. flat.usable_in .. "\" needs effects that work outside fights " ..
-			"(heal_hp, heal_mp, heal_tp); use \"fight\"")
-	end
-end
-
--- The effects list of a flat entity.
-function spells.effects(flat)
-	return effects.unflatten(flat, "effects")
 end
 
 function spells.write_children(id, flat)
-	dk.db:exec("UPDATE spells SET effects = ? WHERE id = ?", effects.encode(spells.effects(flat)), id)
+	scripted.write("spells", id, flat)
 end
 
--- Admin page fields: name, description, MP and the parameters of every effect.
+-- Admin page fields: name, description, MP, power, the named numbers and the messages.
 function spells.admin_fields(flat)
 	local out = {}
 	for _, f in ipairs(spells.fields) do
 		if f.admin then out[#out + 1] = f end
 	end
-	for i, e in ipairs(spells.effects(flat)) do
-		for _, p in ipairs(effects.KINDS[e.kind].params) do
-			if e[p] ~= nil then
-				local spec = spells.field("effects." .. i .. "." .. p)
-				spec.label = "Effect " .. i .. " (" .. effects.label(e) .. "): " .. effects.param_spec(p).label
-				out[#out + 1] = spec
-			end
-		end
-	end
+	for _, f in ipairs(scripted.admin_fields(flat)) do out[#out + 1] = f end
 	return out
 end
 

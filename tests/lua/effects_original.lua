@@ -1,3 +1,7 @@
+-- tests/lua/effects_original.lua :: a frozen copy of app/lib/effects.lua as shipped up to
+-- commit 4956060 (the effects engine that scripted spells and items replaced in schema
+-- version 7). tests/lua/test_action.lua runs the original spells and consumables through
+-- it and through their content files and compares the results. Do not edit.
 -- effects.lua :: the effects engine: what spells (and items) do to a character.
 --
 -- An effect is a small table: { kind = "heal_hp", amount = 10 }. Content files list them

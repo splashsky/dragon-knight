@@ -2,16 +2,19 @@
 -- lib/content/schema.lua for the kind interface and docs/APP.md "Items" for the file format.
 --
 -- Gear (category weapon, armor, shield or accessory) is equipped in its slot and adds its
--- attack, defense and `modifiers` (stat effects, lib/effects.lua) while equipped; it never
--- stacks. Consumables stack up to max_stack in the bag and run their `use_effects` when
--- used. Quest items can't be sold or discarded and don't count against the bag size.
--- Modifiers and use effects are stored as text (effects.encode) in items.modifiers and
--- items.use_effects; the flat form has them as "modifiers.1.stat", "use_effects.1.amount".
-local effects = require("lib.effects")
+-- attack, defense and `modifiers` (stat bonuses, lib/stats.lua) while equipped; it never
+-- stacks. Modifiers are stored as text (stats.encode_modifiers) in items.modifiers; the
+-- flat form has them as "modifiers.1.stat", "modifiers.1.amount". Consumables stack up to
+-- max_stack in the bag and are scripted like spells (docs/APP.md "Scripting spells and
+-- items"): power, data and message strings are data, their use function (and the
+-- optional can_use) stays in the file (lib/content/scripted.lua). Quest items can't be
+-- sold or discarded and don't count against the bag size.
+local scripted = require("lib.content.scripted")
+local stats = require("lib.stats")
 
 local items = {
 	name = "items", table = "items", dir = "content.items", label = "item",
-	extra_keys = { modifiers = true, use_effects = true },
+	extra_keys = { modifiers = true, messages = true, data = true, use = true, can_use = true },
 }
 
 items.CATEGORIES = { "weapon", "armor", "shield", "accessory", "consumable", "quest", "misc" }
@@ -37,43 +40,49 @@ items.fields = {
 		help = "Shops buy it (default: when it has a price)." },
 	{ name = "droppable", type = "bool", default = true, admin = true, label = "Droppable",
 		help = "Monsters drop it (with a drop level)." },
+	-- consumables
+	{ name = "usable_in", type = "choice", values = { "town", "fight", "both" }, default = "fight", label = "Usable in" },
+	{ name = "target", type = "choice", values = { "enemy", "self" }, default = "enemy", label = "Target" },
+	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",
+		help = "What the item's code makes of it: the HP it heals, ..." },
 }
+
+items.FUNCTIONS = { { "use", true }, { "can_use", false } }
+-- fields only consumables have
+local CONSUMABLE = { usable_in = true, target = true, power = true }
 
 local by_name = {}
 for _, f in ipairs(items.fields) do by_name[f.name] = f end
 
--- Modifier stats and amounts and use effect parameters are overridable; kinds are not.
--- An override of a modifier index the file doesn't have adds that modifier (with both
--- its stat and amount).
+-- Modifier stats and amounts, the consumables' messages and numbers are overridable
+-- (lib/content/scripted.lua); a modifier's kind is not. An override of a modifier index
+-- the file doesn't have adds that modifier (with both its stat and amount).
 function items.field(name)
 	if by_name[name] then return by_name[name] end
 	local i, param = tostring(name):match("^modifiers%.(%d+)%.([%a_]+)$")
 	if i then
 		if param == "stat" then
-			return { name = name, type = "choice", values = effects.STATS, admin = true, label = "Modifier " .. i .. " stat" }
+			return { name = name, type = "choice", values = stats.STATS, admin = true, label = "Modifier " .. i .. " stat" }
 		elseif param == "amount" then
-			local spec = effects.param_spec("amount", true)
-			return { name = name, type = "int", min = spec.min, max = spec.max, admin = true,
+			return { name = name, type = "int", min = stats.AMOUNT.min, max = stats.AMOUNT.max, admin = true,
 							 label = "Modifier " .. i .. " amount" }
 		end
 		return nil
 	end
-	local j, p = tostring(name):match("^use_effects%.(%d+)%.([%a_]+)$")
-	if not j or p == "kind" then return nil end
-	local spec = effects.param_spec(p)
-	if not spec then return nil end
-	return { name = name, type = spec.type, min = spec.min, max = spec.max, admin = true,
-					 label = "Use effect " .. j .. " " .. spec.label }
+	return scripted.field(name)
 end
 
-local function effect_list(data, field, passive, flat, err)
-	if data[field] == nil then return {} end
-	local list, errs = effects.validate(data[field], passive)
+local function modifier_list(data, flat, err)
+	if data.modifiers == nil then return {} end
+	local list, errs = stats.validate_modifiers(data.modifiers)
 	if not list then
-		for _, e in ipairs(errs) do err(field .. (e:sub(1, 1) == "[" and "" or " ") .. e) end
+		for _, e in ipairs(errs) do err("modifiers" .. (e:sub(1, 1) == "[" and "" or " ") .. e) end
 		return nil
 	end
-	effects.flatten(list, field, flat)
+	for i, m in ipairs(list) do
+		flat["modifiers." .. i .. ".stat"] = m.stat
+		flat["modifiers." .. i .. ".amount"] = m.amount
+	end
 	return list
 end
 
@@ -84,15 +93,31 @@ function items.validate_extra(data, flat, err)
 			flat.category .. " (or leave it out)")
 	end
 	flat.slot = slot
-	local modifiers = effect_list(data, "modifiers", true, flat, err)
-	local use = effect_list(data, "use_effects", false, flat, err)
+	local modifiers = modifier_list(data, flat, err)
 	if data.sellable == nil then
 		flat.sellable = ((flat.price or 0) > 0 and flat.category ~= "quest") and 1 or 0
 	end
 	if not flat.category then return end
+	if flat.category == "consumable" then
+		scripted.validate(data, flat, err, items.FUNCTIONS)
+		if flat.usable_in ~= "fight" and flat.target == "enemy" then
+			err("usable_in = \"" .. flat.usable_in .. "\" needs target = \"self\" (outside fights there is no " ..
+				"enemy); use usable_in = \"fight\" for an item used on the enemy")
+		end
+	else
+		local extra = {}
+		for name in pairs(CONSUMABLE) do
+			if data[name] ~= nil then extra[#extra + 1] = name end
+		end
+		if scripted.present(data, items.FUNCTIONS) then extra[#extra + 1] = "use/can_use/messages/data" end
+		table.sort(extra)
+		if #extra > 0 then
+			err(table.concat(extra, ", ") .. ": for consumables, not " .. flat.category ..
+				(slot and " (gear has attack, defense and modifiers)" or ""))
+		end
+	end
 	if slot then
 		if flat.max_stack ~= 1 then err("max_stack must be 1 for gear (" .. flat.category .. ")") end
-		if use and #use > 0 then err("use_effects are for consumables; gear has modifiers") end
 	else
 		if flat.attack ~= 0 or flat.defense ~= 0 then
 			err("attack and defense are for gear (weapon, armor, shield, accessory), not " .. flat.category)
@@ -100,11 +125,6 @@ function items.validate_extra(data, flat, err)
 		if modifiers and #modifiers > 0 then
 			err("modifiers are for gear (weapon, armor, shield, accessory), not " .. flat.category)
 		end
-	end
-	if flat.category == "consumable" then
-		if use and #use == 0 then err("missing field 'use_effects' (a consumable must do something)") end
-	elseif use and #use > 0 and slot == nil then
-		err("use_effects are for consumables, not " .. flat.category)
 	end
 	if flat.category == "quest" and flat.sellable == 1 then err("quest items can't be sellable") end
 	if flat.sellable == 1 and flat.price == 0 then err("sellable = true needs a price") end
@@ -134,39 +154,30 @@ function items.modifiers(flat)
 	return list
 end
 
-function items.use_effects(flat)
-	return effects.unflatten(flat, "use_effects")
-end
-
 function items.write_children(id, flat)
-	dk.db:exec("UPDATE items SET modifiers = ?, use_effects = ? WHERE id = ?",
-						 effects.encode(items.modifiers(flat)), effects.encode(items.use_effects(flat)), id)
+	dk.db:exec("UPDATE items SET modifiers = ? WHERE id = ?", stats.encode_modifiers(items.modifiers(flat)), id)
+	scripted.write("items", id, flat)
 end
 
 -- Admin page fields: name, description, price, the gear's attack/defense and modifiers,
--- the drop settings of items that drop, sellable, and the use effects' parameters.
+-- the drop settings of items that drop, sellable, and the consumables' power, numbers and
+-- messages.
 function items.admin_fields(flat)
 	local out = {}
 	local gear = items.SLOT[flat.category] ~= nil
+	local consumable = flat.category == "consumable"
 	for _, f in ipairs(items.fields) do
 		local show = f.admin
 		if f.name == "attack" or f.name == "defense" then show = gear end
 		if f.name == "drop_level" or f.name == "droppable" then show = flat.drop_level ~= nil end
+		if f.name == "power" then show = consumable end
 		if show then out[#out + 1] = f end
 	end
 	for _, i in ipairs(modifier_indices(flat)) do
 		out[#out + 1] = items.field("modifiers." .. i .. ".stat")
 		out[#out + 1] = items.field("modifiers." .. i .. ".amount")
 	end
-	for i, e in ipairs(items.use_effects(flat)) do
-		for _, p in ipairs(effects.KINDS[e.kind] and effects.KINDS[e.kind].params or {}) do
-			if e[p] ~= nil then
-				local spec = items.field("use_effects." .. i .. "." .. p)
-				spec.label = "Use effect " .. i .. " (" .. effects.label(e) .. "): " .. effects.param_spec(p).label
-				out[#out + 1] = spec
-			end
-		end
-	end
+	for _, f in ipairs(scripted.admin_fields(flat)) do out[#out + 1] = f end
 	return out
 end
 

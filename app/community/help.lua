@@ -3,7 +3,6 @@
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
 local classes = require("lib.classes")
-local effects = require("lib.effects")
 local game = require("lib.game")
 local items = require("lib.items")
 local leveling = require("lib.leveling")
@@ -41,7 +40,7 @@ function help.index(req)
 end
 
 -- One table per item category (items.CATEGORIES order): gear with its power and modifiers,
--- drops with their monster level, consumables with what they do.
+-- drops with their monster level, consumables with their description and power.
 function help.items(req)
 	local groups, by_cat = {}, {}
 	for _, cat in ipairs(items.CATEGORIES) do
@@ -58,7 +57,7 @@ function help.items(req)
 		end
 		g.rows[#g.rows + 1] = {
 			item = it, image = ({ weapon = "weapon", armor = "armor", shield = "shield" })[it.slot],
-			power = power, special = items.special_lines(it), effects = items.effect_lines(it),
+			power = power, special = items.special_lines(it),
 		}
 	end
 	local out = {}
@@ -68,18 +67,10 @@ function help.items(req)
 	return page(req, "Items & Drops", "community/help/items", { groups = out })
 end
 
--- Type and attribute columns per effect (most spells have one).
+-- Name and description, MP cost and power (what a spell does is its file's code; the
+-- description says it).
 function help.spells(req)
-	local list = {}
-	for _, s in ipairs(spells.active()) do
-		local types, attributes = {}, {}
-		for _, e in ipairs(s.effects) do
-			types[#types + 1] = effects.label(e)
-			attributes[#attributes + 1] = effects.attribute(e)
-		end
-		list[#list + 1] = { spell = s, type = table.concat(types, " + "), attribute = table.concat(attributes, ", ") }
-	end
-	return page(req, "Spells", "community/help/spells", { spells = list })
+	return page(req, "Spells", "community/help/spells", { spells = spells.active() })
 end
 
 function help.monsters(req)

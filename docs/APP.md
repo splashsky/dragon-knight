@@ -15,13 +15,13 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, shop, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
-| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
+| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Content (classes, spells, items) | `app/content/{classes,spells,items}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
-| Effects (what spells and items do) | `app/lib/effects.lua` | | `tests/lua/test_effects.lua` |
+| Scripted spells and items (what they do) | `app/lib/{action,actors}.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/act.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4,seed_v5}.sql`), `tests/lua/test_db.lua` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4,seed_v5,seed_v6}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -187,7 +187,7 @@ starting with `__` are reserved.
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
 | `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
 | `game.stats(user)` | the effective stats of a users row: `{ maxhp, maxmp, maxtp, strength, dexterity, attack, defense, exp_bonus_pct, gold_bonus_pct }` (see [Derived stats](#derived-stats)) |
-| `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the effects engine take |
+| `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the spell and item actions (`lib/actors.lua`) take |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
@@ -247,9 +247,10 @@ experience already covers the next level gets it (or several) on the next victor
 
 ## Content
 
-Classes, spells and items are **content**: Lua data files in git, one per entity,
-hot-reloaded like the code and synced into the database, where players' rows reference
-them by id.
+Classes, spells and items are **content**: Lua files in git, one per entity, hot-reloaded
+like the code and synced into the database, where players' rows reference them by id.
+Spells and consumables also carry code: what they do (see
+[Scripting spells and items](#scripting-spells-and-items)).
 
 ```lua
 -- app/content/classes/knight.lua: the file name is the key ("knight")
@@ -272,8 +273,10 @@ High hit points]],                       -- one line per point on the help page
 
 - **Files** `app/content/<kind>/<key>.lua` return a table. The key (file name) is
 	`[a-z0-9_]+` and never changes once players may reference it: renaming means a new
-	entity plus retiring the old one. A file runs in an empty environment (no globals, no
-	`require`, no DB); loops and locals are fine. `lib/content/load.lua` lists files with
+	entity plus retiring the old one. A file runs in a restricted environment
+	(`lib/content/sandbox.lua`: `math`, `string`, `table` and a few safe functions; no
+	`dk`, `require`, `io`, `os`, no DB); loops, locals and functions are fine.
+	`lib/content/load.lua` lists files with
 	`dk.list_modules("content.classes")` (new files count without a restart) and validates
 	them with the kind's schema (`lib/content/kinds/<kind>.lua`, field validators in
 	`lib/content/schema.lua`): wrong types, missing or unknown fields and missing levels
@@ -289,7 +292,8 @@ High hit points]],                       -- one line per point on the help page
 - **When**: every request (`main.lua`) compares `meta.content_seen` with
 	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
 	After a restart or any app file change, the files are loaded and fingerprinted (sha256
-	of a canonical serialization, `meta.content_fingerprint`); only a different
+	of a canonical serialization of the data plus a hash of each file's source, so a
+	change of code alone counts too; `meta.content_fingerprint`); only a different
 	fingerprint runs the sync, inside the request's transaction (a savepoint). `dk install`,
 	`dk migrate` and `dk content sync` sync directly; `dk content status` reports.
 - **Invalid content** never breaks the game: the database keeps the last good content,
@@ -300,16 +304,17 @@ High hit points]],                       -- one line per point on the help page
 	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
 	`/admin/spells/#id`, `/admin/items/#id`, shared code in `admin/content.lua` and
 	`templates/admin/content_form.html`) write them for the kind's `admin_fields` (classes:
-	name, description, sort, playable, starting stats; spells: name, description, MP and
-	the effects' amounts; items: see [Items](#items); a value equal to the file's deletes
-	the override) and offer "reset to file". Field names are those of the flat form:
-	`name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `effects.1.amount`,
-	`modifiers.2.stat`.
+	name, description, sort, playable, starting stats; spells: name, description, MP,
+	power, numbers and message strings; items: see [Items](#items); a value equal to the
+	file's deletes the override) and offer "reset to file". Field names are those of the
+	flat form: `name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `power`,
+	`data.min`, `messages.hit`, `messages.enemy.hit`, `modifiers.2.stat`.
 - **Migrations into content**: a migration that turns old rows into content writes the
 	old values into `content_adopt(kind, key, field, value)`; the next sync turns those
 	that differ from the file (and are valid) into overrides (that is how schema version 4
 	kept edited class names and levels data, version 5 edited spell names, MP and amounts,
-	and version 6 edited items and drops).
+	version 6 edited items and drops, and version 7 turned edited effect amounts into
+	`power`).
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
@@ -318,8 +323,9 @@ load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` m
 `validate_extra`/`write_children`), its table (`id`, `key` UNIQUE, the field columns,
 `retired`) and an entry in `schema.KINDS` (in sync order: kinds others reference first).
 A field of type `keys` with `refs = "<kind>"` lists keys of another kind (checked by
-`load.all`); `write_children` maps them to ids. Bump `load.FORMAT` when the flat form
-changes meaning.
+`load.all`); `write_children` maps them to ids. A kind with code uses
+`lib/content/scripted.lua` (function fields, messages, data; `load.module(kind, key)`
+gives the runtime the loaded file). Bump `load.FORMAT` when the flat form changes meaning.
 
 ## Spells
 
@@ -329,82 +335,207 @@ Spells are content (see [Content](#content)): `app/content/spells/<key>.lua`, sy
 `craze`, `rage`, `fury`, `ward`, `fend`, `barrier`).
 
 ```lua
--- app/content/spells/hurt.lua
+-- app/content/spells/heal.lua (scripted: see Scripting spells and items)
 return {
-	name = "Hurt",
-	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
-	mp = 5,                                   -- MP it costs
-	usable_in = "fight",                      -- "fight" (default), "town" or "both"
-	effects = { { kind = "damage", max = 15 } },   -- applied in order (see Effects)
+	name = "Heal",
+	description = "Restores hit points, in a fight or out of it.",
+	mp = 5,                       -- MP it costs (deducted after a successful cast)
+	power = 10,                   -- the most HP it restores (what cast makes of it)
+	usable_in = "both",           -- "fight" (default), "town" or "both"
+	target = "self",              -- "enemy" (default) or "self"
+	messages = {
+		cast = "You have cast the %s spell, and gained %d Hit Points.",
+		full = "Your Hit Points are already full. Please go back and try again.",
+		full_town = "Your Hit Points are already full. You don't need to use a Healing spell now.",
+	},
+	can_cast = function(s)
+		if s.caster.hp >= s.caster.maxhp then return s:refuse(s.in_fight and "full" or "full_town") end
+	end,
+	cast = function(s)
+		s:say("cast", s.name, s.caster:heal("hp", s.power))
+	end,
 }
 ```
 
-- `usable_in`: where it can be cast. `"town"` and `"both"` need effects that work outside
-	fights (the heals); `"town"` and `"both"` spells are the Fast Spells in the right column
-	(`POST /spell/#id`, `town/heal.lua`), and the fight's spell list shows `"fight"` and
-	`"both"` spells.
+- `usable_in`: where it can be cast. `"town"` and `"both"` need `target = "self"`; they
+	are the Fast Spells in the right column (`POST /spell/#id`, `town/heal.lua`), and the
+	fight's spell list shows `"fight"` and `"both"` spells.
+- The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
+	`chaos`: damage `rand(power * 5/6, power)`, none if the monster is immune), sleeps
+	(`sleep`, `dream`, `nightmare`: the monster stays asleep while `rand(1, 15) <= power`;
+	immunity 2 stops it), damage buffs (`craze`, `rage`, `fury`: +power% damage) and
+	defense buffs (`ward`, `fend`, `barrier`: -power% damage taken). Heals use inline
+	functions, hurts and damage buffs free-standing ones.
 - A class learns a spell when its file lists the key in `levels[N].spells`; victory
 	level-ups (`combat.level_up`) add a `user_spells(user_id, spell_id, learned_level)` row.
 	The admin user editor edits a character's spells as a list of keys (`learned_level`
 	NULL: unknown).
 - Deleting a spell file retires the spell: no class file may list it any more (`dk check`
-	fails), characters who know it keep it and can still cast it, and the help page no
-	longer lists it.
-- Casting: `combat.cast_error` / `combat.cast` in fights, `town/heal.lua` outside; both
-	check the spell is known (`spells.knows`), affordable and castable there, then run its
-	effects. Messages are the original game's.
+	fails), characters who know it keep it but can no longer cast it (its code was the
+	file), and the help page no longer lists it.
+- Casting: `fight/act.lua` in fights, `town/heal.lua` outside; both check the spell is
+	known (`spells.knows`), affordable and castable there (`spells.usable`), then run it
+	(`action.perform`). Messages are the original game's.
 
-`lib/spells.lua`: rows come back with `effects` decoded into a list.
+`lib/spells.lua`: rows come back with `messages` and `data` decoded into tables.
 
 | Function | Returns |
 |---|---|
 | `spells.get(id)` | a spells row (retired or not), or nil |
 | `spells.active()`, `spells.all()` | non-retired spells (help) / every spell (admin), by id |
 | `spells.known(user [, place])` | the spells `user` knows, by id; `place` `"town"` or `"fight"` keeps those castable there |
-| `spells.knows(user, id)`, `spells.usable(spell, place)` | booleans |
+| `spells.knows(user, id)`, `spells.usable(spell, place)` | booleans (`usable`: per `usable_in`, and not retired) |
 | `spells.learn(user_id, id, level)`, `spells.set_known(user_id, ids)` | teach one (known ones keep their level) / set the whole list |
 
-Adding a spell: copy a file in `app/content/spells/` to `<key>.lua`, edit it, list the key
+Adding a spell: copy a file in `app/content/spells/` to `<key>.lua` (`hurt.lua` for an
+attack, `heal.lua` for a heal, `rage.lua` for a buff), edit its data and code, list the key
 in a class file's `levels[N].spells`, run `./dk check`. The next page load syncs both; the
 spell appears on `/help/spells` and characters of that class learn it on reaching level N
 (existing characters already past N don't get it retroactively; give it to them in the
 admin user editor).
 
-## Effects (`lib/effects.lua`)
+## Scripting spells and items
 
-What spells, consumables (`use_effects`) and gear (`modifiers`) do is a list of effects: small tables
-`{ kind = ..., <parameters> }`, validated by `effects.validate(list [, passive])` (used by
-the content kinds), stored as text (`effects.encode`: `"damage max=15; sleep chance=5"`)
-and applied by a pure engine (no DB), unit-tested in `tests/lua/test_effects.lua`.
+What a spell or a consumable *does* is Lua code in its content file; everything else in the
+file is data. The data (name, description, MP cost, `power`, named numbers, message
+strings) is synced into the database and admins can override it; the code stays in the
+file and runs from there (`lib/content/load.lua` `load.module(kind, key)`, loaded once per
+request). Functions are ordinary Lua values: a field may hold an inline `function ... end`
+or a local function defined anywhere in the file, the two work the same.
 
-| Kind | Parameters | Does (the original spell type) |
-|---|---|---|
-| `heal_hp` | `amount` | restores up to `amount` HP, never above the maximum, never lowering it (1, Heal) |
-| `heal_mp`, `heal_tp` | `amount` | the same for MP / TP |
-| `damage` | `max`, optional `min` | hurts the monster by `rand(min, max)`; `min` defaults to `max * 5/6` (`rand((max / 6) * 5, max)`, as the original); nothing if it is immune (2, Hurt) |
-| `sleep` | `chance` (1-15) | the monster sleeps, staying asleep while `rand(1, 15) <= chance`; not if immune to sleep (3, Sleep) |
-| `buff_attack_pct` | `pct` | +pct% damage dealt until the end of the fight (4, +Damage) |
-| `buff_defense_pct` | `pct` | -pct% damage taken until the end of the fight (5, +Defense) |
-| `stat` (passive) | `stat`, `amount` (may be negative) | a modifier while gear is equipped: `maxhp`, `maxmp`, `maxtp`, `strength`, `dexterity`, `attack`, `defense`, `exp_bonus_pct`, `gold_bonus_pct` (summed by `effects.modifiers(list)`) |
+```lua
+-- app/content/spells/hurt.lua: a free-standing local function
+local function cast(s)
+	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	local damage = s:roll((s.power / 6) * 5, s.power)   -- the original's rand(max * 5/6, max)
+	s.target:hurt(damage)
+	s:say("hit", s.name, damage)
+end
 
-- Context: `{ player = <users row copy, changed in place>, in_fight = bool, rand =
-	php.rand, intro = "You have cast the Heal spell" }`. The fight state lives on the
-	player row (`currentmonsterhp`, `currentmonstersleep`, `currentmonsterimmune`,
-	`currentuberdamage`, `currentuberdefense`), as in the original game.
-- `effects.refusal(list, ctx)`: nil, or why the list can't be used now: `"cannot"`
-	(empty, unknown, invalid or passive effects), `"fight_only"` (outside a fight, an
-	effect needs a monster), `"hp_full"`/`"mp_full"`/`"tp_full"` (only heals, none would
-	restore anything). Callers map these to their messages.
-- `effects.apply(list, ctx)`: applies the effects in order; returns one message line per
-	effect (`intro` + the effect's ending: ", and gained 10 Hit Points.") and the set of
-	player fields that changed. Costs (MP) are the caller's.
-- `effects.flatten(list, prefix, flat)` / `effects.unflatten(flat, prefix)`: the content
-	flat form (`effects.1.kind`, `effects.1.max`); `effects.label(e)` / `effects.attribute(e)`:
-	the help page's type and attribute columns.
+return {
+	name = "Hurt",
+	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
+	mp = 5,
+	power = 15,                  -- data: s.power (admin-overridable)
+	messages = {                 -- data: said by key, s:say("hit", ...) (admin-overridable)
+		hit = "You have cast the %s spell for %d damage.",
+		immune = "You have cast the %s spell, but the monster is immune to it.",
+		enemy = {                  -- optional: the wording when a monster casts it
+			hit = "The monster casts %s on you for %d damage.",
+			immune = "The monster casts %s, but you are immune to it.",
+		},
+	},
+	cast = cast,
+}
+```
 
-Adding an effect kind: an entry in `effects.KINDS` (label, parameters, `town` when it works
-outside fights, `heals` for "already full"), its parameter specs, an `APPLY` function, and
-tests.
+```lua
+-- app/content/items/herb.lua: inline functions, a refusal
+return {
+	name = "Herb",
+	description = "Restores 30 hit points, in a fight or out of it.",
+	category = "consumable", price = 15, max_stack = 10,
+	usable_in = "both",          -- "fight" (default), "town" or "both"
+	target = "self",             -- "enemy" (default) or "self"
+	power = 30,
+	messages = {
+		used = "You have used the %s, and gained %d Hit Points.",
+		full = "Your Hit Points are already full. Please go back and try again.",
+		full_town = "Your Hit Points are already full. You don't need to use the %s now.",
+	},
+	can_use = function(u)        -- nil, or a refusal: costs nothing
+		if u.caster.hp >= u.caster.maxhp then return u:refuse(u.in_fight and "full" or "full_town", u.name) end
+	end,
+	use = function(u)
+		u:say("used", u.name, u.caster:heal("hp", u.power))
+	end,
+}
+```
+
+**Fields.** Data: `power` (integer >= 0, default 0: what the code makes of it), `data`
+(named integers, `data = { min = 3 }` → `s.data.min`), `messages` (strings, or functions
+`function(s, ...) return text end`; `messages.enemy` holds the monster wordings),
+`usable_in`, `target`, plus the kind's own fields (a spell's `mp`; an item's price, ...).
+Behaviour: a spell needs `cast(s)`, a consumable `use(u)`; `can_cast(s)` / `can_use(u)` are
+optional. Only consumables have these fields; gear stays declarative (modifiers, see
+[Derived stats](#derived-stats)). `usable_in = "town"` or `"both"` needs
+`target = "self"` (outside fights there is no enemy).
+
+**The context** `s` (`lib/action.lua`, an object built per cast or use):
+
+| | |
+|---|---|
+| `s.name`, `s.description`, `s.key`, `s.kind` | the entity (after overrides); kind `"spell"` or `"item"` |
+| `s.power`, `s.mp`, `s.data.<name>` | its numbers (after overrides) |
+| `s.messages` | its messages: the stored strings (after overrides) and the file's functions; `s.messages.enemy` |
+| `s.caster`, `s.target` | combatant handles: who acts, who it is aimed at (`target = "self"`: the caster; `"enemy"`: the monster, nil outside fights) |
+| `s.in_fight`, `s.by_player` | whether in a fight; whether the player acts (false for a monster) |
+| `s:roll(min, max)` | `php.rand` semantics (arguments truncated to integers, swapped when min > max, inclusive); the only dice (`math.random` is not available) |
+| `s:say(msg, ...)` | adds a line: `msg` is a message key (`"hit"`: uses the overridable text), a format text or a function; the rest are `string.format` arguments (`%s`, `%d`, `%%`) |
+| `s:refuse(msg, ...)` | a refusal (same arguments): `return` it from `can_cast`/`can_use` (or from `cast`/`use`) and nothing happens, nothing is spent |
+
+**Combatants** (`s.caster`, `s.target`; the player and, from Phase E, monsters and summons
+alike) have read-only fields `name`, `is_player`, `level`, `hp`, `maxhp`, `mp`, `maxmp`,
+`tp`, `maxtp`, `attack`, `defense`, `strength`, `dexterity`, `immune` (0, 1: hurt spells,
+2: hurt and sleep), `asleep`, `sleep_chance`, `uber_damage`, `uber_defense`, and methods:
+
+| | |
+|---|---|
+| `:heal(stat, n)` | restores up to `n` of `"hp"`, `"mp"` or `"tp"`, never above the maximum (and never lowering a value above it); returns what it restored |
+| `:hurt(n)` | takes `n` HP (may go below 0; the fight decides who died); returns `n` |
+| `:spend(stat, n)` | uses up `n` of a stat (a cost) |
+| `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the player only, for now) |
+| `:sleep(chance)` | asleep; stays asleep while `rand(1, 15) <= chance` on each of its turns (monsters only, for now) |
+
+Amounts are whole numbers >= 0; anything else is an error. The handle's numbers follow its
+own changes during the action (heal, then read `hp`).
+
+**Running an action** (`action.perform`): the framework checks the place (`usable_in`,
+retired; the caller's message), runs `can_cast`/`can_use` (which may only decide: changing
+anything there is an error), then `cast`/`use`, then deducts a spell's MP from the caster.
+Nothing touches the game state meanwhile: the handles record an ordered list of events
+(`heal`, `hurt`, `spend`, `buff`, `sleep`, `say`), and the caller applies them
+(`lib/actors.lua` maps the player and the monster to the users row's fight columns) and
+saves. A refusal, or an error, returns no events, so nothing changes and no MP, item or
+turn is spent. Fights go through one entry point, `fight/act.lua` `act.run(state, action)`
+(attack, spell or item: Phase E's round pipeline grows from it); town casting
+(`town/heal.lua`) and the inventory's Use (`town/inventory.lua`) call `action.perform`
+directly.
+
+**Monsters acting.** Messages are worded for the player. When a monster is the caster,
+`s:say("hit", ...)` uses `messages.enemy.hit` if there is one (same arguments); otherwise
+the line becomes a generic "The Dragon casts Hurt." (items: "The Dragon uses the Potion.")
+followed by what changed since the previous line ("You take 13 damage.", "The Dragon
+recovers 10 Hit Points.", ...). No monster casts yet (Phase E); `tests/lua/test_action.lua`
+covers both forms with monster casters.
+
+**Errors** in content code (a typo, a bad format, `error(...)`, more than
+`sandbox.BUDGET` instructions) are caught: logged as a warning with the traceback, the
+player sees "Something went wrong with the Hurt spell. Please go back and try again.",
+and nothing changes. A spell or consumable whose file is gone (retired) or invalid has no
+code: it can't be cast or used (spells stay known, items stay in the bag).
+
+**The environment.** Content files (every kind) run in a restricted environment
+(`lib/content/sandbox.lua`): `math` (without `random`), `string`, `table`, `ipairs`,
+`pairs`, `next`, `select`, `type`, `tostring`, `tonumber`, `assert`, `error`, `pcall`; no
+`dk`, `require`, `io`, `os`, no database. Reading or setting any other global is an error,
+so typos fail early. Each file gets its own copies of the libraries.
+
+**Data, sync and overrides.** The flat form (see [Content](#content)) has `power`,
+`data.<name>` and `messages.<key>` / `messages.enemy.<key>` (strings only; functions are
+skipped); `lib/content/scripted.lua` validates them and stores messages and data as
+`key=value` lines in the `messages` and `data` columns. Message texts may only use the
+placeholders `%s`, `%d` and `%%`, and an override must keep the file's placeholders in the
+same order (the admin form refuses others; the sync skips stale ones), so the code's
+arguments still fit. The fingerprint includes a hash of every file's source, so an edit of
+the code alone is noticed too.
+
+Testing: `tests/lua/test_action.lua` runs the original 19 spells and the consumables
+through the effects engine they replaced (a frozen copy, `tests/lua/effects_original.lua`)
+and through their files over many seeded states, in fights and in town, and compares the
+rolls (arguments and order), numbers, messages and refusals; it also covers the API with
+fake modules (inline and free-standing functions, refusals, errors, runaway code, monster
+casters).
 
 ## Items
 
@@ -434,31 +565,52 @@ return {
 	},
 }
 
--- app/content/items/herb.lua (a consumable: stacks in the bag)
+-- app/content/items/potion.lua (a consumable: stacks in the bag; scripted like a spell,
+-- see Scripting spells and items)
+local function can_use(u)
+	if u.caster.hp >= u.caster.maxhp then return u:refuse(u.in_fight and "full" or "full_town", u.name) end
+end
+
+local function use(u)
+	u:say("used", u.name, u.caster:heal("hp", u.power))
+end
+
 return {
-	name = "Herb",
-	description = "Restores 30 hit points, in a fight or out of it.",
+	name = "Potion",
+	description = "Restores 100 hit points, in a fight or out of it.",
 	category = "consumable",
-	price = 15,
+	price = 60,
 	max_stack = 10,             -- default 1 (gear must be 1)
-	use_effects = { { kind = "heal_hp", amount = 30 } },   -- lib/effects.lua
+	usable_in = "both",         -- "fight" (default), "town" or "both"
+	target = "self",            -- "enemy" (default) or "self"
+	power = 100,
+	messages = {
+		used = "You have used the %s, and gained %d Hit Points.",
+		full = "Your Hit Points are already full. Please go back and try again.",
+		full_town = "Your Hit Points are already full. You don't need to use the %s now.",
+	},
+	can_use = can_use,
+	use = use,
 }
 ```
 
 - Other fields: `description`, `slot` (optional; it is the category for gear and absent
 	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
 	(default true; with a `drop_level`).
-- Validation (`dk check`): gear has `max_stack` 1 and no use effects; only gear has
-	attack, defense and modifiers; consumables need use effects; quest items can't be
-	sellable; `sellable = true` needs a price.
+- Validation (`dk check`): gear has `max_stack` 1; only gear has attack, defense and
+	modifiers; only consumables have `use`/`can_use`, `power`, `messages`, `data`,
+	`usable_in` and `target`, and a consumable needs `use`; quest items can't be sellable;
+	`sellable = true` needs a price.
 - Admins override name, description, price, attack, defense, drop level, sellable,
 	droppable, the modifiers' stats and amounts (an override can add a modifier: both its
-	`modifiers.N.stat` and `.amount`) and the use effects' parameters at `/admin/items`.
+	`modifiers.N.stat` and `.amount`) and a consumable's power, numbers and message strings
+	at `/admin/items`.
 - Modifier stats: `maxhp`, `maxmp`, `maxtp`, `strength`, `dexterity`, `attack`, `defense`,
 	`exp_bonus_pct`, `gold_bonus_pct` (see [Derived stats](#derived-stats)).
-- Use: a consumable can be used in town (from `/inventory`) when every use effect works
-	outside fights (the heals), and in fights ("Use Item", costs the turn like a spell;
-	`combat.use_error` / `combat.use`). Refusals (already full, ...) cost nothing.
+- Use: a consumable can be used in town (from `/inventory`) and in fights ("Use Item",
+	costs the turn like a spell; `fight/act.lua`) per its `usable_in`, with the player as
+	caster. Refusals (already full, ...) and errors cost nothing; the item is taken from
+	the bag only when it was used.
 - Shops: `town_items(town_id, item_id)` is what a town sells (the admin town editor takes
 	item keys). Weapons, armor and shields are equipped when bought: with an old item in the
 	slot the player either keeps it in the bag (needs a free slot) or sells it back (its
@@ -470,9 +622,11 @@ return {
 	(`/drop`; with a full bag, after discarding a bag item) or leaves it (moving on drops it
 	too).
 - Deleting an item file retires the item: shops stop selling it and monsters stop dropping
-	it; characters keep theirs, and equipped retired items still count.
+	it; characters keep theirs, and equipped retired items still count (a retired
+	consumable can't be used: its code was the file).
 
-`lib/items.lua`: rows come back with `modifiers` and `use_effects` decoded into lists.
+`lib/items.lua`: rows come back with `modifiers` decoded into a list (`stats.decode_modifiers`)
+and `messages` and `data` into tables.
 
 | Function | Returns |
 |---|---|
@@ -480,7 +634,7 @@ return {
 | `items.active()`, `items.all()` | non-retired items (help) / every item (admin), by id |
 | `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
-| `items.attributes(item)`, `items.special_lines(item)`, `items.effect_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Heal 30"`) |
+| `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
 
 Adding an item: copy a file in `app/content/items/` to `<key>.lua`, edit it, run
 `./dk check`. The next page load syncs it: give it a `drop_level` for monsters to drop it,
@@ -529,10 +683,16 @@ original game's inconsistencies there, and admins can set them). Effective stats
 
 Stats that were UNSIGNED columns in the original never go below 0. `game.stats(user)`
 computes them (the equipment is read once per request); every page, the fight and the
-effects engine use them (`game.player(user)` for the latter, so `fight/combat.lua` keeps
-the original formulas and names). Never store effective stats: change base stats or
-equipment. `stats.solve(expected, mods)` is the inverse (base columns that give expected
-effective stats), used by the migration.
+spell and item actions use them (`game.player(user)` for the latter, so
+`fight/combat.lua` keeps the original formulas and names). Never store effective stats:
+change base stats or equipment. `stats.solve(expected, mods)` is the inverse (base columns
+that give expected effective stats), used by the migration.
+
+Modifiers are gear's passive stat bonuses, plain data (not code: they are summed,
+displayed and overridden): `{ kind = "stat", stat = "strength", amount = 50 }` (amount may
+be negative), checked by `stats.validate_modifiers(list)`, stored as text by
+`stats.encode_modifiers` (`"stat stat=strength amount=50; stat stat=maxhp amount=-50"`,
+read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 
 ## Forum and news
 
@@ -627,8 +787,8 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v5.sql` (version 5) with the
-	 game data of that time (`seed_v3.sql`, `seed_v4.sql`, `seed_v5.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v6.sql` (version 6) with the
+	 game data of that time (`seed_v3.sql` to `seed_v6.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.

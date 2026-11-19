@@ -70,7 +70,7 @@ function shop.list(req)
 		elseif it.defense ~= 0 or it.slot == "armor" or it.slot == "shield" then
 			line = "Defense Power: " .. it.defense
 		else
-			line = table.concat(items.is_gear(it) and items.special_lines(it) or items.effect_lines(it), ", ")
+			line = table.concat(items.is_gear(it) and items.special_lines(it) or items.use_lines(it), ", ")
 		end
 		list[#list + 1] = {
 			item = it, icon = ICONS[it.slot], line = line,

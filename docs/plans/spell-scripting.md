@@ -1,7 +1,8 @@
 # Plan: Phase D — scripted spells and items (2.1)
 
-Status: approved, starts after Phase C (items, inventory, derived stats) is committed.
-Changelog lines go to the top 2.1.0 entry.
+Status: **done** (schema version 7); see "Phase D as implemented" at the end. The
+developer documentation is docs/APP.md, "Scripting spells and items". Changelog lines are in
+the top 2.1.0 entry.
 
 ## Goal
 
@@ -121,3 +122,76 @@ summons) builds on this API. Read its "Requirements on Phase D" section and desi
 object-style context and combatant handles, an ordered event list applied by the caller,
 one entry point for running an action in a fight, and function-capable content loading
 for any kind.
+
+## Phase D as implemented
+
+- **Action API** (`app/lib/action.lua`): `action.combatant(t)` builds read-only combatant
+	handles (fields `name`, `is_player`, `level`, `hp`/`mp`/`tp` and their maxima, `attack`,
+	`defense`, `strength`, `dexterity`, `immune`, `asleep`, `sleep_chance`, `uber_damage`,
+	`uber_defense`; methods `:heal(stat, n) -> restored`, `:hurt(n)`, `:spend(stat, n)`,
+	`:buff(kind, pct)`, `:sleep(chance)`), `action.new(o)` the context (metatable class;
+	`name`, `description`, `key`, `kind`, `power`, `mp`, `data`, `messages`, `caster`,
+	`target`, `in_fight`, `by_player`, `:roll`, `:say`, `:refuse`) and `action.perform(o)`
+	runs can_cast/can_use, cast/use and the MP cost and returns the ordered event list
+	(`heal`, `hurt`, `spend`, `buff`, `sleep`, `say`; each with `who` and `side`) plus the
+	lines, or a refusal (`reason` "cannot" / "refused" / "error"). Handles change their own
+	numbers as they go; nothing reaches the game state unless the caller applies the events.
+	Capabilities per handle (`can = { buff, sleep }`): the player can be buffed, the monster
+	put to sleep; the other way round is an error until Phase E gives monsters buffs and the
+	player statuses.
+- `app/lib/actors.lua` maps the game state (the users row copy holding the fight) to
+	handles (`actors.player(st)`, `actors.monster(st, monster)`) and applies events
+	(`actors.apply(st, events)`; monster MP/TP changes are ignored: monsters have none yet).
+- **One fight entry point**: `app/fight/act.lua` `act.run(state, action)` for the attack,
+	spell and item turns (`state = { st, monster, rand }`, `action = { kind = "attack" |
+	"spell" | "item", spell/item = row }` -> `{ lines, killed }` or `{ refused }`); the
+	monster's turn stays in the route for now. Town casting and the inventory's Use call
+	`action.perform` with the player as caster.
+- **Messages**: `s:say(msg, ...)` takes a message key (the stored text, after overrides),
+	a format text or a function. Messages may use only `%s`, `%d` and `%%`; an override must
+	keep the file's placeholders in order (refused by the admin form, skipped by the sync).
+	A monster caster uses `messages.enemy[key]`, else a generic "The X casts Y." / "The X
+	uses the Y." line followed by descriptions of the events since the previous line.
+	Refusal texts differ between fights and town in the original game, so the original
+	files pick their key by `s.in_fight` (`full` / `full_town`).
+- **Errors** are caught by `lib/content/sandbox.lua` (`sandbox.call`: xpcall plus an
+	instruction budget, `sandbox.BUDGET` = 10M; once spent every instruction fails, so
+	`pcall` can't swallow it), logged as warnings with the traceback; the player gets a
+	generic "Something went wrong with the X spell." and nothing changes.
+- **Loading**: every content kind runs in `sandbox.env()` (the plan's safe globals, with
+	`math.random`/`randomseed` left out so dice come from `s:roll`; unknown globals are
+	errors). `lib/content/scripted.lua` validates the function fields (`cast` required for
+	spells, `use` for consumables, `can_*` optional), messages (strings or functions,
+	`enemy` subtable) and `data` (named integers), and stores the strings and numbers as
+	`key=value` lines in `messages`/`data` columns. Spells and consumables also store
+	`power`, `target` ("enemy" default, "self") and `usable_in` (items: new). Outside fights
+	an "enemy" target is nil, so `usable_in` "town"/"both" requires `target = "self"`.
+	`load.module(kind, key)` returns the validated module, cached per VM (= per request);
+	`load.kind` also returns `modules`. The fingerprint adds a `#source` line per entity
+	(sha256 of the file); `load.FORMAT` is "dk-content-4".
+- **Content**: the 19 spells and Herb, Potion, Ether are scripted with `power` (the old
+	amount/max/chance/pct). Heal and sleep families and the defense buffs and Herb/Ether use
+	inline functions; the hurt family, the damage buffs and the Potion free-standing local
+	functions. The hurt family has `messages.enemy` wordings.
+- **Retired** spells and consumables (file deleted) have no code: they stay known / in the
+	bag but are no longer usable (`spells.usable` / `items.usable` check `retired`); before,
+	a retired spell's effects stayed castable from the database.
+- **Removed**: `app/lib/effects.lua` and its tests. Modifier validation, storage and sums
+	moved to `app/lib/stats.lua` (`validate_modifiers`, `encode_modifiers`,
+	`decode_modifiers`, `modifiers`); the modifiers format is unchanged.
+- **Admin**: spells and consumables override name, description, MP, power, `data.*` and
+	message strings; the behaviour, `usable_in` and `target` are shown read-only with a
+	note to edit the file. Help pages show spells' cost and power and consumables' power.
+- **Migration 7**: `ALTER TABLE` adds `power`, `target`, `messages`, `data` to spells and
+	`usable_in`, `target`, `power`, `messages`, `data` to items, and drops `effects` /
+	`use_effects` (the tables can't be rebuilt with foreign keys on, so the new columns
+	follow `retired`). Rows without a file get power/target/usable_in from their old
+	effects. Overrides and pending adoptions of an effect's main amount become `power`
+	overrides; others (`min`, a second effect) are dropped with a warning. A version 4
+	database's sleep chance 99, which version 5 couldn't keep, is now kept as power.
+	`tests/fixtures/schema_v6.sql` + `seed_v6.sql` are the frozen version 6.
+- **Equivalence**: `tests/lua/test_action.lua` runs every original spell and consumable
+	through a frozen copy of the effects engine (`tests/lua/effects_original.lua`) and
+	through the content files, 150 seeded states each, in fights and (heals) in town, and
+	compares refusal texts, lines, kills, the rand call ranges in order and the whole state
+	afterwards (4,500 cases).

@@ -1,15 +1,15 @@
-{#- Spell list (admin/spells.lua). ctx: rows { s (spells row, decoded effects), effects
-		(as text), users, overrides }, status (content_sync.status()). -#}
+{#- Spell list (admin/spells.lua). ctx: rows { s (spells row, decoded), users, overrides },
+		status (content_sync.status()). -#}
 <h1 class="admin-heading">Spells</h1>
 <p>Spells are content files, <code>app/content/spells/&lt;key&gt;.lua</code>; the game picks up a
 new or edited file on the next page load. Click a spell to override its name, description,
-MP cost and effect amounts on this server.</p>
+MP cost, power and messages on this server; what it does is the file's code.</p>
 <table class="admin-list admin-spells">
-<tr><th>ID</th><th>Spell</th><th>Key</th><th>MP</th><th>Usable in</th><th>Effects</th><th>Characters</th><th>Overrides</th></tr>
+<tr><th>ID</th><th>Spell</th><th>Key</th><th>MP</th><th>Power</th><th>Usable in</th><th>Target</th><th>Characters</th><th>Overrides</th></tr>
 {%- for _, r in ipairs(rows) do %}
 <tr><td class="admin-id">{{ r.s.id }}</td><td><a href="/admin/spells/{{ r.s.id }}">{{ r.s.name }}</a>
 {%- if r.s.retired ~= 0 then %} <span class="highlight">(retired)</span>{% end %}</td>
-<td>{{ r.s.key }}</td><td>{{ r.s.mp }}</td><td>{{ r.s.usable_in }}</td><td>{{ r.effects }}</td>
+<td>{{ r.s.key }}</td><td>{{ r.s.mp }}</td><td>{{ r.s.power }}</td><td>{{ r.s.usable_in }}</td><td>{{ r.s.target }}</td>
 <td>{{ r.users }}</td><td>{{ r.overrides }}</td></tr>
 {%- end %}
 </table>
@@ -18,5 +18,7 @@ MP cost and effect amounts on this server.</p>
 <p>Copy one of the files in <code>app/content/spells/</code> to a new name (the file name is the
 spell's key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it,
 then list its key in a class file's <code>levels[N].spells</code> so characters learn it on
-reaching that level. Deleting a file retires its spell: characters who know it keep it, and
-class files can no longer list it. Run <code>dk check</code> to validate the files.</p>
+reaching that level. What a spell does is its <code>cast</code> function (see
+<code>docs/APP.md</code>, "Scripting spells and items"). Deleting a file retires its spell:
+characters who know it keep it but can no longer cast it, and class files can no longer list it.
+Run <code>dk check</code> to validate the files.</p>
