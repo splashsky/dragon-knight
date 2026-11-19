@@ -113,11 +113,16 @@ function shop.buy(req, params)
 		end
 		u[col] = u[col] + value
 		touch(col)
-		-- Legacy bug kept: strength/dexterity also move attack/defense power, but only the
-		-- slot's own stat column is written below, so e.g. a strength special on armor never
-		-- reaches attackpower.
-		if col == "strength" then u.attackpower = u.attackpower + value end
-		if col == "dexterity" then u.defensepower = u.defensepower + value end
+		-- fixed: legacy only wrote the slot's own stat column, so e.g. a strength special on
+		-- armor never reached attackpower.
+		if col == "strength" then
+			u.attackpower = u.attackpower + value
+			touch("attackpower")
+		end
+		if col == "dexterity" then
+			u.defensepower = u.defensepower + value
+			touch("defensepower")
+		end
 	end
 	special(item.special, 1)
 	special(old.special, -1)

@@ -29,12 +29,12 @@ end
 
 local function save_death(user, st)
 	local d = combat.death(st)
-	-- legacy: currentuberdamage/currentuberdefense are not reset on death (they carry into
-	-- the next fight), and currentmp is not written, so the MP of a spell cast on the
-	-- fatal turn is refunded.
-	dk.db:exec([[UPDATE users SET currenthp = ?, currentaction = 'In Town', currentmonster = 0,
-		currentmonsterhp = 0, currentmonstersleep = 0, currentmonsterimmune = 0, currentfight = 0,
-		latitude = 0, longitude = 0, gold = ? WHERE id = ?]], d.currenthp, d.gold, user.id)
+	-- fixed: legacy kept the uber buffs and didn't write currentmp, refunding the MP of a
+	-- spell cast on the fatal turn.
+	dk.db:exec([[UPDATE users SET currenthp = ?, currentmp = ?, currentaction = 'In Town',
+		currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0, currentmonsterimmune = 0,
+		currentuberdamage = 0, currentuberdefense = 0, currentfight = 0, latitude = 0,
+		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
 end
 
 -- Monster's turn + death bookkeeping shared by every branch. Returns lines, died.
@@ -79,15 +79,18 @@ local function fight(req)
 	local died = false
 
 	if form.run ~= nil then
-		if not combat.run_chance(st, monster, rand) then
-			-- legacy: the "blocked" page is never shown and the damage is not saved: the
-			-- player always escapes, unless the blow is fatal (then dead at 0,0, but the
-			-- update below still leaves them 'Exploring' instead of 'In Town').
-			monster_turn(user, st, monster, control, false)
+		-- fixed: legacy always let the player escape (a failed run's damage was never saved,
+		-- and a fatal blow left them 'Exploring' at 0,0) and kept the fight state.
+		if combat.run_chance(st, monster, rand) then
+			dk.db:exec([[UPDATE users SET currentaction = 'Exploring', currentfight = 0,
+				currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0,
+				currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0
+				WHERE id = ?]], user.id)
+			return view.redirect("/")
 		end
-		-- legacy: running keeps currentfight/currentmonster*/uber values as they were.
-		dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
-		return view.redirect("/")
+		page.yourturn = { "You tried to run away, but were blocked in front!" }
+		page.monsterhp = st.currentmonsterhp
+		page.monsterturn, died = monster_turn(user, st, monster, control, false)
 
 	elseif form.fight ~= nil then
 		local killed
@@ -117,6 +120,8 @@ local function fight(req)
 		if st.currentmp < spell.mp then
 			return error_page(req, "You do not have enough Magic Points to cast this spell. Please go back and try again.")
 		end
+		local refused = combat.cast_error(st, spell)
+		if refused then return error_page(req, refused) end
 		local killed
 		page.yourturn, killed = combat.cast(st, spell, rand)
 		page.monsterhp = st.currentmonsterhp
@@ -164,7 +169,7 @@ local function victory(req)
 	local r = combat.rewards(user, monster, control, rand)
 	local ctx = { monster = monster, r = r }
 	local key = function(stat) return game.level_key(user.charclass, stat) end
-	local up = combat.level_up(user, game.level_row(user.level + 1), r.newexp, key)
+	local up = combat.level_up(user, r.newexp, key, game.level_row)
 	local title
 	local s = {
 		level = user.level, maxhp = user.maxhp, maxmp = user.maxmp, maxtp = user.maxtp,
@@ -182,9 +187,9 @@ local function victory(req)
 		if combat.drop_roll(rand) then
 			local drops = dk.db:query("SELECT id FROM drops WHERE mlevel <= ? ORDER BY id", monster.level)
 			local drop = combat.pick(drops, rand)
-			-- legacy: with no eligible drop the code was '' (stored as 0) but the text still shows.
+			-- fixed: legacy showed the drop text even with no eligible drop (dropcode stored as 0).
 			s.dropcode = drop and drop.id or 0
-			ctx.dropped = true
+			ctx.dropped = drop ~= nil
 		end
 		title = "Victory!"
 	end

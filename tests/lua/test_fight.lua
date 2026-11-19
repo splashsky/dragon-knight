@@ -77,6 +77,10 @@ function T.start_monster_hp_and_swing_first()
 	-- immunity copied from the monster
 	st, d = player(), dice({ 8, 1, 1 })
 	combat.start(st, SHADOW, CONTROL, d.rand); eq(st.currentmonsterimmune, 1)
+	-- buffs left over from an earlier fight are cleared
+	st = player({ currentuberdamage = 25, currentuberdefense = 10 })
+	combat.start(st, SHADOW, CONTROL, dice({ 8, 1, 1 }).rand)
+	eq(st.currentuberdamage, 0); eq(st.currentuberdefense, 0)
 end
 
 function T.player_attack()
@@ -200,6 +204,21 @@ function T.spells()
 	eq(st.currentuberdefense, 10); eq(st.currentmp, 0)
 end
 
+function T.cast_refusals()
+	local heal = { id = 1, name = "Heal", mp = 5, attribute = 10, type = 1 }
+	local full = "Your Hit Points are already full. Please go back and try again."
+	eq(combat.cast_error(player({ currenthp = 14, maxhp = 15 }), heal), nil)
+	eq(combat.cast_error(player({ currenthp = 15, maxhp = 15 }), heal), full)
+	eq(combat.cast_error(player({ currenthp = 20, maxhp = 15 }), heal), full)   -- above max (a drop)
+	for t = 2, 5 do
+		eq(combat.cast_error(player(), { id = 6, name = "X", mp = 5, attribute = 15, type = t }), nil)
+	end
+	for _, t in ipairs({ 0, 6, 99 }) do
+		eq(combat.cast_error(player(), { id = 20, name = "Odd", mp = 5, attribute = 1, type = t }),
+			"This spell cannot be cast. Please go back and try again.")
+	end
+end
+
 function T.run_chance()
 	-- rand(4,10)=4 + 3 = 7 vs rand(1,5)=4 + ceil(sqrt(8)) 3 = 7: blocked; 5 + 3 = 8 > 7: escape
 	local d = dice({ 4, 4 })
@@ -220,33 +239,68 @@ function T.victory_rewards()
 	d.done(); ranges(d, "3,4 1,2")
 	eq(r.exp, 5); eq(r.gold, 3); eq(r.newexp, 5); eq(r.newgold, 103); eq(r.warnexp, "")
 	-- Blue Slime maxexp 1: (1/6)*5 = 0.83 -> rand(0,1) = 0 -> at least 1
-	-- bonuses: exp 1 + ceil(0.1*1) = 2; gold bonus is a % of the exp: 1 + ceil(0.1*2) = 2
+	-- bonuses: exp 1 + ceil(0.1*1) = 2; gold 1 + ceil(0.1*1) = 2
 	d = dice({ 0, 0 })
 	r = combat.rewards(player({ expbonus = 10, goldbonus = 10 }), BLUE_SLIME, CONTROL, d.rand)
 	ranges(d, "0,1 0,1"); eq(r.exp, 2); eq(r.gold, 2)
+	-- the gold bonus is a % of the gold (legacy: of the exp, 2 + ceil(0.5*4) = 4)
+	r = combat.rewards(player({ goldbonus = 50 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	eq(r.exp, 4); eq(r.gold, 3)
+	r = combat.rewards(player({ goldbonus = -50 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	eq(r.gold, 1)
 	-- caps
 	r = combat.rewards(player({ experience = 16777214, gold = 16777214 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
 	eq(r.exp, 0); eq(r.newexp, 16777214); eq(r.warnexp, "You have maxed out your experience points.")
-	eq(r.gold, 0); eq(r.newgold, 16777214); eq(r.warngold, "You have maxed out your experience points.")
+	eq(r.gold, 0); eq(r.newgold, 16777214); eq(r.warngold, "You have maxed out your gold.")
 	r = combat.rewards(player({ experience = 16777210 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
 	eq(r.newexp, 16777214)
 end
 
 function T.level_up()
-	-- seed levels row 2: class 1 = exp 15, hp 2, mp 5, tp 1, str 0, dex 1, spell 1
-	local row = { id = 2, ["1_exp"] = 15, ["1_hp"] = 2, ["1_mp"] = 5, ["1_tp"] = 1,
-								["1_strength"] = 0, ["1_dexterity"] = 1, ["1_spells"] = 1 }
+	-- seed levels rows 2-4, class 1: exp 15/45/105, hp 2/3/3, mp 5/4/3, tp 1/2/2,
+	-- str 0/1/1, dex 1/2/2, spells 1/0/6
+	local rows = {
+		[2] = { id = 2, ["1_exp"] = 15, ["1_hp"] = 2, ["1_mp"] = 5, ["1_tp"] = 1,
+						["1_strength"] = 0, ["1_dexterity"] = 1, ["1_spells"] = 1 },
+		[3] = { id = 3, ["1_exp"] = 45, ["1_hp"] = 3, ["1_mp"] = 4, ["1_tp"] = 2,
+						["1_strength"] = 1, ["1_dexterity"] = 2, ["1_spells"] = 0 },
+		[4] = { id = 4, ["1_exp"] = 105, ["1_hp"] = 3, ["1_mp"] = 3, ["1_tp"] = 2,
+						["1_strength"] = 1, ["1_dexterity"] = 2, ["1_spells"] = 6 },
+	}
+	local row = function(n) return rows[n] end
 	local key = function(stat) return "1_" .. stat end
 	local u = player()
-	eq(combat.level_up(u, row, 14, key), nil)
-	local g = combat.level_up(u, row, 15, key)
-	eq(g.level, 2); eq(g.maxhp, 17); eq(g.maxmp, 5); eq(g.maxtp, 11)
+	eq(combat.level_up(u, 14, key, row), nil)
+	local g = combat.level_up(u, 15, key, row)
+	eq(g.level, 2); eq(g.levels, 1); eq(g.hp, 2); eq(g.mp, 5); eq(g.learned, 1)
+	eq(g.maxhp, 17); eq(g.maxmp, 5); eq(g.maxtp, 11)
 	eq(g.newstrength, 5); eq(g.newdexterity, 6); eq(g.attackpower, 5); eq(g.defensepower, 6)
 	eq(g.spells, "0,1")
-	row["1_spells"] = 0
-	eq(combat.level_up(u, row, 15, key).spells, nil)
-	eq(combat.level_up(player({ level = 100 }), row, 10 ^ 7, key), nil)
-	eq(combat.level_up(u, nil, 15, key), nil)
+	-- several levels at once: 2 and 3 (44 < 45 stops at 2; 104 < 105 stops at 3)
+	eq(combat.level_up(u, 44, key, row).level, 2)
+	g = combat.level_up(u, 104, key, row)
+	eq(g.level, 3); eq(g.levels, 2); eq(g.hp, 5); eq(g.mp, 9); eq(g.tp, 3)
+	eq(g.strength, 1); eq(g.dexterity, 3); eq(g.learned, 1); eq(g.spells, "0,1")
+	eq(g.maxhp, 20); eq(g.maxmp, 9); eq(g.maxtp, 13); eq(g.newstrength, 6); eq(g.newdexterity, 8)
+	eq(g.attackpower, 6); eq(g.defensepower, 8)
+	-- all the way, stopping where the rows run out
+	g = combat.level_up(u, 10 ^ 6, key, row)
+	eq(g.level, 4); eq(g.levels, 3); eq(g.learned, 2); eq(g.spells, "0,1,6")
+	-- from level 3 only row 4 counts
+	g = combat.level_up(player({ level = 3, spells = "0,1" }), 10 ^ 6, key, row)
+	eq(g.level, 4); eq(g.levels, 1); eq(g.hp, 3); eq(g.spells, "0,1,6")
+	-- no spell learned: spells stays nil
+	rows[2]["1_spells"] = 0
+	g = combat.level_up(u, 15, key, row)
+	eq(g.spells, nil); eq(g.learned, 0)
+	-- stops at the max level (100), even with a row 101
+	local any = { id = 0, ["1_exp"] = 0, ["1_hp"] = 1, ["1_mp"] = 0, ["1_tp"] = 0,
+								["1_strength"] = 0, ["1_dexterity"] = 0, ["1_spells"] = 0 }
+	local every = function(n) local r = {}; for k, v in pairs(any) do r[k] = v end; r.id = n; return r end
+	g = combat.level_up(player({ level = 97 }), 10 ^ 7, key, every)
+	eq(g.level, 100); eq(g.levels, 3); eq(g.hp, 3)
+	eq(combat.level_up(player({ level = 100 }), 10 ^ 7, key, every), nil)
+	eq(combat.level_up(u, 15, key, function() return nil end), nil)
 end
 
 function T.drop_roll_and_pick()
@@ -275,10 +329,13 @@ function T.equip_drop()
 	combat.equip_drop(st, wing, sin)
 	eq(st.maxhp, 150); eq(st.currenthp, 100); eq(st.strength, 5); eq(st.attackpower, 5)
 	eq(st.dexterity, 55); eq(st.defensepower, 55)
-	-- empty slot with a negative item: no clamp (legacy)
+	-- empty slot with a negative item: clamped too
 	st = player({ currenthp = 15, maxhp = 15 })
 	combat.equip_drop(st, sin, nil)
-	eq(st.maxhp, -35); eq(st.currenthp, 15)
+	eq(st.maxhp, -35); eq(st.currenthp, -35); eq(php.mysql_uint(st.currenthp), 0)
+	st = player({ currenthp = 100, maxhp = 100, currentmp = 30, maxmp = 60 })
+	combat.equip_drop(st, { id = 99, name = "Curse", attribute1 = "maxhp,-20", attribute2 = "maxmp,-40" }, nil)
+	eq(st.maxhp, 80); eq(st.currenthp, 80); eq(st.maxmp, 20); eq(st.currentmp, 20)
 end
 
 function T.drop_attribute_text()

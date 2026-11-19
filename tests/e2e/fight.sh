@@ -39,9 +39,29 @@ t_get /fight; expect_body "Monster's HP: $hp"; f_is currentfight 3   # refresh: 
 
 t_section "fight: run away"
 CS=$(t_csrf)
+DEX=$(f_col dexterity); DEF=$(f_col defensepower)
+# dexterity 10000: rand(4,10) + 100 beats rand(1,5) + ceil(sqrt(maxdam)) of any level 9-11 monster
+f_sql "UPDATE users SET dexterity = 10000, currentuberdamage = 10, currentuberdefense = 20"
 t_post /fight "csrf=$CS&run=Run"; expect_redirect /
-f_is currentaction Exploring
+f_is currentaction Exploring; f_is currentfight 0; f_is currentmonster 0; f_is currentmonsterhp 0
+f_is currentuberdamage 0; f_is currentuberdefense 0
 t_get /fight; expect_body 'Cheat attempt detected.'
+t_get /victory; expect_redirect /
+
+t_section "fight: run away blocked"
+# Lucifuge (maxdam 600): ceil(sqrt(600)) = 25 beats any run roll with dexterity 0 (max 10);
+# no dodge with dexterity 0, and the hit is rand(300,600) - 0 on Easy
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
+	currentmonsterhp = 30000, currentmonstersleep = 0, currentmonsterimmune = 2, dexterity = 0,
+	defensepower = 0, currenthp = 5000, maxhp = 5000, currentuberdefense = 0"
+t_post /fight "csrf=$CS&run=Run"; expect_status 200
+expect_body 'You tried to run away, but were blocked in front!'; expect_body "Monster's HP: 30000"
+expect_body 'The monster attacks you for'; expect_body 'name="run"'; expect_no_body 'You have died.'
+f_is currentaction Fighting; f_is currentfight 3; f_is currentmonster 151; f_is currentmonsterhp 30000
+hp=$(f_col currenthp)
+[ "$hp" -ge 4400 ] && [ "$hp" -le 4700 ] && t_ok || t_fail "blocked run: currenthp $hp not in 4400..4700"
+f_sql "UPDATE users SET currentaction = 'Exploring', currentfight = 0, currentmonster = 0,
+	currentmonsterhp = 0, currentmonsterimmune = 0, dexterity = $DEX, defensepower = $DEF"
 
 t_section "fight: victory + level up"
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, latitude = 0, longitude = 0,
@@ -88,6 +108,21 @@ f_is currentmp 10
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"
 expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 f_is currentmp 5
+# heal at (or above) full HP: refused, no MP spent, the monster doesn't act
+f_sql "UPDATE users SET currenthp = maxhp, currentmp = 10"
+FIGHT=$(f_col currentfight)
+t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
+expect_no_body 'The monster attacks'
+f_is currentmp 10; f_is currentfight "$FIGHT"; f_is "currenthp = maxhp" 1
+f_sql "UPDATE users SET currenthp = maxhp + 5"
+t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
+f_is currentmp 10; f_is "currenthp = maxhp + 5" 1
+# a spell of an unknown type: refused the same way
+t_sql "UPDATE spells SET type = 9 WHERE id = 1"
+f_sql "UPDATE users SET currenthp = 100"
+t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'This spell cannot be cast.'
+f_is currentmp 10; f_is currenthp 100; f_is currentfight "$FIGHT"
+t_sql "UPDATE spells SET type = 1 WHERE id = 1"
 f_sql "UPDATE users SET currentmp = 4"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'You do not have enough Magic Points'
 f_is currentmp 4
@@ -115,6 +150,27 @@ f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f
 f_is currentfight 0; f_is currentmonster 0
 t_get /; expect_status 200; expect_body 'Town Options'
 
+t_section "fight: death on a spell turn keeps the MP spent, clears buffs"
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
+	currentmonsterhp = 30000, currentmonstersleep = 0, currenthp = 1, currentmp = 30, maxmp = 50,
+	spells = '0,1,6,11,14', currentuberdamage = 0, currentuberdefense = 25, gold = 100"
+t_post /fight "csrf=$CS&spell=Spell&userspell=14"
+expect_status 200; expect_body 'You have cast the Craze spell'; expect_body '<b>You have died.</b>'
+f_is currentaction 'In Town'; f_is currentmp 20; f_is currentuberdamage 0; f_is currentuberdefense 0
+f_is gold 50; f_is currenthp 8
+
+t_section "fight: run away blocked, fatal"
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
+	currentmonsterhp = 30000, currentmonstersleep = 0, currenthp = 1, currentmp = 7,
+	currentuberdamage = 10, currentuberdefense = 10, gold = 101, latitude = 40, longitude = -40"
+t_post /fight "csrf=$CS&run=Run"
+expect_status 200; expect_body 'You tried to run away, but were blocked in front!'
+expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'; expect_no_body 'name="run"'
+f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
+f_is currentfight 0; f_is currentmonster 0; f_is currentmonsterhp 0
+f_is currentuberdamage 0; f_is currentuberdefense 0; f_is currentmp 7
+t_get /; expect_status 200; expect_body 'Town Options'
+
 t_section "fight: item drop"
 f_sql "UPDATE users SET dropcode = 1, maxhp = 30, currenthp = 30, strength = 7, attackpower = 10"
 t_get /drop; expect_status 200; expect_body '<b>Life Pebble</b>'; expect_body 'Max HP +10'
@@ -131,6 +187,10 @@ t_get /drop; expect_body 'Max HP-50'; expect_body 'Strength +50'; expect_body 'S
 t_post /drop "csrf=$CS&submit=Submit&slot=1"; expect_body 'The item has been equipped.'
 f_is slot1id 13; f_is slot1name "Demon's Sin"; f_is maxhp 0; f_is currenthp 0
 f_is strength 57; f_is attackpower 60
+# into an empty slot: current HP is clamped to the lowered max as well
+f_sql "UPDATE users SET dropcode = 13, maxhp = 100, currenthp = 100"
+t_get /drop; t_post /drop "csrf=$CS&submit=Submit&slot=2"; expect_body 'The item has been equipped.'
+f_is slot2id 13; f_is maxhp 50; f_is currenthp 50; f_is strength 107; f_is attackpower 110
 f_sql "UPDATE users SET dropcode = 32"
 t_get /drop; t_post /drop "csrf=$CS&submit=Submit&slot=3"; f_is goldbonus 10; f_is slot3name 'Fortune Drop'
 
@@ -140,6 +200,26 @@ f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmon
 	currentmonsterhp = 0, experience = 0, gold = 0, expbonus = -500, goldbonus = 0, level = 2"
 t_get /victory; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
 f_is experience 0; f_is gold 1; f_is level 2
-f_sql "UPDATE users SET expbonus = 0"
+
+t_section "fight: gold bonus is a percentage of the gold"
+# Blue Slime: exp 1 + ceil(5 * 1) = 6; gold 1 + ceil(1 * 1) = 2 (legacy: of the exp, 7)
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
+	currentmonsterhp = 0, experience = 0, gold = 0, expbonus = 500, goldbonus = 100"
+t_get /victory; expect_body 'You gain 6 experience.'; expect_body 'You gain 2 gold.'
+f_is experience 6; f_is gold 2
+
+t_section "fight: several levels at once"
+# Blue Slime gives exactly 1 exp: 53 + 1 = 54 reaches Warrior levels 2 (18) and 3 (54)
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
+	currentmonsterhp = 0, experience = 53, level = 1, maxhp = 15, maxmp = 0, maxtp = 10,
+	strength = 5, dexterity = 5, attackpower = 5, defensepower = 5, spells = '0',
+	expbonus = 0, goldbonus = 0"
+t_get /victory; expect_body '<title>Courage and Wit have served thee well!</title>'
+expect_body 'You have gained 2 levels!'; expect_no_body 'gained a level'
+expect_body 'You gain 4 hit points.'; expect_body 'You gain 7 magic points.'
+expect_body 'You gain 3 travel points.'; expect_body 'You gain 5 strength.'
+expect_body 'You gain 3 dexterity.'; expect_body 'You have learned a new spell.'
+f_is level 3; f_is maxhp 19; f_is maxmp 7; f_is maxtp 13; f_is strength 10; f_is dexterity 8
+f_is attackpower 10; f_is defensepower 8; f_is spells 0,1; f_is experience 54
 
 fi

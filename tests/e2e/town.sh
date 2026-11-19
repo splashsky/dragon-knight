@@ -110,6 +110,18 @@ tu "latitude=5, longitude=5, currentaction='Exploring'"
 t_get /shop;                      expect_body 'Cheat attempt detected.'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 
+t_section "town: shop strength/dexterity specials in any slot"
+t_sql "UPDATE items SET special = 'strength,10' WHERE id = 18"
+t_sql "UPDATE items SET special = 'dexterity,3' WHERE id = 1"
+tu "$TOWN_HOME, gold=1000, weaponid=0, weaponname='None', armorid=0, armorname='None', attackpower=5, defensepower=5, strength=5, dexterity=5"
+t_post /shop/buy/18 "csrf=$TC&submit=Yes"     # Clothes 50/5 with strength +10: attack power too
+expect_db "gold,strength,attackpower,defensepower" "950|15|15|10" "armor strength special"
+t_post /shop/buy/1 "csrf=$TC&submit=Yes"      # Stick 10/2 with dexterity +3: defense power too
+expect_db "gold,dexterity,defensepower,attackpower" "940|8|13|17" "weapon dexterity special"
+t_post /shop/buy/2 "csrf=$TC&submit=Yes"      # Branch 30/4 sells the Stick: 940 + 5 - 30 ; 17 - 2 + 4
+expect_db "gold,dexterity,defensepower,attackpower" "915|5|10|19" "weapon special sold back"
+t_sql "UPDATE items SET special = 'X' WHERE id IN (1, 18)"
+
 t_section "town: maps"
 tu "$TOWN_HOME, towns='0,1', gold=100"
 t_get /maps;                      expect_status 200
@@ -217,6 +229,8 @@ expect_body 'Experience: 1,234 <span class="light">(-5%)</span>'; expect_body '<
 expect_body "Next Level: $(t_sql 'SELECT "1_exp" FROM levels WHERE id = 2')<"
 expect_body 'Heal<br>'; expect_body 'Hurt<br>'; expect_no_body 'Revive<br>'; expect_no_body 'action="/move"'
 tu "level=99"
+t_get /character;                 expect_body "Next Level: 16,777,215<"
+tu "level=100"
 t_get /character;                 expect_body 'Next Level: <span class="light">None</span>'
 ADMIN_ID=$(t_sql "SELECT id FROM users WHERE username = '$ADMIN_USER'")
 t_get "/character/$ADMIN_ID";     expect_status 200

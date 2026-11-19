@@ -5,14 +5,20 @@
 You gain {{ r.exp }} experience. {{ r.warnexp }}<br>
 You gain {{ r.gold }} gold. {{ r.warngold }}</p>
 {%- if levelup then %}
+{%- if levelup.levels == 1 then %}
 <p><b>You have gained a level!</b></p>
+{%- else %}
+<p><b>You have gained {{ levelup.levels }} levels!</b></p>
+{%- end %}
 <p>You gain {{ levelup.hp }} hit points.<br>
 You gain {{ levelup.mp }} magic points.<br>
 You gain {{ levelup.tp }} travel points.<br>
 You gain {{ levelup.strength }} strength.<br>
 You gain {{ levelup.dexterity }} dexterity.
-{%- if levelup.spells then %}<br>
+{%- if levelup.learned == 1 then %}<br>
 You have learned a new spell.
+{%- elseif levelup.learned > 1 then %}<br>
+You have learned {{ levelup.learned }} new spells.
 {%- end %}</p>
 <p>You can now continue <a href="/">exploring</a>.</p>
 {%- elseif dropped then %}

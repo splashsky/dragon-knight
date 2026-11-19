@@ -138,10 +138,27 @@ PLAN.md         design notes: engine API, URL map, data model
 - Installation and upgrades are the `dk install` command; there is no web installer.
 - The admin "page compression" setting is gone (the server doesn't gzip).
 - The built-in forum is only available when the forum type is set to "Internal".
-- Gameplay fixes: Bris sells its full item list; when buying in a shop, the sell-back value
-	of the item you replace counts toward the price; heal spells can't be cast when HP is
-	already at or above the maximum. Other fixes of crashes or exploits are commented in
-	the code (`fixed: …`); harmless quirks of the original are kept (`legacy: …`).
+- Gameplay fixes:
+	- Bris sells its full item list.
+	- In the shop, the sell-back value of the item you replace counts toward the price.
+	- Heal spells can't be cast when HP is at or above the maximum, in town or in a fight
+		(no MP spent, and in a fight the monster doesn't act).
+	- Running away can fail: the monster blocks you, attacks, and the damage counts (a
+		fatal blow is a normal death). A successful run ends the fight.
+	- Damage/defense spell buffs end with the fight (on running away and on death too).
+	- The gold bonus is a percentage of the gold gained (it was of the experience), and the
+		gold cap warning talks about gold.
+	- Dying on a spell turn keeps the MP spent.
+	- A victory grants every level its experience covers ("You have gained N levels!").
+	- Equipping a drop into an empty slot clamps current HP/MP/TP to the new maxima.
+	- "This monster has dropped an item" only shows when there is an item.
+	- The character sheet shows the experience for level 100 at level 99.
+	- Spells of an unknown type are refused in fights.
+	- Shop items with a strength/dexterity special update attack/defense power whatever
+		the slot.
+
+	Other fixes of crashes or exploits are commented in the code (`fixed: …`); harmless
+	quirks of the original are kept (`legacy: …`).
 
 ## License
 

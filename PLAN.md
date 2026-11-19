@@ -268,9 +268,23 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - When legacy has an obvious bug that affects gameplay, the behavior is kept unless it
 	is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
 	"fixed: …").
-- Deliberate gameplay changes (requested): Bris sells its full item list; in the shop the
-	sell-back value of the replaced item counts toward the price; heal spells do nothing
-	when HP is already at or above max.
+- Deliberate gameplay changes (requested):
+	- Bris sells its full item list.
+	- In the shop the sell-back value of the replaced item counts toward the price.
+	- Heal spells are refused when HP is already at or above max, also in fights (no MP
+		cost, no monster turn).
+	- Running away can fail ("blocked in front": monster turn, damage saved, normal death
+		handling); a successful run clears the fight state.
+	- `currentuberdamage`/`currentuberdefense` reset on a new fight, a successful run and
+		death (as on victory).
+	- `goldbonus` is a percentage of the gold gained; the gold cap warning mentions gold.
+	- Death saves `currentmp` (no refund for a spell cast on the fatal turn).
+	- A victory grants several levels when the experience covers them (up to 100).
+	- Equipping a drop into an empty slot also clamps current HP/MP/TP.
+	- The drop message only shows when a drop was picked.
+	- The character sheet shows the next level's experience at level 99.
+	- Unknown spell types are refused in fights (no MP cost, no monster turn).
+	- Shop strength/dexterity specials update attack/defense power in any slot.
 - Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
 	forum is only reachable when `control.forumtype = 1`.
 

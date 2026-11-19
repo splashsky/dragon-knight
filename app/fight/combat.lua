@@ -41,16 +41,17 @@ function combat.pick(rows, rand)
 	return rows[rand(1, #rows)]
 end
 
--- New fight against `monster`: monster HP, sleep, immunity. Returns true when the player
--- gets to swing first.
--- legacy: currentuberdamage/currentuberdefense are not reset here, so a buff left over from
--- a fight the player ran from or died in still applies to the next monster.
+-- New fight against `monster`: monster HP, sleep, immunity, buffs. Returns true when the
+-- player gets to swing first.
 function combat.start(st, monster, control, rand)
 	st.currentmonster = monster.id
 	st.currentmonsterhp = rand((monster.maxhp / 5) * 4, monster.maxhp)
 	st.currentmonsterhp = diffmod(st.currentmonsterhp, st.difficulty, control)
 	st.currentmonstersleep = 0
 	st.currentmonsterimmune = monster.immune
+	-- fixed: legacy kept the uber buffs of a fight the player ran from or died in.
+	st.currentuberdamage = 0
+	st.currentuberdefense = 0
 	local chance = rand(1, 10) + php.ceil(sqrt(st.dexterity))
 	return chance > (rand(1, 7) + php.ceil(sqrt(monster.maxdam)))
 end
@@ -126,14 +127,26 @@ function combat.attack(st, monster, rand)
 	return lines, st.currentmonsterhp <= 0
 end
 
+-- Why `spell` (known and affordable) can't be cast in combat, or nil when it can.
+-- fixed: legacy let a heal spell cost MP at full HP (and heal a negative amount above max
+-- HP), and spells of an unknown type were a free no-op turn.
+function combat.cast_error(st, spell)
+	local t = spell.type
+	if t == 1 and st.currenthp >= st.maxhp then
+		return "Your Hit Points are already full. Please go back and try again."
+	end
+	if t ~= 1 and t ~= 2 and t ~= 3 and t ~= 4 and t ~= 5 then
+		return "This spell cannot be cast. Please go back and try again."
+	end
+	return nil
+end
+
 -- Casting `spell` (a spells row) in combat; the caller has checked it is known and
--- affordable. Returns lines, monster_killed.
+-- affordable and that combat.cast_error allows it. Returns lines, monster_killed.
 function combat.cast(st, spell, rand)
 	local lines = {}
 	local t, name, attr = spell.type, spell.name, spell.attribute
 	if t == 1 then -- Heal spell.
-		-- legacy: no "HP already full" check in combat (unlike heal.php): at full HP it heals 0
-		-- and still costs MP; above max HP (after a drop lowered maxhp) the heal is negative.
 		local newhp = st.currenthp + attr
 		if st.maxhp < newhp then
 			attr = st.maxhp - st.currenthp
@@ -170,7 +183,6 @@ function combat.cast(st, spell, rand)
 		lines[1] = "You have cast the " .. name .. " spell, and will gain " .. attr ..
 							 "% defense until the end of this fight."
 	end
-	-- legacy: any other spell type does nothing and costs nothing.
 	return lines, st.currentmonsterhp <= 0
 end
 
@@ -188,8 +200,8 @@ function combat.rewards(user, monster, control, rand)
 	local gold = rand((monster.maxgold / 6) * 5, monster.maxgold)
 	if gold < 1 then gold = 1 end
 	gold = diffmod(gold, user.difficulty, control)
-	-- legacy: the gold bonus is a percentage of the *experience* gained, not of the gold.
-	if user.goldbonus ~= 0 then gold = gold + php.ceil((user.goldbonus / 100) * exp) end
+	-- fixed: legacy took the gold bonus as a percentage of the experience gained.
+	if user.goldbonus ~= 0 then gold = gold + php.ceil((user.goldbonus / 100) * gold) end
 
 	local r = { warnexp = "", warngold = "" }
 	if user.experience + exp < combat.MAX_EXPERIENCE then
@@ -204,28 +216,43 @@ function combat.rewards(user, monster, control, rand)
 	else
 		r.newgold = user.gold
 		gold = 0
-		-- legacy: the gold warning says "experience points" too.
-		r.warngold = "You have maxed out your experience points."
+		r.warngold = "You have maxed out your gold."
 	end
 	r.exp, r.gold = exp, gold
 	return r
 end
 
--- Level up check against the levels row for user.level + 1 (`levelrow` may be nil).
--- Returns nil (no level gained) or the gains and new stats. `key(stat)` maps a stat to
--- the levels column for the user's class (game.level_key).
--- legacy: at most one level per victory, even if the experience covers several.
-function combat.level_up(user, levelrow, newexp, key)
+-- Level ups for `newexp` experience: one level at a time while the experience covers the
+-- next levels row (`level_row(n)`, may return nil), up to MAX_LEVEL. Returns nil (no level
+-- gained) or the summed gains (hp, mp, tp, strength, dexterity), `levels` (how many),
+-- `learned` (spells learned) and the new stats. `key(stat)` maps a stat to the levels
+-- column for the user's class (game.level_key).
+-- fixed: legacy granted at most one level per victory.
+function combat.level_up(user, newexp, key, level_row)
+	local g = {
+		level = user.level, levels = 0, learned = 0,
+		hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0,
+	}
+	local spells = user.spells
 	-- fixed: legacy left every column unset (and MySQL stored 0) for level >= 100 or a
 	-- missing levels row, wiping the character; those victories now just don't level.
-	if user.level >= combat.MAX_LEVEL or not levelrow then return nil end
-	if newexp < levelrow[key("exp")] then return nil end
-	local g = {
-		hp = levelrow[key("hp")], mp = levelrow[key("mp")], tp = levelrow[key("tp")],
-		strength = levelrow[key("strength")], dexterity = levelrow[key("dexterity")],
-		spell = levelrow[key("spells")],
-	}
-	g.level = levelrow.id
+	while g.level < combat.MAX_LEVEL do
+		local row = level_row(g.level + 1)
+		if not row or newexp < row[key("exp")] then break end
+		g.level = row.id
+		g.levels = g.levels + 1
+		g.hp = g.hp + row[key("hp")]
+		g.mp = g.mp + row[key("mp")]
+		g.tp = g.tp + row[key("tp")]
+		g.strength = g.strength + row[key("strength")]
+		g.dexterity = g.dexterity + row[key("dexterity")]
+		local spell = row[key("spells")]
+		if spell ~= 0 then
+			spells = spells .. "," .. spell
+			g.learned = g.learned + 1
+		end
+	end
+	if g.levels == 0 then return nil end
 	g.maxhp = user.maxhp + g.hp
 	g.maxmp = user.maxmp + g.mp
 	g.maxtp = user.maxtp + g.tp
@@ -233,7 +260,7 @@ function combat.level_up(user, levelrow, newexp, key)
 	g.newdexterity = user.dexterity + g.dexterity
 	g.attackpower = user.attackpower + g.strength
 	g.defensepower = user.defensepower + g.dexterity
-	if g.spell ~= 0 then g.spells = user.spells .. "," .. g.spell end
+	if g.learned > 0 then g.spells = spells end
 	return g
 end
 
@@ -271,25 +298,22 @@ local function apply(st, stat, value, sign)
 end
 
 -- Equip `drop` into a slot that holds `old` (a drops row) or nothing (nil).
--- Mutates `st` exactly like legacy drop().
+-- Mutates `st` like legacy drop().
 function combat.equip_drop(st, drop, old)
-	local n1s, n1v = combat.parse_attribute(drop.attribute1)
-	local n2s, n2v = combat.parse_attribute(drop.attribute2)
 	if old then
 		local o1s, o1v = combat.parse_attribute(old.attribute1)
 		local o2s, o2v = combat.parse_attribute(old.attribute2)
 		apply(st, o1s, o1v, -1)
 		apply(st, o2s, o2v, -1)
-		apply(st, n1s, n1v, 1)
-		apply(st, n2s, n2v, 1)
-		if st.currenthp > st.maxhp then st.currenthp = st.maxhp end
-		if st.currentmp > st.maxmp then st.currentmp = st.maxmp end
-		if st.currenttp > st.maxtp then st.currenttp = st.maxtp end
-	else
-		-- legacy: an empty slot skips the current HP/MP/TP clamp (matters for negative items).
-		apply(st, n1s, n1v, 1)
-		apply(st, n2s, n2v, 1)
 	end
+	local n1s, n1v = combat.parse_attribute(drop.attribute1)
+	local n2s, n2v = combat.parse_attribute(drop.attribute2)
+	apply(st, n1s, n1v, 1)
+	apply(st, n2s, n2v, 1)
+	-- fixed: legacy skipped this clamp when the slot was empty (matters for negative items).
+	if st.currenthp > st.maxhp then st.currenthp = st.maxhp end
+	if st.currentmp > st.maxmp then st.currentmp = st.maxmp end
+	if st.currenttp > st.maxtp then st.currenttp = st.maxtp end
 end
 
 -- Display lines for a drop's attributes: "Max HP +10", and legacy's "Max HP-50".
