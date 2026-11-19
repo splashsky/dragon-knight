@@ -18,7 +18,14 @@
  * scratch buffer; only a partial request is copied into a pooled buffer, bufpool.h). A
  * request is parsed into one allocation (job + head + header array + path + body).
  * Responses go out as a queue of segments (head, body, a shared iobuf, a file for
- * sendfile) without copying them together. Timeouts live in a min-heap. */
+ * sendfile) without copying them together. Timeouts live in a min-heap.
+ *
+ * Event streams (SSE): a handler that answers with resp_sse() gets no direct write; the
+ * job comes back to the I/O thread, which sends the stream head and the opening (hub.h)
+ * and keeps the connection in CS_STREAM: no deadline, input discarded, output queued as
+ * shared frames by the hub (one iobuf per event for all subscribers). Delivered streams
+ * are written once per loop iteration; one left with more than stream_queue_bytes unsent
+ * is closed. Published events are drained on the same eventfd wake-up as completions. */
 #include "http.h"
 
 #include <arpa/inet.h>
@@ -48,6 +55,7 @@
 
 #include "bufpool.h"
 #include "evloop.h"
+#include "hub.h"
 #include "static.h"
 #include "stats.h"
 
@@ -135,6 +143,7 @@ void resp_init(dk_response *r)
 	r->nheaders = 0;
 	r->cap_headers = 0;
 	r->harena = NULL;
+	r->sse = NULL;
 	sb_init(&r->body);
 }
 
@@ -153,6 +162,7 @@ static void resp_clear_headers(dk_response *r)
 void resp_free(dk_response *r)
 {
 	resp_clear_headers(r);
+	free(r->sse);
 	free(r->headers);
 	sb_free(&r->body);
 	resp_init(r);
@@ -245,6 +255,8 @@ void resp_error(dk_response *r, int status, const char *message)
 {
 	resp_clear_headers(r);
 	sb_reset(&r->body);
+	free(r->sse);
+	r->sse = NULL;
 	r->status = status;
 	const char *reason = reason_phrase(status);
 	resp_add_header(r, "Content-Type", "text/html; charset=utf-8");
@@ -258,9 +270,27 @@ void resp_error(dk_response *r, int status, const char *message)
 	sb_puts(&r->body, "</body></html>\n");
 }
 
+int resp_sse(dk_response *r, const char *const *channels, int n, int retry_ms)
+{
+	if (n < 1 || n > HUB_STREAM_CHANNELS || retry_ms < 0)
+		return -1;
+	for (int i = 0; i < n; i++)
+		if (!channels[i] || !hub_valid_channel(channels[i], strlen(channels[i])))
+			return -1;
+	dk_sse *x = r->sse ? r->sse : malloc(sizeof *x);
+	if (!x)
+		return -1;
+	x->nchannels = n;
+	x->retry_ms = retry_ms;
+	for (int i = 0; i < n; i++)
+		snprintf(x->channels[i], sizeof x->channels[i], "%s", channels[i]);
+	r->sse = x;
+	return 0;
+}
+
 /* ------------------------------------------------------------------ server state */
 
-enum { CS_READ, CS_BUSY, CS_WRITE, CS_LINGER, CS_NSTATES };
+enum { CS_READ, CS_BUSY, CS_WRITE, CS_LINGER, CS_STREAM, CS_NSTATES };
 enum { CF_EOF = 1, CF_CLOSE = 2 };         /* conn->wflags, read by workers */
 enum { SEG_MEM, SEG_IOBUF, SEG_FILE };
 
@@ -297,7 +327,8 @@ struct job {
 	size_t      sent;
 	int         keepalive_out;
 	int         write_failed;
-	char        data[];                  /* head copy, header array, path, body */
+	int         sse;                     /* open resp.sse on the I/O thread */
+	_Alignas(max_align_t) char data[];   /* header array, head copy, path, body */
 };
 
 struct conn {
@@ -318,7 +349,12 @@ struct conn {
 	job     *inflight;      /* owned by a worker right now */
 	seg     *q;             /* output queue */
 	int      qhead, qn, qcap;
+	size_t   qbytes;        /* unsent bytes in it */
 	seg      qinline[4];
+	hub_stream *hs;         /* CS_STREAM: its subscriptions */
+	conn    *dirty_next;    /* streams with new output this iteration */
+	int      dirty;
+	int      kill;          /* stream out of memory: close */
 	double   req_start;     /* first byte of the current request; 0 = idle */
 	double   last_active;
 	ev_timer timer;
@@ -347,6 +383,9 @@ typedef struct server {
 	conn    *conns;             /* list of all connections */
 	size_t   nconns;
 	conn    *dead;              /* closed this iteration, freed at its end */
+	hub     *hub;
+	size_t   nstreams;
+	conn    *dirty;             /* streams to flush */
 
 	pthread_mutex_t qmu;
 	pthread_cond_t  qcv;
@@ -513,7 +552,8 @@ static void count_latency(double seconds)
 
 /* ------------------------------------------------------------------ connection bookkeeping */
 
-static const int state_stat[CS_NSTATES] = { ST_conn_reading, ST_conn_busy, ST_conn_writing, ST_conn_closing };
+static const int state_stat[CS_NSTATES] = { ST_conn_reading, ST_conn_busy, ST_conn_writing, ST_conn_closing,
+											ST_conn_streaming };
 
 static void set_state(conn *c, int st)
 {
@@ -534,6 +574,29 @@ static void seg_done(seg *g)
 		g->release(g->owner);
 }
 
+/* Unsent bytes: per connection (the stream cap), and in all streams (a gauge). */
+static void q_account(conn *c, size_t add, size_t sub)
+{
+	c->qbytes += add;
+	c->qbytes -= sub;
+	if (c->state == CS_STREAM) {
+		if (add)
+			stat_add(ST_stream_queued_bytes, add);
+		if (sub)
+			stat_sub(ST_stream_queued_bytes, sub);
+	}
+}
+
+static void q_shrink(conn *c)
+{
+	c->qhead = 0;
+	if (c->q != c->qinline) {
+		free(c->q);
+		c->q = c->qinline;
+		c->qcap = (int)(sizeof c->qinline / sizeof c->qinline[0]);
+	}
+}
+
 static int q_push(conn *c, seg g)
 {
 	if (c->qn == c->qcap) {
@@ -551,6 +614,7 @@ static int q_push(conn *c, seg g)
 	}
 	c->q[(c->qhead + c->qn) % c->qcap] = g;
 	c->qn++;
+	q_account(c, g.len - g.off, 0);
 	return 0;
 }
 
@@ -561,12 +625,8 @@ static void q_drop_all(conn *c)
 		c->qhead = (c->qhead + 1) % c->qcap;
 		c->qn--;
 	}
-	c->qhead = 0;
-	if (c->q != c->qinline) {
-		free(c->q);
-		c->q = c->qinline;
-		c->qcap = (int)(sizeof c->qinline / sizeof c->qinline[0]);
-	}
+	q_account(c, 0, c->qbytes);
+	q_shrink(c);
 }
 
 static void conn_close(server *s, conn *c)
@@ -591,6 +651,11 @@ static void conn_close(server *s, conn *c)
 	q_drop_all(c);
 	pbuf_release(&s->pool, &c->in);
 	pbuf_release(&s->pool, &c->hbuf);
+	if (c->hs) {
+		hub_close(s->hub, c->hs);
+		c->hs = NULL;
+		s->nstreams--;
+	}
 	if (!c->dead) {
 		c->dead = 1;
 		c->dead_next = s->dead;
@@ -654,6 +719,7 @@ static void conn_arm(server *s, conn *c)
 	ev_timer_set(&s->timers, &c->timer, d);
 	if (c->fd >= 0) {
 		int want = c->state == CS_WRITE ? EV_WRITE
+				   : c->state == CS_STREAM ? EV_READ | (c->qn ? EV_WRITE : 0)
 				   : (c->state == CS_READ && !c->peer_eof) || c->state == CS_LINGER ? EV_READ : 0;
 		ev_want(s->ev, c->fd, c, 1, want);
 	}
@@ -971,6 +1037,7 @@ static int conn_flush(server *s, conn *c)
 			return -1;
 		}
 		stat_add(ST_bytes_out, (uint64_t)n);
+		q_account(c, 0, (size_t)n);
 		size_t left = (size_t)n;
 		while (c->qn) {
 			seg *x = &c->q[c->qhead];
@@ -986,7 +1053,7 @@ static int conn_flush(server *s, conn *c)
 				break;
 		}
 	}
-	c->qhead = 0;
+	q_shrink(c);
 	pbuf_release(&s->pool, &c->hbuf);
 	return 1;
 }
@@ -1128,6 +1195,14 @@ static void serve_static(server *s, conn *c, job *j)
 static void worker_finish(server *s, job *j)
 {
 	conn *c = j->c;
+	if (j->resp.sse) {
+		if (strcmp(j->req.method, "GET") == 0) {
+			j->sse = 1;               /* the I/O thread opens it */
+			return;
+		}
+		resp_error(&j->resp, 405, "Event streams are opened with GET.");
+		resp_add_header(&j->resp, "Allow", "GET");
+	}
 	j->keepalive_out = j->keepalive && !atomic_load(&s->stopping_flag)
 					   && !(atomic_load(&c->wflags) & CF_EOF);
 	size_t body = build_head(&j->head_out, &j->resp, j->is_head, &j->keepalive_out);
@@ -1467,6 +1542,169 @@ static void conn_written(server *s, conn *c)
 	c->last_active = s->now;
 }
 
+/* ------------------------------------------------------------------ event streams */
+
+static void conn_drive(server *s, conn *c);
+
+static void mark_dirty(server *s, conn *c)
+{
+	if (!c->dirty) {
+		c->dirty = 1;
+		c->dirty_next = s->dirty;
+		s->dirty = c;
+	}
+}
+
+/* hub_sink.deliver: queue a shared frame (written by flush_dirty). */
+static void stream_deliver(void *owner, iobuf *b, const char *p, size_t len, void *ud)
+{
+	server *s = ud;
+	conn *c = owner;
+	if (c->closed || c->kill)
+		return;
+	if (q_push(c, (seg){ SEG_IOBUF, p, len, 0, iobuf_ref(b), -1, NULL, NULL }) < 0) {
+		iobuf_unref(b);
+		c->kill = 1;
+	} else {
+		stat_add(ST_stream_bytes, len);
+	}
+	mark_dirty(s, c);
+}
+
+/* Discard input (a stream has nothing more to say), notice the peer leaving, write as
+ * much as the socket takes; a stream left with more than stream_queue_bytes unsent is
+ * not reading: closed. */
+static void stream_drive(server *s, conn *c)
+{
+	if (c->kill) {
+		conn_close(s, c);
+		return;
+	}
+	while (c->readable) {
+		ssize_t n = recv(c->fd, s->scratch, SCRATCH_SIZE, 0);
+		if (n > 0) {
+			stat_add(ST_bytes_in, (uint64_t)n);
+			if ((size_t)n < SCRATCH_SIZE)
+				c->readable = 0;
+			continue;
+		}
+		if (n < 0 && errno == EINTR)
+			continue;
+		if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			c->readable = 0;
+			break;
+		}
+		conn_close(s, c);         /* EOF or error: the client went away */
+		return;
+	}
+	int r = conn_flush(s, c);
+	if (r == 0 && c->qbytes > s->cfg->stream_queue_bytes) {
+		stat_inc(ST_streams_slow_closed);
+		conn_close(s, c);
+	} else if (r < 0 || (r > 0 && s->stopping)) {
+		conn_close(s, c);
+	} else if (r > 0) {
+		c->last_active = s->now;
+	}
+}
+
+static void flush_dirty(server *s)
+{
+	while (s->dirty) {
+		conn *c = s->dirty;
+		s->dirty = c->dirty_next;
+		c->dirty_next = NULL;
+		c->dirty = 0;
+		if (!c->closed)
+			conn_drive(s, c);
+	}
+}
+
+#define STREAM_RETRY_AFTER "5"           /* on the 503 for a refused stream */
+
+/* A worker's job answered with resp_sse(): send the stream head and its opening. */
+static void stream_start(server *s, conn *c, job *j)
+{
+	const dk_config *cfg = s->cfg;
+	const dk_sse *x = j->resp.sse;
+	const char *refuse = NULL;
+	if (s->stopping)
+		refuse = "The server is shutting down.";
+	else if (s->nstreams >= (size_t)cfg->max_streams)
+		refuse = "Too many open event streams. Please try again in a moment.";
+	else if (cfg->max_streams_per_ip > 0) {
+		int mine = 0;
+		for (conn *o = s->conns; o; o = o->next)
+			mine += o->hs && !o->closed && strcmp(o->remote, c->remote) == 0;
+		if (mine >= cfg->max_streams_per_ip)
+			refuse = "Too many open event streams from your address.";
+	}
+	if (refuse) {
+		stat_inc(ST_streams_refused);
+		dk_response r;
+		resp_init(&r);
+		resp_error(&r, 503, refuse);
+		resp_add_header(&r, "Retry-After", STREAM_RETRY_AFTER);
+		conn_respond(s, c, &r, j->req.method, j->req.target, 0, j->keepalive, j->t0);
+		resp_free(&r);
+		conn_drive(s, c);
+		return;
+	}
+
+	sbuf head;
+	sb_init(&head);
+	int err = sb_puts(&head, "HTTP/1.1 200 OK\r\n");
+	for (size_t i = 0; i < j->resp.nheaders; i++) {
+		const char *n = j->resp.headers[i].name, *v = j->resp.headers[i].value;
+		if (!is_token(n, strlen(n)) || !header_value_ok(v))
+			continue;
+		static const char *const own[] = { "content-type", "content-length", "transfer-encoding",
+										   "connection", "date", "server", "cache-control",
+										   "x-accel-buffering" };
+		int skip = 0;
+		for (size_t k = 0; k < sizeof own / sizeof own[0] && !skip; k++)
+			skip = strcasecmp(n, own[k]) == 0;
+		if (!skip)
+			err |= sb_printf(&head, "%s: %s\r\n", n, v);
+	}
+	err |= sb_printf(&head, "Content-Type: text/event-stream\r\nCache-Control: no-store\r\n"
+					 "X-Accel-Buffering: no\r\nDate: %s\r\nServer: dk\r\n"
+					 "Connection: keep-alive\r\n\r\n", date_now());
+	/* no blank line after it: it joins the opening's first frame */
+	if (x->retry_ms > 0)
+		err |= sb_printf(&head, "retry: %d\n", x->retry_ms);
+	/* anything pipelined after the stream request is ignored */
+	job_free(c->pending);
+	c->pending = NULL;
+	pbuf_release(&s->pool, &c->in);
+	set_state(c, CS_STREAM);
+	c->last_active = s->now;
+	if (err || queue_head(s, c, &head) < 0) {
+		sb_free(&head);
+		conn_close(s, c);
+		return;
+	}
+	sb_free(&head);
+	log_response(c, j->req.method, j->req.target, 200, 0, j->t0, cfg);
+
+	/* events committed before this request finished are drained first: the opening's
+	 * position covers them (deterministic: they come only through a replay) */
+	hub_drain(s->hub, s->now);
+	const char *chans[HUB_STREAM_CHANNELS];
+	for (int i = 0; i < x->nchannels; i++)
+		chans[i] = x->channels[i];
+	c->hs = hub_open(s->hub, c, chans, x->nchannels, req_header(&j->req, "last-event-id"), s->now);
+	if (!c->hs) {
+		conn_close(s, c);
+		return;
+	}
+	s->nstreams++;
+	stat_inc(ST_streams_opened);
+	c->served++;
+	c->req_start = 0;
+	conn_drive(s, c);
+}
+
 /* Run the connection state machine as far as it can go without blocking. */
 static void conn_drive(server *s, conn *c)
 {
@@ -1484,6 +1722,12 @@ static void conn_drive(server *s, conn *c)
 		}
 		if (c->state == CS_LINGER) {
 			conn_drain(s, c);
+			break;
+		}
+		if (c->state == CS_STREAM) {
+			stream_drive(s, c);
+			if (c->closed)
+				return;
 			break;
 		}
 		if (c->state != CS_READ)
@@ -1626,6 +1870,11 @@ static void complete(server *s, job *j)
 		return;
 	}
 	set_state(c, CS_READ);
+	if (j->sse) {
+		stream_start(s, c, j);
+		job_free(j);
+		return;
+	}
 	size_t total = j->head_len + j->body_out;
 	if (j->write_failed) {
 		job_free(j);
@@ -1747,9 +1996,12 @@ static void begin_stop(server *s)
 			continue;
 		if (c->state == CS_READ || c->state == CS_LINGER)
 			conn_close(s, c);
-		else
+		else if (c->state != CS_STREAM)
 			c->close_after = 1;
 	}
+	/* streams: "event: bye", closed once it is written */
+	hub_bye(s->hub);
+	flush_dirty(s);
 }
 
 static void io_loop(server *s)
@@ -1780,7 +2032,15 @@ static void io_loop(server *s)
 			ev_want(s->ev, s->lfd, &listener_tag, 0, EV_READ);
 		}
 
+		if (s->now >= hub_next_tick(s->hub)) {
+			hub_tick(s->hub, s->now);
+			flush_dirty(s);
+		}
+
 		double next = ev_timer_next(&s->timers);
+		double tick = hub_next_tick(s->hub);
+		if (!next || tick < next)
+			next = tick;
 		if (s->stopping && (!next || next > s->stop_deadline))
 			next = s->stop_deadline;
 		if (!s->listening && s->lfd >= 0 && (!next || next > s->accept_pause_until))
@@ -1812,8 +2072,14 @@ static void io_loop(server *s)
 				on_conn_event(s, p, evs[i].events);
 			}
 		}
-		if (completions)
+		if (completions) {
+			/* events before completions: a stream opened by a completion starts after
+			 * the events its own request published */
+			hub_drain(s->hub, s->now);
 			process_completions(s);
+		}
+		flush_dirty(s);
+		reap(s);             /* now, not at the next wake-up (gauges stay current) */
 	}
 }
 
@@ -1978,6 +2244,9 @@ static void free_server(server *s)
 		conn_free(s, c);
 	}
 	s->dead = NULL;
+	s->dirty = NULL;
+	hub_free(s->hub);
+	s->hub = NULL;
 	if (s->lfd >= 0)
 		close(s->lfd);
 	if (s->sfd >= 0) {
@@ -2022,6 +2291,13 @@ int http_serve(const dk_config *cfg, const dk_hooks *hooks)
 	const char *be = getenv("DK_EVENT_BACKEND");
 	s.ev = ev_new(atomic_load(&g_force_poll) || (be && strcmp(be, "poll") == 0));
 	s.scratch = malloc(SCRATCH_SIZE);
+	hub_opts ho = {
+		.replay_events = cfg->stream_replay_events,
+		.replay_seconds = cfg->stream_replay_seconds,
+		.heartbeat = cfg->stream_heartbeat_ms / 1000.0,
+	};
+	hub_sink sink = { stream_deliver, &s };
+	s.hub = hub_new(&ho, &sink);
 
 	char *public_real = cfg->public_dir ? realpath(cfg->public_dir, NULL) : NULL;
 	if (!public_real)
@@ -2040,8 +2316,10 @@ int http_serve(const dk_config *cfg, const dk_hooks *hooks)
 	sigaction(SIGPIPE, &sa, &old_pipe);
 
 	int rc = -1;
-	if (!s.ev || !s.scratch || !s.statics) {
+	if (!s.ev || !s.scratch || !s.statics || !s.hub) {
 		log_error("http: out of memory");
+	} else if (hub_attach(s.hub, wake) < 0) {
+		log_error("http: another server in this process publishes events");
 	} else {
 		s.lfd = open_listener(cfg);
 	}

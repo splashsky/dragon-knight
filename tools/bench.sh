@@ -3,9 +3,11 @@
 #
 # Environment (all optional):
 #   BIN=build/release/dk  DKBENCH=build/release/dkbench
-#   BENCH_SCENARIO=mixed      comma list of pages, fights, static, mixed, idle, or "all"
+#   BENCH_SCENARIO=mixed      comma list of pages, fights, static, mixed, idle, realtime,
+#                             or "all" (all but realtime)
 #   BENCH_CLIENTS=50  BENCH_RATE=10 (req/s per client; 0 = closed loop)  BENCH_THREADS=4
 #   BENCH_DURATION=10  BENCH_WARMUP=3  BENCH_IDLE=1000 (connections for "idle")
+#   BENCH_LISTENERS=1000 (event streams for "realtime")  BENCH_EVENTS=10 (events/s published)
 #   BENCH_SERVER_CPUS=10,11   taskset CPU list for the server ("" = no pinning)
 #   BENCH_CLIENT_CPUS=4-7     taskset CPU list for dkbench
 #   BENCH_WORKERS=            config `workers` (unset: the config default)
@@ -29,6 +31,8 @@ THREADS=${BENCH_THREADS:-4}
 DURATION=${BENCH_DURATION:-10}
 WARMUP=${BENCH_WARMUP:-3}
 IDLE=${BENCH_IDLE:-1000}
+LISTENERS=${BENCH_LISTENERS:-1000}
+EVENTS=${BENCH_EVENTS:-10}
 SERVER_CPUS=${BENCH_SERVER_CPUS-10,11}
 CLIENT_CPUS=${BENCH_CLIENT_CPUS-4-7}
 
@@ -56,6 +60,7 @@ cp -r "$ROOT/app" "$ROOT/templates" "$ROOT/public" "$T/"
 	echo "	port = ${BENCH_PORT:-0}, db_path = \"$T/dk.db\", app_dir = \"$T/app\", template_dir = \"$T/templates\","
 	echo "	public_dir = \"$T/public\", outbox_dir = \"$T/outbox\", secret = \"bench\", dev = false,"
 	echo "	pbkdf2_iterations = 1000, keepalive_timeout = 120, max_connections = 4096,"
+	echo "	max_streams = 4096, max_streams_per_ip = 0, test_routes = true,"
 	[ -n "${BENCH_WORKERS:-}" ] && echo "	workers = $BENCH_WORKERS,"
 	[ -n "${BENCH_CONFIG:-}" ] && echo "	$BENCH_CONFIG,"
 	echo "}"
@@ -64,6 +69,7 @@ cp -r "$ROOT/app" "$ROOT/templates" "$ROOT/public" "$T/"
 	>"$T/install.log" 2>&1 || { cat "$T/install.log" >&2; exit 1; }
 (cd "$T/public" && find . -type f | sort | sed 's#^\./#/static/#') > "$T/static.txt"
 
+ulimit -n "$(ulimit -Hn)" 2>/dev/null || true    # realtime: a descriptor per stream
 t0=$(date +%s.%N)
 "${PIN_SERVER[@]}" "$BIN" serve --config "$T/config.lua" >"${BENCH_LOG:-$T/server.log}" 2>&1 &
 SERVER_PID=$!
@@ -94,6 +100,11 @@ for s in "${LIST[@]}"; do
 	idle)
 		echo "-- idle: $IDLE keep-alive connections"
 		"${PIN_CLIENT[@]}" "$DKBENCH" -p "$PORT" -s idle -c "$IDLE" -d 5 -x "$SERVER_PID" -S "$T/static.txt"
+		;;
+	realtime)
+		echo "-- realtime: $LISTENERS event streams, $EVENTS events/s"
+		"${PIN_CLIENT[@]}" "$DKBENCH" -p "$PORT" -s realtime -l "$LISTENERS" -e "$EVENTS" -t "$THREADS" \
+			-d "$DURATION" -x "$SERVER_PID" -u live
 		;;
 	pages|fights|static|mixed)
 		echo "-- $s"

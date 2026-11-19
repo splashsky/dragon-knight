@@ -91,6 +91,12 @@ void config_defaults(dk_config *c)
 	c->db_cache_kb       = 8192;
 	c->db_mmap_bytes     = 0;
 	c->db_checkpoint_ms  = 1000;
+	c->max_streams           = 512;
+	c->max_streams_per_ip    = 8;
+	c->stream_queue_bytes    = 256u << 10;
+	c->stream_heartbeat_ms   = 15000;
+	c->stream_replay_events  = 200;
+	c->stream_replay_seconds = 300;
 }
 
 int config_workers(const dk_config *c)
@@ -165,6 +171,12 @@ static const cfg_key cfg_keys[] = {
 	{ "db_cache_kb",       K_INT,  OFF(db_cache_kb),       0, 1 << 22 },
 	{ "db_mmap_bytes",     K_SIZE, OFF(db_mmap_bytes),     0, 1LL << 40 },
 	{ "db_checkpoint_ms",  K_INT,  OFF(db_checkpoint_ms),  0, 3600000 },
+	{ "max_streams",           K_INT,  OFF(max_streams),           0, 1000000 },
+	{ "max_streams_per_ip",    K_INT,  OFF(max_streams_per_ip),    0, 1000000 },
+	{ "stream_queue_bytes",    K_SIZE, OFF(stream_queue_bytes),    1024, 1LL << 30 },
+	{ "stream_heartbeat_ms",   K_INT,  OFF(stream_heartbeat_ms),   0, 3600000 },
+	{ "stream_replay_events",  K_INT,  OFF(stream_replay_events),  0, 100000 },
+	{ "stream_replay_seconds", K_INT,  OFF(stream_replay_seconds), 0, 86400 },
 };
 #undef OFF
 

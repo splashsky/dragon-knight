@@ -12,6 +12,7 @@ for _, name in ipairs({
 	"routes.community",  -- forum, help
 	"routes.admin",      -- admin panel
 	"routes.theme",      -- POST /theme (theme selector)
+	"routes.live",       -- GET /live (event stream)
 }) do
 	require(name)(r)
 end

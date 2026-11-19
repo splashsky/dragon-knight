@@ -39,6 +39,7 @@ src/                  C engine
   http.[ch]           I/O thread (event loop) + worker threads + backpressure
   evloop.[ch]         epoll (poll fallback) backend + timer min-heap
   bufpool.[ch]        size-classed connection buffers + refcounted iobufs
+  hub.[ch]            event streams (SSE): channels, shared frames, replay rings, heartbeats
   static.[ch]         /static/ files: path checks, memory cache, ETag, sendfile
   stats.[ch]          atomic metrics (dk stats, /admin/server)
   codecache.[ch]      bytecode cache (read-mostly rwlock) + inotify watcher + generation
@@ -51,8 +52,9 @@ src/                  C engine
 app/                  Lua application (hot-reloaded)
   main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
   routes.lua          route table assembly (requires the route modules listed in it)
-  routes/             thin route modules: auth, home, town, fight, community, admin
-  lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
+  routes/             thin route modules: auth, home, town, fight, community, admin, theme,
+                      live (GET /live, the event stream)
+  lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount, json,
                       news, paging, migrations (schema versions), leveling, classes,
                       spells, items, inventory, stats (derived stats, gear modifiers),
                       action (the API scripted spells, items, statuses and summons run
@@ -95,12 +97,15 @@ data/                 runtime (gitignored): dk.db, outbox/
             ┌──────────── I/O thread (epoll, edge-triggered; poll fallback) ────────────┐
  client ──▶ │ accept4 · read (scratch buffer) · parse · keep-alive · timer heap · writev │──▶ /static/*:
             │ queue wait > queue_timeout_ms → fast 503        stats socket (dk stats)    │    memory cache /
-            └───────┬───────────────────────────────────────────▲───────────────────────┘    sendfile
-          request queue (mutex/condvar)          completion + wakeup (eventfd): the I/O
-            ┌───────▼───────────────────────────────────────────┴──────────┐  thread takes the
-            │ worker thread × N (default: one per CPU; own sqlite3* each)  │  connection back,
-            │  vm = vmpool_acquire()     ← ready queue                     │  writes the rest
-            │  lock(txn) BEGIN IMMEDIATE · handler · COMMIT unlock(txn)    │
+            │ event streams (CS_STREAM): hub channels → one shared frame per event,      │    sendfile
+            │ replay rings, heartbeats, slow-reader cutoff                               │
+            └───────┬───────────────────────────────────────────▲───────────────────────┘
+          request queue (mutex/condvar)          completion + published events + wakeup
+            ┌───────▼───────────────────────────────────────────┴──────────┐  (eventfd): the I/O
+            │ worker thread × N (default: one per CPU; own sqlite3* each)  │  thread takes the
+            │  vm = vmpool_acquire()     ← ready queue                     │  connection back,
+            │  lock(txn) BEGIN IMMEDIATE · handler · COMMIT → publish      │  writes the rest or
+            │            unlock(txn)                                       │  opens the stream
             │  serialize head; writev(head, body) straight to the socket   │
             │  vmpool_release(vm): restore arena snapshot, reseed → ready   │
             └───────▲──────────────────────────────────────────────────────┘
@@ -136,6 +141,16 @@ data/                 runtime (gitignored): dk.db, outbox/
 	job is in flight the I/O thread never writes to or closes that socket. An idle
 	keep-alive connection holds no buffer (input goes through one scratch buffer; partial
 	requests use pooled 2/8/32 KiB buffers).
+- **Event streams** (`hub.c`, server-sent events): a handler returning `{ sse = {
+	channels = {...}, retry = ms } }` gets no direct write; the I/O thread sends the stream
+	head and keeps the connection (state `CS_STREAM`: no deadline, input discarded), so a
+	stream holds no worker, VM or buffer. `dk.publish` buffers events per request; after
+	COMMIT (still under the writer lock, so in commit order) they go to a mutex-guarded
+	queue and the eventfd. The I/O thread numbers them (`<boot>-<n>`), keeps them in the
+	channel's replay ring and appends the same refcounted frame to every subscriber's output
+	queue, then writes each touched stream once per loop iteration; a stream with more than
+	`stream_queue_bytes` left unsent is closed. Heartbeats carry the current id, so a
+	reconnect after a blip replays from the ring instead of resyncing.
 - **DB connections** are per worker and persistent (WAL). VMs are ephemeral; `dk.db`
 	is bound to the worker's connection only for the one request. Statements are
 	finalized before `db:query` returns (no statement objects escape to Lua). An optional
@@ -173,6 +188,7 @@ Global `dk` table installed in every VM:
 | `dk.config` | the table returned by config.lua (re-read per VM build → hot) |
 | `dk.vmstats()` | table of vmpool stats (`built`, `reaped`, `recycled`, `hot_acquires`, ...), `generation` (code cache) and `boot_id` (random per process) |
 | `dk.server_stats()` | the server's metrics (`dk stats`) as `{name = number}`, and a second table `{name = description}` |
+| `dk.publish(channel, event, data)` | queue a server-sent event (data: a string, e.g. JSON from `lib/json.lua`) for the streams on `channel`; sent only after the request's transaction commits, dropped on rollback or error. Channel `[a-z0-9:_-]{1,64}`, event `[A-Za-z0-9_.:-]{1,64}`, data up to 64 KiB without NUL bytes, at most 256 per request; invalid arguments raise. In CLI commands (no server in the process): a warning, nothing sent |
 | `dk.list_modules(prefix)` | sorted module names of the `*.lua` files directly under `app/<prefix as path>` (`"content.classes"` → `{"content.classes.mage", ...}`); read live, so new files count at once |
 | `require(name)` | loads `app/<name with . → />.lua` from codecache; `package.path`/`cpath` disabled |
 
@@ -205,7 +221,10 @@ return {
 ```
 
 The C side adds `Content-Length`, `Date`, `Server: dk`, `Connection`, and drops HEAD
-bodies. Bodies other than
+bodies. A response with `sse = { channels = { "babble", "user:12" }, retry = 3000 }`
+(1–16 valid channel names; `retry` optional, ms) opens an event stream instead: status and
+body are ignored, headers such as `Set-Cookie` kept; only `GET` may open one (others get
+405 from C). Bodies other than
 urlencoded (e.g. multipart) → the C side passes `form = {}`; the app doesn't need uploads.
 
 ## Template language (`templates/**/*.html`)

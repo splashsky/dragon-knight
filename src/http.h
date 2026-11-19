@@ -8,12 +8,15 @@
  * waited longer than `queue_timeout_ms` for a worker gets a fast 503 with Retry-After.
  * Requests under /static/ are served from cfg->public_dir by the I/O thread (GET/HEAD
  * only, no traversal, mime by extension, small files cached in memory, larger ones sent
- * with sendfile, Last-Modified + ETag -> 304). Everything else goes to the handler. */
+ * with sendfile, Last-Modified + ETag -> 304). Everything else goes to the handler.
+ * A handler may answer with an event stream (resp_sse): the connection then stays with
+ * the I/O thread, subscribed to channels of the hub (hub.h), without a worker or VM. */
 #ifndef DK_HTTP_H
 #define DK_HTTP_H
 
 #include <stddef.h>
 #include "config.h"
+#include "hub.h"
 #include "util.h"
 
 typedef struct {
@@ -33,6 +36,13 @@ typedef struct {
 	const char  *remote_addr;  /* "1.2.3.4" or "::1" */
 } dk_request;
 
+/* An event stream instead of a response body (resp_sse). */
+typedef struct {
+	int  nchannels;
+	int  retry_ms;             /* 0: no "retry:" line */
+	char channels[HUB_STREAM_CHANNELS][HUB_CHANNEL_MAX + 1];
+} dk_sse;
+
 typedef struct {
 	int        status;         /* default 200 */
 	dk_header *headers;        /* response headers (name as given), owned by response */
@@ -40,6 +50,7 @@ typedef struct {
 	size_t     cap_headers;
 	sbuf       body;
 	void      *harena;         /* storage of the header strings */
+	dk_sse    *sse;            /* non-NULL: open an event stream (see resp_sse) */
 } dk_response;
 
 /* Look up a request header by lowercase name; NULL if absent. */
@@ -50,6 +61,13 @@ void resp_free(dk_response *r);
 int  resp_add_header(dk_response *r, const char *name, const char *value); /* copies; multiple allowed */
 /* Replace the whole response with a simple text/html error page. */
 void resp_error(dk_response *r, int status, const char *message);
+/* Answer with an event stream on these channels instead (status and body are ignored;
+ * headers such as Set-Cookie are kept). Only GET may open one (others get 405). The I/O
+ * thread sends the stream head ("Content-Type: text/event-stream"), "retry: <retry_ms>"
+ * when > 0, the opening (replay after Last-Event-ID, see hub.h), then the channels'
+ * events; or 503 when max_streams / max_streams_per_ip are reached. 0 ok, -1 when a
+ * channel name is invalid, there are none or more than HUB_STREAM_CHANNELS, or no memory. */
+int  resp_sse(dk_response *r, const char *const *channels, int n, int retry_ms);
 
 typedef struct {
 	/* Called once on each worker thread at startup; return per-worker context (e.g. a DB connection). */

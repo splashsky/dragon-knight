@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "codecache.h"
+#include "hub.h"
 #include "vmpool.h"
 
 _Atomic uint64_t dk_stat[ST_COUNT];
@@ -70,6 +71,7 @@ int stats_format(sbuf *out)
 	err |= sb_printf(out, "code_generation %llu\n", (unsigned long long)codecache_generation());
 	for (int k = 0; k < ST_COUNT; k++)
 		err |= sb_printf(out, "%s %llu\n", info[k].name, (unsigned long long)stat_get(k));
+	err |= hub_format_stats(out);
 	return err ? -1 : 0;
 }
 

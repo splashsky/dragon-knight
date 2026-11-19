@@ -112,7 +112,66 @@ Nothing is tuned without a number before and after. All results go into `docs/PE
 - Memory: server RSS < 64 MB at idle after warm-up; + ≤ 16 KiB per idle connection.
 - No unbounded growth over a 1-hour mixed soak (R4).
 
-## R1: SSE in the C server (no extra dependencies)
+## R1: SSE in the C server (no extra dependencies) — ✅ done
+
+**As implemented** (numbers in `docs/PERF.md`, "R1: event streams"; Lua side in
+`docs/APP.md`, "Realtime"): `src/hub.c` (channels, streams, replay rings, heartbeats, the
+publish queue) and `CS_STREAM` in `src/http.c`. A handler returns `{ sse = { channels,
+retry } }` (validated in `bind_dk.c`: 1–16 valid names, `retry` 0–3600000 ms); the worker
+skips its direct write, the job comes back to the I/O thread (`stream_start`), which
+refuses with `503 Retry-After: 5` over `max_streams`/`max_streams_per_ip`, else queues the
+head (`200`, `text/event-stream`, `no-store`, `X-Accel-Buffering: no`, `keep-alive`, the
+handler's other headers such as `Set-Cookie`) plus `retry:`, drains pending events, and
+calls `hub_open`. Only `GET` opens a stream (`HEAD`/`POST` → 405 from C). Each event is
+framed once by the publishing worker into one `iobuf` with room for its id line, which
+the I/O thread fills in (`<boot>-<n>`, boot = 8 random hex digits per server start); the
+ring and every subscriber's output queue take a reference (`test_hub` asserts the shared
+pointer and the refcount). Delivered streams are flushed once per loop iteration; a
+stream left with more than `stream_queue_bytes` unsent after the write is closed (a burst
+the socket takes in does not count). Heartbeats are one shared `: ping\nid: <current>\n\n`
+per tick on streams quiet for half the interval: carrying the position keeps a quiet
+stream's `Last-Event-ID` recent, so reconnects after a blip replay instead of resyncing.
+Openings end with an id line for the current position (`id: x\n\n`, no event); a
+`Last-Event-ID` from another boot, unparsable, or older than an event a channel dropped
+(by count or age; a channel freed after aging out leaves its high-water mark to channels
+created later) gets `event: resync` with the current id. Shutdown: `event: bye`, closed
+once written (the 10 s grace still applies). `dk.publish` buffers per worker thread
+(thread-local, max 256 per request), posts after `COMMIT` while still holding the writer
+lock (so events are queued in commit order), drops on rollback/error/HEAD (when the Lua
+code rolled back itself, nothing is posted); in CLI processes it warns once and does
+nothing. Metrics: `conn_streaming`, `streams_*`, `stream_*`, `events_*`, `replay_*`,
+`publish_queue_max` in `DK_STATS`, plus `channel.<name> <subscribers>` lines (`user:<id>`
+channels summed as `channel.user:*`) in `dk stats` / `dk.server_stats()`; `/admin/server`
+has "Event streams" and "Channels" groups. Config keys: `max_streams`,
+`max_streams_per_ip`, `stream_queue_bytes`, `stream_heartbeat_ms`,
+`stream_replay_events`, `stream_replay_seconds`. App: `GET /live` (`app/routes/live.lua`,
+`auth.game`; `babble`, `presence`, `notices`, `user:<id>`, `admin` for admins),
+`app/lib/json.lua` (encoder), `POST /__test/publish` only with `test_routes = true`.
+Tests: `tests/c/test_hub.c` (hub units + streams over HTTP on epoll and poll),
+`tests/e2e/live.sh` (`curl -N`), `tests/lua/test_json.lua`; `make bench
+BENCH_SCENARIO=realtime` (dkbench `-s realtime -l LISTENERS -e EVENTS_PER_S`).
+
+**Notes for R2**:
+- Publish with `dk.publish(channel, event, json.encode(t))` from the handler that commits
+	the change (chat post, news post, banner); never before validation succeeded. A
+	request's own events are not delivered on a stream opened by that same request
+	(the opening's position is after them); a page that needs them renders them
+	server-side.
+- The JS client: `EventSource("/live")`; on `resync` reload the live parts (or the page);
+	on `bye` close and reconnect after a delay; on an error status (503 when the limits
+	are reached, 302 to /login when logged out) `EventSource` does **not** retry by itself:
+	retry with a backoff, and stop on a redirect to /login. Share one stream between tabs
+	(`max_streams_per_ip` is 8 per address by default).
+- Presence needs "has an open stream": streams are owned by C and invisible to Lua. Either
+	keep presence on request times (`onlinetime`) and publish joins from `/live` itself
+	(the stream is about to open), or add a small C hook later (e.g. subscriber counts per
+	`user:<id>` via `dk.server_stats()`; the I/O-thread side already counts per channel).
+- Logout/password change: publish `logout` on `user:<id>` (the server doesn't re-check
+	sessions on open streams).
+- The admin broadcast: `notices` is shared by every stream; keep banners short (one frame
+	per event, `HUB_DATA_MAX` 64 KiB).
+
+## R1 plan (as approved)
 
 - **Opening a stream**: a Lua handler returns `{ sse = { channels = { "babble", "user:12" },
 	retry = 3000 } }`. The worker finishes the request as usual (transaction commits, VM is

@@ -8,8 +8,8 @@
 #   make TSAN=1 CC=clang BUILD=build/tsan BIN=build/tsan/dk ctest
 #                        C unit tests under ThreadSanitizer (make ctest: C tests only)
 #   make bench           release build + tools/dkbench, then tools/bench.sh against a temp
-#                        install (BENCH_SCENARIO=pages|fights|static|mixed|idle|all, see
-#                        docs/PERF.md)
+#                        install (BENCH_SCENARIO=pages|fights|static|mixed|idle|realtime|all,
+#                        see docs/PERF.md)
 #   make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]
 #                        build and serve in the foreground; on first use creates CONFIG
 #                        (random secret) and installs the game with ADMIN_USER/ADMIN_PASS

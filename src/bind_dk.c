@@ -3,6 +3,7 @@
 #include "bind.h"
 
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -10,6 +11,7 @@
 
 #include "codecache.h"
 #include "crypto.h"
+#include "hub.h"
 #include "lauxlib.h"
 #include "lualib.h"
 #include "stats.h"
@@ -162,6 +164,53 @@ static int l_server_stats(lua_State *L)
 		lua_setfield(L, -2, stat_name(k));
 	}
 	return 2;
+}
+
+/* ---- dk.publish ---- */
+
+#define PUBLISH_MAX 256          /* events per request */
+
+/* The current request's events (this worker thread's): posted to the hub after COMMIT,
+ * dropped on ROLLBACK or error. */
+static _Thread_local hub_msg *pub_pending;
+static _Thread_local int pub_count, pub_in_txn;
+static atomic_int pub_warned;
+
+static void pub_reset(void)
+{
+	hub_msg_free(pub_pending);
+	pub_pending = NULL;
+	pub_count = 0;
+}
+
+/* dk.publish(channel, event, data) */
+static int l_publish(lua_State *L)
+{
+	const char *ch = luaL_checkstring(L, 1);
+	const char *ev = luaL_checkstring(L, 2);
+	size_t n;
+	const char *data = luaL_checklstring(L, 3, &n);
+	char err[256];
+	hub_msg *m = hub_msg_new(ch, ev, data, n, err, sizeof err);
+	if (!m) return luaL_error(L, "dk.publish: %s", err);
+	if (!hub_active()) {
+		/* CLI commands run in their own process: no stream can see the event */
+		hub_msg_free(m);
+		if (!atomic_exchange(&pub_warned, 1))
+			log_warn("dk.publish('%s', '%s'): no server in this process; event dropped", ch, ev);
+		return 0;
+	}
+	if (!pub_in_txn) {
+		hub_msg_free(m);
+		return luaL_error(L, "dk.publish: only during a request");
+	}
+	if (pub_count >= PUBLISH_MAX) {
+		hub_msg_free(m);
+		return luaL_error(L, "dk.publish: more than %d events in one request", PUBLISH_MAX);
+	}
+	hub_msg_append(&pub_pending, m);
+	pub_count++;
+	return 0;
 }
 
 /* dk.list_modules(prefix) -> sorted array of module names under app/<prefix as path>. */
@@ -411,6 +460,7 @@ int bind_install(lua_State *L, const dk_config *cfg)
 		{ "vmstats", l_vmstats },
 		{ "server_stats", l_server_stats },
 		{ "list_modules", l_list_modules },
+		{ "publish", l_publish },
 		{ NULL, NULL }
 	};
 	luaL_newlib(L, funcs);
@@ -558,6 +608,36 @@ static int header_ok(const char *s, size_t n, int is_name)
 	return 1;
 }
 
+/* response.sse = { channels = { "a", "b:1", ... }, retry = ms } */
+static void read_sse(lua_State *L, int t, dk_response *resp)
+{
+	if (lua_getfield(L, t, "channels") != LUA_TTABLE)
+		luaL_error(L, "response sse.channels must be an array of channel names");
+	int ci = lua_gettop(L);
+	lua_Integer n = (lua_Integer)lua_rawlen(L, ci);
+	if (n < 1 || n > HUB_STREAM_CHANNELS)
+		luaL_error(L, "response sse.channels must have 1 to %d names", HUB_STREAM_CHANNELS);
+	const char *names[HUB_STREAM_CHANNELS];
+	luaL_checkstack(L, (int)n, "too many channels");
+	for (lua_Integer i = 1; i <= n; i++) {
+		size_t len = 0;
+		names[i - 1] = lua_rawgeti(L, ci, i) == LUA_TSTRING ? lua_tolstring(L, -1, &len) : NULL;
+		if (!hub_valid_channel(names[i - 1], len))
+			luaL_error(L, "response sse.channels[%d]: invalid channel name (want [a-z0-9:_-], 1 to 64 characters)",
+					   (int)i);
+	}
+	lua_Integer retry = 0;
+	int rt = lua_getfield(L, t, "retry");
+	if (rt != LUA_TNIL) {
+		int isint = 0;
+		retry = lua_tointegerx(L, -1, &isint);
+		if (rt != LUA_TNUMBER || !isint || retry < 0 || retry > 3600000)
+			luaL_error(L, "response sse.retry must be an integer from 0 to 3600000 (ms)");
+	}
+	if (resp_sse(resp, names, (int)n, (int)retry) < 0) luaL_error(L, "out of memory");
+	lua_settop(L, t);
+}
+
 /* Converts the response at stack index idx into resp. Raises on malformed input. */
 static void read_response(lua_State *L, int idx, dk_response *resp)
 {
@@ -603,6 +683,11 @@ static void read_response(lua_State *L, int idx, dk_response *resp)
 	lua_pop(L, 1);
 	if (!has_ct && resp_add_header(resp, "Content-Type", "text/html; charset=utf-8") < 0)
 		luaL_error(L, "out of memory");
+
+	int st = lua_getfield(L, idx, "sse");
+	if (st == LUA_TTABLE) read_sse(L, lua_gettop(L), resp);
+	else if (st != LUA_TNIL) luaL_error(L, "response sse must be a table (got %s)", luaL_typename(L, -1));
+	lua_pop(L, 1);
 
 	int bt = lua_getfield(L, idx, "body");
 	if (bt == LUA_TSTRING || bt == LUA_TNUMBER) {
@@ -712,6 +797,7 @@ static int run_txn_locked(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx 
 	char err[512];
 	*errmsg = NULL;
 	lua_settop(L, 0);
+	pub_reset();
 	double t0 = now_mono();
 	if (db_exec_simple(db, "BEGIN IMMEDIATE", err, sizeof err) < 0) {
 		*errmsg = strdup(err);
@@ -727,10 +813,13 @@ static int run_txn_locked(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx 
 	lua_pushcfunction(L, msgh);
 	lua_pushcfunction(L, fn);
 	lua_pushlightuserdata(L, c);
+	pub_in_txn = 1;
 	int st = lua_pcall(L, 1, 0, 1);
+	pub_in_txn = 0;
 	if (st != LUA_OK) {
 		const char *m = lua_tostring(L, -1);
 		*errmsg = strdup(m ? m : "unknown error");
+		pub_reset();
 		txn_rollback(db);
 		bind_attach_db(L, NULL);
 		lua_settop(L, 0);
@@ -747,9 +836,18 @@ static int run_txn_locked(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx 
 		stat_max(ST_db_commit_max_us, us);
 		if (rc < 0) {
 			*errmsg = strdup(err);
+			pub_reset();
 			txn_rollback(db);
 			return -1;
 		}
+	} else if (db) {
+		pub_reset();             /* the handler rolled back itself (an error page, HEAD) */
+	}
+	/* committed: the events go out, in commit order (the writer lock is still held) */
+	if (pub_pending) {
+		hub_post(pub_pending);
+		pub_pending = NULL;
+		pub_count = 0;
 	}
 	return 0;
 }

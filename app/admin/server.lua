@@ -7,7 +7,7 @@ local server = {}
 local GROUPS = {
 	{ "Process", { "uptime_s", "rss_kb", "event_backend", "workers" } },
 	{ "Connections", { "conn_open", "conn_reading", "conn_busy", "conn_writing", "conn_closing",
-		"conn_accepted", "conn_rejected" } },
+		"conn_streaming", "conn_accepted", "conn_rejected" } },
 	{ "Requests", { "requests", "requests_static", "responses_2xx", "responses_3xx", "responses_4xx",
 		"responses_5xx", "backpressure_503", "latency_le_1ms", "latency_le_5ms", "latency_le_10ms",
 		"latency_le_50ms", "latency_gt_50ms", "bytes_in", "bytes_out" } },
@@ -21,6 +21,10 @@ local GROUPS = {
 		"db_commit_us", "db_commit_max_us", "db_time_us", "db_busy_retries", "db_stmt_hits",
 		"db_stmt_prepares", "db_checkpoints", "db_checkpoint_us", "db_wal_frames",
 		"db_wal_frames_max", "db_wal_restarts", "db_checkpoint_lock_max_us" } },
+	{ "Event streams", { "streams_opened", "streams_refused", "streams_slow_closed",
+		"stream_subscriptions", "stream_channels", "stream_queued_bytes", "stream_bytes",
+		"stream_heartbeats", "stream_resyncs", "events_published", "events_dropped", "events_sent",
+		"events_replayed", "replay_events", "replay_bytes", "publish_queue_max" } },
 	{ "Static files, buffers, log", { "static_hits", "static_misses", "static_sendfile",
 		"static_cache_bytes", "buf_used_bytes", "buf_pooled_bytes", "log_lines", "log_dropped",
 		"loop_wakeups", "loop_events" } },
@@ -50,6 +54,15 @@ function server.show(req)
 		end
 		groups[#groups + 1] = { title = g[1], rows = rows }
 	end
+	-- subscribers per channel ("channel.user:*": all user:<id> channels together)
+	local channels = {}
+	for name, value in pairs(values) do
+		if name:sub(1, 8) == "channel." then
+			channels[#channels + 1] = { name = name, value = value, help = "subscribers" }
+		end
+	end
+	table.sort(channels, function(a, b) return a.name < b.name end)
+	if #channels > 0 then groups[#groups + 1] = { title = "Channels", rows = channels } end
 	local handled = values.handled or 0
 	local averages = {}
 	if handled > 0 then

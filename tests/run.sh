@@ -42,6 +42,8 @@ return {
 	secret = "e2e-test-secret",
 	dev = true,
 	pbkdf2_iterations = 1000,
+	test_routes = true,
+	stream_heartbeat_ms = 1000,
 }
 EOF
 CONFIG="$T/config.lua"

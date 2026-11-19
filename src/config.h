@@ -36,6 +36,12 @@ typedef struct {
 	int    db_cache_kb;       /* 8192: SQLite page cache per connection (KiB) */
 	size_t db_mmap_bytes;     /* 0: SQLite memory-mapped I/O per connection (bytes; 0 = off) */
 	int    db_checkpoint_ms;  /* 1000: background WAL checkpoint interval (0 = SQLite's auto) */
+	int    max_streams;           /* 512: open event streams (SSE) in all; more get 503 */
+	int    max_streams_per_ip;    /* 8: open event streams per client address */
+	size_t stream_queue_bytes;    /* 256 KiB: unsent bytes a stream may queue before it is closed */
+	int    stream_heartbeat_ms;   /* 15000: ": ping" on quiet streams (0 = none) */
+	int    stream_replay_events;  /* 200: events kept per channel for Last-Event-ID replay */
+	int    stream_replay_seconds; /* 300: ... and for how long (0 = no replay) */
 } dk_config;
 
 void config_defaults(dk_config *c);

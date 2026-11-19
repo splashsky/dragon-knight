@@ -20,6 +20,7 @@
 	X(conn_busy,            GAUGE,   "connections with a request at a worker") \
 	X(conn_writing,         GAUGE,   "connections writing a response") \
 	X(conn_closing,         GAUGE,   "connections draining before close") \
+	X(conn_streaming,       GAUGE,   "connections with an open event stream") \
 	X(requests,             COUNTER, "requests") \
 	X(requests_static,      COUNTER, "requests for /static/") \
 	X(responses_2xx,        COUNTER, "2xx responses") \
@@ -85,7 +86,23 @@
 	X(buf_pooled_bytes,     GAUGE,   "bytes in pooled connection buffers (free)") \
 	X(buf_used_bytes,       GAUGE,   "bytes in connection buffers in use") \
 	X(log_lines,            COUNTER, "log lines through the background writer") \
-	X(log_dropped,          COUNTER, "access log lines dropped (ring full)")
+	X(log_dropped,          COUNTER, "access log lines dropped (ring full)") \
+	X(streams_opened,       COUNTER, "event streams opened") \
+	X(streams_refused,      COUNTER, "event streams refused with 503 (max_streams, max_streams_per_ip)") \
+	X(streams_slow_closed,  COUNTER, "event streams closed for not reading (stream_queue_bytes)") \
+	X(stream_subscriptions, GAUGE,   "channel subscriptions of open event streams") \
+	X(stream_channels,      GAUGE,   "channels with subscribers or events kept for replay") \
+	X(stream_queued_bytes,  GAUGE,   "bytes waiting in event stream output queues") \
+	X(stream_bytes,         COUNTER, "bytes queued to event streams") \
+	X(stream_heartbeats,    COUNTER, "heartbeat comments sent") \
+	X(stream_resyncs,       COUNTER, "reconnects told to resync (missed events no longer kept)") \
+	X(events_published,     COUNTER, "events published (after their transaction committed)") \
+	X(events_dropped,       COUNTER, "events dropped (no server in this process, or queue full)") \
+	X(events_sent,          COUNTER, "event frames queued to streams (one per subscriber)") \
+	X(events_replayed,      COUNTER, "events replayed to reconnecting streams (Last-Event-ID)") \
+	X(replay_events,        GAUGE,   "events kept for replay") \
+	X(replay_bytes,         GAUGE,   "bytes of events kept for replay") \
+	X(publish_queue_max,    MAX,     "most events waiting for the I/O thread at once")
 
 #define DK_STAT_ENUM(name, kind, help) ST_##name,
 enum { DK_STATS(DK_STAT_ENUM) ST_COUNT };

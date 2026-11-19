@@ -1,7 +1,8 @@
 /* dkbench.c :: HTTP/1.1 load generator for dk (`make bench`, see docs/PERF.md).
  *
- *   dkbench -p PORT [-s pages|fights|static|mixed|idle|jitter] [-c CLIENTS] [-t THREADS]
- *           [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX] [-S PATHS] [-x SERVER_PID]
+ *   dkbench -p PORT [-s pages|fights|static|mixed|idle|realtime|jitter] [-c CLIENTS]
+ *           [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX] [-S PATHS]
+ *           [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]
  *
  * Every client is one keep-alive connection running a scripted sequence. Logged-in
  * scenarios first register (when needed) and log in one account per client
@@ -13,6 +14,12 @@
  *   mixed   per step: 50% GET /, 30% a fight step, 20% a static file
  *   idle    open CLIENTS connections, one request each, then hold them idle for the
  *           duration (with -x: the server's RSS before and after)
+ *   realtime  LISTENERS logged-in accounts each hold an event stream (GET /live) open;
+ *           with the server's RSS and CPU while they idle, then one more account
+ *           publishes EVENTS_PER_SECOND events (Poisson) on "babble" through
+ *           POST /__test/publish (config test_routes = true) for the duration; each event
+ *           carries its send time, and every listener measures publish -> receive
+ *           latency (the fan-out). Needs max_streams and max_streams_per_ip >= LISTENERS.
  *   jitter  no server: THREADS threads sleep 1 ms in a loop and report how late they
  *           wake up (the machine's scheduling noise floor; run it pinned like the server)
  * RATE is requests per second per client (0: closed loop, as fast as answers come).
@@ -37,6 +44,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/epoll.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
@@ -53,7 +61,7 @@ static const char *const kind_names[NKINDS] = {
 	"page GET /", "fight POST", "fight GET", "move POST", "victory GET", "other", "static",
 };
 
-enum { SC_PAGES, SC_FIGHTS, SC_STATIC, SC_MIXED, SC_IDLE, SC_JITTER };
+enum { SC_PAGES, SC_FIGHTS, SC_STATIC, SC_MIXED, SC_IDLE, SC_REALTIME, SC_JITTER };
 
 static struct {
 	const char *host;
@@ -65,7 +73,9 @@ static struct {
 	char  *paths[MAX_PATHS];
 	int    npaths;
 	int    server_pid;
-} O = { "127.0.0.1", 0, SC_MIXED, 50, 4, 10, 2, 0, "bench", { 0 }, 0, 0 };
+	int    listeners;
+	double events;
+} O = { "127.0.0.1", 0, SC_MIXED, 50, 4, 10, 2, 0, "bench", { 0 }, 0, 0, 1000, 10 };
 
 static void die(const char *fmt, ...)
 {
@@ -871,6 +881,27 @@ static long server_rss_kb(void)
 	return kb;
 }
 
+static double server_cpu_s(void);
+
+/* user and system CPU seconds of the server, or -1 */
+static double server_cpu_part(int sys)
+{
+	if (!O.server_pid)
+		return -1;
+	char p[64], line[2048];
+	snprintf(p, sizeof p, "/proc/%d/stat", O.server_pid);
+	FILE *f = fopen(p, "r");
+	if (!f)
+		return -1;
+	char *ok = fgets(line, sizeof line, f);
+	fclose(f);
+	char *rp = ok ? strrchr(line, ')') : NULL;
+	unsigned long ut = 0, st = 0;
+	if (!rp || sscanf(rp + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &ut, &st) != 2)
+		return -1;
+	return (double)(sys ? st : ut) / (double)sysconf(_SC_CLK_TCK);
+}
+
 static double server_cpu_s(void)
 {
 	if (!O.server_pid)
@@ -948,6 +979,355 @@ static int run_idle(void)
 	return served == O.clients && still == served ? 0 : 1;
 }
 
+/* ------------------------------------------------------------------ realtime mode */
+
+typedef struct {
+	int     fd, state;            /* RT_* */
+	buf     out, in;
+	size_t  out_off;
+} listener;
+
+enum { RT_CONNECTING, RT_HEAD, RT_STREAM, RT_CLOSED };
+
+typedef struct {
+	listener *ls;
+	client   *cl;                 /* the accounts (cookies) */
+	int       n;
+	hist      h;
+	uint64_t  events, pings, bytes, closed, failed;
+	pthread_t th;
+} lworker;
+
+static atomic_int g_rt_phase;     /* 0 opening/idle, 1 measuring, 2 draining, 3 stop */
+static atomic_int g_rt_open;
+
+static void rt_close(lworker *w, listener *l, int epfd, int failed)
+{
+	if (l->fd >= 0) {
+		epoll_ctl(epfd, EPOLL_CTL_DEL, l->fd, NULL);
+		close(l->fd);
+	}
+	l->fd = -1;
+	if (l->state == RT_STREAM) {
+		w->closed++;
+		atomic_fetch_sub(&g_rt_open, 1);
+	} else if (failed) {
+		w->failed++;
+	}
+	l->state = RT_CLOSED;
+}
+
+/* One frame (without its blank line): a bench event, a heartbeat, or anything else. */
+static void rt_frame(lworker *w, const char *f, int64_t now)
+{
+	if (strncmp(f, ": ping", 6) == 0) {
+		w->pings++;
+		return;
+	}
+	const char *e = strstr(f, "event: bench\ndata: ");
+	if (!e)
+		return;
+	unsigned long long seq;
+	long long t;
+	if (sscanf(e + 19, "%llu %lld", &seq, &t) != 2)
+		return;
+	w->events++;
+	if (atomic_load(&g_rt_phase) >= 1 && now > t)
+		hist_add(&w->h, (uint64_t)((now - t) / 1000));
+}
+
+static void rt_read(lworker *w, listener *l, int epfd)
+{
+	for (;;) {
+		buf_reserve(&l->in, 65536);
+		ssize_t n = recv(l->fd, l->in.p + l->in.len, l->in.cap - l->in.len - 1, 0);
+		if (n < 0 && (errno == EAGAIN || errno == EINTR))
+			break;
+		if (n <= 0) {
+			rt_close(w, l, epfd, 1);
+			return;
+		}
+		l->in.len += (size_t)n;
+		l->in.p[l->in.len] = '\0';
+		w->bytes += (uint64_t)n;
+	}
+	int64_t now = now_ns();
+	if (l->state == RT_HEAD) {
+		char *end = strstr(l->in.p, "\r\n\r\n");
+		if (!end)
+			return;
+		int status = 0;
+		sscanf(l->in.p, "HTTP/1.%*d %d", &status);
+		if (status != 200 || !strcasestr(l->in.p, "content-type: text/event-stream")) {
+			rt_close(w, l, epfd, 1);
+			return;
+		}
+		buf_consume(&l->in, (size_t)(end - l->in.p) + 4);
+		l->state = RT_STREAM;
+		atomic_fetch_add(&g_rt_open, 1);
+	}
+	char *p;
+	while (l->in.len && (p = strstr(l->in.p, "\n\n"))) {
+		*p = '\0';
+		rt_frame(w, l->in.p, now);
+		buf_consume(&l->in, (size_t)(p - l->in.p) + 2);
+	}
+}
+
+static void *rt_listen_main(void *arg)
+{
+	lworker *w = arg;
+	int epfd = epoll_create1(EPOLL_CLOEXEC);
+	if (epfd < 0)
+		die("epoll_create1: %s", strerror(errno));
+	for (int i = 0; i < w->n; i++) {
+		listener *l = &w->ls[i];
+		l->state = RT_CONNECTING;
+		buf_printf(&l->out, "GET /live HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n"
+				   "Accept: text/event-stream\r\nCookie: %s\r\n\r\n", O.host, w->cl[i].cookie);
+		int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+		struct sockaddr_in a = { 0 };
+		a.sin_family = AF_INET;
+		a.sin_port = htons((unsigned short)O.port);
+		inet_pton(AF_INET, O.host, &a.sin_addr);
+		struct epoll_event ev = { .events = EPOLLIN | EPOLLOUT, .data.ptr = l };
+		if (fd < 0 || (connect(fd, (struct sockaddr *)&a, sizeof a) < 0 && errno != EINPROGRESS)
+			|| epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+			if (fd >= 0)
+				close(fd);
+			l->fd = -1;
+			l->state = RT_CLOSED;
+			w->failed++;
+			continue;
+		}
+		l->fd = fd;
+	}
+	struct epoll_event evs[256];
+	while (atomic_load(&g_rt_phase) < 3) {
+		int n = epoll_wait(epfd, evs, 256, 50);
+		for (int i = 0; i < n; i++) {
+			listener *l = evs[i].data.ptr;
+			if (l->fd < 0)
+				continue;
+			if (l->state == RT_CONNECTING) {
+				int err = 0;
+				socklen_t el = sizeof err;
+				getsockopt(l->fd, SOL_SOCKET, SO_ERROR, &err, &el);
+				if (err) {
+					rt_close(w, l, epfd, 1);
+					continue;
+				}
+				while (l->out_off < l->out.len) {
+					ssize_t k = send(l->fd, l->out.p + l->out_off, l->out.len - l->out_off, MSG_NOSIGNAL);
+					if (k <= 0)
+						break;
+					l->out_off += (size_t)k;
+				}
+				if (l->out_off < l->out.len)
+					continue;
+				l->state = RT_HEAD;
+				struct epoll_event ev = { .events = EPOLLIN, .data.ptr = l };
+				epoll_ctl(epfd, EPOLL_CTL_MOD, l->fd, &ev);
+			}
+			if (evs[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR))
+				rt_read(w, l, epfd);
+		}
+	}
+	for (int i = 0; i < w->n; i++) {
+		if (w->ls[i].fd >= 0)
+			close(w->ls[i].fd);
+		free(w->ls[i].in.p);
+		free(w->ls[i].out.p);
+	}
+	close(epfd);
+	return NULL;
+}
+
+typedef struct {
+	client  *c;
+	hist     h;
+	uint64_t sent, errors;
+} publisher;
+
+static void sleep_until(int64_t t)
+{
+	int64_t d = t - now_ns();
+	if (d <= 0)
+		return;
+	struct timespec ts = { (time_t)(d / 1000000000), (long)(d % 1000000000) };
+	nanosleep(&ts, NULL);
+}
+
+static void *rt_publish_main(void *arg)
+{
+	publisher *p = arg;
+	bconn bc = { -1, { 0 } };
+	int64_t next = now_ns();
+	unsigned seq = 0;
+	while (atomic_load(&g_rt_phase) == 1) {
+		sleep_until(next);
+		if (atomic_load(&g_rt_phase) != 1)
+			break;
+		int64_t t0 = now_ns();
+		char body[256];
+		snprintf(body, sizeof body, "csrf=%s&channel=babble&event=bench&data=%u+%lld", p->c->csrf, ++seq,
+				 (long long)t0);
+		hresp r;
+		if (bc_request(&bc, "POST", "/__test/publish", p->c->cookie, body, &r) < 0 || r.status != 200)
+			p->errors++;
+		else
+			p->sent++;
+		hist_add(&p->h, (uint64_t)((now_ns() - t0) / 1000));
+		double u = rnd(p->c);
+		if (u < 1e-9)
+			u = 1e-9;
+		next += (int64_t)(-log(u) / O.events * 1e9);
+		if (next < now_ns() - 1000000000)
+			next = now_ns();
+	}
+	bc_close(&bc);
+	free(bc.in.p);
+	return NULL;
+}
+
+static void sleep_s(double s)
+{
+	struct timespec ts = { (time_t)s, (long)((s - (double)(time_t)s) * 1e9) };
+	nanosleep(&ts, NULL);
+}
+
+static void fmt_us(char *out, size_t n, uint64_t us);
+
+static int run_realtime(void)
+{
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < rl.rlim_max) {
+		rl.rlim_cur = rl.rlim_max;
+		setrlimit(RLIMIT_NOFILE, &rl);
+	}
+	int nl = O.listeners;
+	client *cl = calloc((size_t)nl + 1, sizeof *cl);
+	listener *ls = calloc((size_t)nl, sizeof *ls);
+	if (!cl || !ls)
+		die("out of memory");
+	for (int i = 0; i <= nl; i++) {
+		cl[i].id = i;
+		cl[i].fd = -1;
+		cl[i].rng = 0x9e3779b9u * (unsigned)(i + 1);
+	}
+	int64_t t0 = now_ns();
+	int ns = 8;
+	pthread_t th[8];
+	setup_arg sa[8];
+	for (int i = 0; i < ns; i++) {
+		sa[i] = (setup_arg){ cl, (nl + 1) * i / ns, (nl + 1) * (i + 1) / ns, 0 };
+		pthread_create(&th[i], NULL, setup_main, &sa[i]);
+	}
+	int failed = 0;
+	for (int i = 0; i < ns; i++) {
+		pthread_join(th[i], NULL);
+		failed += sa[i].failed;
+	}
+	if (failed)
+		die("%d of %d accounts could not log in", failed, nl + 1);
+	printf("setup: %d accounts logged in in %.2f s\n", nl + 1, (double)(now_ns() - t0) / 1e9);
+
+	sleep_s(1);
+	long rss0 = server_rss_kb();
+	int nt = O.threads < nl ? O.threads : nl;
+	lworker *w = calloc((size_t)nt, sizeof *w);
+	if (!w)
+		die("out of memory");
+	atomic_store(&g_rt_phase, 0);
+	atomic_store(&g_rt_open, 0);
+	t0 = now_ns();
+	for (int i = 0; i < nt; i++) {
+		int from = nl * i / nt, to = nl * (i + 1) / nt;
+		w[i].ls = ls + from;
+		w[i].cl = cl + from;
+		w[i].n = to - from;
+		pthread_create(&w[i].th, NULL, rt_listen_main, &w[i]);
+	}
+	while (atomic_load(&g_rt_open) < nl && now_ns() - t0 < 30 * 1000000000LL) {
+		uint64_t gone = 0;
+		for (int i = 0; i < nt; i++)
+			gone += w[i].failed;
+		if ((int)gone + atomic_load(&g_rt_open) >= nl)
+			break;
+		sleep_s(0.01);
+	}
+	double open_s = (double)(now_ns() - t0) / 1e9;
+	int opened = atomic_load(&g_rt_open);
+	printf("realtime: %d of %d event streams open in %.2f s\n", opened, nl, open_s);
+	sleep_s(1);
+	long rss1 = server_rss_kb();
+	double idle_s = 5, cpu_a = server_cpu_s();
+	sleep_s(idle_s);
+	double cpu_b = server_cpu_s();
+	long rss2 = server_rss_kb();
+	if (rss0 >= 0)
+		printf("server idle with the streams: RSS %ld KiB before, %ld KiB with them open (+%.1f KiB per stream), "
+			   "%ld KiB after %.0f s; CPU %.1f%%\n", rss0, rss1, opened ? (double)(rss1 - rss0) / opened : 0.0,
+			   rss2, idle_s, cpu_a >= 0 ? (cpu_b - cpu_a) / idle_s * 100 : -1.0);
+
+	publisher pub;
+	memset(&pub, 0, sizeof pub);
+	pub.c = &cl[nl];
+	atomic_store(&g_rt_phase, 1);
+	double cpu0 = server_cpu_s(), sys0 = server_cpu_part(1);
+	int64_t m0 = now_ns();
+	pthread_t pth;
+	pthread_create(&pth, NULL, rt_publish_main, &pub);
+	sleep_s(O.duration);
+	atomic_store(&g_rt_phase, 2);
+	pthread_join(pth, NULL);
+	double secs = (double)(now_ns() - m0) / 1e9;
+	double cpu1 = server_cpu_s(), sys1 = server_cpu_part(1);
+	long rss3 = server_rss_kb();
+	sleep_s(1);                                   /* deliveries still under way */
+	atomic_store(&g_rt_phase, 3);
+	hist tot;
+	memset(&tot, 0, sizeof tot);
+	uint64_t events = 0, pings = 0, bytes = 0, closed = 0;
+	for (int i = 0; i < nt; i++) {
+		pthread_join(w[i].th, NULL);
+		hist_merge(&tot, &w[i].h);
+		events += w[i].events;
+		pings += w[i].pings;
+		bytes += w[i].bytes;
+		closed += w[i].closed;
+	}
+	char a[16], b[16], c[16], d[16], e[16];
+	printf("publish: %.1f events/s offered for %.0f s: %llu published (%.1f/s), %llu errors; "
+		   "POST p50 ", O.events, secs, (unsigned long long)pub.sent, pub.sent / secs,
+		   (unsigned long long)pub.errors);
+	fmt_us(a, sizeof a, hist_pct(&pub.h, 50));
+	fmt_us(b, sizeof b, hist_pct(&pub.h, 99));
+	printf("%s p99 %s\n", a, b);
+	uint64_t want = pub.sent * (uint64_t)opened;
+	fmt_us(a, sizeof a, hist_pct(&tot, 50));
+	fmt_us(b, sizeof b, hist_pct(&tot, 90));
+	fmt_us(c, sizeof c, hist_pct(&tot, 99));
+	fmt_us(d, sizeof d, hist_pct(&tot, 99.9));
+	fmt_us(e, sizeof e, tot.max);
+	printf("fan-out (POST sent -> event read by a listener): %llu of %llu deliveries; p50 %s p90 %s "
+		   "p99 %s p99.9 %s max %s\n", (unsigned long long)events, (unsigned long long)want, a, b, c, d, e);
+	printf("listeners: received %.1f MB, %llu heartbeats, %llu streams closed by the server\n",
+		   (double)bytes / 1e6, (unsigned long long)pings, (unsigned long long)closed);
+	if (cpu0 >= 0 && cpu1 >= 0)
+		printf("server while publishing: %.0f%% CPU (%.2f cores; %.0f%% of it in the kernel), RSS %ld KiB\n",
+			   (cpu1 - cpu0) / secs * 100, (cpu1 - cpu0) / secs,
+			   cpu1 > cpu0 ? (sys1 - sys0) / (cpu1 - cpu0) * 100 : 0.0, rss3);
+	free(w);
+	free(ls);
+	for (int i = 0; i <= nl; i++) {
+		free(cl[i].in.p);
+		free(cl[i].out.p);
+	}
+	free(cl);
+	return opened == nl && events == want && !closed ? 0 : 1;
+}
+
 /* ------------------------------------------------------------------ jitter mode */
 
 static void *jitter_main(void *arg)
@@ -991,9 +1371,9 @@ static int run_jitter(void)
 static void usage(void)
 {
 	fprintf(stderr,
-			"usage: dkbench -p PORT [-h HOST] [-s pages|fights|static|mixed|idle|jitter] [-c CLIENTS]\n"
-			"               [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX]\n"
-			"               [-S PATHS_FILE] [-x SERVER_PID]\n");
+			"usage: dkbench -p PORT [-h HOST] [-s pages|fights|static|mixed|idle|realtime|jitter]\n"
+			"               [-c CLIENTS] [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX]\n"
+			"               [-S PATHS_FILE] [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]\n");
 	exit(2);
 }
 
@@ -1036,7 +1416,7 @@ static void print_row(const char *name, const hist *h, uint64_t errs, uint64_t s
 int main(int argc, char **argv)
 {
 	int opt;
-	while ((opt = getopt(argc, argv, "h:p:s:c:t:d:w:r:u:S:x:")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:s:c:t:d:w:r:u:S:x:l:e:")) != -1) {
 		switch (opt) {
 		case 'h': O.host = optarg; break;
 		case 'p': O.port = atoi(optarg); break;
@@ -1046,6 +1426,7 @@ int main(int argc, char **argv)
 			else if (!strcmp(optarg, "static")) O.scenario = SC_STATIC;
 			else if (!strcmp(optarg, "mixed")) O.scenario = SC_MIXED;
 			else if (!strcmp(optarg, "idle")) O.scenario = SC_IDLE;
+			else if (!strcmp(optarg, "realtime")) O.scenario = SC_REALTIME;
 			else if (!strcmp(optarg, "jitter")) O.scenario = SC_JITTER;
 			else usage();
 			break;
@@ -1057,6 +1438,8 @@ int main(int argc, char **argv)
 		case 'u': O.prefix = optarg; break;
 		case 'S': load_paths(optarg); break;
 		case 'x': O.server_pid = atoi(optarg); break;
+		case 'l': O.listeners = atoi(optarg); break;
+		case 'e': O.events = atof(optarg); break;
 		default: usage();
 		}
 	}
@@ -1073,6 +1456,11 @@ int main(int argc, char **argv)
 			O.paths[O.npaths++] = strdup(default_paths[i]);
 	if (O.scenario == SC_IDLE)
 		return run_idle();
+	if (O.scenario == SC_REALTIME) {
+		if (O.listeners < 1 || O.events <= 0)
+			usage();
+		return run_realtime();
+	}
 
 	client *cl = calloc((size_t)O.clients, sizeof *cl);
 	if (!cl)

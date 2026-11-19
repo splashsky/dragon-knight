@@ -1339,6 +1339,8 @@ static void test_config(void)
 	CHECK(c.static_cache_bytes == 8u << 20 && c.static_cache_file_max == 256u << 10);
 	CHECK(c.vm_memory_limit == 256u << 20 && c.vm_gc_pause == 1000);
 	CHECK(c.db_cache_kb == 8192 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 1000);
+	CHECK(c.max_streams == 512 && c.max_streams_per_ip == 8 && c.stream_queue_bytes == 256u << 10);
+	CHECK(c.stream_heartbeat_ms == 15000 && c.stream_replay_events == 200 && c.stream_replay_seconds == 300);
 	CHECK(config_workers(&c) >= 2);
 	char sp[256];
 	CHECK_STR_EQ(config_stats_socket(&c, sp, sizeof sp), "data/dk.sock");
@@ -1363,6 +1365,8 @@ static void test_config(void)
 				   "  queue_timeout_ms = 0, access_log = false, static_cache_bytes = 0,\n"
 				   "  static_cache_file_max = 1, stats_socket = '', vm_memory_limit = 16777216,\n"
 				   "  vm_gc_pause = 200, db_cache_kb = 0, db_mmap_bytes = 0, db_checkpoint_ms = 0,\n"
+				   "  max_streams = 3, max_streams_per_ip = 0, stream_queue_bytes = 4096,\n"
+				   "  stream_heartbeat_ms = 250, stream_replay_events = 0, stream_replay_seconds = 10,\n"
 				   "  pbkdf2_iterations = 1000, unknown = { nested = true } }\n",
 				   err, sizeof err) == 0);
 	CHECK_STR_EQ(c.bind, "::1");
@@ -1378,6 +1382,8 @@ static void test_config(void)
 	CHECK(c.queue_timeout_ms == 0 && c.access_log == 0 && c.static_cache_bytes == 0);
 	CHECK(c.static_cache_file_max == 1 && c.vm_memory_limit == 16777216 && c.vm_gc_pause == 200);
 	CHECK(c.db_cache_kb == 0 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 0);
+	CHECK(c.max_streams == 3 && c.max_streams_per_ip == 0 && c.stream_queue_bytes == 4096);
+	CHECK(c.stream_heartbeat_ms == 250 && c.stream_replay_events == 0 && c.stream_replay_seconds == 10);
 	CHECK(config_stats_socket(&c, sp, sizeof sp) == NULL);   /* "" = no socket */
 	config_free(&c);
 
@@ -1410,6 +1416,8 @@ static void test_config(void)
 		{ "return { vm_memory_limit = 1024 }", "vm_memory_limit" },
 		{ "return { access_log = 'no' }", "access_log" },
 		{ "return { queue_timeout_ms = -5 }", "queue_timeout_ms" },
+		{ "return { stream_queue_bytes = 10 }", "stream_queue_bytes" },
+		{ "return { max_streams = -1 }", "max_streams" },
 		{ "return 42", "table" },
 		{ "return", "table" },
 		{ "return {", "" },

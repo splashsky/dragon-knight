@@ -32,6 +32,12 @@ messages and the three-column look are kept as in the original.
 - **Templates** (`templates/**/*.html`) are compiled to Lua by the C side:
 	`{{ expr }}` (HTML-escaped), `{{{ expr }}}` (raw), `{% lua statements %}`,
 	`{# comments #}`, with `-` trim markers. Errors report `template:line`.
+- **Event streams (server-sent events).** `GET /live` keeps a connection open on which
+	the server pushes events (chat, notices, …). Streams belong to the I/O thread, not to
+	a worker or a VM: a hub fans each event out as one shared buffer to every subscriber,
+	keeps the last events of each channel for reconnects (`Last-Event-ID`), sends
+	heartbeats and drops clients that stop reading. Lua publishes with `dk.publish`, and
+	events go out only when the request's transaction commits.
 - **SQLite** (WAL), one connection per worker. Every request runs in one transaction
 	(`BEGIN IMMEDIATE … COMMIT`, rolled back on any error), so game updates are atomic;
 	workers take turns on an in-process lock, and a background thread checkpoints the WAL.
@@ -94,7 +100,7 @@ with status 3 when it doesn't exist.
 | `dk user passwd USER NEWPASS` | set a password (ends the user's sessions) |
 | `dk user admin USER` | make a user an administrator |
 | `dk check` | compile every Lua module and template, build a VM and validate the content files; non-zero exit on error (naming the file) |
-| `dk stats` | the running server's metrics (connections, requests and latency buckets, queue, workers, VM pool, database lock waits and checkpoints, static cache, memory), read from its stats socket (`stats_socket`, by default `dk.sock` next to the database); administrators see the same on `/admin/server` |
+| `dk stats` | the running server's metrics (connections, requests and latency buckets, queue, workers, VM pool, database lock waits and checkpoints, static cache, event streams and subscribers per channel, memory), read from its stats socket (`stats_socket`, by default `dk.sock` next to the database); administrators see the same on `/admin/server` |
 | `dk version` | print the version and the Lua/SQLite versions |
 
 ## Configuration
@@ -141,6 +147,30 @@ Server tuning keys (the defaults suit a small server; see `docs/PERF.md`):
 | `vm_gc_pause` | `1000` | Lua GC pause (%) of request VMs |
 | `db_cache_kb` / `db_mmap_bytes` | 8192 / 0 (off) | SQLite page cache and memory-mapped I/O per connection |
 | `db_checkpoint_ms` | `1000` | background WAL checkpoint interval (0 = SQLite's automatic checkpoints in requests) |
+
+Event streams (`GET /live`, see below):
+
+| Key | Default | |
+|---|---|---|
+| `max_streams` | `512` | open event streams in all; one more gets `503` with `Retry-After: 5` (0 = streams off) |
+| `max_streams_per_ip` | `8` | open event streams per client address (0 = no limit); behind a reverse proxy every client has the proxy's address, so raise it there |
+| `stream_queue_bytes` | 256 KiB | a stream with more unsent bytes than this (after the socket took what it could) is not reading: it is closed |
+| `stream_heartbeat_ms` | `15000` | a `: ping` comment on streams that had nothing else for half that long (0 = none) |
+| `stream_replay_events` / `stream_replay_seconds` | 200 / 300 | events kept per channel so a reconnecting client (`Last-Event-ID`) gets what it missed (0 = no replay: it is told to resync) |
+
+Events are numbered `<boot>-<n>` (`boot` is random per server start), so a client that
+reconnects after a restart, or after its missed events were dropped, gets an
+`event: resync` instead of a replay. Streams are exempt from `keepalive_timeout` and
+`request_timeout`; at shutdown each gets `event: bye` before it is closed. Behind nginx,
+`X-Accel-Buffering: no` (sent by dk) turns off buffering for the stream; give the proxy a
+read timeout longer than the heartbeat.
+
+**`GET /live`** (logged-in players): the player's event stream with the channels
+`babble`, `presence`, `notices`, `user:<id>` (their own) and, for administrators,
+`admin`. It carries nothing yet: chat, presence and notices arrive in 2.3's next steps.
+The app-level key `test_routes = true` adds `POST /__test/publish` (publish an event as
+any logged-in user) for the end-to-end tests and the realtime benchmark; never set it on
+a real server.
 
 ## Deployment
 
@@ -208,7 +238,7 @@ does the same check, backup and migration.
 | `make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]` | build and serve in the foreground; first use creates the config and installs the game (admin / admin), an old database is backed up and migrated (see [Quick start](#quick-start)) |
 | `make test` | lint, C unit tests, Lua unit tests and end-to-end tests |
 | `make lint` | check tab indentation |
-| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, or `all`; see `docs/PERF.md`) |
+| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, `realtime` — 1,000 event streams and the fan-out latency of published events —, or `all`; see `docs/PERF.md`) |
 | `make release` | optimized build in `build/release/dk` (`-O2`, no sanitizers) |
 | `make dist` | release tarball `dist/dk-VERSION-OS-ARCH.tar.gz` |
 | `make backup [CONFIG=config.lua]` | `./dk backup` |

@@ -4,7 +4,7 @@
 -- (base library only: no io/os/require/load/dofile; limited CPU and memory).
 -- Any key left out gets the default shown below; a missing file means all defaults.
 --
--- Server keys (bind ... db_checkpoint_ms) are read once at startup: restart to apply.
+-- Server keys (bind ... stream_replay_seconds) are read once at startup: restart to apply.
 -- The whole table is also exposed to the Lua app as dk.config and is re-read for every
 -- fresh VM, so app-level keys (e.g. pbkdf2_iterations) take effect on the next request.
 
@@ -77,6 +77,20 @@ return {
 	db_mmap_bytes    = 0,
 	db_checkpoint_ms = 1000,
 
+	-- Event streams (server-sent events, GET /live). Streams in all and per client address
+	-- (0 = no limit per address; behind a reverse proxy all clients share its address);
+	-- more get "503 Service Unavailable". max_streams = 0 turns streams off.
+	max_streams        = 512,
+	max_streams_per_ip = 8,
+	-- A stream with more unsent bytes than this is not reading: it is closed.
+	stream_queue_bytes = 262144,         -- 256 KiB
+	-- A ": ping" comment on quiet streams this often, so proxies keep them open (0 = none).
+	stream_heartbeat_ms = 15000,
+	-- Events kept per channel, and for how long, so a client that reconnects with
+	-- Last-Event-ID gets what it missed (else it is told to resync; 0 = no replay).
+	stream_replay_events  = 200,
+	stream_replay_seconds = 300,
+
 	-- App-level keys (read by the Lua app via dk.config; hot-reloaded).
 
 	-- PBKDF2-HMAC-SHA256 iterations for new password hashes. Existing hashes keep their
@@ -84,4 +98,7 @@ return {
 	pbkdf2_iterations = 210000,
 	-- Add "Secure" to cookies (set true when the game is served over HTTPS).
 	cookie_secure = false,
+	-- Test-only routes (POST /__test/publish) for the end-to-end tests and the realtime
+	-- benchmark. Never on a real server.
+	test_routes = false,
 }

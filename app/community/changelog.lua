@@ -18,6 +18,8 @@ changelog.RELEASES = {
 			"Added dk stats and an admin Server page with the server's live metrics, and make bench, a load generator with scripted players.",
 			"Added themes: Default (new artwork: a snowy background and a new logo) and Retro (the original look); choose one in the page footer, logged in or not.",
 			"The whole site now uses the Vollkorn typeface, a little larger than the old 11px Verdana; the side columns are slightly wider to fit.",
+			"The server can now push live updates to open pages (server-sent events on /live): events are sent only once the change behind them is saved, a page that reconnects gets what it missed, and players who stop reading are cut off. It carries nothing yet; chat, who's online and notices follow.",
+			"Added settings for live updates (max_streams, max_streams_per_ip, stream_queue_bytes, stream_heartbeat_ms, stream_replay_events, stream_replay_seconds), their metrics on the admin Server page and in dk stats, and make bench BENCH_SCENARIO=realtime.",
 		},
 	},
 	{

@@ -23,6 +23,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Scripted spells and items (what they do) | `app/lib/action.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/{act,engine}.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
+| Realtime (event streams) | `app/routes/live.lua`, `app/lib/json.lua` | | `tests/e2e/live.sh`, `tests/lua/test_json.lua`, `tests/c/test_hub.c` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
 | Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,...,seed_v8}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
@@ -83,9 +84,13 @@ issue `BEGIN`/`COMMIT` yourself.
 	never reach Lua (cached in memory, `ETag`/`Last-Modified`, 304s). Access log lines are
 	written by a background thread (`access_log = false` turns them off); `dk.log` lines
 	too, in order.
+- **Event streams.** A handler may answer with `{ sse = {...} }` instead of a page; the
+	connection then stays open, held by the server, not by a worker or a VM (see
+	[Realtime](#realtime-event-streams)). `dk.publish` events go out after the commit.
 - **Metrics.** `/admin/server` (administrators) and `dk stats` show the server's counters:
 	requests and latency buckets, queue wait, worker time, VM pool, time in SQLite and
-	waiting for the write lock, checkpoints, static cache, memory. `make bench` loads a
+	waiting for the write lock, checkpoints, static cache, event streams and subscribers
+	per channel, memory. `make bench` loads a
 	temporary install with scripted players (`tools/dkbench.c`, `docs/PERF.md`).
 
 ## Routes
@@ -175,6 +180,78 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `{{{ include("layout/head") }}}` in `<head>` to get the CSS links (`dk.css` + the four
 feature stylesheets + the theme's) and `dk.js`, put `theme-{{ theme.key }}` in the
 `<body>` class, and use `{{{ logo() }}}` and `{{{ theme_picker() }}}`.
+
+## Realtime (event streams)
+
+The server pushes events to browsers over [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+(`EventSource` in the browser). The engine part (`src/hub.c`) knows channels and
+streams; the app decides who may listen to what and what to send.
+
+**Opening a stream.** A GET handler returns
+
+```lua
+return { sse = { channels = { "babble", "user:" .. req.user.id }, retry = 3000 } }
+```
+
+- `channels`: 1 to 16 names, each `[a-z0-9:_-]{1,64}`. **Authorization is the
+	handler's job**: only put a private channel (`user:<id>`, `admin`) in the list when
+	the request's user may read it. The C side checks names, not rights.
+- `retry` (optional, ms): the browser's reconnect delay (`retry:` line).
+- `status` and `body` are ignored; headers (cookies queued on `req.out_headers`) are
+	sent. Only `GET` opens a stream: HEAD and POST get a 405 from the engine.
+- The handler's transaction commits and the VM is released as usual; then the server
+	sends `200`, `Content-Type: text/event-stream`, `Cache-Control: no-store`,
+	`X-Accel-Buffering: no`, and keeps the connection, without timeouts.
+- When `max_streams` or `max_streams_per_ip` is reached the answer is a `503` with
+	`Retry-After: 5`. `EventSource` does not retry after an error status: the client
+	script has to (with a backoff).
+- The stream is fixed once open: the server does not re-check the session. A logout or
+	password change should publish an event on `user:<id>` that makes the page close its
+	stream (2.3, R2).
+
+`GET /live` (`app/routes/live.lua`) is the game's stream: `babble`, `presence`,
+`notices`, `user:<id>`, plus `admin` for administrators (`live.channels(user)`).
+
+**Publishing.** `dk.publish(channel, event, data)` from any request handler:
+
+```lua
+local json = require("lib.json")
+dk.publish("babble", "chat", json.encode({ id = id, author = name, text = text, time = dk.now() }))
+```
+
+- `data` is a string; encode tables with `lib/json.lua` (`json.encode`, see its header:
+	strings are escaped so the result is safe in HTML too; `json.array({})` for an empty
+	array). Line breaks in data are fine (each line becomes a `data:` line; the browser
+	joins them with `\n`). Up to 64 KiB, no NUL bytes; event names `[A-Za-z0-9_.:-]{1,64}`.
+	Invalid arguments raise a Lua error (a 500).
+- Events are buffered per request and handed to the server **only after the
+	transaction commits**, in commit order. On a rollback (an error, `view.server_error`,
+	a HEAD request) they are dropped. At most 256 per request.
+- The server numbers events `<boot>-<n>` (`boot`: random per server start) and sends
+	`id:`, `event:` and `data:` lines. Every subscriber gets the same bytes (one buffer
+	shared by all).
+- Events committed before a stream opened are not sent on it, except as a replay (below).
+	That includes events the stream's own request published.
+- From CLI commands (`dk user ...`) `dk.publish` logs a warning and sends nothing: the
+	streams belong to the server process.
+
+**Reconnects.** The browser reconnects by itself and sends the last id it saw
+(`Last-Event-ID`; also visible to the handler as `req.headers["last-event-id"]`). The
+server replays the stream's channels' events after that id from each channel's ring
+(`stream_replay_events`, `stream_replay_seconds`), or, when some are gone (or the id is
+from before a restart), sends `event: resync` (empty data): the page should reload what
+it shows. Every opening ends with an id line for the current position, and heartbeats
+(`: ping` every `stream_heartbeat_ms` on quiet streams) carry it too, so a short network
+blip replays instead of resyncing. At shutdown streams get `event: bye`.
+
+**Limits.** A client that stops reading is cut off once `stream_queue_bytes` (256 KiB)
+are waiting for it. `max_streams` (512) and `max_streams_per_ip` (8) bound the number of
+open streams; a browser has at most 6 connections per host over HTTP/1.1, so a page
+should share one stream between tabs (R2).
+
+**Testing.** `test_routes = true` in the config (the e2e config sets it) enables
+`POST /__test/publish` (`channel`, `event`, `data`, optional `delay_ms`, `fail=1`) for any
+logged-in user; `tests/e2e/live.sh` reads streams with `curl -N`.
 
 ## Templates
 

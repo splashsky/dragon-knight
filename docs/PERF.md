@@ -9,6 +9,7 @@ in this repository; nothing was tuned without a number before and after.
 ```sh
 make bench                                  # mixed scenario, 50 clients at 10 req/s each
 make bench BENCH_SCENARIO=all               # pages, fights, static, mixed, idle
+make bench BENCH_SCENARIO=realtime          # 1,000 event streams + published events (R1)
 make bench BENCH_SCENARIO=pages BENCH_RATE=0    # saturation (closed loop, no think time)
 build/release/dkbench -s jitter -t 2 -d 10      # the machine's scheduling noise floor
 ```
@@ -31,6 +32,7 @@ scenarios register and log in one account per client first (`bench<n>`).
 | `static` | `GET` of every file under `public/` in turn |
 | `mixed` | per step: 50% `GET /`, 30% a fight step, 20% a static file |
 | `idle` | opens 1,000 connections, one request each, holds them idle; reports server RSS before and after |
+| `realtime` | 1,000 accounts hold event streams (`GET /live`) open; one more publishes events through `POST /__test/publish`; reports RSS and CPU with the streams idle, then fan-out latency (send → read by each listener) and CPU (see "R1: event streams") |
 | `jitter` | no server: threads sleep 1 ms in a loop and report how late they wake up |
 
 With a rate (`-r`, requests per second per client) arrivals are a Poisson process and
@@ -214,6 +216,69 @@ at saturation.
 	SQLite statement execution (Lua's ~930 allocations go to the VM arena). Larger
 	SQLite lookaside slots changed that by under 10%; left as is.
 
+## R1: event streams
+
+Step R1 of `docs/plans/realtime.md` (the SSE hub, `src/hub.c`). Same machine, server on
+CPUs 10,11, dkbench on 4-7 (4 threads).
+
+```sh
+make bench BENCH_SCENARIO=realtime                    # 1,000 streams, 10 events/s
+make bench BENCH_SCENARIO=realtime BENCH_EVENTS=100   # 100 events/s
+```
+
+`dkbench -s realtime` logs in 1,001 accounts, opens 1,000 event streams (`GET /live`,
+5 channels each), measures the server's RSS and CPU while they idle for 5 s, then one
+more account publishes events on `babble` (every stream listens) through
+`POST /__test/publish` at the given rate (Poisson) for 10 s. Each event carries its send
+time; every listener records POST sent → event read (the fan-out latency, including the
+publishing request, its commit and the hand-over to the I/O thread). Three runs each:
+
+| 1,000 streams | 10 events/s (10,000 deliveries/s) | 100 events/s (~95,000 deliveries/s) |
+|---|---|---|
+| fan-out p50 | 22.0 / 33.8 / 26.4 ms | 27.9 / 18.2 / 22.3 ms |
+| fan-out p99 | 65.5 / 88.1 / 61.4 ms | 41.0 / 45.6 / 39.4 ms |
+| fan-out max | 81 / 105 / 68 ms | 58 / 81 / 54 ms |
+| deliveries | all (90,000 of 90,000 per run), no stream closed | all (841,000–992,000 per run) |
+| server CPU | 0.27 / 0.37 / 0.31 cores, 98% in the kernel | 1.03 / 0.93 / 0.95 cores, 94% in the kernel |
+| publishing `POST` p50 / p99 | 2.5–3.0 / 41–68 ms | 7.9–11.7 / 18–22 ms |
+
+| Idle streams | |
+|---|---|
+| opening 1,000 streams | 0.20–0.28 s |
+| server RSS | 15.8 MB before → 17.9 MB with 1,000 streams open: **+2.1 KiB per stream** (budget: 16 KiB) |
+| server CPU with 1,000 idle streams | 0.0–0.2% (a shared `: ping` every 15 s) |
+
+Where the time goes: the I/O thread writes each event to the 1,000 sockets one after the
+other (one `writev` each of the same shared buffer), and on loopback each write also
+runs the receiving side of TCP and wakes a dkbench thread: 94–98% of the server's CPU is
+in the kernel, ~10–30 µs per write. So the last of 1,000 subscribers reads an event
+~10–30 ms after the first, and the publishing `POST` waits behind a fan-out in progress
+at 10 events/s (its p99). At 100 events/s the CPU per delivery drops by two thirds
+(warm caches, and several events per stream in one `writev` when they queue up); the
+latency is no worse. The user-space part (framing once, a reference per subscriber,
+the replay ring) does not show. The R4 target (chat fan-out p99 < 100 ms at 1,000
+listeners) holds on 2 CPUs; a real NIC costs the sender less per write than loopback.
+
+Per stream: the connection (~0.5 KiB, as an idle keep-alive one), the stream's
+subscription record (~0.2 KiB with 5 channels) and its `user:<id>` channel; the rest of
+the +2.1 KiB is malloc and SQLite page cache growth from logging in 1,000 users (not
+separated). No buffer is held while a stream is idle (output segments point at shared
+frames; the queue array shrinks back when written).
+
+**R0 numbers after R1** (no regression): the R0 build (`HEAD` before R1) against the R1
+build, interleaved, 3 runs each, rate 10. This machine was noisier than when the R0
+tables were recorded (the same R0 binary now measures `pages` p99 15 ms and 0.67 cores
+instead of 6.5 ms and 0.30), so compare the columns, not with the tables above:
+
+| Median of 3 | R0 | R1 |
+|---|---|---|
+| `pages` `GET /` p50 / p99, CPU | 1.79 / 15.1 ms, 0.67 cores | 1.20 / 21.0 ms, 0.54 cores |
+| `fights` fight `POST` p50 / p99, CPU | 2.46 / 23.8 ms, 0.80 cores | 2.24 / 16.6 ms, 0.78 cores |
+| `mixed` `GET /` p99 / fight `POST` p99, CPU | 15.9 / 17.2 ms, 0.60 cores | 15.2 / 15.6 ms, 0.62 cores |
+| saturation `GET /` (2 runs) | 1,523 / 1,987 req/s | 1,821 / 1,989 req/s |
+| saturation `mixed` (2 runs) | 2,276 / 2,618 req/s | 2,222 / 2,697 req/s |
+| RSS after load | 13.4–16.7 MB | 13.5–15.8 MB |
+
 ## Sanitizers
 
 ```sh
@@ -224,4 +289,6 @@ make TSAN=1 CC=clang BUILD=build/tsan BIN=build/tsan/dk ctest   # ThreadSanitize
 Both run clean: ASan/UBSan over the C tests, the Lua tests and the end-to-end suite;
 ThreadSanitizer over every C test (`test_http` runs the server on epoll and on poll, with
 50 concurrent clients, worker direct writes, backpressure and the stats socket;
-`test_vmpool` the pool, the arena restore and the code cache watcher).
+`test_hub` event streams with handlers publishing from worker threads, the slow-reader
+cutoff and shutdown; `test_vmpool` the pool, the arena restore and the code cache
+watcher).
