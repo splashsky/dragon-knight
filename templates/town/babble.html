@@ -1,0 +1,14 @@
+{#- Babble box iframe (legacy babblebox()). Minimal layout. The box is a column-reverse
+    scroller so it opens scrolled to the newest post (legacy: onload scrollTo). -#}
+<div class="babble">
+<form class="babble-form" action="/babble" method="post">
+{{{ csrf_field() }}}
+<input type="text" name="babble" size="15" maxlength="120" aria-label="Message"><br>
+<input type="submit" name="submit" value="Babble"> <input type="reset" name="reset" value="Clear">
+</form>
+<div class="babble-posts">
+{%- for _, p in ipairs(posts) do %}
+<div class="babble-post">[<b>{{ p.author }}</b>] {{ p.babble }}</div>
+{%- end %}
+</div>
+</div>

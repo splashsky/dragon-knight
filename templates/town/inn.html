@@ -1,0 +1,9 @@
+{#- Inn confirmation (legacy towns.php inn()). -#}
+<div class="town-message">
+Resting at the inn will refill your current HP, MP, and TP to their maximum levels.<br><br>
+A night's sleep at this Inn will cost you <b>{{ town.innprice }} gold</b>. Is that ok?<br><br>
+<form action="/inn" method="post">
+{{{ csrf_field() }}}
+<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
+</form>
+</div>

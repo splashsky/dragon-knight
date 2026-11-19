@@ -1,0 +1,8 @@
+{#- Page links; ctx.pages from forum.lua pager() (empty when everything fits on one page). -#}
+{%- if #pages > 0 then %}
+<p class="forum-pages">Pages:
+{%- for _, p in ipairs(pages) do %}
+{% if p.current then %}<b>[{{ p.n }}]</b>{% else %}<a href="{{ p.url }}">{{ p.n }}</a>{% end %}
+{%- end %}
+</p>
+{%- end %}

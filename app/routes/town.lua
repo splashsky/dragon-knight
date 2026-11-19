@@ -1,19 +1,41 @@
--- routes/town.lua :: OWNED BY F1 (town/explore/heal/character/map/babble). Stub from P2.
---
--- Routes to implement (PLAN.md "URL map"; legacy towns.php, explore.php, heal.php, index.php):
---   GET  /inn                 inn() confirm page          POST /inn            stay (name="submit") / cancel
---   GET  /shop                buy() item list
---   GET  /shop/buy/#id        buy2() confirm               POST /shop/buy/#id   buy3() (submit / cancel)
---   GET  /maps                maps() list
---   GET  /maps/buy/#id        maps2() confirm              POST /maps/buy/#id   maps3()
---   POST /travel/#id          travelto() (left nav "Travel To" buttons)
---   POST /move                move(); button name north|south|east|west (left nav compass)
---   POST /spell/#id           healspells() (right nav "Fast Spells" buttons)
---   GET  /character           showchar() popup, layout = "minimal"
---   GET  /character/#id       onlinechar() (Who's Online links)
---   GET  /map                 showmap() popup, layout = "minimal"
---   GET  /babble              babblebox() iframe page      POST /babble         post a message
---   GET  /ninja               302 to http://www.se7enet.com/img/shirtninja.jpg
--- Use auth.game as the guard on all of them. See docs/APP.md.
+-- routes/town.lua :: town, exploring, fast heal spells, character/map popups, babble box
+-- (F1). Ports legacy towns.php, explore.php, heal.php and the misc index.php actions.
+-- The logic lives in app/town/*.lua.
+local auth = require("lib.auth")
+local babble = require("town.babble")
+local character = require("town.character")
+local common = require("town.common")
+local explore = require("town.explore")
+local heal = require("town.heal")
+local inn = require("town.inn")
+local maps = require("town.maps")
+local shop = require("town.shop")
+local travel = require("town.travel")
+local view = require("lib.view")
+
+local game_ok, not_fighting = auth.game, common.not_fighting
+
 return function(r)
+  r:route({ "GET", "POST" }, "/inn", game_ok, not_fighting, inn.handle)
+
+  r:get("/shop", game_ok, not_fighting, shop.list)
+  r:get("/shop/buy/#id", game_ok, not_fighting, shop.confirm)
+  r:post("/shop/buy/#id", game_ok, not_fighting, shop.buy)
+
+  r:get("/maps", game_ok, not_fighting, maps.list)
+  r:get("/maps/buy/#id", game_ok, not_fighting, maps.confirm)
+  r:post("/maps/buy/#id", game_ok, not_fighting, maps.buy)
+
+  r:post("/travel/#id", game_ok, travel.handle)
+  r:post("/move", game_ok, explore.move)
+  r:post("/spell/#id", game_ok, heal.cast)
+
+  r:get("/character", game_ok, character.show)
+  r:get("/character/#id", game_ok, character.online)
+  r:get("/map", game_ok, character.map)
+
+  r:get("/babble", game_ok, babble.show)
+  r:post("/babble", game_ok, babble.post)
+
+  r:get("/ninja", game_ok, function() return view.redirect("http://www.se7enet.com/img/shirtninja.jpg") end)
 end

@@ -1,0 +1,24 @@
+{#- Victory (legacy fight.php victory()). -#}
+<section class="box victory">
+<div class="box-body">
+<p>Congratulations. You have defeated the {{ monster.name }}.<br>
+You gain {{ r.exp }} experience. {{ r.warnexp }}<br>
+You gain {{ r.gold }} gold. {{ r.warngold }}</p>
+{%- if levelup then %}
+<p><b>You have gained a level!</b></p>
+<p>You gain {{ levelup.hp }} hit points.<br>
+You gain {{ levelup.mp }} magic points.<br>
+You gain {{ levelup.tp }} travel points.<br>
+You gain {{ levelup.strength }} strength.<br>
+You gain {{ levelup.dexterity }} dexterity.
+{%- if levelup.spells then %}<br>
+You have learned a new spell.
+{%- end %}</p>
+<p>You can now continue <a href="/">exploring</a>.</p>
+{%- elseif dropped then %}
+<p>This monster has dropped an item. <a href="/drop">Click here</a> to reveal and equip the item, or you may also move on and continue <a href="/">exploring</a>.</p>
+{%- else %}
+<p>You can now continue <a href="/">exploring</a>.</p>
+{%- end %}
+</div>
+</section>

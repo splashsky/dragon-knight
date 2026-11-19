@@ -1,0 +1,27 @@
+{#- One thread (legacy forum.php showthread()) + the reply form. -#}
+<table class="forum">
+<thead>
+<tr><th colspan="2" class="forum-thread-title"><a href="/forum">Forum</a> :: {{ thread.title }}</th></tr>
+</thead>
+<tbody>
+{%- for _, p in ipairs(posts) do %}
+<tr><td class="forum-author"><span class="small"><b>{{ p.author }}</b><br><br>{{ date(p.postdate) }}</span></td><td>{{{ nl2br(p.content) }}}</td></tr>
+{%- end %}
+</tbody>
+</table>
+{{{ include("community/forum/pager") }}}
+<br>
+<b>Reply To This Thread:</b><br>
+{%- if errors then %}
+<p class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</p>
+{%- end %}
+<form action="/forum/reply/{{ thread.id }}" method="post">
+{{{ csrf_field() }}}
+<textarea name="content" rows="7" cols="40" required>
+{{ draft }}</textarea><br>
+<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+</form>

@@ -1,1 +1,4 @@
 /* fight.css :: owned by F2 (fight). Linked by every layout. */
+.fight .box-body p, .victory .box-body p, .drop .box-body p { margin: 0 0 1em; }
+.fight-command p { margin: 0 0 1em; }
+.fight-command input[type="submit"] { min-width: 4.5em; }

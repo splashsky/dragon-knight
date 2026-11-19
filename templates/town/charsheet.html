@@ -1,0 +1,57 @@
+{#- Character sheet boxes (legacy templates/showchar.php, onlinechar.php). full = own sheet
+    (bonuses, next level, spells). -#}
+<section class="box">
+<div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
+<div class="box-body">
+<b>{{ u.charname }}</b><br><br>
+
+Difficulty: {{ difficulty }}<br>
+Class: {{ charclass }}<br><br>
+
+Level: {{ u.level }}<br>
+{%- if full then %}
+Experience: {{ experience }}{% if plusexp then %} <span class="light">{{ plusexp }}</span>{% end %}<br>
+Next Level: {% if nextlevel then %}{{ nextlevel }}{% else %}<span class="light">None</span>{% end %}<br>
+Gold: {{ gold }}{% if plusgold then %} <span class="light">{{ plusgold }}</span>{% end %}<br>
+{%- else %}
+Experience: {{ experience }}<br>
+Gold: {{ gold }}<br>
+{%- end %}
+Hit Points: {{ u.currenthp }} / {{ u.maxhp }}<br>
+Magic Points: {{ u.currentmp }} / {{ u.maxmp }}<br>
+Travel Points: {{ u.currenttp }} / {{ u.maxtp }}<br><br>
+
+Strength: {{ u.strength }}<br>
+Dexterity: {{ u.dexterity }}<br>
+Attack Power: {{ u.attackpower }}<br>
+Defense Power: {{ u.defensepower }}<br>
+</div>
+</section>
+
+<section class="box">
+<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<div class="box-body">
+<table class="inventory">
+<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td>Weapon: {{ u.weaponname }}</td></tr>
+<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td>Armor: {{ u.armorname }}</td></tr>
+<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td>Shield: {{ u.shieldname }}</td></tr>
+</table>
+Slot 1: {{ u.slot1name }}<br>
+Slot 2: {{ u.slot2name }}<br>
+Slot 3: {{ u.slot3name }}
+</div>
+</section>
+{%- if full then %}
+
+<section class="box">
+<div class="title"><img src="/static/images/button_spells.gif" alt="Spells" title="Spells"></div>
+<div class="box-body">
+{%- if #spells == 0 then %}
+None
+{%- end %}
+{%- for _, name in ipairs(spells) do %}
+{{ name }}<br>
+{%- end %}
+</div>
+</section>
+{%- end %}

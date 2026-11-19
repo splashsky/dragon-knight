@@ -1,0 +1,18 @@
+{#- New thread form (legacy forum.php newthread()). -#}
+<b>Make A New Post:</b><br><br>
+{%- if errors then %}
+<p class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</p>
+{%- end %}
+<form action="/forum/new" method="post">
+{{{ csrf_field() }}}
+Title:<br>
+<input type="text" name="title" size="50" maxlength="{{ title_max }}" value="{{ draft.title }}" required><br><br>
+Message:<br>
+<textarea name="content" rows="7" cols="40" required>
+{{ draft.content }}</textarea><br><br>
+<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+</form>

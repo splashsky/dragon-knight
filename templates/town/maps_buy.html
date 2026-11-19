@@ -1,0 +1,8 @@
+{#- Map purchase confirmation (legacy towns.php maps2()). -#}
+<div class="town-message">
+You are buying the {{ town.name }} map. Is that ok?<br><br>
+<form action="/maps/buy/{{ town.id }}" method="post">
+{{{ csrf_field() }}}
+<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
+</form>
+</div>

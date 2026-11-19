@@ -1,0 +1,52 @@
+{#- Generic edit form (admin/editor.lua). ctx: heading, intro, notes, fields, action,
+    values (name -> string), errors (list) or nil, saved (message) or nil.
+    Field labels/values/options are escaped; f.help is trusted HTML from the specs. -#}
+<h1 class="admin-heading">{{ heading }}</h1>
+{%- if saved then %}
+<p class="admin-saved">{{ saved }}</p>
+{%- end %}
+{%- if errors then %}
+<div class="admin-errors"><b>Errors:</b><br>
+<div class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</div>
+Please correct the fields below and try again.</div>
+{%- end %}
+{%- if intro then %}
+<p>{{ intro }}</p>
+{%- end %}
+<form action="{{ action }}" method="post">
+{{{ csrf_field() }}}
+<table class="admin-form">
+{%- for _, f in ipairs(fields) do %}
+{%- if f.kind == "separator" then %}
+<tr><td colspan="2" class="admin-sep">&nbsp;</td></tr>
+{%- else %}
+<tr><td class="admin-label">{% if f.highlight then %}<span class="highlight">{{ f.label }}:</span>{% else %}{{ f.label }}:{% end %}</td><td>
+{%- if f.kind == "static" then %}
+{{ values[f.name] }}
+{%- elseif f.kind == "select" then %}
+<select name="{{ f.name }}">
+{%- for _, o in ipairs(f.options) do %}
+<option value="{{ o[1] }}"{% if tostring(o[1]) == values[f.name] then %} selected{% end %}>{{ o[2] }}</option>
+{%- end %}
+</select>
+{%- elseif f.kind == "password" then %}
+<input type="password" name="{{ f.name }}" size="20" autocomplete="new-password">
+{%- else %}
+<input type="text" name="{{ f.name }}" size="{{ f.size or 30 }}"{% if f.maxlength then %} maxlength="{{ f.maxlength }}"{% end %} value="{{ values[f.name] }}">
+{%- end %}{{ f.suffix }}
+{%- if f.help then %}
+<br><span class="small">{{{ f.help }}}</span>
+{%- end %}
+</td></tr>
+{%- end %}
+{%- end %}
+</table>
+<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+</form>
+{%- if notes then %}
+{{{ include(notes) }}}
+{%- end %}

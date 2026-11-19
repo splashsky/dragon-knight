@@ -1,0 +1,20 @@
+{#- Item drop (legacy fight.php drop()). -#}
+<section class="box drop">
+<div class="box-body">
+<p>The monster dropped the following item: <b>{{ drop.name }}</b></p>
+<p>This item has the following attribute(s):
+{%- for _, line in ipairs(attributes) do %}<br>
+{{ line }}
+{%- end %}</p>
+<p>Select an inventory slot from the list below to equip this item. If the inventory slot is already full, the old item will be discarded.</p>
+<form action="/drop" method="post">
+{{{ csrf_field() }}}
+<select name="slot" aria-label="Inventory slot"><option value="0">Choose One</option>
+{%- for i, name in ipairs(slots) do %}
+<option value="{{ i }}">Slot {{ i }}: {{ name }}</option>
+{%- end %}
+</select> <input type="submit" name="submit" value="Submit">
+</form>
+<p>You may also choose to just continue <a href="/">exploring</a> and give up this item.</p>
+</div>
+</section>

@@ -1,0 +1,22 @@
+{#- Levels spoilers, one table per class (legacy help_levels.php). -#}
+{{{ include("community/help/header") }}}
+{%- for ci, c in ipairs(classes) do %}
+{%- if ci > 1 then %}
+<br><br>
+{%- end %}
+<table class="help-table help-w50">
+<thead>
+<tr><th colspan="8" class="help-caption">{{ c.name }} Levels</th></tr>
+<tr><th>Level</th><th>Exp.</th><th>HP</th><th>MP</th><th>TP</th><th>Strength</th><th>Dexterity</th><th>Spell</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(c.rows) do %}
+<tr><td>{{ r.level }}</td><td>{{ r.exp }}</td>{% for _, v in ipairs(r.stats) do %}<td>{{ v }}</td>{% end %}<td>{% if r.has_spell then %}{{ r.spell }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+{%- end %}
+<br>
+Experience points listed are total values up until that point. All other values are just the new amount that you gain for each level.
+<br><br>
+{{{ include("community/help/footer") }}}

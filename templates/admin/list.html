@@ -1,0 +1,32 @@
+{#- Table list (legacy items()/drops()/...). ctx: heading, intro, none, path, rows {id, name},
+    monster_note, and for users: prev/next offsets, total, first, last. -#}
+<h1 class="admin-heading">{{ heading }}</h1>
+{%- if monster_note then %}
+{%- if monster_note.mismatch then %}
+<p><span class="highlight">Note:</span> Your highest monster level does not match with your entered map size. Highest monster level should be {{ monster_note.want }}, yours is {{ monster_note.have }}. Please fix this before opening the game to the public.</p>
+{%- else %}
+<p>Monster level and map size match. No further actions are required for map compatibility.</p>
+{%- end %}
+{%- end %}
+<p>{{ intro }}</p>
+<table class="admin-list">
+{%- for _, row in ipairs(rows) do %}
+<tr><td class="admin-id">{{ row.id }}</td><td><a href="{{ path }}/{{ row.id }}">{{ row.name }}</a></td></tr>
+{%- end %}
+{%- if #rows == 0 then %}
+<tr><td>{{ none }}</td></tr>
+{%- end %}
+</table>
+{%- if total then %}
+<p class="admin-pager">
+{%- if total > 0 then %}
+Showing {{ first }}&ndash;{{ last }} of {{ total }}.
+{%- end %}
+{%- if prev then %}
+<a href="{{ url(path, { start = prev }) }}">&laquo; Previous</a>
+{%- end %}
+{%- if next then %}
+<a href="{{ url(path, { start = next }) }}">Next &raquo;</a>
+{%- end %}
+</p>
+{%- end %}

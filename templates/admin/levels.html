@@ -1,0 +1,10 @@
+<h1 class="admin-heading">Edit Levels</h1>
+<p>Select a level number from the dropdown box to edit it.</p>
+<form action="/admin/levels" method="get">
+<select name="level">
+{%- for _, i in ipairs(options) do %}
+<option value="{{ i }}">{{ i }}</option>
+{%- end %}
+</select>
+<input type="submit" value="Submit">
+</form>

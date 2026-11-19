@@ -1,0 +1,19 @@
+<h1 class="admin-heading">Add A News Post</h1>
+{%- if saved then %}
+<p class="admin-saved">News post added.</p>
+{%- end %}
+{%- if errors then %}
+<div class="admin-errors"><b>Errors:</b><br>
+<div class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</div>
+Please try again.</div>
+{%- end %}
+<form action="/admin/news" method="post">
+{{{ csrf_field() }}}
+Type your post below and then click Submit to add it.<br>
+<textarea name="content" rows="5" cols="50">{{ content }}</textarea><br>
+<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+</form>

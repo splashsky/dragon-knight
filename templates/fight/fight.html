@@ -1,0 +1,32 @@
+{#- Fight screen (legacy templates/fight.php + fight.php fight()). -#}
+<section class="box fight">
+<div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
+<div class="box-body">
+<p>You are fighting a <b>{{ monstername }}</b></p>
+{%- if monsterhp then %}
+<p class="fight-monsterhp">Monster's HP: {{ monsterhp }}</p>
+{%- end %}
+{%- if #yourturn > 0 then %}
+<p class="fight-yourturn">{% for i, line in ipairs(yourturn) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- end %}
+{%- if #monsterturn > 0 then %}
+<p class="fight-monsterturn">{% for i, line in ipairs(monsterturn) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- end %}
+{%- if dead then %}
+{{{ include("fight/died") }}}
+{%- else %}
+<p>Command?</p>
+<form class="fight-command" action="/fight" method="post">
+{{{ csrf_field() }}}
+<p><input type="submit" name="fight" value="Fight"></p>
+<p><select name="userspell" aria-label="Spell"><option value="0">Choose One</option>
+{%- if #spells == 0 then %}<option value="0">None</option>{% end %}
+{%- for _, s in ipairs(spells) do %}
+<option value="{{ s.id }}">{{ s.name }}</option>
+{%- end %}
+</select> <input type="submit" name="spell" value="Spell"></p>
+<p><input type="submit" name="run" value="Run"></p>
+</form>
+{%- end %}
+</div>
+</section>

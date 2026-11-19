@@ -1,1 +1,59 @@
 /* community.css :: owned by F3 (forum/help/news). Linked by every layout. */
+
+/* ---- forum (legacy: black 1px grid, #dddddd headers, white/#eeeeee rows) ---- */
+table.forum {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 1px;
+  background-color: black;
+}
+table.forum th,
+table.forum td {
+  padding: 3px;
+  background-color: #ffffff;
+  vertical-align: top;
+}
+table.forum th { background-color: #dddddd; }
+table.forum tbody tr:nth-child(even) td { background-color: #eeeeee; }
+table.forum .forum-new { text-align: center; }
+table.forum .forum-thread-title { text-align: left; }
+table.forum .forum-col-thread { width: 50%; }
+table.forum .forum-col-replies { width: 10%; }
+table.forum .forum-author { width: 25%; }
+table.forum td { overflow-wrap: anywhere; }
+.forum-pages { margin: 6px 0; }
+.forum-pages a, .forum-pages b { margin-right: 4px; }
+
+/* ---- help pages (legacy standalone pages, shown in the minimal layout) ---- */
+body.minimal .dk-content:has(.help-page) {
+  display: block;
+}
+.help-page h3 { margin-top: 1em; }
+table.help-table {
+  border: solid 1px black;
+  border-collapse: collapse;
+}
+table.help-table th {
+  text-align: left;
+  padding: 3px;
+}
+table.help-table th.help-caption {
+  text-align: center;
+  background-color: #ffffff;
+}
+table.help-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
+.help-w50 { width: 50%; }
+.help-w60 { width: 60%; }
+.help-w75 { width: 75%; }
+.help-copyright {
+  display: flex;
+  width: 100%;
+}
+.help-copyright > div {
+  flex: 1 1 50%;
+  text-align: center;
+  padding: 3px;
+}
+@media (max-width: 700px) {
+  .help-w50, .help-w60, .help-w75 { width: 100%; }
+}

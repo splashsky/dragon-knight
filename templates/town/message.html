@@ -1,0 +1,38 @@
+{#- Short legacy display("...") messages for town/explore/heal (F1). ctx.key picks one. -#}
+<div class="town-message">
+{%- if key == "cheat" then %}
+Cheat attempt detected.<br><br>Get a life, loser.
+{%- elseif key == "inn_poor" then %}
+You do not have enough gold to stay at this Inn tonight.<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "inn_done" then %}
+You wake up feeling refreshed and ready for action.<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "shop_poor" then %}
+You do not have enough gold to buy this item.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "shop_done" then %}
+Thank you for purchasing this item.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "maps_poor" then %}
+You do not have enough gold to buy this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "maps_done" then %}
+Thank you for purchasing this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "travel_tp" then %}
+You do not have enough TP to travel here. Please go back and try again when you get more TP.
+{%- elseif key == "travel_here" then %}
+You are already in this town. <a href="/">Click here</a> to return to the main town screen.
+{%- elseif key == "travel_done" then %}
+You have travelled to {{ town.name }}. You may now <a href="/">enter this town</a>.
+{%- elseif key == "spell_unknown" then %}
+You have not yet learned this spell. Please go back and try again.
+{%- elseif key == "spell_not_heal" then %}
+This is not a healing spell. Please go back and try again.
+{%- elseif key == "spell_no_mp" then %}
+You do not have enough Magic Points to cast this spell. Please go back and try again.
+{%- elseif key == "spell_fighting" then %}
+You cannot use the Quick Spells list during a fight. Please go back and select the Healing Spell you wish to use from the Spells box on the main fighting screen to continue.
+{%- elseif key == "spell_full" then %}
+Your Hit Points are already full. You don't need to use a Healing spell now.
+{%- elseif key == "spell_done" then %}
+You have cast the {{ spell.name }} spell, and gained {{ gained }} Hit Points. You can now continue <a href="/">exploring</a>.
+{%- elseif key == "no_user" then %}
+No such user.
+{%- end %}
+</div>

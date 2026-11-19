@@ -1,0 +1,12 @@
+{#- Purchase confirmation (legacy towns.php buy2()). -#}
+<div class="town-message">
+{%- if old then %}
+If you are buying the {{ item.name }}, then I will buy your {{ old.name }} for {{ sellback }} gold. Is that ok?<br><br>
+{%- else %}
+You are buying the {{ item.name }}, is that ok?<br><br>
+{%- end %}
+<form action="/shop/buy/{{ item.id }}" method="post">
+{{{ csrf_field() }}}
+<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
+</form>
+</div>

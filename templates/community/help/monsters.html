@@ -1,0 +1,17 @@
+{#- Monsters spoilers (legacy help_monsters.php). -#}
+{{{ include("community/help/header") }}}
+
+<table class="help-table help-w75">
+<thead>
+<tr><th colspan="8" class="help-caption">Monsters</th></tr>
+<tr><th>Name</th><th>Max HP</th><th>Max Damage</th><th>Armor</th><th>Level</th><th>Max Exp.</th><th>Max Gold</th><th>Immunity</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(monsters) do %}
+{%- local m = r.monster %}
+<tr><td style="width: 30%">{{ m.name }}</td><td style="width: 10%">{{ m.maxhp }}</td><td style="width: 10%">{{ m.maxdam }}</td><td style="width: 10%">{{ m.armor }}</td><td style="width: 10%">{{ m.level }}</td><td style="width: 10%">{{ m.maxexp }}</td><td style="width: 10%">{{ m.maxgold }}</td><td style="width: 20%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<br>
+{{{ include("community/help/footer") }}}

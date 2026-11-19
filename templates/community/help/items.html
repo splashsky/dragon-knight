@@ -1,0 +1,29 @@
+{#- Items & Drops spoilers (legacy help_items.php). -#}
+{{{ include("community/help/header") }}}
+
+<table class="help-table help-w60">
+<thead>
+<tr><th colspan="5" class="help-caption">Items</th></tr>
+<tr><th>Type</th><th>Name</th><th>Cost</th><th>Attribute</th><th>Special</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(items) do %}
+<tr><td style="width: 5%"><img src="/static/images/icon_{{ r.image }}.gif" alt="{{ r.image }}"></td><td style="width: 30%">{{ r.item.name }}</td><td style="width: 20%">{{ r.item.buycost }} Gold</td><td style="width: 20%">{{ r.item.attribute }} {{ r.power }} Power</td><td style="width: 25%">{% if r.special then %}{{ r.special }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<br>
+<br>
+<table class="help-table help-w60">
+<thead>
+<tr><th colspan="4" class="help-caption">Drops</th></tr>
+<tr><th>Name</th><th>Monster Level</th><th>Attribute 1</th><th>Attribute 2</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(drops) do %}
+<tr><td style="width: 25%">{{ r.drop.name }}</td><td style="width: 15%">{{ r.drop.mlevel }}</td><td style="width: 30%">{% if r.attr1 then %}{{ r.attr1 }}{% else %}<span class="light">None</span>{% end %}</td><td style="width: 30%">{% if r.attr2 then %}{{ r.attr2 }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<br>
+{{{ include("community/help/footer") }}}
