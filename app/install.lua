@@ -9,7 +9,7 @@ local php = require("lib.php")
 local USAGE = [[
 usage: dk install [--partial] [--force]
 									[--admin <username> <email> <password>] [--charname NAME]
-									[--class 1|2|3] [--difficulty 1|2|3]
+									[--class 1|2|3]
 
 	--partial     create tables but load no game data except the control row, the
 								forum boards and the first news post (legacy "Partial Setup")
@@ -17,7 +17,6 @@ usage: dk install [--partial] [--force]
 	--admin       administrator account; prompted for when omitted
 	--charname    administrator character name (default: the username)
 	--class       character class (default 1)
-	--difficulty  difficulty (default 1)
 ]]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users
@@ -33,7 +32,7 @@ local function read_file(path)
 end
 
 local function parse_args(argv)
-	local o = { class = "1", difficulty = "1" }
+	local o = { class = "1" }
 	local i = 1
 	while i <= #argv do
 		local a = argv[i]
@@ -43,7 +42,7 @@ local function parse_args(argv)
 			o.username, o.email, o.password = argv[i + 1], argv[i + 2], argv[i + 3]
 			if not o.password then return nil, "--admin needs <username> <email> <password>" end
 			i = i + 3
-		elseif a == "--charname" or a == "--class" or a == "--difficulty" then
+		elseif a == "--charname" or a == "--class" then
 			if not argv[i + 1] then return nil, a .. " needs a value" end
 			o[a:sub(3)] = argv[i + 1]
 			i = i + 1
@@ -75,11 +74,9 @@ local function admin_errors(o)
 	end
 	if not php.is_email(o.email) then errs[#errs + 1] = "email isn't valid" end
 	if php.trim(o.password) == "" then errs[#errs + 1] = "password is required" end
-	for _, k in ipairs({ "class", "difficulty" }) do
-		local n = math.tointeger(tonumber(o[k]))
-		if not n or n < 1 or n > 3 then errs[#errs + 1] = k .. " must be 1, 2 or 3" end
-		o[k] = n
-	end
+	local class = math.tointeger(tonumber(o.class))
+	if not class or class < 1 or class > 3 then errs[#errs + 1] = "class must be 1, 2 or 3" end
+	o.class = class
 	return errs
 end
 
@@ -152,11 +149,10 @@ local function run(...)
 	dk.db:exec_script(seed_sql(not o.partial, seed))
 
 	local now = dk.now()
-	-- legacy install never set difficulty (left 0, which has no name/modifier); default 1 here
 	local _, id = dk.db:exec(
-		"INSERT INTO users (username, password, email, verify, charname, charclass, difficulty, " ..
-		"regdate, onlinetime, authlevel) VALUES (?, ?, ?, '1', ?, ?, ?, ?, ?, 1)",
-		o.username, auth.hash_password(o.password), o.email, o.charname, o.class, o.difficulty, now, now)
+		"INSERT INTO users (username, password, email, verify, charname, charclass, " ..
+		"regdate, onlinetime, authlevel) VALUES (?, ?, ?, '1', ?, ?, ?, ?, 1)",
+		o.username, auth.hash_password(o.password), o.email, o.charname, o.class, now, now)
 	news.adopt({ id = id })
 	migrations.stamp(migrations.VERSION)
 

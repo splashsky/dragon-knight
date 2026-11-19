@@ -60,13 +60,6 @@ local function spec()
 			name_field("class1name", "Class 1 Name"),
 			name_field("class2name", "Class 2 Name"),
 			name_field("class3name", "Class 3 Name"),
-			name_field("diff1name", "Difficulty 1 Name"),
-			name_field("diff2name", "Difficulty 2 Name"),
-			{ name = "diff2mod", label = "Difficulty 2 Value", size = 3, maxlength = 3, real = true,
-				help = "Default is 1.2. Specify factoral value for medium difficulty here." },
-			name_field("diff3name", "Difficulty 3 Name"),
-			{ name = "diff3mod", label = "Difficulty 3 Value", size = 3, maxlength = 3, real = true,
-				help = "Default is 1.5. Specify factoral value for hard difficulty here." },
 		},
 		-- legacy main() checks, in its order
 		validate = function(v, errors)
@@ -80,18 +73,6 @@ local function spec()
 			end
 			for i = 1, 3 do
 				if v["class" .. i .. "name"] == "" then err("Class " .. i .. " name is required.") end
-			end
-			for i = 1, 3 do
-				if v["diff" .. i .. "name"] == "" then err("Difficulty " .. i .. " name is required.") end
-			end
-			for i = 2, 3 do
-				local m = v["diff" .. i .. "mod"]
-				if m == "" then
-					err("Difficulty " .. i .. " value is required.")
-				elseif not common.is_numeric(m) then
-					-- not in legacy (MySQL would store 0 and break the formulas)
-					err("Difficulty " .. i .. " value must be a number.")
-				end
 			end
 		end,
 	}

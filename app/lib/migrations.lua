@@ -75,8 +75,23 @@ ALTER TABLE news ADD COLUMN thread_id INTEGER REFERENCES forum (id) ON DELETE SE
 	end
 end
 
+-- 2: no more difficulty levels (everyone plays at the original Easy, which never scaled
+-- anything). No index, constraint or foreign key uses these columns, so DROP COLUMN works.
+local function v2_drop_difficulty()
+	dk.db:exec_script([[
+ALTER TABLE control DROP COLUMN diff1name;
+ALTER TABLE control DROP COLUMN diff1mod;
+ALTER TABLE control DROP COLUMN diff2name;
+ALTER TABLE control DROP COLUMN diff2mod;
+ALTER TABLE control DROP COLUMN diff3name;
+ALTER TABLE control DROP COLUMN diff3mod;
+ALTER TABLE users DROP COLUMN difficulty;
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
+	{ name = "remove difficulty levels", up = v2_drop_difficulty },
 }
 
 migrations.VERSION = #migrations.STEPS

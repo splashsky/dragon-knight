@@ -178,10 +178,10 @@ t_has_sql() { command -v sqlite3 >/dev/null || command -v python3 >/dev/null; }
 t_mail_latest() { ls -t "$OUTBOX"/*.eml 2>/dev/null | head -n1; }
 t_mail_count() { ls "$OUTBOX"/*.eml 2>/dev/null | wc -l; }
 
-# t_register USER PASS EMAIL CHARNAME [CLASS] [DIFFICULTY]  (current jar)
+# t_register USER PASS EMAIL CHARNAME [CLASS]  (current jar)
 t_register() {
 	t_get /register
-	t_post /register "csrf=$(t_csrf)&username=$1&password1=$(t_enc "$2")&password2=$(t_enc "$2")&email1=$(t_enc "$3")&email2=$(t_enc "$3")&charname=$4&charclass=${5:-1}&difficulty=${6:-1}"
+	t_post /register "csrf=$(t_csrf)&username=$1&password1=$(t_enc "$2")&password2=$(t_enc "$2")&email1=$(t_enc "$3")&email2=$(t_enc "$3")&charname=$4&charclass=${5:-1}"
 }
 # t_login USER PASS [rememberme]  (current jar; expects success)
 t_login() {
@@ -273,14 +273,15 @@ t_post /login "csrf=$OTHER_TOKEN&username=admin&password=$ADMIN_PASS"; expect_st
 
 t_section "register + login"
 t_jar alice
-t_register alice secretpw alice@example.com Alice 2 1
+t_register alice secretpw alice@example.com Alice 2
 expect_status 200; expect_body 'Your account was created succesfully'
 t_register alice secretpw alice@example.com Alice
 expect_body 'Username already taken'; expect_body 'Email already taken'
-t_get /register
-t_post /register "csrf=$(t_csrf)&username=bad+name&password1=a&password2=b&email1=x&email2=y&charname=Bad&charclass=1&difficulty=9"
+t_get /register;         expect_body 'name="charclass"'; expect_body 'information about character classes.'
+expect_no_body 'difficulty'
+t_post /register "csrf=$(t_csrf)&username=bad+name&password1=a&password2=b&email1=x&email2=y&charname=Bad&charclass=9"
 expect_body 'Username must be alphanumeric.'; expect_body 'Email isn&#39;t valid.'; expect_body 'Emails don&#39;t match.'
-expect_body 'Passwords don&#39;t match.'; expect_body 'Difficulty is invalid.'; expect_body 'value="bad name"'
+expect_body 'Passwords don&#39;t match.'; expect_body 'Character Class is invalid.'; expect_body 'value="bad name"'
 t_login alice wrongpw;   expect_status 200; expect_body 'Invalid username or password'
 t_login alice secretpw;  expect_redirect /; expect_header '^set-cookie: dk_session=[0-9a-f]{64}; Path=/; HttpOnly; SameSite=Lax'
 t_get /;                 expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
@@ -289,7 +290,7 @@ expect_body 'action="/move"'; expect_body 'Seconds,'
 t_post /logout "";       expect_status 403
 t_get /;                 expect_status 200
 if t_has_sql; then
-	[ "$(t_sql "SELECT charclass||','||difficulty FROM users WHERE username='alice'")" = 2,1 ] && t_ok || t_fail "class/difficulty stored"
+	[ "$(t_sql "SELECT charclass FROM users WHERE username='alice'")" = 2 ] && t_ok || t_fail "class stored"
 	t_sql "UPDATE users SET currentaction='Exploring' WHERE username='alice'"
 	t_get /; expect_body 'You are exploring the map'
 	t_sql "UPDATE users SET currentaction='Fighting' WHERE username='alice'"

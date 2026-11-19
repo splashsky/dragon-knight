@@ -78,7 +78,7 @@ when it doesn't exist.
 | Command | |
 |---|---|
 | `dk serve [--port N] [--bind ADDR]` | run the HTTP server; `--port` (1–65535, or 0 for any free port) and `--bind` (an IPv4 or IPv6 address) override the config |
-| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class 1-3] [--difficulty 1-3] [--partial] [--force]` | create the schema, load the default game data and create the administrator (`--partial`: no game data; `--force`: drop existing tables first) |
+| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class 1-3] [--partial] [--force]` | create the schema, load the default game data and create the administrator (`--partial`: no game data; `--force`: drop existing tables first) |
 | `dk migrate [--status]` | upgrade an existing database to the current schema, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
 | `dk backup [OUTPUT]` | copy the database, safely while `dk serve` runs (SQLite backup API, one consistent snapshot), check the copy with `PRAGMA integrity_check` and print its path. OUTPUT defaults to `<db dir>/backups/<db name>-YYYYMMDD-HHMMSS.db` (UTC); an existing file is never overwritten. Exit status 3 if the database does not exist |
 | `dk user list` | list accounts |
@@ -92,8 +92,8 @@ when it doesn't exist.
 `config.example.lua` documents every key. Server keys (`bind`, `port`, `workers`,
 `spares`, paths, request limits) are read at startup. App keys (`dev`, `secret`,
 `pbkdf2_iterations`, `cookie_secure`) are re-read for every fresh VM, so they apply on the
-next request. Game settings (game name, map size, forum, email verification, class and
-difficulty names, …) live in the database and are edited in the admin panel at `/admin`.
+next request. Game settings (game name, map size, forum, email verification, class
+names, …) live in the database and are edited in the admin panel at `/admin`.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -246,6 +246,8 @@ in-game `/changelog` page (also linked from the version number in the footer).
 - Installation and upgrades are the `dk install`, `dk migrate` and `dk backup` commands
 	(and `make deploy`); there is no web installer.
 - The admin "page compression" setting is gone (the server doesn't gzip).
+- There are no difficulty levels: everyone plays at the original Easy difficulty (no
+	multiplier on monster HP, damage, experience or gold).
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

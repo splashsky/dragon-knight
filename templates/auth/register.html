@@ -22,10 +22,7 @@
 <tr><td>Character Class:</td><td><select name="charclass">
 {%- for i, name in ipairs(classes) do %}<option value="{{ i }}"{% if v.charclass == tostring(i) then %} selected{% end %}>{{ name }}</option>{% end -%}
 </select></td></tr>
-<tr><td>Difficulty:</td><td><select name="difficulty">
-{%- for i, name in ipairs(difficulties) do %}<option value="{{ i }}"{% if v.difficulty == tostring(i) then %} selected{% end %}>{{ name }}</option>{% end -%}
-</select></td></tr>
-<tr><td colspan="2">See <a href="/help">Help</a> for more information about character classes and difficulty levels.<br><br></td></tr>
+<tr><td colspan="2">See <a href="/help">Help</a> for more information about character classes.<br><br></td></tr>
 <tr><td colspan="2"><input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset"></td></tr>
 </table>
 </form>

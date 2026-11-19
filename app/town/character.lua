@@ -31,7 +31,6 @@ local function sheet(user)
 		plusgold = bonus(user.goldbonus),
 		nextlevel = nextlevel,
 		charclass = game.class_name(user.charclass),
-		difficulty = game.difficulty_name(user.difficulty),
 		spells = spells,
 	}
 end

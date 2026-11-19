@@ -5,8 +5,6 @@ local combat = require("fight.combat")
 local php = require("lib.php")
 local T = {}
 
-local CONTROL = { diff1mod = 1.0, diff2mod = 1.2, diff3mod = 1.5 }
-
 -- rand that returns `values` in order and records the PHP-cast ranges.
 local function dice(values)
 	local d = { calls = {} }
@@ -33,7 +31,7 @@ local function ranges(d, list) eq(table.concat(d.calls, " "), list, "rand ranges
 
 local function player(over)
 	local p = {
-		id = 1, level = 1, charclass = 1, difficulty = 1, experience = 0, gold = 100,
+		id = 1, level = 1, charclass = 1, experience = 0, gold = 100,
 		currenthp = 15, maxhp = 15, currentmp = 0, maxmp = 0, currenttp = 10, maxtp = 10,
 		strength = 5, dexterity = 5, attackpower = 5, defensepower = 5,
 		expbonus = 0, goldbonus = 0, spells = "0", latitude = 0, longitude = 0,
@@ -59,27 +57,27 @@ function T.monster_level_band()
 end
 
 function T.start_monster_hp_and_swing_first()
-	-- Creature, medium: rand(8, 10) -> 9, ceil(9 * 1.2) = ceil(10.8) = 11.
+	-- Creature: rand(8, 10) -> 9 HP, unscaled.
 	-- swing: rand(1,10)=2 + ceil(sqrt(5))=3 -> 5  vs  rand(1,7)=3 + ceil(sqrt(8))=3 -> 6: monster first.
-	local st, d = player({ difficulty = 2 }), dice({ 9, 2, 3 })
-	local first = combat.start(st, CREATURE, CONTROL, d.rand)
+	local st, d = player(), dice({ 9, 2, 3 })
+	local first = combat.start(st, CREATURE, d.rand)
 	d.done(); ranges(d, "8,10 1,10 1,7")
-	eq(st.currentmonsterhp, 11, "hp"); eq(math.type(st.currentmonsterhp), "integer", "hp type")
+	eq(st.currentmonsterhp, 9, "hp"); eq(math.type(st.currentmonsterhp), "integer", "hp type")
 	eq(st.currentmonster, 4); eq(st.currentmonstersleep, 0); eq(st.currentmonsterimmune, 0)
 	eq(first, false, "swing first")
 	-- 6 vs 6 is not "greater": still the monster. 7 vs 6: player.
-	d = dice({ 9, 3, 3 }); eq(combat.start(player(), CREATURE, CONTROL, d.rand), false)
-	d = dice({ 9, 4, 3 }); eq(combat.start(player(), CREATURE, CONTROL, d.rand), true)
-	-- Blue Slime: (4/5)*4 = 3.2 -> rand(3, 4); hard: ceil(3 * 1.5) = 5
-	st, d = player({ difficulty = 3 }), dice({ 3, 1, 1 })
-	combat.start(st, BLUE_SLIME, CONTROL, d.rand)
-	ranges(d, "3,4 1,10 1,7"); eq(st.currentmonsterhp, 5)
+	d = dice({ 9, 3, 3 }); eq(combat.start(player(), CREATURE, d.rand), false)
+	d = dice({ 9, 4, 3 }); eq(combat.start(player(), CREATURE, d.rand), true)
+	-- Blue Slime: (4/5)*4 = 3.2 -> rand(3, 4)
+	st, d = player(), dice({ 3, 1, 1 })
+	combat.start(st, BLUE_SLIME, d.rand)
+	ranges(d, "3,4 1,10 1,7"); eq(st.currentmonsterhp, 3)
 	-- immunity copied from the monster
 	st, d = player(), dice({ 8, 1, 1 })
-	combat.start(st, SHADOW, CONTROL, d.rand); eq(st.currentmonsterimmune, 1)
+	combat.start(st, SHADOW, d.rand); eq(st.currentmonsterimmune, 1)
 	-- buffs left over from an earlier fight are cleared
 	st = player({ currentuberdamage = 25, currentuberdefense = 10 })
-	combat.start(st, SHADOW, CONTROL, dice({ 8, 1, 1 }).rand)
+	combat.start(st, SHADOW, dice({ 8, 1, 1 }).rand)
 	eq(st.currentuberdamage, 0); eq(st.currentuberdefense, 0)
 end
 
@@ -113,33 +111,33 @@ function T.player_attack()
 end
 
 function T.monster_turn()
-	-- Creature maxdam 8: rand(4, 8) = 8; medium: ceil(8*1.2) = ceil(9.6) = 10
-	-- defense 5: rand(3, 5) = 5 -> ceil(5/4) = 2; dodge rand(1,150)=100 > sqrt(5): hit for 8
-	local st = player({ difficulty = 2, currenthp = 15 })
+	-- Creature maxdam 8: rand(4, 8) = 8, unscaled
+	-- defense 5: rand(3, 5) = 5 -> ceil(5/4) = 2; dodge rand(1,150)=100 > sqrt(5): hit for 6
+	local st = player({ currenthp = 15 })
 	local d = dice({ 8, 5, 100 })
-	local lines, died = combat.monster_turn(st, CREATURE, CONTROL, d.rand, false)
+	local lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
 	d.done(); ranges(d, "4,8 3,5 1,150")
-	eq(lines[1], "The monster attacks you for 8 damage."); eq(st.currenthp, 7); eq(died, false)
-	-- uber defense 50%: 8 - ceil(4) = 4
-	st = player({ difficulty = 2, currenthp = 15, currentuberdefense = 50 })
+	eq(lines[1], "The monster attacks you for 6 damage."); eq(st.currenthp, 9); eq(died, false)
+	-- uber defense 50%: 6 - ceil(3) = 3
+	st = player({ currenthp = 15, currentuberdefense = 50 })
 	d = dice({ 8, 5, 100 })
-	combat.monster_turn(st, CREATURE, CONTROL, d.rand, false); eq(st.currenthp, 11)
+	combat.monster_turn(st, CREATURE, d.rand, false); eq(st.currenthp, 12)
 	-- dodge: roll 2 <= sqrt(5)
 	st = player({ currenthp = 3 })
 	d = dice({ 8, 5, 2 })
-	lines, died = combat.monster_turn(st, CREATURE, CONTROL, d.rand, false)
+	lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
 	eq(lines[1], "You dodge the monster's attack. No damage has been scored.")
 	eq(lines[2], "The monster attacks you for 0 damage."); eq(st.currenthp, 3); eq(died, false)
-	-- fatal: easy, 8 - 2 = 6 >= 3 hp
+	-- fatal: 8 - 2 = 6 >= 3 hp
 	st = player({ currenthp = 3 })
 	d = dice({ 8, 5, 100 })
-	lines, died = combat.monster_turn(st, CREATURE, CONTROL, d.rand, false)
+	lines, died = combat.monster_turn(st, CREATURE, d.rand, false)
 	eq(st.currenthp, -3); eq(died, true)
 	-- block >= hit: damage 1 in both variants; uber defense can't take it below 1
 	for _, after_spell in ipairs({ false, true }) do
 		st = player({ defensepower = 40, currentuberdefense = 50 })   -- rand(30,40)=40 -> 10
 		d = dice({ 2, 40, 100 })                                       -- Blue Slime: rand(1,3)
-		combat.monster_turn(st, BLUE_SLIME, CONTROL, d.rand, after_spell)
+		combat.monster_turn(st, BLUE_SLIME, d.rand, after_spell)
 		ranges(d, "1,3 30,40 1,150"); eq(st.currenthp, 14)
 	end
 end
@@ -148,12 +146,12 @@ function T.monster_sleep_and_wake()
 	-- still asleep: rand(1,15)=5 is not > 5: no attack rolls at all
 	local st = player({ currentmonstersleep = 5 })
 	local d = dice({ 5 })
-	local lines = combat.monster_turn(st, CREATURE, CONTROL, d.rand, false)
+	local lines = combat.monster_turn(st, CREATURE, d.rand, false)
 	d.done(); eq(lines[1], "The monster is still asleep."); eq(#lines, 1); eq(st.currentmonstersleep, 5)
 	-- wakes up (6 > 5) and attacks in the same turn
 	st = player({ currentmonstersleep = 5 })
 	d = dice({ 6, 4, 3, 100 })     -- tohit 4, block ceil(3/4) = 1 -> 3
-	lines = combat.monster_turn(st, CREATURE, CONTROL, d.rand, false)
+	lines = combat.monster_turn(st, CREATURE, d.rand, false)
 	d.done(); eq(lines[1], "The monster has woken up.")
 	eq(lines[2], "The monster attacks you for 3 damage."); eq(st.currentmonstersleep, 0); eq(st.currenthp, 12)
 end
@@ -232,27 +230,27 @@ function T.death_penalty()
 end
 
 function T.victory_rewards()
-	-- Creature maxexp 4: (4/6)*5 = 3.33 -> rand(3,4) = 4; medium ceil(4.8) = 5
-	-- maxgold 2: (2/6)*5 = 1.66 -> rand(1,2) = 2; ceil(2.4) = 3
+	-- Creature maxexp 4: (4/6)*5 = 3.33 -> rand(3,4) = 4, unscaled
+	-- maxgold 2: (2/6)*5 = 1.66 -> rand(1,2) = 2
 	local d = dice({ 4, 2 })
-	local r = combat.rewards(player({ difficulty = 2 }), CREATURE, CONTROL, d.rand)
+	local r = combat.rewards(player(), CREATURE, d.rand)
 	d.done(); ranges(d, "3,4 1,2")
-	eq(r.exp, 5); eq(r.gold, 3); eq(r.newexp, 5); eq(r.newgold, 103); eq(r.warnexp, "")
+	eq(r.exp, 4); eq(r.gold, 2); eq(r.newexp, 4); eq(r.newgold, 102); eq(r.warnexp, ""); eq(r.warngold, "")
 	-- Blue Slime maxexp 1: (1/6)*5 = 0.83 -> rand(0,1) = 0 -> at least 1
 	-- bonuses: exp 1 + ceil(0.1*1) = 2; gold 1 + ceil(0.1*1) = 2
 	d = dice({ 0, 0 })
-	r = combat.rewards(player({ expbonus = 10, goldbonus = 10 }), BLUE_SLIME, CONTROL, d.rand)
+	r = combat.rewards(player({ expbonus = 10, goldbonus = 10 }), BLUE_SLIME, d.rand)
 	ranges(d, "0,1 0,1"); eq(r.exp, 2); eq(r.gold, 2)
 	-- the gold bonus is a % of the gold (legacy: of the exp, 2 + ceil(0.5*4) = 4)
-	r = combat.rewards(player({ goldbonus = 50 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	r = combat.rewards(player({ goldbonus = 50 }), CREATURE, dice({ 4, 2 }).rand)
 	eq(r.exp, 4); eq(r.gold, 3)
-	r = combat.rewards(player({ goldbonus = -50 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	r = combat.rewards(player({ goldbonus = -50 }), CREATURE, dice({ 4, 2 }).rand)
 	eq(r.gold, 1)
 	-- caps
-	r = combat.rewards(player({ experience = 16777214, gold = 16777214 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	r = combat.rewards(player({ experience = 16777214, gold = 16777214 }), CREATURE, dice({ 4, 2 }).rand)
 	eq(r.exp, 0); eq(r.newexp, 16777214); eq(r.warnexp, "You have maxed out your experience points.")
 	eq(r.gold, 0); eq(r.newgold, 16777214); eq(r.warngold, "You have maxed out your gold.")
-	r = combat.rewards(player({ experience = 16777210 }), CREATURE, CONTROL, dice({ 4, 2 }).rand)
+	r = combat.rewards(player({ experience = 16777210 }), CREATURE, dice({ 4, 2 }).rand)
 	eq(r.newexp, 16777214)
 end
 

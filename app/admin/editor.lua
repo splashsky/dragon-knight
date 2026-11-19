@@ -19,7 +19,7 @@
 --   column = "buycost",           -- DB column (default: name); nil for kind "password"
 --   label = "Cost",               -- escaped on output
 --   kind = "text" | "select" | "static" | "separator" | "password",
---   int = true | real = true,     -- storage conversion (default: text as typed)
+--   int = true,                   -- storage conversion (default: text as typed)
 --   required = "Cost is required.", numeric = "Cost must be a number.",
 --   empty = { "", " " },          -- values that count as missing for `required`
 --   default = "X", default_if = { "", " " },   -- replaced before validation
@@ -128,7 +128,6 @@ end
 
 local function convert(f, s)
 	if f.int then return common.to_int(s) end
-	if f.real then return common.to_real(s) end
 	return s
 end
 

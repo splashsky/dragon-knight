@@ -40,11 +40,6 @@ function help.index(req)
 	local c = game.control()
 	return page(req, nil, "community/help/index", {
 		classes = { c.class1name, c.class2name, c.class3name },
-		difficulties = {
-			{ name = c.diff1name, mod = php.str(c.diff1mod) },
-			{ name = c.diff2name, mod = php.str(c.diff2mod) },
-			{ name = c.diff3name, mod = php.str(c.diff3mod) },
-		},
 	})
 end
 

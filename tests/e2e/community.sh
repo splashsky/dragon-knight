@@ -5,7 +5,7 @@
 t_section "help pages (logged out)"
 t_jar f3anon; t_reset_jar
 t_get /help;          expect_status 200; expect_body 'Dragon Knight Help</h1>'
-expect_body '<b>Mage</b>'; expect_body 'Medium: <b>1.2</b>'; expect_body 'Easy: <b>1</b>'
+expect_body '<b>Mage</b>'; expect_body 'href="#classes"'; expect_no_body 'Difficulty'; expect_no_body 'difficulties'
 expect_body 'Each quadrant is 250 spaces'; expect_body 'href="/help/items"'; expect_body 'href="/ninja"'
 expect_no_body 'help_items.php'
 t_get /help/items;    expect_status 200; expect_body 'Help: Items &amp; Drops'

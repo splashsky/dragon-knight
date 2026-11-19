@@ -65,13 +65,7 @@ function common.to_int(s)
 	return php.mysql_int(n)
 end
 
-function common.to_real(s)
-	local n = tonumber(s) or 0
-	if n ~= n or n == math.huge or n == -math.huge then return 0.0 end
-	return n + 0.0
-end
-
--- Display a DB value in a form field (REAL columns print like PHP: 1.0 -> "1").
+-- Display a DB value in a form field (numbers print like PHP: 1.0 -> "1").
 function common.str(v)
 	return php.str(v)
 end

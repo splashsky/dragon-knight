@@ -16,7 +16,7 @@ TOWN_HOME="currentaction='In Town', latitude=0, longitude=0"
 t_section "town: setup"
 t_jar town
 t_get /inn;                       expect_redirect /login
-t_register townie townpw1 townie@example.com Townie 1 1
+t_register townie townpw1 townie@example.com Townie 1
 t_login townie townpw1;           expect_redirect /
 t_get /;                          expect_body 'Welcome to Midworld'
 TC=$(t_csrf)
@@ -224,7 +224,7 @@ expect_db "currenthp,currentmp" "20|10" "heal capped"
 t_section "town: character + map"
 tu "expbonus=-5, goldbonus=10, level=1, experience=1234, charclass=1"
 t_get /character;                 expect_status 200
-expect_body '<b>Townie</b>'; expect_body 'Class: Mage'; expect_body 'Difficulty: Easy'
+expect_body '<b>Townie</b>'; expect_body 'Class: Mage'; expect_no_body 'Difficulty'
 expect_body 'Experience: 1,234 <span class="light">(-5%)</span>'; expect_body '<span class="light">(+10%)</span>'
 expect_body "Next Level: $(t_sql 'SELECT "1_exp" FROM levels WHERE id = 2')<"
 expect_body 'Heal<br>'; expect_body 'Hurt<br>'; expect_no_body 'Revive<br>'; expect_no_body 'action="/move"'

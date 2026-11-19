@@ -70,7 +70,6 @@ local function register_ctx(values, errors)
 		errors = errors,
 		verifyemail = c.verifyemail == 1,
 		classes = { c.class1name, c.class2name, c.class3name },
-		difficulties = { c.diff1name, c.diff2name, c.diff3name },
 	}
 end
 
@@ -102,7 +101,7 @@ local function register_post(req)
 	local v = {
 		username = field(req, "username"), charname = field(req, "charname"),
 		email1 = field(req, "email1"), email2 = field(req, "email2"),
-		charclass = field(req, "charclass"), difficulty = field(req, "difficulty"),
+		charclass = field(req, "charclass"),
 	}
 	local password1, password2 = field(req, "password1"), field(req, "password2")
 	local errors = {}
@@ -135,18 +134,16 @@ local function register_post(req)
 	if password1 ~= password2 then err("Passwords don't match.") end
 
 	local charclass = math.tointeger(tonumber(v.charclass))
-	local difficulty = math.tointeger(tonumber(v.difficulty))
 	if not charclass or charclass < 1 or charclass > 3 then err("Character Class is invalid.") end
-	if not difficulty or difficulty < 1 or difficulty > 3 then err("Difficulty is invalid.") end
 
 	if #errors > 0 then
 		return view.page(req, "Register", "auth/register", register_ctx(v, errors), PAGE)
 	end
 
 	local verifycode = c.verifyemail == 1 and auth.random_letters(8) or "1"
-	dk.db:exec("INSERT INTO users (regdate, verify, username, password, email, charname, charclass, difficulty) " ..
-						 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode, v.username,
-						 auth.hash_password(password1), v.email1, v.charname, charclass, difficulty)
+	dk.db:exec("INSERT INTO users (regdate, verify, username, password, email, charname, charclass) " ..
+						 "VALUES (?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode, v.username,
+						 auth.hash_password(password1), v.email1, v.charname, charclass)
 
 	local msg
 	if c.verifyemail == 1 then

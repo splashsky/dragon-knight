@@ -25,6 +25,7 @@ changelog.RELEASES = {
 			"Emails (verification, lost password) are written to an outbox folder instead of being sent. Email verification is off by default.",
 			"The forum shows a message when the built-in forum is turned off, and its paging works.",
 			"Admin: removed the page compression option, added paging to the user list, added setting a user's password, fixed swapped labels in the user editor.",
+			"Removed difficulty levels; everyone plays at the original Easy difficulty.",
 			"Fixed the Bris item list so it sells the Buckler and Small Shield.",
 			"The sell-back value of the item you replace now counts toward the shop price.",
 			"Heal spells can't be cast at full HP, in town or in fights, and never lower your HP.",

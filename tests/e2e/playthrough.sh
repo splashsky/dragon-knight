@@ -70,7 +70,7 @@ t_section "playthrough: register + verify"
 t_get /;         expect_redirect /login
 t_get /register; expect_body 'A verification code will be sent'
 mails=$(t_mail_count)
-t_register pthero heropass1 pthero@example.com Wanderer 1 1
+t_register pthero heropass1 pthero@example.com Wanderer 1
 expect_body 'You should receive an Account Verification email'
 [ "$(t_mail_count)" -gt "$mails" ] && t_ok || t_fail "no verification mail"
 MAIL=$(t_mail_latest)

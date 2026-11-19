@@ -16,14 +16,6 @@ combat.MAX_GOLD = 16777215
 combat.MAX_LEVEL = 100
 combat.MAX_FIGHT = 255             -- users.currentfight was TINYINT UNSIGNED (MySQL clamps)
 
--- legacy only scales for difficulty 2 and 3; difficulty 1 ignores diff1mod.
-local function diffmod(v, difficulty, control)
-	if difficulty == 2 then return php.ceil(v * control.diff2mod) end
-	if difficulty == 3 then return php.ceil(v * control.diff3mod) end
-	return v
-end
-combat.diffmod = diffmod
-
 -- Monster level band from the distance to the origin (one mlevel per five spaces).
 function combat.monster_levels(latitude, longitude)
 	if latitude < 0 then latitude = latitude * -1 end
@@ -43,10 +35,9 @@ end
 
 -- New fight against `monster`: monster HP, sleep, immunity, buffs. Returns true when the
 -- player gets to swing first.
-function combat.start(st, monster, control, rand)
+function combat.start(st, monster, rand)
 	st.currentmonster = monster.id
 	st.currentmonsterhp = rand((monster.maxhp / 5) * 4, monster.maxhp)
-	st.currentmonsterhp = diffmod(st.currentmonsterhp, st.difficulty, control)
 	st.currentmonstersleep = 0
 	st.currentmonsterimmune = monster.immune
 	-- fixed: legacy kept the uber buffs of a fight the player ran from or died in.
@@ -65,7 +56,7 @@ end
 -- The monster's turn. `after_spell` selects the variant legacy used after casting a spell
 -- (tohit raised to toblock + 1 instead of clamping the damage; same outcome).
 -- Returns lines, player_died.
-function combat.monster_turn(st, monster, control, rand, after_spell)
+function combat.monster_turn(st, monster, rand, after_spell)
 	local lines = {}
 	if st.currentmonstersleep ~= 0 then -- Check to wake up.
 		if rand(1, 15) > st.currentmonstersleep then
@@ -78,7 +69,6 @@ function combat.monster_turn(st, monster, control, rand, after_spell)
 	if st.currentmonstersleep ~= 0 then return lines, false end
 
 	local tohit = php.ceil(rand(monster.maxdam * .5, monster.maxdam))
-	tohit = diffmod(tohit, st.difficulty, control)
 	local toblock = php.ceil(rand(st.defensepower * .75, st.defensepower) / 4)
 	local damage
 	if rand(1, 150) <= sqrt(st.dexterity) then
@@ -192,14 +182,12 @@ function combat.death(user)
 end
 
 -- Victory rewards. Returns { exp, gold, newexp, newgold, warnexp, warngold }.
-function combat.rewards(user, monster, control, rand)
+function combat.rewards(user, monster, rand)
 	local exp = rand((monster.maxexp / 6) * 5, monster.maxexp)
 	if exp < 1 then exp = 1 end
-	exp = diffmod(exp, user.difficulty, control)
 	if user.expbonus ~= 0 then exp = exp + php.ceil((user.expbonus / 100) * exp) end
 	local gold = rand((monster.maxgold / 6) * 5, monster.maxgold)
 	if gold < 1 then gold = 1 end
-	gold = diffmod(gold, user.difficulty, control)
 	-- fixed: legacy took the gold bonus as a percentage of the experience gained.
 	if user.goldbonus ~= 0 then gold = gold + php.ceil((user.goldbonus / 100) * gold) end
 

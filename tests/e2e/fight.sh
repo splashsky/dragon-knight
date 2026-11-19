@@ -3,7 +3,7 @@ if t_has_sql; then
 
 t_section "fight: setup + guards"
 t_jar fighter
-t_register fighter fightpw fighter@example.com Fighter 2 1   # Warrior, Easy
+t_register fighter fightpw fighter@example.com Fighter 2   # Warrior
 t_login fighter fightpw
 FQ="WHERE username = 'fighter'"
 f_sql() { t_sql "$1 $FQ"; }
@@ -50,7 +50,7 @@ t_get /victory; expect_redirect /
 
 t_section "fight: run away blocked"
 # Lucifuge (maxdam 600): ceil(sqrt(600)) = 25 beats any run roll with dexterity 0 (max 10);
-# no dodge with dexterity 0, and the hit is rand(300,600) - 0 on Easy
+# no dodge with dexterity 0, and the hit is rand(300,600) - 0
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
 	currentmonsterhp = 30000, currentmonstersleep = 0, currentmonsterimmune = 2, dexterity = 0,
 	defensepower = 0, currenthp = 5000, maxhp = 5000, currentuberdefense = 0"

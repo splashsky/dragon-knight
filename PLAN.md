@@ -65,7 +65,8 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, fight, migrate,
                       news, playthrough, town)
-tests/fixtures/       schema_v0.sql: the pre-versioning schema, for the migration test
+tests/fixtures/       schema_v0.sql (pre-versioning), schema_v1.sql: frozen old schemas for
+                      the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
 
@@ -250,6 +251,8 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 - `news` gains `title`, `author_id` (→ `users.id`) and `thread_id` (→ `forum.id`, the
 	post's discussion thread in the News board, created with the post). References to users
 	are `ON DELETE SET NULL`; foreign keys are enforced.
+- No difficulty levels: `control.diff1name`…`diff3mod` and `users.difficulty` are dropped
+	(schema version 2); everyone plays at the original Easy difficulty (no scaling).
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -266,7 +269,8 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
 - Seed data in `app/sql/seed.sql` matches the original install.php "complete setup"
-	exactly (all rows of drops, items, levels, monsters, spells, towns, control).
+	exactly (all rows of drops, items, levels, monsters, spells, towns, control), minus
+	the difficulty settings.
 - Email (registration verification, lost password) is written to
 	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 

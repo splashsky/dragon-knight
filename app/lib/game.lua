@@ -15,9 +15,8 @@ function game.control()
 		cache.control = dk.db:first("SELECT * FROM control WHERE id = 1") or
 			{ id = 1, gamename = "Dragon Knight", gamesize = 250, gameopen = 1, forumtype = 0,
 				forumaddress = "", class1name = "Mage", class2name = "Warrior", class3name = "Paladin",
-				diff1name = "Easy", diff1mod = 1.0, diff2name = "Medium", diff2mod = 1.2,
-				diff3name = "Hard", diff3mod = 1.5, verifyemail = 0, shownews = 0, showbabble = 0,
-				showonline = 0, gameurl = "", adminemail = "" }
+				verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "",
+				adminemail = "" }
 	end
 	return cache.control
 end
@@ -42,20 +41,10 @@ function game.current_town(user)
 	return game.town_at(user.latitude, user.longitude)
 end
 
--- Class / difficulty names from control (nil for out-of-range values, like legacy).
+-- Class name from control (nil for out-of-range values, like legacy).
 function game.class_name(n)
 	local c = game.control()
 	return ({ c.class1name, c.class2name, c.class3name })[tonumber(n)]
-end
-
-function game.difficulty_name(n)
-	local c = game.control()
-	return ({ c.diff1name, c.diff2name, c.diff3name })[tonumber(n)]
-end
-
-function game.difficulty_mod(n)
-	local c = game.control()
-	return ({ c.diff1mod, c.diff2mod, c.diff3mod })[tonumber(n)]
 end
 
 -- Spells the user knows (users.spells comma list), ordered by id; optional type filter

@@ -38,8 +38,8 @@ local function save_death(user, st)
 end
 
 -- Monster's turn + death bookkeeping shared by every branch. Returns lines, died.
-local function monster_turn(user, st, monster, control, after_spell)
-	local lines, died = combat.monster_turn(st, monster, control, rand, after_spell)
+local function monster_turn(user, st, monster, after_spell)
+	local lines, died = combat.monster_turn(st, monster, rand, after_spell)
 	if died then save_death(user, st) end
 	return lines, died
 end
@@ -49,7 +49,6 @@ local function fight(req)
 	if user.currentaction ~= "Fighting" then
 		return error_page(req, "Cheat attempt detected.<br><br>Get a life, loser.")
 	end
-	local control = game.control()
 	local form = req.method == "POST" and req.form or {}
 	local st = {}
 	for k, v in pairs(user) do st[k] = v end
@@ -62,7 +61,7 @@ local function fight(req)
 		if not monster then
 			return error_page(req, "There are no monsters in this area. Please contact the game administrator.")
 		end
-		swing_first = combat.start(st, monster, control, rand)
+		swing_first = combat.start(st, monster, rand)
 	else
 		monster = monster_row(st.currentmonster)
 		if not monster then
@@ -71,7 +70,7 @@ local function fight(req)
 			if not monster then
 				return error_page(req, "There are no monsters in this area. Please contact the game administrator.")
 			end
-			swing_first = combat.start(st, monster, control, rand)
+			swing_first = combat.start(st, monster, rand)
 		end
 	end
 
@@ -90,7 +89,7 @@ local function fight(req)
 		end
 		page.yourturn = { "You tried to run away, but were blocked in front!" }
 		page.monsterhp = st.currentmonsterhp
-		page.monsterturn, died = monster_turn(user, st, monster, control, false)
+		page.monsterturn, died = monster_turn(user, st, monster, false)
 
 	elseif form.fight ~= nil then
 		local killed
@@ -103,7 +102,7 @@ local function fight(req)
 								 st.currentmonster, user.id)
 			return view.redirect("/victory")
 		end
-		page.monsterturn, died = monster_turn(user, st, monster, control, false)
+		page.monsterturn, died = monster_turn(user, st, monster, false)
 
 	elseif form.spell ~= nil then
 		local picked = form.userspell
@@ -130,13 +129,13 @@ local function fight(req)
 				currentmonster = ? WHERE id = ?]], st.currenthp, st.currentmp, st.currentmonster, user.id)
 			return view.redirect("/victory")
 		end
-		page.monsterturn, died = monster_turn(user, st, monster, control, true)
+		page.monsterturn, died = monster_turn(user, st, monster, true)
 
 	elseif not swing_first then
 		-- Do a monster's turn if person lost the chance to swing first.
 		page.yourturn = { "The monster attacks before you are ready!" }
 		page.monsterhp = st.currentmonsterhp
-		page.monsterturn, died = monster_turn(user, st, monster, control, false)
+		page.monsterturn, died = monster_turn(user, st, monster, false)
 
 	else
 		page.monsterhp = st.currentmonsterhp
@@ -164,9 +163,8 @@ local function victory(req)
 	-- fixed: legacy paid out for a missing monster (e.g. /victory right after an encounter
 	-- began, before the monster was picked: currentmonster 0, currentmonsterhp 0).
 	if not monster then return view.redirect("/") end
-	local control = game.control()
 
-	local r = combat.rewards(user, monster, control, rand)
+	local r = combat.rewards(user, monster, rand)
 	local ctx = { monster = monster, r = r }
 	local key = function(stat) return game.level_key(user.charclass, stat) end
 	local up = combat.level_up(user, r.newexp, key, game.level_row)

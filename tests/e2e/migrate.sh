@@ -1,5 +1,6 @@
 # tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
-# (tests/fixtures/schema_v0.sql), the 503 page for an outdated database, and no-op runs.
+# (tests/fixtures/schema_v0.sql) and from version 1 (tests/fixtures/schema_v1.sql), the
+# 503 page for an outdated database, and no-op runs.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
@@ -26,7 +27,7 @@ else
 
 t_section "migrate: fresh install is current"
 CUR_VERSION=$(t_sql "PRAGMA user_version")
-[ "$CUR_VERSION" -ge 1 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
+[ "$CUR_VERSION" -ge 2 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
 "$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
 grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
 [ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
@@ -90,7 +91,8 @@ grep -qF "Database schema version 0; this game uses version $CUR_VERSION (run dk
 [ "$(mig_sql "$MIG_DB" "PRAGMA user_version")" = 0 ] && t_ok || t_fail "--status changed the db"
 
 "$BIN" migrate --config "$MIG/config.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate failed: $(cat "$T/migrate.log")"
-grep -qF 'Migrating to version 1: forum boards' "$T/migrate.log" && t_ok || t_fail "step not reported"
+grep -qF 'Migrating to version 1: forum boards' "$T/migrate.log" && t_ok || t_fail "step 1 not reported"
+grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && t_ok || t_fail "step 2 not reported"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
@@ -155,6 +157,46 @@ if grep -q '\[error\]' "$MIG/server.log"; then
 	t_fail "errors in the second server's log:"; grep -A5 '\[error\]' "$MIG/server.log" | head -20 >&2
 fi
 t_jar default
+
+t_section "migrate: version 1 database"
+# version 1 schema (with difficulty levels) + the game data, a player on each difficulty
+# and the old difficulty settings; only step 2 runs
+V1_DB="$MIG/v1.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V1_DB\"#" "$CONFIG" > "$MIG/v1.lua"
+mig_script "$V1_DB" "$ROOT/tests/fixtures/schema_v1.sql"
+mig_script "$V1_DB" "$T/app/sql/seed.sql"
+cat > "$MIG/v1_data.sql" <<'SQL'
+UPDATE control SET diff1name = 'Easy', diff1mod = 1, diff2name = 'Medium', diff2mod = 1.2,
+	diff3name = 'Hard', diff3mod = 1.5;
+INSERT INTO users (id, username, email, charname, verify, authlevel, difficulty, charclass, gold) VALUES
+	(1, 'easyone', 'e@example.com', 'Easyone', '1', 1, 1, 1, 10),
+	(2, 'medone', 'm@example.com', 'Medone', '1', 0, 2, 2, 20),
+	(3, 'hardone', 'h@example.com', 'Hardone', '1', 0, 3, 3, 30);
+PRAGMA user_version = 1;
+SQL
+mig_script "$V1_DB" "$MIG/v1_data.sql"
+MIG_DB=$V1_DB
+mig_eq "PRAGMA user_version" "1" "fixture is version 1"
+V1_DATA="SELECT id, username, charname, charclass, gold, authlevel FROM users ORDER BY id;
+	SELECT id, gamename, gamesize, gameopen, forumtype, class1name, class2name, class3name, verifyemail FROM control;
+	SELECT count(*) FROM monsters; SELECT count(*) FROM forums"
+before=$(mig_sql "$V1_DB" "$V1_DATA")
+"$BIN" migrate --config "$MIG/v1.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v1) failed: $(cat "$T/migrate.log")"
+grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && t_ok || t_fail "step 2 not reported (v1)"
+grep -qF 'Migrating to version 1' "$T/migrate.log" && t_fail "step 1 ran on a version 1 database" || t_ok
+grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message (v1)"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v1 stamped"
+mig_eq "SELECT count(*) FROM pragma_table_info('control') WHERE name LIKE 'diff%';
+	SELECT count(*) FROM pragma_table_info('users') WHERE name = 'difficulty'" "0
+0" "difficulty columns dropped"
+[ "$(mig_layout "$V1_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v1 schema differs from a fresh install:"
+	diff <(mig_layout "$V1_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v1)"
+[ "$(mig_sql "$V1_DB" "$V1_DATA")" = "$before" ] && t_ok || t_fail "v1 data changed by the migration"
+"$BIN" user --config "$MIG/v1.lua" list >"$T/migrate.log" 2>&1 && grep -q 'hardone' "$T/migrate.log" \
+	&& t_ok || t_fail "dk user list on the migrated v1 database: $(cat "$T/migrate.log")"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

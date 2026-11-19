@@ -52,14 +52,14 @@ admin_eq "SELECT name FROM items WHERE id = 1" "Stick" "item untouched without c
 admin_eq "SELECT count(*) FROM news WHERE content = 'forged'" "0" "news untouched without csrf"
 
 t_section "admin: settings"
-t_get /admin/settings;     expect_status 200; expect_body 'Main Settings'; expect_body 'name="diff2mod" size="3" maxlength="3" value="1.2"'
+t_get /admin/settings;     expect_status 200; expect_body 'Main Settings'; expect_body 'name="gamesize" size="3" maxlength="3" value="250"'
+expect_body 'name="class1name" size="20" maxlength="50" value="Mage"'; expect_no_body 'name="diff'; expect_no_body 'Difficulty'
 expect_no_body 'name="compression"'
-t_form_submit /admin/settings gamename= gamesize=252 forumtype=2 forumaddress= class2name= diff3name= diff2mod= diff3mod=abc
+t_form_submit /admin/settings gamename= gamesize=252 forumtype=2 forumaddress= class2name= class3name=
 expect_status 200
 expect_body 'Game name is required.'; expect_body 'Map size must be divisible by five.'
 expect_body 'You must specify a forum address when using the External setting.'
-expect_body 'Class 2 name is required.'; expect_body 'Difficulty 3 name is required.'
-expect_body 'Difficulty 2 value is required.'; expect_body 'Difficulty 3 value must be a number.'
+expect_body 'Class 2 name is required.'; expect_body 'Class 3 name is required.'; expect_no_body 'Class 1 name'
 expect_no_body 'Map size must be a number.'
 t_form_submit /admin/settings gamesize=abc
 expect_body 'Map size must be a number.'; expect_no_body 'divisible by five'
@@ -68,14 +68,14 @@ expect_body 'Forum Type is invalid.'
 admin_eq "SELECT gamename || '|' || gamesize FROM control" "Dragon Knight|250" "invalid settings not saved"
 
 t_get /admin/settings
-t_form_submit /admin/settings "gamename=Realm <&> Test" gameopen=0 gamesize=200 diff2mod=1.3 diff3mod=2 \
+t_form_submit /admin/settings "gamename=Realm <&> Test" gameopen=0 gamesize=200 class1name=Sorcerer \
 	shownews=1 compression=1 id=5 bogus=1
 expect_redirect '/admin/settings\?saved=1'
 t_get '/admin/settings?saved=1'; expect_body 'Settings updated.'
-expect_body 'value="Realm &lt;&amp;&gt; Test"'; expect_body 'name="diff3mod" size="3" maxlength="3" value="2"'
-admin_eq "SELECT id || '|' || gamename || '|' || gameopen || '|' || gamesize || '|' || diff2mod || '|' || diff3mod || '|' || compression FROM control" \
-	"1|Realm <&> Test|0|200|1.3|2.0|1" "settings saved (compression untouched)"
-admin_eq "SELECT typeof(diff2mod) || typeof(gamesize) FROM control" "realinteger" "settings types"
+expect_body 'value="Realm &lt;&amp;&gt; Test"'; expect_body 'name="gamesize" size="3" maxlength="3" value="200"'
+admin_eq "SELECT id || '|' || gamename || '|' || gameopen || '|' || gamesize || '|' || class1name || '|' || shownews || '|' || compression FROM control" \
+	"1|Realm <&> Test|0|200|Sorcerer|1|1" "settings saved (compression untouched)"
+admin_eq "SELECT typeof(gamesize) || typeof(gameopen) || typeof(class1name) FROM control" "integerintegertext" "settings types"
 t_get /login;              expect_body 'alt="Realm &lt;&amp;&gt; Test"'
 t_jar admtester
 t_get /;                   expect_body 'The game is currently closed for maintanence.'
@@ -84,7 +84,7 @@ t_get /admin;              expect_status 200   # admin works while the game is c
 t_get /admin/monsters
 expect_body 'Highest monster level should be 40, yours is 50.'
 t_get /admin/settings
-t_form_submit /admin/settings gameopen=1 gamesize=250
+t_form_submit /admin/settings gameopen=1 gamesize=250 class1name=Mage
 t_jar admtester
 t_get /;                   expect_no_body 'The game is currently closed'
 t_jar admadmin
@@ -170,6 +170,7 @@ ADM_UID=$(t_sql "SELECT id FROM users WHERE username = 'admtester'")
 ADM_HASH=$(t_sql "SELECT password FROM users WHERE id = $ADM_UID")
 t_get /admin/users;        expect_body "<a href=\"/admin/users/$ADM_UID\">admtester</a>"
 t_get /admin/users/$ADM_UID; expect_body 'Username:'; expect_body 'Current Monster Sleep:'; expect_no_body 'pbkdf2$'
+expect_body 'name="charclass"'; expect_no_body 'name="difficulty"'
 t_form_submit /admin/users/$ADM_UID email= gold=lots
 expect_body 'Email is required.'; expect_body 'Gold must be a number.'
 t_get /admin/users/$ADM_UID

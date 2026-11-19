@@ -18,7 +18,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/schema_v0.sql`) |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/schema_v*.sql`) |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -179,7 +179,7 @@ starting with `__` are reserved.
 | `game.control()` | control row (id 1), cached per request; `game.reload_control()` after updating it |
 | `game.user(id)` | fresh users row |
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
-| `game.class_name(n)`, `game.difficulty_name(n)`, `game.difficulty_mod(n)` | from control (nil if out of range) |
+| `game.class_name(n)` | from control (nil if out of range) |
 | `game.user_spells(user [, type])` | spell rows in `users.spells`, ordered by id (type 1 heal, 2 hurt, 3 sleep, 4 uber damage, 5 uber defense) |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.level_row(level)` | levels row; read stats as `row[game.level_key(class, "exp")]` |
@@ -224,7 +224,7 @@ Game mechanics must match legacy exactly. Use these helpers rather than ad-hoc L
 	float into an integer column (rounded; the unsigned version clamps to 0). SQLite would
 	keep `12.5` as REAL, so convert floats before writing them to INTEGER columns.
 - `php.str(v)`: PHP number-to-string (`1.0` → `"1"`, `1.2` → `"1.2"`). Use it to display
-	REAL columns such as `control.diff2mod`.
+	numbers that may be floats.
 - `php.number_format(n)`, `php.prettydate(ts)`, `php.datetime(ts)`.
 - `php.nl2br(s)` does **not** escape. Templates use `h.nl2br`.
 - `php.explode(sep, s)`, `php.implode(sep, t)`, `php.in_list(list, v)`: comma-list
@@ -279,10 +279,13 @@ To change the schema:
 	 modules that query tables, since they follow the latest schema (pure helpers are fine).
 	 SQLite can't `ADD COLUMN` with `REFERENCES` and a non-NULL default while foreign keys
 	 are on: rebuild the table (create `t_new`, copy, drop, rename, recreate indexes), as
-	 step 1 does for `forum`.
-3. Extend `tests/e2e/migrate.sh`: it builds a version-0 database from
-	 `tests/fixtures/schema_v0.sql`, migrates it, checks the data and compares the column,
-	 foreign key and index layout with a fresh install. Never edit the fixture.
+	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
+	 foreign key, trigger or view uses (step 2).
+3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
+	 `tests/fixtures/schema_v0.sql` (version 0) and `schema_v1.sql` (version 1), migrates
+	 them, checks the data and compares the column, foreign key and index layout with a
+	 fresh install. Never edit the fixtures; add a `schema_vN.sql` copy of the old schema
+	 when a test needs to start from version N.
 
 ## Sessions, CSRF, accounts
 
@@ -331,7 +334,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `expect_status N`, `expect_body text`, `expect_no_body text`, `expect_header regex`, `expect_redirect /path` | assertions; `expect_body` matches raw HTML, so write `'` as `&#39;` |
 | `t_ok` / `t_fail msg` | custom assertions |
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |
-| `t_register user pass email charname [class] [diff]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
+| `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |

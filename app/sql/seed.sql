@@ -1,9 +1,10 @@
 -- Default game data, ported 1:1 from the original install.php ("Complete Setup").
--- Differences: control.verifyemail = 0 (PLAN.md); news.postdate is unix time
--- (2004-01-01 12:00:00 UTC). Dragon's -> Dragon''s (SQL quoting).
+-- Differences: control.verifyemail = 0 (PLAN.md) and no difficulty names/modifiers
+-- (difficulty levels were removed); news.postdate is unix time (2004-01-01 12:00:00 UTC).
+-- Dragon's -> Dragon''s (SQL quoting).
 
 -- control
-INSERT INTO control VALUES (1, 'Dragon Knight', 250, 1, '', '', 1, '', 'Mage', 'Warrior', 'Paladin', 'Easy', '1', 'Medium', '1.2', 'Hard', '1.5', 1, 0, 1, 1, 1);
+INSERT INTO control (id, gamename, gamesize, gameopen, gameurl, adminemail, forumtype, forumaddress, class1name, class2name, class3name, compression, verifyemail, shownews, showbabble, showonline) VALUES (1, 'Dragon Knight', 250, 1, '', '', 1, '', 'Mage', 'Warrior', 'Paladin', 1, 0, 1, 1, 1);
 
 -- drops
 INSERT INTO drops VALUES (1, 'Life Pebble', 1, 1, 'maxhp,10', 'X');

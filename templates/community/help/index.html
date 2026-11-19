@@ -5,7 +5,6 @@
 <ul>
 <li><a href="#intro">Introduction</a></li>
 <li><a href="#classes">Character Classes</a></li>
-<li><a href="#difficulties">Difficulty Levels</a></li>
 <li><a href="#intown">Playing The Game: In Town</a></li>
 <li><a href="#exploring">Playing The Game: Exploring &amp; Fighting</a></li>
 <li><a href="#status">Playing The Game: Status Panels</a></li>
@@ -84,22 +83,6 @@ for the game. If your administrator has used his/her own class setup, this infor
 <li>3 sleep spells</li>
 <li>2 +defense spells</li>
 <li>2 +attack spells</li>
-</ul>
-[ <a href="#top">Top</a> ]
-
-<br><br><hr>
-
-<h3 id="difficulties">Difficulty Levels</h3>
-<i>{{ gamename }}</i> includes the ability to play using one of three difficulty levels.
-All monster statistics in the game are set at a base number. However, using a difficulty multiplier, certain statistics
-are increased. The amount of hit points a monster has goes up, which means it will take longer to kill. But the amount
-of experience and gold you gain from killing it also goes up. So the game is a little bit harder, but it is also more
-rewarding. The following are the three difficulty levels and their statistic multiplier, which applies to the monster's
-HP, experience drop, and gold drop.
-<ul>
-{%- for _, d in ipairs(difficulties) do %}
-<li>{{ d.name }}: <b>{{ d.mod }}</b></li>
-{%- end %}
 </ul>
 [ <a href="#top">Top</a> ]
 
