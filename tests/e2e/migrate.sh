@@ -1,7 +1,8 @@
 # tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
-# (tests/fixtures/schema_v0.sql) and from versions 1 to 4 (tests/fixtures/schema_vN.sql,
-# with the game data of that time, tests/fixtures/seed_v3.sql and seed_v4.sql), the 503
-# page for an outdated database, and no-op runs.
+# (tests/fixtures/schema_v0.sql) and from versions 1 to 5 (tests/fixtures/schema_vN.sql,
+# with the game data of that time, tests/fixtures/seed_v3.sql, seed_v4.sql and
+# seed_v5.sql), the 503 page for an outdated database, and no-op runs. Version 5 -> 6
+# checks that every character's effective stats are the same before and after.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
@@ -21,9 +22,17 @@ mig_layout() {
 		SELECT m.name, i.name, c.seqno, c.name FROM sqlite_master m, pragma_index_list(m.name) i,
 			pragma_index_info(i.name) c WHERE m.type = 'table' ORDER BY 1, 2, 3;"
 }
-# users columns other than the dropped spells list, as a SELECT list (of database $1).
-mig_user_cols() {
-	mig_sql "$1" "SELECT group_concat('\"' || name || '\"', ', ') FROM pragma_table_info('users') WHERE name <> 'spells'"
+# The users rows of database $1 (the columns every version has, max HP/MP/TP under their
+# name of the time: base_maxhp since version 6, the same for characters without gear).
+MIG_USERS_COMMON="id, username, password, email, verify, charname, regdate, onlinetime, authlevel, latitude,
+	longitude, charclass, currentaction, currentfight, currentmonster, currentmonsterhp, currentmonstersleep,
+	currentmonsterimmune, currentuberdamage, currentuberdefense, currenthp, currentmp, currenttp, level, gold,
+	experience, strength, dexterity, dropcode, towns"
+mig_users() {
+	local max="maxhp, maxmp, maxtp"
+	[ "$(mig_sql "$1" "SELECT count(*) FROM pragma_table_info('users') WHERE name = 'base_maxhp'")" = 1 ] \
+		&& max="base_maxhp, base_maxmp, base_maxtp"
+	mig_sql "$1" "SELECT $MIG_USERS_COMMON, $max FROM users ORDER BY id"
 }
 # mig_serve CONFIG LOG: start a server on another database and point the t_* helpers at it;
 # mig_unserve LOG: stop it (failing on errors in its log) and point them back.
@@ -50,6 +59,8 @@ mig_unserve() {
 }
 # The spells as data (the same on a fresh install and a migrated database without edits).
 MIG_SPELLS="SELECT * FROM spells ORDER BY id"
+# The items and what towns sell (the same on a fresh install and a migrated database without edits).
+MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id"
 # The classes as data (the same on a fresh install and a migrated database without edits).
 MIG_CLASSES="SELECT * FROM classes ORDER BY id; SELECT * FROM class_levels ORDER BY class_id, level;
 	SELECT * FROM class_spells ORDER BY class_id, level, spell_id"
@@ -79,7 +90,7 @@ CUR_VERSION=$(t_sql "PRAGMA user_version")
 [ "$CUR_VERSION" -ge 3 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
 "$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
 grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
-grep -qF "Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
+grep -qF "Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 68, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
 [ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
 
 t_section "migrate: version checks on every request"
@@ -153,7 +164,9 @@ grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && 
 grep -qF 'Migrating to version 3: experience, TP and HP milestones' "$T/migrate.log" && t_ok || t_fail "step 3 not reported"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported"
 grep -qF 'Migrating to version 5: spells are content files with effects' "$T/migrate.log" && t_ok || t_fail "step 5 not reported"
-grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
+grep -qF 'Migrating to version 6: items and drops are content files' "$T/migrate.log" && t_ok || t_fail "step 6 not reported"
+grep -qF 'Converted the stats of 3 characters to base stats (verified); 0 keep extra attack/defense power.' "$T/migrate.log" && t_ok || t_fail "stats conversion not reported"
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 68, 0 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
@@ -167,6 +180,8 @@ mig_layout "$MIG_DB" | grep -q '^forum|8|board|INTEGER|1|1|0$' && t_ok || t_fail
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's"
+mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's"
+mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name IN ('items', 'drops')" "0" "items ids are plain rowids now"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name = 'spells'" "0" "spells ids are plain rowids now"
 mig_eq "SELECT count(*) FROM content_overrides; SELECT count(*) FROM content_adopt" "0
 0" "stock data: no overrides"
@@ -289,10 +304,10 @@ SQL
 mig_script "$V2_DB" "$MIG/v2_data.sql"
 MIG_DB=$V2_DB
 mig_eq "PRAGMA user_version" "2" "fixture is version 2"
-V2_DATA="SELECT $(mig_user_cols "$V2_DB") FROM users ORDER BY id; SELECT id, gamename, gamesize, gameopen, gameurl, adminemail,
+V2_DATA="SELECT id, gamename, gamesize, gameopen, gameurl, adminemail,
 	forumtype, forumaddress, compression, verifyemail, shownews, showbabble, showonline FROM control;
 	SELECT count(*) FROM monsters"
-before=$(mig_sql "$V2_DB" "$V2_DATA")
+before=$(mig_sql "$V2_DB" "$V2_DATA"; mig_users "$V2_DB")
 "$BIN" migrate --config "$MIG/v2.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v2) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 3: experience, TP and HP milestones per level are formulas (edited exp/tp values are discarded)' \
 	"$T/migrate.log" && t_ok || t_fail "step 3 not reported (v2)"
@@ -311,7 +326,7 @@ mig_eq "$MIG_LEVELS_V4" "$(mig_sql "$MIG/fresh.db" "$MIG_LEVELS_V4" | sed \
 mig_eq "SELECT key || '|' || field || '|' || value FROM content_overrides ORDER BY key, field" \
 	"mage|levels.5.hp|7
 warrior|levels.20.hp|3" "edited levels kept as overrides (v2)"
-[ "$(mig_sql "$V2_DB" "$V2_DATA")" = "$before" ] && t_ok || t_fail "v2 data changed by the migration"
+[ "$(mig_sql "$V2_DB" "$V2_DATA"; mig_users "$V2_DB")" = "$before" ] && t_ok || t_fail "v2 data changed by the migration"
 
 t_section "migrate: version 3 database"
 # version 3 schema + its game data with admin edits to the class names and the levels
@@ -337,12 +352,11 @@ mig_script "$V3_DB" "$MIG/v3_data.sql"
 MIG_DB=$V3_DB
 mig_eq "PRAGMA user_version" "3" "fixture is version 3"
 V3_LEVELS=$(mig_sql "$V3_DB" "$MIG_LEVELS_V3")
-V3_COLS=$(mig_user_cols "$V3_DB")
-V3_USERS=$(mig_sql "$V3_DB" "SELECT $V3_COLS FROM users ORDER BY id")
+V3_USERS=$(mig_users "$V3_DB")
 "$BIN" migrate --config "$MIG/v3.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v3) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported (v3)"
 grep -qE 'Migrating to version [123]:' "$T/migrate.log" && t_fail "steps 1-3 ran on a version 3 database" || t_ok
-grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides).' "$T/migrate.log" \
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides; items: 68, 0 new, 0 retired).' "$T/migrate.log" \
 	&& t_ok || t_fail "sync report (v3): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v3 stamped"
 [ "$(mig_layout "$V3_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -367,7 +381,7 @@ paladin|name|Templar
 warrior|levels.3.spells|pain
 warrior|levels.3.strength|30" "admin edits are overrides"
 mig_eq "SELECT count(*) FROM content_adopt" "0" "adoptions done"
-mig_eq "SELECT $V3_COLS FROM users ORDER BY id" "$V3_USERS" "users unchanged (v3)"
+[ "$(mig_users "$V3_DB")" = "$V3_USERS" ] && t_ok || t_fail "users changed (v3)"
 # War (level 2, "0,1") knows Heal, learned at level 2 like the Warrior schedule says
 mig_eq "SELECT user_id || '|' || spell_id || '|' || learned_level FROM user_spells" "2|1|2" "known spells (v3)"
 # a second sync changes nothing
@@ -387,7 +401,7 @@ t_login wiz v3pass1; expect_redirect /
 t_get /character;  expect_body 'Class: Wizard'
 mig_sql "$V3_DB" "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmonster = 1, currentmonsterhp = 0 WHERE id = 1"
 t_get /victory;    expect_status 200; expect_body 'You have gained a level!'
-mig_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || coalesce($T_KNOWN, '') FROM users WHERE id = 1" \
+mig_eq "SELECT level || '|' || experience || '|' || base_maxhp || '|' || base_maxmp || '|' || base_maxtp || '|' || coalesce($T_KNOWN, '') FROM users WHERE id = 1" \
 	"2|15|24|5|11|" "level-up with the migrated gains"
 mig_unserve "$MIG/v3server.log"
 
@@ -418,15 +432,14 @@ SQL
 mig_script "$V4_DB" "$MIG/v4_data.sql"
 MIG_DB=$V4_DB
 mig_eq "PRAGMA user_version" "4" "fixture is version 4"
-V4_COLS=$(mig_user_cols "$V4_DB")
-V4_USERS=$(mig_sql "$V4_DB" "SELECT $V4_COLS FROM users ORDER BY id")
+V4_USERS=$(mig_users "$V4_DB")
 "$BIN" migrate --config "$MIG/v4.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v4) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 5: spells are content files with effects; the spells characters know move to user_spells' \
 	"$T/migrate.log" && t_ok || t_fail "step 5 not reported (v4)"
 grep -qE 'Migrating to version [1234]:' "$T/migrate.log" && t_fail "steps 1-4 ran on a version 4 database" || t_ok
 grep -qF "warning: spell 7 (Pain) had its type changed to 4; it keeps the effect of app/content/spells/pain.lua" \
 	"$T/migrate.log" && t_ok || t_fail "type change not reported: $(cat "$T/migrate.log")"
-grep -qF 'Content synced (spells: 19, 0 new, 1 retired, 3 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides).' \
+grep -qF 'Content synced (spells: 19, 0 new, 1 retired, 3 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides; items: 68, 0 new, 0 retired).' \
 	"$T/migrate.log" && t_ok || t_fail "sync report (v4): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v4 stamped"
 [ "$(mig_layout "$V4_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -461,7 +474,7 @@ mig_eq "SELECT user_id || '|' || spell_id || '|' || coalesce(learned_level, '-')
 2|1|-
 2|7|-
 4|2|-" "known spells (v4)"
-mig_eq "SELECT $V4_COLS FROM users ORDER BY id" "$V4_USERS" "users otherwise unchanged (v4)"
+[ "$(mig_users "$V4_DB")" = "$V4_USERS" ] && t_ok || t_fail "users otherwise changed (v4)"
 "$BIN" content status --config "$MIG/v4.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk content status (v4)"
 grep -qF 'spells: 19 files, 20 in the database (1 retired), 3 overrides' "$T/migrate.log" && t_ok || t_fail "status (v4): $(cat "$T/migrate.log")"
 grep -qF 'The database is in sync with the content files' "$T/migrate.log" && t_ok || t_fail "status in sync (v4): $(cat "$T/migrate.log")"
@@ -480,6 +493,150 @@ t_get /fight;      expect_body '<option value="20">Fireball</option>'
 t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'You have cast the Fireball spell for'
 mig_unserve "$MIG/v4server.log"
 
+t_section "migrate: version 5 database"
+# version 5 schema + its game data (items, drops, towns.itemslist), admin edits to items,
+# drops and a town, admin-added items, and characters with gear, drops (negative ones too),
+# bonuses, a pending drop, and stored stats the original's arithmetic left inconsistent;
+# only step 6 runs. Every character's effective stats must be the same before and after.
+V5_DB="$MIG/v5.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V5_DB\"#" "$CONFIG" > "$MIG/v5.lua"
+mig_script "$V5_DB" "$ROOT/tests/fixtures/schema_v5.sql"
+mig_script "$V5_DB" "$ROOT/tests/fixtures/seed_v5.sql"
+cat > "$MIG/v5_data.sql" <<'SQL'
+UPDATE items SET name = 'Twig', buycost = 12 WHERE id = 1;
+UPDATE items SET attribute = 120 WHERE id = 12;
+UPDATE items SET special = 'expbonus,-8' WHERE id = 13;
+UPDATE items SET special = 'X' WHERE id = 15;
+UPDATE items SET special = 'maxhp,20' WHERE id = 18;
+UPDATE items SET special = 'gold,100' WHERE id = 19;
+UPDATE items SET type = 1 WHERE id = 30;
+UPDATE drops SET mlevel = 2, attribute2 = 'dexterity,5' WHERE id = 1;
+UPDATE drops SET name = 'Fortune Stone' WHERE id = 32;
+INSERT INTO items (id, type, name, buycost, attribute, special) VALUES (34, 1, 'Custom Blade', 99, 7, 'strength,3');
+INSERT INTO drops (id, name, mlevel, type, attribute1, attribute2) VALUES (33, 'Odd Gem', 3, 1, 'maxtp,5', 'X');
+UPDATE towns SET itemslist = '0,1,34,2' WHERE id = 1;
+INSERT INTO users (id, username, email, charname, verify, authlevel, charclass, level, currenthp, maxhp, maxmp, maxtp,
+	strength, dexterity, attackpower, defensepower, expbonus, goldbonus, weaponid, armorid, shieldid, slot1id, slot2id,
+	slot3id, weaponname, armorname, shieldname, slot1name, slot2name, slot3name, dropcode) VALUES
+	(1, 'gearhead', 'g@example.com', 'Gearhead', '1', 1, 1, 30, 90, 100, 50, 40, 130, 70, 380, 370, 10, 10,
+		16, 27, 33, 13, 32, 31, 'Destiny Blade', 'Destiny Raiment', 'Destiny Aegis', 'Demon''s Sin', 'Fortune Drop', 'Memory Drop', 0),
+	(2, 'negative', 'n@example.com', 'Negative', '1', 0, 2, 45, 0, 0, 0, 10, 105, 5, 105, 5, 0, 0,
+		0, 0, 0, 15, 0, 0, 'None', 'None', 'None', 'Demon''s Lie', 'None', 'None', 7),
+	(3, 'oddone', 'o@example.com', 'Oddone', '1', 0, 3, 3, 15, 15, 0, 10, 10, 7, 20, 12, 0, 0,
+		1, 18, 0, 0, 0, 0, 'Stick', 'Clothes', 'None', 'None', 'None', 'None', 0),
+	(4, 'custom', 'c@example.com', 'Custom', '1', 0, 1, 2, 15, 15, 0, 15, 8, 5, 15, 5, 0, 0,
+		34, 0, 0, 33, 0, 0, 'Custom Blade', 'None', 'None', 'Odd Gem', 'None', 'None', 0),
+	(5, 'plain', 'p@example.com', 'Plain', '1', 0, 1, 1, 15, 15, 0, 10, 5, 5, 5, 5, 5, -3,
+		0, 0, 0, 0, 0, 0, 'None', 'None', 'None', 'None', 'None', 'None', 0),
+	(6, 'typo', 't@example.com', 'Typo', '1', 0, 2, 4, 15, 15, 0, 10, 5, 5, 15, 5, 0, 0,
+		30, 0, 0, 0, 0, 0, 'Small Shield', 'None', 'None', 'None', 'None', 'None', 0),
+	(7, 'swordy', 's@example.com', 'Swordy', '1', 0, 1, 20, 15, 15, 0, 10, 5, 5, 130, 7, -8, 10,
+		13, 17, 0, 0, 0, 0, 'Dark Sword', 'Skivvies', 'None', 'None', 'None', 'None', 0),
+	(8, 'leather', 'l@example.com', 'Leather', '1', 0, 1, 5, 15, 15, 0, 10, 5, 5, 5, 15, 0, 0,
+		0, 19, 0, 0, 0, 0, 'None', 'Leather Armor', 'None', 'None', 'None', 'None', 0);
+PRAGMA user_version = 5;
+SQL
+mig_script "$V5_DB" "$MIG/v5_data.sql"
+MIG_DB=$V5_DB
+mig_eq "PRAGMA user_version" "5" "fixture is version 5"
+V5_STATS="SELECT 'Max HP ' || maxhp || ', Max MP ' || maxmp || ', Max TP ' || maxtp || ', Strength ' || strength ||
+	', Dexterity ' || dexterity || ', Attack Power ' || attackpower || ', Defense Power ' || defensepower ||
+	', Experience Bonus ' || expbonus || '%, Gold Bonus ' || goldbonus || '%' FROM users ORDER BY id"
+V5_BEFORE=$(mig_sql "$V5_DB" "$V5_STATS")
+V5_KEPT="SELECT id, username, password, email, charname, authlevel, charclass, level, gold, experience, currenthp,
+	currentmp, currenttp, currentaction, latitude, longitude, towns FROM users ORDER BY id"
+V5_USERS=$(mig_sql "$V5_DB" "$V5_KEPT")
+"$BIN" migrate --config "$MIG/v5.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v5) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version [12345]:' "$T/migrate.log" && t_fail "steps 1-5 ran on a version 5 database" || t_ok
+for line in 'Migrating to version 6: items and drops are content files; inventories (user_items), shop lists (town_items) and base stats' \
+	'Converted the stats of 8 characters to base stats (verified); 1 keep extra attack/defense power.' \
+	'note: character Oddone (user 3) keeps 8 attack and 0 defense power that strength, dexterity and gear don'"'"'t give' \
+	'warning: item 19 (Leather Armor) has the special "gold,100", which is not a stat' \
+	'warning: item 30 (Small Shield) had its type changed to 1; it keeps the category of app/content/items/small_shield.lua' \
+	'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 68, 0 new, 2 retired, 11 earlier admin edits kept as overrides).' \
+	'warning: character Typo (user 6): the items'"'"' new values changed attack, defense; base stats adjusted to keep them'; do
+	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v5) output lacks: $line
+$(cat "$T/migrate.log")"
+done
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v5 stamped"
+[ "$(mig_layout "$V5_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v5 schema differs from a fresh install:"
+	diff <(mig_layout "$V5_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v5)"
+mig_eq "SELECT count(*) FROM sqlite_master WHERE name IN ('drops', 'v6_expected')" "0" "drops table dropped, temp table gone"
+mig_eq "$V5_KEPT" "$V5_USERS" "users otherwise unchanged (v5)"
+# the edits are overrides; the admin-added rows are retired items (69, 70), kept for their owners
+mig_eq "SELECT key || '|' || field || '|' || value FROM content_overrides WHERE kind = 'items' ORDER BY key, field" \
+	"clothes|modifiers.1.amount|20
+clothes|modifiers.1.stat|maxhp
+dark_axe|attack|120
+dark_sword|modifiers.1.amount|-8
+fortune_drop|name|Fortune Stone
+life_pebble|drop_level|2
+life_pebble|modifiers.2.amount|5
+life_pebble|modifiers.2.stat|dexterity
+magic_sword|modifiers.1.amount|0
+stick|name|Twig
+stick|price|12" "item edits kept as overrides"
+mig_eq "SELECT id || '|' || key || '|' || name || '|' || category || '|' || attack || '|' || modifiers || '|' || coalesce(drop_level, '-') || '|' || retired FROM items WHERE id > 68 ORDER BY id" \
+	"69|item_34|Custom Blade|weapon|7|stat stat=strength amount=3|-|1
+70|drop_33|Odd Gem|accessory|0|stat stat=maxtp amount=5|3|1" "admin-added items"
+V5_EDITED="'stick', 'dark_axe', 'dark_sword', 'clothes', 'magic_sword', 'life_pebble', 'fortune_drop'"
+mig_eq "SELECT * FROM items WHERE id <= 68 AND key NOT IN ($V5_EDITED) ORDER BY id" \
+	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM items WHERE key NOT IN ($V5_EDITED) ORDER BY id")" "unedited items equal a fresh install's"
+mig_eq "SELECT name || '|' || price || '|' || modifiers FROM items WHERE key IN ('stick', 'clothes', 'magic_sword') ORDER BY id" \
+	"Twig|12|
+Magic Sword|10000|stat stat=maxmp amount=0
+Clothes|50|stat stat=maxhp amount=20" "edited items"
+mig_eq "SELECT town_id || '|' || item_id FROM town_items WHERE town_id = 1 ORDER BY item_id" "1|1
+1|2
+1|66
+1|69" "Midworld's edited list (and the new Herbs)"
+mig_eq "SELECT * FROM town_items WHERE town_id > 1 ORDER BY town_id, item_id" \
+	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM town_items WHERE town_id > 1 ORDER BY town_id, item_id")" "other shops equal a fresh install's"
+# equipment and drops became user_items, the pending drop its item id
+mig_eq "SELECT id || ':' || coalesce($T_ITEMS, '') || ':' || dropcode FROM users ORDER BY id" \
+	"1:destiny_blade@weapon,destiny_raiment@armor,destiny_aegis@shield,demons_sin@accessory1,fortune_drop@accessory2,memory_drop@accessory3:0
+2:demons_lie@accessory1:40
+3:stick@weapon,clothes@armor:0
+4:item_34@weapon,drop_33@accessory1:0
+5::0
+6:small_shield@weapon:0
+7:dark_sword@weapon,skivvies@armor:0
+8:leather_armor@armor:0" "inventories"
+mig_eq "SELECT id || '|' || base_maxhp || '|' || strength || '|' || dexterity || '|' || base_attack || '|' || base_defense || '|' || base_exp_bonus || '|' || base_gold_bonus FROM users ORDER BY id" \
+	"1|100|30|20|0|0|0|0
+2|100|5|5|0|0|0|0
+3|-5|10|7|8|0|0|0
+4|15|5|5|0|0|0|0
+5|15|5|5|0|0|5|-3
+6|15|5|5|10|-10|0|0
+7|15|5|5|0|0|0|0
+8|15|5|5|0|0|0|0" "base stats"
+# the game computes the same effective stats as were stored before (admin user editor)
+mig_serve "$MIG/v5.lua" "$MIG/v5server.log"
+"$BIN" user --config "$MIG/v5.lua" passwd gearhead v5pass1 >/dev/null && t_ok || t_fail "dk user passwd (v5)"
+t_jar migv5
+t_login gearhead v5pass1; expect_redirect /
+after=
+for id in 1 2 3 4 5 6 7 8; do
+	t_get "/admin/users/$id"
+	after+="$(grep -o 'Max HP [0-9-]*, Max MP .*Gold Bonus [0-9-]*%' "$BODY")"$'\n'
+done
+[ "${after%$'\n'}" = "$V5_BEFORE" ] && t_ok || {
+	t_fail "effective stats changed by the migration:"
+	diff <(printf '%s\n' "$V5_BEFORE") <(printf '%s' "$after") >&2
+}
+t_get /character;  expect_body 'Attack Power: 380<'; expect_body 'Defense Power: 370<'; expect_body 'Slot 2: Fortune Stone'
+expect_body 'Experience: 0 <span class="light">(+10%)</span>'
+expect_stats "100 50 40 130 70 380 370" "gearhead"
+t_get /inventory;  expect_body 'Demon&#39;s Sin'
+t_post /inventory/unequip/accessory1 "csrf=$(t_csrf)"; expect_body 'You took off the Demon&#39;s Sin.'
+expect_stats "150 50 40 80 70 330 370" "without the Demon's Sin"
+mig_unserve "$MIG/v5server.log"
+"$BIN" migrate --config "$MIG/v5.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v5)"
+
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"
 "$BIN" install --config "$MIG/partial.lua" --partial --admin part part@example.com partpw --charname Parter \
@@ -490,6 +647,7 @@ mig_eq "SELECT count(*) FROM forums" "2" "partial install has the boards"
 mig_eq "SELECT count(*) FROM towns" "0" "partial install has no game data"
 mig_eq "SELECT count(*) || '|' || (SELECT count(*) FROM class_levels) FROM classes" "3|297" "partial install has the classes"
 mig_eq "SELECT count(*) || '|' || max(id) || '|' || sum(effects <> '') FROM spells" "19|19|19" "partial install has the spells"
+mig_eq "SELECT count(*) || '|' || max(id) || '|' || (SELECT count(*) FROM town_items) FROM items" "68|68|0" "partial install has the items, no shops"
 mig_eq "SELECT f.board || '|' || f.author || '|' || (f.author_id = n.author_id) FROM news n JOIN forum f ON f.id = n.thread_id" \
 	"2|Parter|1" "partial install news thread"
 "$BIN" install --config "$MIG/partial.lua" --force --admin part part@example.com partpw \

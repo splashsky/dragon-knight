@@ -5,29 +5,13 @@
 local classes = require("lib.classes")
 local effects = require("lib.effects")
 local game = require("lib.game")
+local items = require("lib.items")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 local spells = require("lib.spells")
 local view = require("lib.view")
 
 local help = {}
-
-local SPECIAL_NAMES = {
-	maxhp = "Max HP", maxmp = "Max MP", maxtp = "Max TP",
-	goldbonus = "Gold Bonus (%)", expbonus = "Experience Bonus (%)",
-	strength = "Strength", dexterity = "Dexterity",
-	attackpower = "Attack Power", defensepower = "Defense Power",
-}
-
--- "maxhp,10" -> "Max HP +10"; "X" -> nil (shown as a light "None").
-function help.special(s)
-	if s == "X" then return nil end
-	local parts = php.explode(",", s)
-	local value = parts[2] or ""
-	local n = tonumber(value)
-	if n and n > 0 then value = "+" .. value end
-	return (SPECIAL_NAMES[parts[1]] or parts[1]) .. " " .. value
-end
 
 local function page(req, subtitle, template, ctx)
 	local control = game.control()
@@ -56,19 +40,32 @@ function help.index(req)
 	})
 end
 
+-- One table per item category (items.CATEGORIES order): gear with its power and modifiers,
+-- drops with their monster level, consumables with what they do.
 function help.items(req)
-	local items = {}
-	for _, it in ipairs(dk.db:query("SELECT * FROM items ORDER BY id")) do
-		local image, power = "shield", "Defense"
-		if it.type == 1 then image, power = "weapon", "Attack"
-		elseif it.type == 2 then image = "armor" end
-		items[#items + 1] = { item = it, image = image, power = power, special = help.special(it.special) }
+	local groups, by_cat = {}, {}
+	for _, cat in ipairs(items.CATEGORIES) do
+		by_cat[cat] = { category = cat, heading = items.HEADINGS[cat], rows = {} }
+		groups[#groups + 1] = by_cat[cat]
 	end
-	local drops = {}
-	for _, d in ipairs(dk.db:query("SELECT * FROM drops ORDER BY id")) do
-		drops[#drops + 1] = { drop = d, attr1 = help.special(d.attribute1), attr2 = help.special(d.attribute2) }
+	for _, it in ipairs(items.active()) do
+		local g = by_cat[it.category] or by_cat.misc
+		local power
+		if it.slot == "weapon" or it.attack ~= 0 then
+			power = it.attack .. " Attack Power"
+		elseif it.slot == "armor" or it.slot == "shield" or it.defense ~= 0 then
+			power = it.defense .. " Defense Power"
+		end
+		g.rows[#g.rows + 1] = {
+			item = it, image = ({ weapon = "weapon", armor = "armor", shield = "shield" })[it.slot],
+			power = power, special = items.special_lines(it), effects = items.effect_lines(it),
+		}
 	end
-	return page(req, "Items & Drops", "community/help/items", { items = items, drops = drops })
+	local out = {}
+	for _, g in ipairs(groups) do
+		if #g.rows > 0 then out[#out + 1] = g end
+	end
+	return page(req, "Items & Drops", "community/help/items", { groups = out })
 end
 
 -- Type and attribute columns per effect (most spells have one).

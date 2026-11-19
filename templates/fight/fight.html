@@ -25,6 +25,12 @@
 <option value="{{ s.id }}">{{ s.name }}</option>
 {%- end %}
 </select> <input type="submit" name="spell" value="Spell"></p>
+<p><select name="useritem" aria-label="Item"><option value="0">Choose One</option>
+{%- if #items == 0 then %}<option value="0">None</option>{% end %}
+{%- for _, it in ipairs(items) do %}
+<option value="{{ it.id }}">{{ it.name }} (x{{ it.qty }})</option>
+{%- end %}
+</select> <input type="submit" name="item" value="Use Item"></p>
 <p><input type="submit" name="run" value="Run"></p>
 </form>
 {%- end %}

@@ -147,11 +147,11 @@ local function register_post(req)
 	local verifycode = c.verifyemail == 1 and auth.random_letters(8) or "1"
 	local st = classes.start_stats(class)
 	dk.db:exec("INSERT INTO users (regdate, verify, username, password, email, charname, charclass, " ..
-						 "currenthp, maxhp, currentmp, maxmp, currenttp, maxtp, strength, dexterity, attackpower, " ..
-						 "defensepower) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode,
+						 "currenthp, base_maxhp, currentmp, base_maxmp, currenttp, base_maxtp, strength, dexterity) " ..
+						 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", dk.now(), verifycode,
 						 v.username, auth.hash_password(password1), v.email1, v.charname, class.id,
-						 st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp, st.strength,
-						 st.dexterity, st.attackpower, st.defensepower)
+						 st.currenthp, st.base_maxhp, st.currentmp, st.base_maxmp, st.currenttp, st.base_maxtp, st.strength,
+						 st.dexterity)
 
 	local msg
 	if c.verifyemail == 1 then

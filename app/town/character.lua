@@ -3,6 +3,7 @@
 local classes = require("lib.classes")
 local common = require("town.common")
 local game = require("lib.game")
+local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 local spells = require("lib.spells")
@@ -18,6 +19,7 @@ end
 
 local function sheet(user)
 	local class = classes.get(user.charclass)
+	local s = game.stats(user)
 	local nextlevel
 	-- fixed: legacy showed "Next Level: None" already at level 99.
 	if user.level < leveling.MAX_LEVEL and class then
@@ -27,10 +29,12 @@ local function sheet(user)
 	for _, s in ipairs(spells.known(user)) do names[#names + 1] = s.name end
 	return {
 		u = user,
+		s = s,
+		equipment = inventory.names(user.id),
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),
-		plusexp = bonus(user.expbonus),
-		plusgold = bonus(user.goldbonus),
+		plusexp = bonus(s.exp_bonus_pct),
+		plusgold = bonus(s.gold_bonus_pct),
 		nextlevel = nextlevel,
 		charclass = class and class.name,
 		spells = names,

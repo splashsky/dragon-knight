@@ -63,14 +63,13 @@ function classes.name(id)
 	return c and c.name
 end
 
--- users columns of a new character of class `c`.
+-- users columns of a new character of class `c` (base stats, lib/stats.lua).
 function classes.start_stats(c)
 	return {
-		currenthp = c.start_hp, maxhp = c.start_hp,
-		currentmp = c.start_mp, maxmp = c.start_mp,
-		currenttp = c.start_tp, maxtp = c.start_tp,
+		currenthp = c.start_hp, base_maxhp = c.start_hp,
+		currentmp = c.start_mp, base_maxmp = c.start_mp,
+		currenttp = c.start_tp, base_maxtp = c.start_tp,
 		strength = c.start_strength, dexterity = c.start_dexterity,
-		attackpower = c.start_strength, defensepower = c.start_dexterity,
 	}
 end
 

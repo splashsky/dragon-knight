@@ -1,12 +1,15 @@
 -- routes/fight.lua :: fighting, victory, item drops, death (port of legacy fight.php).
---   GET/POST /fight   fight() -- POST buttons: fight | spell (+ userspell) | run
+--   GET/POST /fight   fight() -- POST buttons: fight | spell (+ userspell) | item (+ useritem) | run
 --   GET      /victory victory()
---   GET/POST /drop    drop()  -- POST: slot (1-3)
+--   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
 -- The dice and formulas live in fight/combat.lua; this module loads and saves state.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
 local combat = require("fight.combat")
+local game = require("lib.game")
+local inventory = require("lib.inventory")
+local items = require("lib.items")
 local php = require("lib.php")
 local spells = require("lib.spells")
 local view = require("lib.view")
@@ -45,14 +48,31 @@ local function monster_turn(user, st, monster, after_spell)
 	return lines, died
 end
 
+-- The fight's "Use item" list: consumables in the bag usable in fights, one line per item
+-- with the quantity over all its stacks.
+local function usable_items(user)
+	local out, by_id = {}, {}
+	for _, e in ipairs(inventory.bag(user.id)) do
+		if items.usable(e.item, "fight") then
+			local line = by_id[e.item.id]
+			if not line then
+				line = { id = e.item.id, name = e.item.name, qty = 0 }
+				by_id[e.item.id] = line
+				out[#out + 1] = line
+			end
+			line.qty = line.qty + e.qty
+		end
+	end
+	return out
+end
+
 local function fight(req)
 	local user = req.user
 	if user.currentaction ~= "Fighting" then
 		return error_page(req, "Cheat attempt detected.<br><br>Get a life, loser.")
 	end
 	local form = req.method == "POST" and req.form or {}
-	local st = {}
-	for k, v in pairs(user) do st[k] = v end
+	local st = game.player(user)
 
 	-- First, check to see if we need to pick a monster.
 	local swing_first = true
@@ -131,6 +151,31 @@ local function fight(req)
 		end
 		page.monsterturn, died = monster_turn(user, st, monster, true)
 
+	elseif form.item ~= nil then
+		-- a consumable from the bag: costs the turn like a spell (refusals cost nothing)
+		local picked = form.useritem
+		if picked == nil or php.intval(picked) == 0 then
+			return error_page(req, "You must select an item first. Please go back and try again.")
+		end
+		-- validated server-side: an integer item id with a stack in the user's bag
+		local item_id = math.tointeger(tonumber(picked))
+		local entry = item_id and inventory.find(user.id, item_id)
+		if not entry then
+			return error_page(req, "You do not have this item. Please go back and try again.")
+		end
+		local refused = combat.use_error(st, entry.item)
+		if refused then return error_page(req, refused) end
+		inventory.take(entry, 1)
+		local killed
+		page.yourturn, killed = combat.use(st, entry.item, rand)
+		page.monsterhp = st.currentmonsterhp
+		if killed then
+			dk.db:exec([[UPDATE users SET currentmonsterhp = 0, currenthp = ?, currentmp = ?, currenttp = ?,
+				currentmonster = ? WHERE id = ?]], st.currenthp, st.currentmp, st.currenttp, st.currentmonster, user.id)
+			return view.redirect("/victory")
+		end
+		page.monsterturn, died = monster_turn(user, st, monster, true)
+
 	elseif not swing_first then
 		-- Do a monster's turn if person lost the chance to swing first.
 		page.yourturn = { "The monster attacks before you are ready!" }
@@ -145,10 +190,11 @@ local function fight(req)
 		page.dead = true
 	else
 		page.spells = spells.known(user, "fight")
+		page.items = usable_items(user)
 		dk.db:exec([[UPDATE users SET currentaction = 'Fighting', currenthp = ?, currentmp = ?,
-			currentfight = ?, currentmonster = ?, currentmonsterhp = ?, currentmonstersleep = ?,
+			currenttp = ?, currentfight = ?, currentmonster = ?, currentmonsterhp = ?, currentmonstersleep = ?,
 			currentmonsterimmune = ?, currentuberdamage = ?, currentuberdefense = ? WHERE id = ?]],
-			st.currenthp, st.currentmp, math.min(st.currentfight + 1, combat.MAX_FIGHT),
+			st.currenthp, st.currentmp, st.currenttp, math.min(st.currentfight + 1, combat.MAX_FIGHT),
 			st.currentmonster, st.currentmonsterhp, st.currentmonstersleep, st.currentmonsterimmune,
 			st.currentuberdamage, st.currentuberdefense, user.id)
 	end
@@ -164,7 +210,7 @@ local function victory(req)
 	-- began, before the monster was picked: currentmonster 0, currentmonsterhp 0).
 	if not monster then return view.redirect("/") end
 
-	local r = combat.rewards(user, monster, rand)
+	local r = combat.rewards(game.player(user), monster, rand)
 	local ctx = { monster = monster, r = r }
 	-- a character of an unknown class gains experience but no levels
 	local cls = classes.get(user.charclass)
@@ -174,93 +220,95 @@ local function victory(req)
 		up = combat.level_up(user, cls, r.newexp, function(level) return levels[level] end)
 	end
 	local title
-	local s = {
-		level = user.level, maxhp = user.maxhp, maxmp = user.maxmp, maxtp = user.maxtp,
-		strength = user.strength, dexterity = user.dexterity, attackpower = user.attackpower,
-		defensepower = user.defensepower, dropcode = user.dropcode,
-	}
+	local g = { level = user.level, hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0 }
+	local dropcode = user.dropcode
 	if up then
-		s.level, s.maxhp, s.maxmp, s.maxtp = up.level, up.maxhp, up.maxmp, up.maxtp
-		s.strength, s.dexterity = up.newstrength, up.newdexterity
-		s.attackpower, s.defensepower = up.attackpower, up.defensepower
+		g = up
 		for _, learned in ipairs(up.spells or {}) do spells.learn(user.id, learned.id, learned.level) end
 		ctx.levelup = up
 		title = "Courage and Wit have served thee well!"
 	else
 		if combat.drop_roll(rand) then
-			local drops = dk.db:query("SELECT id FROM drops WHERE mlevel <= ? ORDER BY id", monster.level)
+			-- the original drops are items 34-65, in the same order: same odds, same picks
+			local drops = dk.db:query("SELECT id FROM items WHERE drop_level IS NOT NULL AND drop_level <= ? " ..
+																"AND droppable <> 0 AND retired = 0 ORDER BY id", monster.level)
 			local drop = combat.pick(drops, rand)
 			-- fixed: legacy showed the drop text even with no eligible drop (dropcode stored as 0).
-			s.dropcode = drop and drop.id or 0
+			dropcode = drop and drop.id or 0
 			ctx.dropped = drop ~= nil
 		end
 		title = "Victory!"
 	end
 
-	-- experience/gold were MEDIUMINT UNSIGNED: a bonus below -100% made them negative and
-	-- MySQL stored 0.
-	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, maxhp = ?, maxmp = ?,
-		maxtp = ?, strength = ?, dexterity = ?, attackpower = ?, defensepower = ?,
-		currentfight = 0, currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0,
-		currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0, dropcode = ?,
-		experience = ?, gold = ? WHERE id = ?]],
-		s.level, s.maxhp, s.maxmp, s.maxtp, s.strength, s.dexterity, s.attackpower,
-		s.defensepower, s.dropcode, php.mysql_uint(r.newexp), php.mysql_uint(r.newgold),
-		user.id)
+	-- level-ups grow the base stats (lib/stats.lua). experience/gold were MEDIUMINT
+	-- UNSIGNED: a bonus below -100% made them negative and MySQL stored 0.
+	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, base_maxhp = base_maxhp + ?,
+		base_maxmp = base_maxmp + ?, base_maxtp = base_maxtp + ?, strength = strength + ?,
+		dexterity = dexterity + ?, currentfight = 0, currentmonster = 0, currentmonsterhp = 0,
+		currentmonstersleep = 0, currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0,
+		dropcode = ?, experience = ?, gold = ? WHERE id = ?]],
+		g.level, g.hp, g.mp, g.tp, g.strength, g.dexterity, dropcode, php.mysql_uint(r.newexp),
+		php.mysql_uint(r.newgold), user.id)
 	return view.page(req, title, "fight/victory", ctx)
 end
 
-local function drop_row(id)
-	return dk.db:first("SELECT * FROM drops WHERE id = ?", id)
+-- The pending drop (users.dropcode: an items.id), or nil.
+local function pending_drop(user)
+	if user.dropcode == 0 then return nil end
+	return items.get(user.dropcode)
 end
 
--- Inventory slot columns, whitelisted (legacy put $_POST["slot"] into the SQL).
-local SLOTS = {
-	["1"] = { id = "slot1id", name = "slot1name" },
-	["2"] = { id = "slot2id", name = "slot2name" },
-	["3"] = { id = "slot3id", name = "slot3name" },
-}
+local function drop_page(req, drop, ctx)
+	local user = req.user
+	local bag = inventory.bag(user.id)
+	ctx = ctx or {}
+	ctx.drop = drop
+	ctx.attributes = items.attributes(drop)
+	local room = inventory.room(drop, bag, inventory.size())
+	ctx.full = room == 0
+	if ctx.full then
+		-- what could make room: bag items that count against the size (not quest items)
+		ctx.discardable = {}
+		for _, e in ipairs(bag) do
+			if e.item.category ~= "quest" then ctx.discardable[#ctx.discardable + 1] = e end
+		end
+	end
+	return view.page(req, "Item Drop", "fight/drop", ctx)
+end
 
 local function drop_get(req)
-	local user = req.user
-	if user.dropcode == 0 then return view.redirect("/") end
-	local drop = drop_row(user.dropcode)
+	local drop = pending_drop(req.user)
 	if not drop then return view.redirect("/") end
-	return view.page(req, "Item Drop", "fight/drop", {
-		drop = drop, attributes = combat.drop_attributes(drop),
-		slots = { user.slot1name, user.slot2name, user.slot3name },
-	})
+	return drop_page(req, drop)
 end
 
+-- POST /drop: "take" puts the item into the bag (after discarding bag entry `discard`
+-- when the bag is full); "leave" gives it up.
 local function drop_post(req)
 	local user = req.user
-	if user.dropcode == 0 then return view.redirect("/") end
-	local drop = drop_row(user.dropcode)
+	local drop = pending_drop(user)
 	if not drop then return view.redirect("/") end
-	local slot = SLOTS[tostring(req.form.slot or "")]
-	if not slot then
-		return error_page(req, "Please go back and select an inventory slot to continue.")
+	if req.form.leave ~= nil then
+		dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
+		return view.redirect("/")
 	end
-
-	local st = {}
-	for k, v in pairs(user) do st[k] = v end
-	local old = user[slot.id] ~= 0 and drop_row(user[slot.id]) or nil
-	combat.equip_drop(st, drop, old)
-
-	-- MySQL clamped negative values in the UNSIGNED columns to 0.
-	local function col(name)
-		if combat.SIGNED_STATS[name] then return php.mysql_int(st[name]) end
-		return php.mysql_uint(st[name])
+	if req.form.take == nil then return drop_page(req, drop) end
+	local discard_id = php.intval(req.form.discard)
+	local discarded
+	if discard_id ~= 0 then
+		local e = inventory.entry(user.id, discard_id)
+		if not e or e.equipped or e.item.category == "quest" then
+			return error_page(req, "Please go back and select an item from your bag to discard.")
+		end
+		inventory.take(e)
+		discarded = e
 	end
-	dk.db:exec("UPDATE users SET " .. slot.name .. " = ?, " .. slot.id .. [[ = ?,
-		maxhp = ?, maxmp = ?, maxtp = ?, strength = ?, dexterity = ?, attackpower = ?,
-		defensepower = ?, expbonus = ?, goldbonus = ?, currenthp = ?, currentmp = ?,
-		currenttp = ?, dropcode = 0 WHERE id = ?]],
-		drop.name, drop.id, col("maxhp"), col("maxmp"), col("maxtp"), col("strength"),
-		col("dexterity"), col("attackpower"), col("defensepower"), col("expbonus"),
-		col("goldbonus"), col("currenthp"), col("currentmp"), col("currenttp"), user.id)
-	return view.message(req, "Item Drop",
-		'The item has been equipped. You can now continue <a href="/">exploring</a>.')
+	if not inventory.add(user.id, drop, 1) then
+		return drop_page(req, drop, { error = "Your bag is full. Choose an item to discard first, or leave the " ..
+			drop.name .. "." })
+	end
+	dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
+	return view.page(req, "Item Drop", "fight/drop_taken", { drop = drop, discarded = discarded })
 end
 
 -- legacy dead() built this page but never displayed it; deaths are reported on the

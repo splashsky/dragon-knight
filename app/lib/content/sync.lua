@@ -107,25 +107,27 @@ function sync.effective(kind, key, flat, skipped)
 end
 
 local function write_row(kind, id, key, flat)
-	local cols, params = {}, {}
+	-- params by explicit index: fields may be nil (NULL, e.g. an item's drop_level)
+	local cols, params, n = {}, {}, 0
 	for _, f in ipairs(kind.fields) do
 		cols[#cols + 1] = quote(f.name)
-		params[#params + 1] = flat[f.name]
+		n = n + 1
+		params[n] = flat[f.name]
 	end
 	local tbl = quote(kind.table)
 	if id then
 		local sets = {}
 		for i, c in ipairs(cols) do sets[i] = c .. " = ?" end
-		params[#params + 1] = id
+		n = n + 1
+		params[n] = id
 		dk.db:exec("UPDATE " .. tbl .. " SET " .. table.concat(sets, ", ") .. ", retired = 0 WHERE id = ?",
-							 table.unpack(params))
+							 table.unpack(params, 1, n))
 	else
 		local marks = {}
 		for i = 1, #cols do marks[i] = "?" end
-		table.insert(params, 1, key)
 		local _
 		_, id = dk.db:exec("INSERT INTO " .. tbl .. " (key, " .. table.concat(cols, ", ") .. ", retired) VALUES (?, " ..
-											 table.concat(marks, ", ") .. ", 0)", table.unpack(params))
+											 table.concat(marks, ", ") .. ", 0)", key, table.unpack(params, 1, n))
 	end
 	if kind.write_children then kind.write_children(id, flat) end
 	return id

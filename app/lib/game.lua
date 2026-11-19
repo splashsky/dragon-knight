@@ -1,8 +1,10 @@
 -- game.lua :: shared game data helpers (control row, towns, nav data, ...).
 -- Module state lives for one request only (fresh VM per request).
 local classes = require("lib.classes")
+local inventory = require("lib.inventory")
 local php = require("lib.php")
 local spells = require("lib.spells")
+local stats = require("lib.stats")
 
 local game = {}
 
@@ -40,6 +42,19 @@ end
 -- Town the user is standing in (by coordinates, regardless of currentaction) or nil.
 function game.current_town(user)
 	return game.town_at(user.latitude, user.longitude)
+end
+
+-- Effective stats of a users row: base stats + equipped items (lib/stats.lua; the
+-- equipment is read once per request): { maxhp, maxmp, maxtp, strength, dexterity,
+-- attack, defense, exp_bonus_pct, gold_bonus_pct }.
+function game.stats(user)
+	return inventory.stats(user)
+end
+
+-- A copy of the users row with the effective stats under the original game's column
+-- names (maxhp, attackpower, expbonus, ...): what the fight code and the effects engine use.
+function game.player(user)
+	return stats.player(user, inventory.stats(user))
 end
 
 -- Class name for a users.charclass value (nil for an unknown class, like legacy).
@@ -100,11 +115,10 @@ end
 -- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
-	local hpbar = game.statbar(user.currenthp, user.maxhp)
-	local mpbar = game.statbar(user.currentmp, user.maxmp)
-	local tpbar = game.statbar(user.currenttp, user.maxtp)
+	local s = game.stats(user)
 	return {
 		user = user,
+		stats = s,
 		latitude = game.latitude_str(user.latitude),
 		longitude = game.longitude_str(user.longitude),
 		town = town,
@@ -113,10 +127,14 @@ function game.nav(user)
 		is_admin = user.authlevel == 1,
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),
-		hp_low = game.is_low(user.currenthp, user.maxhp),
-		mp_low = game.is_low(user.currentmp, user.maxmp),
-		bars = { hpbar, mpbar, tpbar },
+		hp_low = game.is_low(user.currenthp, s.maxhp),
+		mp_low = game.is_low(user.currentmp, s.maxmp),
+		bars = { game.statbar(user.currenthp, s.maxhp), game.statbar(user.currentmp, s.maxmp),
+						 game.statbar(user.currenttp, s.maxtp) },
 		spells = spells.known(user, "town"),
+		equipment = inventory.names(user.id),
+		bag_used = inventory.used(inventory.bag(user.id)),
+		bag_size = inventory.size(),
 	}
 end
 

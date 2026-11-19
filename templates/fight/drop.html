@@ -1,20 +1,35 @@
-{#- Item drop (legacy fight.php drop()). -#}
+{#- Item drop (legacy fight.php drop(); the item goes into the bag now). ctx: drop (items
+		row), attributes (lines), full (no room in the bag), discardable (bag entries that would
+		make room), error. -#}
 <section class="box drop">
 <div class="box-body">
 <p>The monster dropped the following item: <b>{{ drop.name }}</b></p>
+{%- if #attributes > 0 then %}
 <p>This item has the following attribute(s):
 {%- for _, line in ipairs(attributes) do %}<br>
 {{ line }}
 {%- end %}</p>
-<p>Select an inventory slot from the list below to equip this item. If the inventory slot is already full, the old item will be discarded.</p>
+{%- end %}
+{%- if drop.description ~= "" then %}
+<p>{{ drop.description }}</p>
+{%- end %}
+{%- if error then %}
+<p class="error">{{ error }}</p>
+{%- end %}
 <form action="/drop" method="post">
 {{{ csrf_field() }}}
-<select name="slot" aria-label="Inventory slot"><option value="0">Choose One</option>
-{%- for i, name in ipairs(slots) do %}
-<option value="{{ i }}">Slot {{ i }}: {{ name }}</option>
+{%- if full then %}
+<p>Your bag is full. Choose an item to discard to make room for the {{ drop.name }}:</p>
+<p class="drop-discard">
+{%- for _, e in ipairs(discardable) do %}
+<label><input type="radio" name="discard" value="{{ e.id }}"> {{ e.item.name }}{% if e.qty > 1 then %} (x{{ e.qty }}){% end %}</label><br>
 {%- end %}
-</select> <input type="submit" name="submit" value="Submit">
+</p>
+<p><input type="submit" name="take" value="Discard it and take the {{ drop.name }}"> <input type="submit" name="leave" value="Leave it"></p>
+{%- else %}
+<p><input type="submit" name="take" value="Take it"> <input type="submit" name="leave" value="Leave it"></p>
+{%- end %}
 </form>
-<p>You may also choose to just continue <a href="/">exploring</a> and give up this item.</p>
+<p>Items you take go into your bag; equip them from your <a href="/inventory">inventory</a>. You may also just continue <a href="/">exploring</a> and give up this item.</p>
 </div>
 </section>

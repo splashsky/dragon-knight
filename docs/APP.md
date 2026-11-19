@@ -13,14 +13,15 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
-| Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
+| Town, shop, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
+| Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
-| Content (classes, spells) | `app/content/{classes,spells}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,content}.lua` | `templates/admin/{class,classes,spell,spells,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_content.lua` |
+| Content (classes, spells, items) | `app/content/{classes,spells,items}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
 | Effects (what spells and items do) | `app/lib/effects.lua` | | `tests/lua/test_effects.lua` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4}.sql`), `tests/lua/test_db.lua` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4,seed_v5}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -132,7 +133,8 @@ Form and query values are raw strings. Validate them, and convert them with
 - `headers`: extra `{name, value}` pairs.
 
 The layout re-reads `req.user` from the DB before drawing the nav, so stats changed by
-the handler show up straight away (legacy `display()` did the same).
+the handler show up straight away (legacy `display()` did the same). A handler that renders
+stats itself after changing them reads the row again (`game.user(id)`).
 
 Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class`,
 `gamename`, `nav` (table or nil), `logged_in`, `version`, `build`, `elapsed()`,
@@ -184,6 +186,8 @@ starting with `__` are reserved.
 | `game.user(id)` | fresh users row |
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
 | `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
+| `game.stats(user)` | the effective stats of a users row: `{ maxhp, maxmp, maxtp, strength, dexterity, attack, defense, exp_bonus_pct, gold_bonus_pct }` (see [Derived stats](#derived-stats)) |
+| `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the effects engine take |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
@@ -243,9 +247,9 @@ experience already covers the next level gets it (or several) on the next victor
 
 ## Content
 
-Classes and spells (and, later, items) are **content**: Lua data files in git, one per
-entity, hot-reloaded like the code and synced into the database, where players' rows
-reference them by id.
+Classes, spells and items are **content**: Lua data files in git, one per entity,
+hot-reloaded like the code and synced into the database, where players' rows reference
+them by id.
 
 ```lua
 -- app/content/classes/knight.lua: the file name is the key ("knight")
@@ -279,9 +283,9 @@ High hit points]],                       -- one line per point on the help page
 - **Sync** (`lib/content/sync.lua`): upsert every file entity by key (a new key gets the
 	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
 	deleted: players keep their class), un-retire keys whose file is back, then apply the
-	admin overrides. Kinds sync in `schema.KINDS` order (spells before classes, whose
-	`class_spells` rows need the spell ids). The original classes keep ids 1-3 and the
-	original spells 1-19 (seeded in `seed.sql`).
+	admin overrides. Kinds sync in `schema.KINDS` order (spells, classes, items: spells
+	before classes, whose `class_spells` rows need the spell ids). The original classes
+	keep ids 1-3, the original spells 1-19 and the items 1-68 (seeded in `seed.sql`).
 - **When**: every request (`main.lua`) compares `meta.content_seen` with
 	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
 	After a restart or any app file change, the files are loaded and fingerprinted (sha256
@@ -294,17 +298,18 @@ High hit points]],                       -- one line per point on the help page
 	`dk install` fail (and change nothing) instead.
 - **Overrides**: `content_overrides(kind, key, field, value)` hold per-server values that
 	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
-	`/admin/spells/#id`, shared code in `admin/content.lua` and
+	`/admin/spells/#id`, `/admin/items/#id`, shared code in `admin/content.lua` and
 	`templates/admin/content_form.html`) write them for the kind's `admin_fields` (classes:
 	name, description, sort, playable, starting stats; spells: name, description, MP and
-	the effects' amounts; a value equal to the file's deletes the override) and offer
-	"reset to file". Field names are those of the flat form: `name`, `levels.17.hp`,
-	`levels.17.spells` (`"heal,hurt"`), `effects.1.amount`.
+	the effects' amounts; items: see [Items](#items); a value equal to the file's deletes
+	the override) and offer "reset to file". Field names are those of the flat form:
+	`name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `effects.1.amount`,
+	`modifiers.2.stat`.
 - **Migrations into content**: a migration that turns old rows into content writes the
 	old values into `content_adopt(kind, key, field, value)`; the next sync turns those
 	that differ from the file (and are valid) into overrides (that is how schema version 4
-	kept edited class names and levels data, and version 5 edited spell names, MP and
-	amounts).
+	kept edited class names and levels data, version 5 edited spell names, MP and amounts,
+	and version 6 edited items and drops).
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
@@ -367,7 +372,7 @@ admin user editor).
 
 ## Effects (`lib/effects.lua`)
 
-What spells (and, with items, consumables and gear) do is a list of effects: small tables
+What spells, consumables (`use_effects`) and gear (`modifiers`) do is a list of effects: small tables
 `{ kind = ..., <parameters> }`, validated by `effects.validate(list [, passive])` (used by
 the content kinds), stored as text (`effects.encode`: `"damage max=15; sleep chance=5"`)
 and applied by a pure engine (no DB), unit-tested in `tests/lua/test_effects.lua`.
@@ -400,6 +405,134 @@ and applied by a pure engine (no DB), unit-tested in `tests/lua/test_effects.lua
 Adding an effect kind: an entry in `effects.KINDS` (label, parameters, `town` when it works
 outside fights, `heals` for "already full"), its parameter specs, an `APPLY` function, and
 tests.
+
+## Items
+
+Items are content (see [Content](#content)): `app/content/items/<key>.lua`, synced into
+`items` (`lib/content/kinds/items.lua`). The original items keep ids 1-33 (keys from the
+names: `stick`, `battle_axe`, `destiny_blade`, ...), the original drops are accessories
+34-65 (`life_pebble` ... `fortune_drop`), and the Herb, Potion and Ether are 66-68.
+
+```lua
+-- app/content/items/destiny_blade.lua (gear: equipped in its slot)
+return {
+	name = "Destiny Blade",
+	category = "weapon",        -- weapon, armor, shield, accessory (gear), consumable, quest, misc
+	price = 50000,              -- shops sell it for this and buy it back for half (rounded up)
+	attack = 250,               -- added to attack power while equipped (defense: to defense power)
+	modifiers = { { kind = "stat", stat = "strength", amount = 50 } },   -- while equipped
+}
+
+-- app/content/items/demons_sin.lua (a monster drop)
+return {
+	name = "Demon's Sin",
+	category = "accessory",     -- three accessory slots
+	drop_level = 35,            -- monsters of level 35 and up may drop it
+	modifiers = {
+		{ kind = "stat", stat = "maxhp", amount = -50 },
+		{ kind = "stat", stat = "strength", amount = 50 },
+	},
+}
+
+-- app/content/items/herb.lua (a consumable: stacks in the bag)
+return {
+	name = "Herb",
+	description = "Restores 30 hit points, in a fight or out of it.",
+	category = "consumable",
+	price = 15,
+	max_stack = 10,             -- default 1 (gear must be 1)
+	use_effects = { { kind = "heal_hp", amount = 30 } },   -- lib/effects.lua
+}
+```
+
+- Other fields: `description`, `slot` (optional; it is the category for gear and absent
+	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
+	(default true; with a `drop_level`).
+- Validation (`dk check`): gear has `max_stack` 1 and no use effects; only gear has
+	attack, defense and modifiers; consumables need use effects; quest items can't be
+	sellable; `sellable = true` needs a price.
+- Admins override name, description, price, attack, defense, drop level, sellable,
+	droppable, the modifiers' stats and amounts (an override can add a modifier: both its
+	`modifiers.N.stat` and `.amount`) and the use effects' parameters at `/admin/items`.
+- Modifier stats: `maxhp`, `maxmp`, `maxtp`, `strength`, `dexterity`, `attack`, `defense`,
+	`exp_bonus_pct`, `gold_bonus_pct` (see [Derived stats](#derived-stats)).
+- Use: a consumable can be used in town (from `/inventory`) when every use effect works
+	outside fights (the heals), and in fights ("Use Item", costs the turn like a spell;
+	`combat.use_error` / `combat.use`). Refusals (already full, ...) cost nothing.
+- Shops: `town_items(town_id, item_id)` is what a town sells (the admin town editor takes
+	item keys). Weapons, armor and shields are equipped when bought: with an old item in the
+	slot the player either keeps it in the bag (needs a free slot) or sells it back (its
+	value counts toward the price). Everything else goes into the bag (`qty`, up to the room
+	on a stack or a new one, and the gold). The Sell section buys any sellable bag item.
+- Drops: a victory without a level-up drops an item 1 in 30 times, picked uniformly among
+	the non-retired droppable items with `drop_level` at or below the monster's level (the
+	original drops' odds). `users.dropcode` holds it until the player takes it into the bag
+	(`/drop`; with a full bag, after discarding a bag item) or leaves it (moving on drops it
+	too).
+- Deleting an item file retires the item: shops stop selling it and monsters stop dropping
+	it; characters keep theirs, and equipped retired items still count.
+
+`lib/items.lua`: rows come back with `modifiers` and `use_effects` decoded into lists.
+
+| Function | Returns |
+|---|---|
+| `items.get(id)`, `items.by_key(key)` | an items row (retired or not), or nil |
+| `items.active()`, `items.all()` | non-retired items (help) / every item (admin), by id |
+| `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
+| `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
+| `items.attributes(item)`, `items.special_lines(item)`, `items.effect_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Heal 30"`) |
+
+Adding an item: copy a file in `app/content/items/` to `<key>.lua`, edit it, run
+`./dk check`. The next page load syncs it: give it a `drop_level` for monsters to drop it,
+or add its key to a town's shop in the admin town editor. It shows up on `/help/items`.
+
+## Inventory
+
+`user_items(id, user_id, item_id, qty, equipped)`: a stack of one item, equipped in a slot
+(`weapon`, `armor`, `shield`, `accessory1`-`accessory3`; one per slot) or in the bag
+(`equipped` NULL). `lib/inventory.lua` holds the rules; the pure ones are unit-tested in
+`tests/lua/test_inventory.lua`:
+
+- The bag holds `control.inventory_size` stacks (default 12; "Bag Size" in the admin main
+	settings). Equipped items don't count, a stack counts once, quest items never count (a
+	quest can't be blocked by a full bag). Topping up a stack that isn't full
+	(`qty < max_stack`) is always allowed (`inventory.room`).
+- Equipping a bag item swaps it with what is in the slot (never needs a free slot);
+	accessories pick slot 1-3 or the first free one. Unequipping needs room in the bag.
+	After any equipment change current HP/MP/TP are clamped to the new maxima
+	(`inventory.changed`).
+- `/inventory` (link in the left nav, and "Bag: n / 12" in the right one) shows the slots
+	and the bag grid (free slots drawn) with equip, unequip, use and discard (confirmation;
+	how many for a stack; not quest items). Every action is a POST that renders the page
+	with what happened.
+
+| Function | |
+|---|---|
+| `inventory.entries(uid)`, `inventory.bag(uid)`, `inventory.equipped(uid)` (slot -> entry, cached per request), `inventory.entry(uid, id)`, `inventory.find(uid, item_id)` | entries `{ id, user_id, qty, equipped, item }` |
+| `inventory.size()`, `inventory.used(bag)`, `inventory.free(bag, size)`, `inventory.room(item, bag, size)` | the cap |
+| `inventory.add(uid, item, qty)`, `inventory.take(entry [, qty])` | into / out of the bag |
+| `inventory.equip(uid, entry, slot)`, `inventory.equip_new(uid, item, slot)`, `inventory.unequip(uid, slot)`, `inventory.free_accessory_slot(uid)` | equipment (they clamp) |
+| `inventory.stats(user)`, `inventory.names(uid)` | effective stats, equipped names per slot |
+
+## Derived stats
+
+`lib/stats.lua` (pure, `tests/lua/test_stats.lua`). The users row holds base stats:
+`base_maxhp`, `base_maxmp`, `base_maxtp`, `strength`, `dexterity` (level-ups add to them)
+and `base_attack`, `base_defense`, `base_exp_bonus`, `base_gold_bonus` (0 for new
+characters; power neither strength, dexterity nor gear explains: schema version 6 kept the
+original game's inconsistencies there, and admins can set them). Effective stats:
+
+- maxhp/maxmp/maxtp, strength, dexterity = base + modifiers
+- attack = strength + base_attack + the items' attack + attack modifiers
+- defense = dexterity + base_defense + the items' defense + defense modifiers
+- exp/gold bonus (percent) = base + modifiers
+
+Stats that were UNSIGNED columns in the original never go below 0. `game.stats(user)`
+computes them (the equipment is read once per request); every page, the fight and the
+effects engine use them (`game.player(user)` for the latter, so `fight/combat.lua` keeps
+the original formulas and names). Never store effective stats: change base stats or
+equipment. `stats.solve(expected, mods)` is the inverse (base columns that give expected
+effective stats), used by the migration.
 
 ## Forum and news
 
@@ -438,7 +571,7 @@ Game mechanics must match legacy exactly. Use these helpers rather than ad-hoc L
 - `php.number_format(n)`, `php.prettydate(ts)`, `php.datetime(ts)`.
 - `php.nl2br(s)` does **not** escape. Templates use `h.nl2br`.
 - `php.explode(sep, s)`, `php.implode(sep, t)`, `php.in_list(list, v)`: comma-list
-	columns (`users.towns`, `towns.itemslist`) with PHP loose equality
+	columns (`users.towns`) with PHP loose equality
 	(`"3" == 3`). For example `"29.30"` matches neither 29 nor 30. Keep those columns'
 	formats, including the leading `"0"`.
 - `php.loose_eq(a, b)`, `php.trim(s)`, `php.is_email(s)`.
@@ -451,7 +584,7 @@ in a comment.
 - `dk.db:query(sql, ...)` returns rows, `:first` one row or nil, `:value` a scalar,
 	`:exec` returns `changes, last_id`. Always use `?` parameters and **never concatenate
 	user input**. Column identifiers come from whitelists only (a content kind's `fields`,
-	or a table of allowed `slotN` names).
+	or a fixed list in the code).
 - Always call `dk.db` at call time. Don't cache it in a module-level local: it's attached
 	per request and wrapped to count queries.
 - Times are unix seconds (`dk.now()`): `regdate`, `onlinetime`, `postdate`,
@@ -486,15 +619,16 @@ To change the schema:
 1. Edit `schema.sql` (and `seed.sql` if new rows are needed; write `INSERT INTO t (cols)
 	 VALUES …` so seed lines survive later columns).
 2. Append a step to `migrations.STEPS` that makes the same change to an existing database
-	 plus any backfill. Write it in SQL against the schema of its time; don't call app
+	 plus any backfill (and, if it needs the synced content, an `after_sync` function, run
+	 after the content sync that ends `dk migrate`). Write it in SQL against the schema of its time; don't call app
 	 modules that query tables, since they follow the latest schema (pure helpers are fine).
 	 SQLite can't `ADD COLUMN` with `REFERENCES` and a non-NULL default while foreign keys
 	 are on: rebuild the table (create `t_new`, copy, drop, rename, recreate indexes), as
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v4.sql` (version 4) with the
-	 game data of that time (`seed_v3.sql`, `seed_v4.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v5.sql` (version 5) with the
+	 game data of that time (`seed_v3.sql`, `seed_v4.sql`, `seed_v5.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -548,6 +682,8 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
+| `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
+| `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |

@@ -38,3 +38,17 @@ table.inventory td + td { width: 100%; }
 .babble-post:nth-last-child(odd) { background-color: #eeeeee; }
 .babble-post:nth-last-child(even) { background-color: #ffffff; }
 .babble-form { text-align: center; margin: 4px 0 auto; }   /* auto: few posts stay at the top */
+
+/* inventory (/inventory) */
+.inv-notice { font-weight: bold; }
+h3.inv-heading { font-size: 1em; margin: 1em 0 0.3em; }
+table.inv-equipped td { padding: 1px 6px 1px 0; vertical-align: top; }
+table.inv-equipped td.inv-slot { white-space: nowrap; }
+.inv-bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.inv-cell { border: 1px solid #999; padding: 4px; min-height: 4em; }
+.inv-cell.inv-free { border-style: dashed; text-align: center; }
+.inv-cell.inv-quest { border-color: #c00; }
+.inv-actions { margin-top: 3px; }
+
+/* shop: sell section */
+table.shop-sell td { padding: 1px 8px 1px 0; }

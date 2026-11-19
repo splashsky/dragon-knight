@@ -54,6 +54,7 @@ PASS=0
 FAILS=0
 SECTION=
 STATUS=
+LAST_REQ=
 BODY="$T/body"
 HEADERS="$T/headers"
 JAR="$T/jar.default"
@@ -197,6 +198,38 @@ t_spells() {
 		INSERT INTO user_spells (user_id, spell_id) SELECT u.id, s.id FROM users u, spells s
 		WHERE u.username = '$1' AND s.id IN (${2:-0})"
 }
+# t_give USERNAME ITEM_KEY [QTY [SLOT]]: add a user_items row (SLOT: weapon, armor, shield,
+# accessory1-3; none: the bag). t_items_clear USERNAME: take all of a user's items away.
+t_give() {
+	local slot=NULL
+	[ -n "${4:-}" ] && slot="'$4'"
+	t_sql "INSERT INTO user_items (user_id, item_id, qty, equipped) SELECT u.id, i.id, ${3:-1}, $slot
+		FROM users u, items i WHERE u.username = '$1' AND i.key = '$2'"
+}
+t_items_clear() { t_sql "DELETE FROM user_items WHERE user_id = (SELECT id FROM users WHERE username = '$1')"; }
+# SQL expression for a users row's items, "stick@weapon,herbx3" (by user_items id; in a
+# SELECT ... FROM users).
+T_ITEMS="(SELECT group_concat(k) FROM (SELECT i.key || coalesce('@' || ui.equipped, '') ||
+	CASE WHEN ui.qty > 1 THEN 'x' || ui.qty ELSE '' END AS k FROM user_items ui JOIN items i ON i.id = ui.item_id
+	WHERE ui.user_id = users.id ORDER BY ui.id))"
+# t_stats: the logged-in character's effective stats from /character (current jar), as
+# "maxhp maxmp maxtp strength dexterity attack defense" (expect_stats compares).
+t_stats() {
+	t_get /character
+	local hp mp tp
+	hp=$(grep -o 'Hit Points: [0-9-]* / [0-9-]*' "$BODY" | sed 's/.* \/ //')
+	mp=$(grep -o 'Magic Points: [0-9-]* / [0-9-]*' "$BODY" | sed 's/.* \/ //')
+	tp=$(grep -o 'Travel Points: [0-9-]* / [0-9-]*' "$BODY" | sed 's/.* \/ //')
+	printf '%s %s %s %s %s %s %s' "$hp" "$mp" "$tp" \
+		"$(grep -o 'Strength: [0-9-]*' "$BODY" | grep -o '[0-9-]*$')" \
+		"$(grep -o 'Dexterity: [0-9-]*' "$BODY" | grep -o '[0-9-]*$')" \
+		"$(grep -o 'Attack Power: [0-9-]*' "$BODY" | grep -o '[0-9-]*$')" \
+		"$(grep -o 'Defense Power: [0-9-]*' "$BODY" | grep -o '[0-9-]*$')"
+}
+expect_stats() {  # expect_stats "maxhp maxmp maxtp strength dexterity attack defense" label
+	local got; got=$(t_stats)
+	if [ "$got" = "$1" ]; then t_ok; else t_fail "${2:-stats}: expected '$1', got '$got'"; fi
+}
 # SQL expression for a users row's known spell ids, "1,6" (in a SELECT ... FROM users).
 T_KNOWN="(SELECT group_concat(spell_id) FROM (SELECT spell_id FROM user_spells WHERE user_id = users.id ORDER BY spell_id))"
 
@@ -244,7 +277,7 @@ if t_has_sql; then
 	[ "$(t_sql "SELECT group_concat(id || ':' || key || ':' || name, ',') FROM classes")" = "1:mage:Mage,2:warrior:Warrior,3:paladin:Paladin" ] \
 		&& t_ok || t_fail "classes synced at install"
 	[ "$(t_sql 'SELECT count(*) FROM class_levels')" = 297 ] && t_ok || t_fail "class levels synced"
-	[ "$(t_sql "SELECT charclass || ',' || maxhp || ',' || currenttp || ',' || attackpower FROM users WHERE username = 'admin'")" = "1,15,10,5" ] \
+	[ "$(t_sql "SELECT charclass || ',' || base_maxhp || ',' || currenttp || ',' || strength FROM users WHERE username = 'admin'")" = "1,15,10,5" ] \
 		&& t_ok || t_fail "admin's starting stats"
 	[ "$(t_sql 'SELECT count(*) FROM monsters')" = 151 ] && t_ok || t_fail "monsters seeded"
 	[ "$(t_sql 'SELECT verifyemail FROM control')" = 0 ] && t_ok || t_fail "verifyemail default 0"

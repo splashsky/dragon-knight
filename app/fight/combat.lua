@@ -3,9 +3,12 @@
 -- No DB access here. Every function that rolls dice takes `rand`, a PHP-compatible
 -- rand(min, max) (php.rand in production; tests/lua/test_fight.lua injects a scripted
 -- one), and is called with exactly the legacy arguments so the distributions match.
--- `st` is a mutable copy of the users row (the legacy in-memory $userrow); messages are
--- returned as lists of plain-text lines (escaped by the templates).
+-- `st` is a mutable copy of the users row with the effective stats under the original
+-- column names (game.player: maxhp, strength, attackpower, expbonus, ...; the legacy
+-- in-memory $userrow); messages are returned as lists of plain-text lines (escaped by the
+-- templates).
 local effects = require("lib.effects")
+local items = require("lib.items")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 local spells = require("lib.spells")
@@ -147,6 +150,24 @@ function combat.cast(st, spell, rand)
 	return lines, st.currentmonsterhp <= 0
 end
 
+-- Why the consumable `item` (an items row with decoded use effects, lib/items.lua) can't
+-- be used in combat, or nil when it can. Like spells, a refused item costs nothing.
+function combat.use_error(st, item)
+	local refused = not items.usable(item, "fight") and "cannot" or
+									effects.refusal(item.use_effects, { player = st, in_fight = true })
+	if refused == nil then return nil end
+	return FULL[refused] or "This item cannot be used. Please go back and try again."
+end
+
+-- Using a consumable in combat (its use effects; the caller takes it out of the bag).
+-- Returns lines, monster_killed.
+function combat.use(st, item, rand)
+	local lines = effects.apply(item.use_effects, {
+		player = st, in_fight = true, rand = rand, intro = "You have used the " .. item.name,
+	})
+	return lines, st.currentmonsterhp <= 0
+end
+
 -- Death penalty: half the gold (rounded up) and a quarter of max HP (rounded up).
 function combat.death(user)
 	return { gold = php.ceil(user.gold / 2), currenthp = php.ceil(user.maxhp / 4) }
@@ -186,9 +207,9 @@ end
 -- `gains(level)` returns the class's gains for that level ({ hp, mp, strength, dexterity,
 -- spells = { spell id, ... } }, classes.levels; nil stops the loop); TP and the HP
 -- milestone bonus are added from lib/leveling.lua. Returns nil (no level gained) or the
--- summed gains (hp, mp, tp, strength, dexterity), `levels` (how many), `learned` (how many
--- spells the schedule taught, known ones included, like legacy), `spells` ({ { id, level },
--- ... } or nil) and the new stats.
+-- new `level`, how many `levels`, the summed gains (hp, mp, tp, strength, dexterity: added
+-- to the base stats), `learned` (how many spells the schedule taught, known ones included,
+-- like legacy) and `spells` ({ { id, level }, ... } or nil).
 -- fixed: legacy granted at most one level per victory.
 function combat.level_up(user, cls, newexp, gains)
 	local g = {
@@ -217,13 +238,6 @@ function combat.level_up(user, cls, newexp, gains)
 		end
 	end
 	if g.levels == 0 then return nil end
-	g.maxhp = user.maxhp + g.hp
-	g.maxmp = user.maxmp + g.mp
-	g.maxtp = user.maxtp + g.tp
-	g.newstrength = user.strength + g.strength
-	g.newdexterity = user.dexterity + g.dexterity
-	g.attackpower = user.attackpower + g.strength
-	g.defensepower = user.defensepower + g.dexterity
 	if g.learned > 0 then g.spells = learned end
 	return g
 end
@@ -231,67 +245,6 @@ end
 -- Drop chance after a victory without a level up: 1 in 30.
 function combat.drop_roll(rand)
 	return rand(1, 30) == 1
-end
-
----------------------------------------------------------------------------------------
--- Item drops: drops.attribute1/attribute2 are "stat,value" (or "X" for attribute2).
-
--- users columns a drop may change (legacy $attributearray), with display names.
-combat.DROP_STATS = {
-	maxhp = "Max HP", maxmp = "Max MP", maxtp = "Max TP", defensepower = "Defense Power",
-	attackpower = "Attack Power", strength = "Strength", dexterity = "Dexterity",
-	expbonus = "Experience Bonus", goldbonus = "Gold Bonus",
-}
-combat.SIGNED_STATS = { expbonus = true, goldbonus = true }
-
--- "stat,value" -> stat, value. "X" -> "maxhp", 0 (legacy placeholder).
-function combat.parse_attribute(attr)
-	if attr == "X" then return "maxhp", 0 end
-	local parts = php.explode(",", attr)
-	local v = tonumber(parts[2]) or php.intval(parts[2])
-	return parts[1], math.tointeger(v) or v
-end
-
--- One attribute's effect on `st` (sign = 1 to add, -1 to remove). Strength/dexterity also
--- move attack/defense power. Unknown stat names are ignored (legacy wrote any column).
-local function apply(st, stat, value, sign)
-	if not combat.DROP_STATS[stat] then return end
-	st[stat] = st[stat] + sign * value
-	if stat == "strength" then st.attackpower = st.attackpower + sign * value end
-	if stat == "dexterity" then st.defensepower = st.defensepower + sign * value end
-end
-
--- Equip `drop` into a slot that holds `old` (a drops row) or nothing (nil).
--- Mutates `st` like legacy drop().
-function combat.equip_drop(st, drop, old)
-	if old then
-		local o1s, o1v = combat.parse_attribute(old.attribute1)
-		local o2s, o2v = combat.parse_attribute(old.attribute2)
-		apply(st, o1s, o1v, -1)
-		apply(st, o2s, o2v, -1)
-	end
-	local n1s, n1v = combat.parse_attribute(drop.attribute1)
-	local n2s, n2v = combat.parse_attribute(drop.attribute2)
-	apply(st, n1s, n1v, 1)
-	apply(st, n2s, n2v, 1)
-	-- fixed: legacy skipped this clamp when the slot was empty (matters for negative items).
-	if st.currenthp > st.maxhp then st.currenthp = st.maxhp end
-	if st.currentmp > st.maxmp then st.currentmp = st.maxmp end
-	if st.currenttp > st.maxtp then st.currenttp = st.maxtp end
-end
-
--- Display lines for a drop's attributes: "Max HP +10", and legacy's "Max HP-50".
-function combat.drop_attributes(drop)
-	local out = {}
-	local function line(attr)
-		local stat, value = combat.parse_attribute(attr)
-		local label = combat.DROP_STATS[stat] or ""
-		if value > 0 then return label .. " +" .. php.str(value) end
-		return label .. php.str(value)
-	end
-	out[1] = line(drop.attribute1)
-	if drop.attribute2 ~= "X" then out[2] = line(drop.attribute2) end
-	return out
 end
 
 return combat

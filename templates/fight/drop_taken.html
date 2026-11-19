@@ -1,0 +1,7 @@
+{#- A dropped item went into the bag. ctx: drop, discarded (entry) or nil. -#}
+<section class="box drop">
+<div class="box-body">
+<p>{% if discarded then %}You discarded the {{ discarded.item.name }}. {% end %}The {{ drop.name }} is in your bag.</p>
+<p>You can equip it from your <a href="/inventory">inventory</a>, or continue <a href="/">exploring</a>.</p>
+</div>
+</section>

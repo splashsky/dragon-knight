@@ -1,9 +1,11 @@
 -- admin/tables.lua :: field specs for the simple "list + edit one row" tables
--- (legacy admin.php items/edititem, drops, towns, monsters, users; spells and classes are
--- content, see admin/spells.lua and admin/classes.lua). See
+-- (legacy admin.php towns, monsters, users; items and drops, spells and classes are
+-- content, see admin/items.lua, admin/spells.lua and admin/classes.lua). See
 -- admin/editor.lua for the spec format. Column lists here are the UPDATE whitelists.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
+local inventory = require("lib.inventory")
+local items = require("lib.items")
 local spells = require("lib.spells")
 
 local tables = {}
@@ -26,53 +28,15 @@ end
 
 local ID = { name = "id", label = "ID", kind = "static" }
 
-tables.items = function()
-	return {
-		table = "items", path = "/admin/items", column = "name",
-		heading = "Edit Items", saved = "Item updated.",
-		list_intro = "Click an item's name to edit it.", none = "No items found.",
-		notes = "admin/notes_special_item",
-		fields = {
-			ID,
-			text("name", "Name"),
-			{ name = "type", label = "Type", kind = "select", int = true,
-				options = { { 1, "Weapon" }, { 2, "Armor" }, { 3, "Shield" } } },
-			num("buycost", "Cost", 5, 10, { suffix = " gold" }),
-			num("attribute", "Attribute", 5, 10, {
-				help = "How much the item adds to total attackpower (weapons) or defensepower (armor/shields)." }),
-			{ name = "special", label = "Special", size = 30, maxlength = 50,
-				default = "X", default_if = { "", " " },
-				help = 'Should be either a special code or <span class="highlight">X</span> to disable. ' ..
-							 "Edit this field very carefully because mistakes to formatting or field names " ..
-							 "can create problems in the game." },
-		},
-	}
-end
-
-local ATTR_HELP = "Edit this field very carefully because mistakes to formatting or field " ..
-									"names can create problems in the game."
-
-tables.drops = function()
-	return {
-		table = "drops", path = "/admin/drops", column = "name",
-		heading = "Edit Drops", saved = "Item updated.",
-		list_intro = "Click an item's name to edit it.", none = "No items found.",
-		notes = "admin/notes_special_drop",
-		fields = {
-			ID,
-			text("name", "Name"),
-			num("mlevel", "Monster Level", 5, 10, {
-				required = "Monster level is required.", numeric = "Monster level must be a number.",
-				help = "Minimum monster level that will drop this item." }),
-			{ name = "attribute1", label = "Attribute 1", size = 30, maxlength = 50,
-				required = "First attribute is required.", empty = { "", " ", "X" },
-				help = "Must be a special code. First attribute cannot be disabled. " .. ATTR_HELP },
-			{ name = "attribute2", label = "Attribute 2", size = 30, maxlength = 50,
-				default = "X", default_if = { "", " " },
-				help = 'Should be either a special code or <span class="highlight">X</span> to disable. ' ..
-							 ATTR_HELP },
-		},
-	}
+-- Item keys typed in the town editor -> item ids, or nil and the unknown key.
+local function item_ids(text)
+	local ids = {}
+	for key in text:gmatch("[^,%s]+") do
+		local id = dk.db:value("SELECT id FROM items WHERE key = ?", key)
+		if not id then return nil, key end
+		ids[#ids + 1] = id
+	end
+	return ids
 end
 
 tables.towns = function()
@@ -80,6 +44,13 @@ tables.towns = function()
 		table = "towns", path = "/admin/towns", column = "name",
 		heading = "Edit Towns", saved = "Town updated.",
 		list_intro = "Click an town's name to edit it.", none = "No towns found.",
+		validate = function(v, errors)
+			local _, unknown = item_ids(v.items)
+			if unknown then errors[#errors + 1] = "Items: there is no item '" .. unknown .. "'." end
+		end,
+		after_save = function(_, row, v)
+			items.set_town(row.id, item_ids(v.items))
+		end,
 		fields = {
 			ID,
 			text("name", "Name"),
@@ -90,9 +61,10 @@ tables.towns = function()
 				help = "How much it costs to buy the map to this town." }),
 			num("travelpoints", "Travel Points", 5, 10, {
 				help = "How many TP are consumed when travelling to this town." }),
-			text("itemslist", "Items List", 30, 200, {
-				help = "Comma-separated list of item ID numbers available for purchase at this town. " ..
-							 '(Example: <span class="highlight">1,2,3,6,9,10,13,20</span>)' }),
+			{ name = "items", label = "Items", virtual = true, size = 60, maxlength = 2000,
+				get = function(row) return table.concat(items.town_keys(row.id), ", ") end,
+				help = 'Keys of the items this town\'s shop sells, comma-separated (see <a href="/admin/items">Items</a>; ' ..
+							 'example: <span class="highlight">stick, branch, herb</span>).' },
 		},
 	}
 end
@@ -194,34 +166,40 @@ tables.users = function()
 			num("currenthp", "Current HP", 5, 6),
 			num("currentmp", "Current MP", 5, 6),
 			num("currenttp", "Current TP", 5, 6),
-			num("maxhp", "Max HP", 5, 6),
-			num("maxmp", "Max MP", 5, 6),
-			num("maxtp", "Max TP", 5, 6),
+			num("base_maxhp", "Base Max HP", 5, 6),
+			num("base_maxmp", "Base Max MP", 5, 6),
+			num("base_maxtp", "Base Max TP", 5, 6),
 			SEP,
 			num("level", "Level", 5, 5),
 			num("gold", "Gold", 10, 8),
 			num("experience", "Experience", 10, 8),
-			num("goldbonus", "Gold Bonus", 5, 5),
-			num("expbonus", "Experience Bonus", 5, 5),
-			num("strength", "Strength", 5, 5),
-			num("dexterity", "Dexterity", 5, 5),
-			num("attackpower", "Attack Power", 5, 5),
-			num("defensepower", "Defense Power", 5, 5),
+			num("strength", "Base Strength", 5, 5),
+			num("dexterity", "Base Dexterity", 5, 5),
+			num("base_attack", "Extra Attack Power", 5, 5, {
+				help = "Attack power on top of strength and gear (usually 0)." }),
+			num("base_defense", "Extra Defense Power", 5, 5, {
+				help = "Defense power on top of dexterity and gear (usually 0)." }),
+			num("base_exp_bonus", "Base Experience Bonus", 5, 5, { help = "In percent, on top of gear." }),
+			num("base_gold_bonus", "Base Gold Bonus", 5, 5, { help = "In percent, on top of gear." }),
+			{ name = "effective", label = "Effective Stats", kind = "static", virtual = true,
+				get = function(row)
+					local st = inventory.stats(row)
+					return ("Max HP %d, Max MP %d, Max TP %d, Strength %d, Dexterity %d, Attack Power %d, " ..
+									"Defense Power %d, Experience Bonus %d%%, Gold Bonus %d%%"):format(st.maxhp, st.maxmp, st.maxtp,
+						st.strength, st.dexterity, st.attack, st.defense, st.exp_bonus_pct, st.gold_bonus_pct)
+				end },
+			{ name = "inventory", label = "Inventory", kind = "static", virtual = true,
+				get = function(row)
+					local parts = {}
+					for _, e in ipairs(inventory.entries(row.id)) do
+						parts[#parts + 1] = e.item.key .. (e.qty > 1 and (" x" .. e.qty) or "") ..
+							(e.equipped and (" (" .. e.equipped .. ")") or "")
+					end
+					return #parts > 0 and table.concat(parts, ", ") or "Empty"
+				end,
+				help = 'Item keys (see <a href="/admin/items">Items</a>), with the slot of equipped ones. Read-only.' },
 			SEP,
-			num("weaponid", "Weapon ID", 5, 5),
-			num("armorid", "Armor ID", 5, 5),
-			num("shieldid", "Shield ID", 5, 5),
-			num("slot1id", "Slot 1 ID", 5, 5),
-			num("slot2id", "Slot 2 ID", 5, 5),
-			num("slot3id", "Slot 3 ID", 5, 5),
-			text("weaponname", "Weapon Name"),
-			text("armorname", "Armor Name"),
-			text("shieldname", "Shield Name"),
-			text("slot1name", "Slot 1 Name"),
-			text("slot2name", "Slot 2 Name"),
-			text("slot3name", "Slot 3 Name"),
-			SEP,
-			num("dropcode", "Drop Code", 5, 8),
+			num("dropcode", "Drop Code", 5, 8, { help = "The item a monster just dropped (item ID; 0: none)." }),
 			{ name = "spells", label = "Spells", virtual = true, size = 50, maxlength = 1000,
 				get = function(row)
 					local keys = {}

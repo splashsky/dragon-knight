@@ -60,6 +60,10 @@ local function run(...)
 	end
 	print(string.format("Database schema is now version %d.", to))
 	content.sync_or_fail("dk migrate")
+	for v = from + 1, to do
+		local after = migrations.STEPS[v].after_sync
+		if after then after() end
+	end
 	return 0
 end
 

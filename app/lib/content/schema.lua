@@ -1,7 +1,7 @@
 -- content/schema.lua :: the content kinds and the field validators they share.
 --
 -- A kind (app/lib/content/kinds/<kind>.lua) describes one sort of content entity
--- (classes, spells; items later): where its files live, its DB table and the
+-- (classes, spells, items): where its files live, its DB table and the
 -- fields of its files. Validating a file produces the entity's *flat* form: a table of
 -- field name -> value (integer or string) covering everything the file says, nested data
 -- included ("levels.2.hp", "effects.1.amount"). The flat form is what gets fingerprinted,
@@ -31,7 +31,7 @@ local leveling = require("lib.leveling")
 local schema = {}
 
 -- Sync order: kinds that others reference come first.
-schema.KINDS = { "spells", "classes" }
+schema.KINDS = { "spells", "classes", "items" }
 
 local KNOWN = {}
 for _, k in ipairs(schema.KINDS) do KNOWN[k] = true end

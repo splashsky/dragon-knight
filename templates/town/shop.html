@@ -1,21 +1,29 @@
-{#- Item list (legacy towns.php buy()). -#}
+{#- Item list (legacy towns.php buy()) and the Sell section. ctx: items { item, icon, line,
+		owned, special }, sell { entry (bag entry), price (each) }. -#}
 <div class="town-message">
-Buying weapons will increase your Attack Power. Buying armor and shields will increase your Defense Power.<br><br>Click an item name to purchase it.<br><br>The following items are available at this town:<br><br>
+Buying weapons will increase your Attack Power. Buying armor and shields will increase your Defense Power. Other items go into your bag.<br><br>Click an item name to purchase it.<br><br>The following items are available at this town:<br><br>
 <table class="shop-list">
 {%- for _, e in ipairs(items) do %}
 {%- local it = e.item %}
-{%- local attrib = it.type == 1 and "Attack Power:" or "Defense Power:" %}
 <tr><td class="shop-icon">
-{%- if it.type == 1 then %}<img src="/static/images/icon_weapon.gif" alt="weapon">
-{%- elseif it.type == 2 then %}<img src="/static/images/icon_armor.gif" alt="armor">
-{%- elseif it.type == 3 then %}<img src="/static/images/icon_shield.gif" alt="shield">
-{%- end %}</td>
+{%- if e.icon then %}<img src="/static/images/icon_{{ e.icon }}.gif" alt="{{ e.icon }}">{% end %}</td>
 {%- if e.owned then %}
-<td><span class="light">{{ it.name }}</span></td><td><span class="light">{{ attrib }} {{ it.attribute }}</span></td><td><span class="light">Already purchased</span></td></tr>
+<td><span class="light">{{ it.name }}</span></td><td><span class="light">{{ e.line }}</span></td><td><span class="light">Already purchased</span></td></tr>
 {%- else %}
-<td><b><a href="/shop/buy/{{ it.id }}">{{ it.name }}</a>{% if e.special then %}<span class="highlight">*</span>{% end %}</b></td><td>{{ attrib }} <b>{{ it.attribute }}</b></td><td>Price: <b>{{ it.buycost }} gold</b></td></tr>
+<td><b><a href="/shop/buy/{{ it.id }}">{{ it.name }}</a>{% if e.special then %}<span class="highlight">*</span>{% end %}</b></td><td>{{ e.line }}</td><td>Price: <b>{{ it.price }} gold</b></td></tr>
 {%- end %}
 {%- end %}
 </table><br>
+{%- if #sell > 0 then %}
+<b>Sell</b> &mdash; I will buy these from your bag:<br><br>
+<table class="shop-sell">
+{%- for _, s in ipairs(sell) do %}
+<tr><td>{{ s.entry.item.name }}{% if s.entry.qty > 1 then %} x{{ s.entry.qty }}{% end %}</td><td>{{ s.price }} gold{% if s.entry.qty > 1 then %} each{% end %}</td>
+<td><form class="inline" method="post" action="/shop/sell/{{ s.entry.id }}">{{{ csrf_field() }}}
+{%- if s.entry.qty > 1 then %}<input type="text" name="qty" size="3" value="1" aria-label="Quantity"> {% end -%}
+<input type="submit" name="submit" value="Sell"></form></td></tr>
+{%- end %}
+</table><br>
+{%- end %}
 If you've changed your mind, you may also return back to <a href="/">town</a>.
 </div>

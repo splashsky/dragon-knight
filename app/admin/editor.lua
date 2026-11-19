@@ -27,6 +27,7 @@
 --   size, maxlength, suffix, help (trusted HTML), highlight, format = "datetime"
 --   virtual = true,               -- a text field that is not a column: shown as get(row),
 --   get = function(row) end,      -- read from the form, saved by the spec's after_save
+--                                 -- (with kind = "static": shown only)
 -- }
 local common = require("admin.common")
 local php = require("lib.php")
@@ -82,7 +83,7 @@ end
 function editor.values_from_form(spec, req)
 	local v = {}
 	for _, f in ipairs(spec.fields) do
-		if stored(f) or f.kind == "password" or f.virtual then
+		if stored(f) or f.kind == "password" or (f.virtual and f.kind ~= "static") then
 			local s = common.field(req, f.name)
 			if f.default and in_list(f.default_if or { "" }, s) then s = f.default end
 			v[f.name] = s

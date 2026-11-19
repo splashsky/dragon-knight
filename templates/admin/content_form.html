@@ -1,5 +1,5 @@
-{#- The override form of a content entity (admin/content.lua), included by admin/class and
-		admin/spell. ctx: action (the entity's admin URL), entity (its row: id, key, retired),
+{#- The override form of a content entity (admin/content.lua), included by admin/class,
+		admin/spell and admin/item. ctx: action (the entity's admin URL), entity (its row: id, key, retired),
 		form (content.form: fields, others, file_path), errors, sync_error, retired_note,
 		others_note. -#}
 {%- if errors then %}
@@ -25,8 +25,17 @@ override. "Reset to file" removes an override.</p>
 <tr><td class="admin-label">{{ f.spec.label }}:</td><td>
 {%- if f.spec.type == "text" then %}
 <textarea name="{{ f.spec.name }}" rows="6" cols="40">{{ f.value }}</textarea>
+{%- elseif f.spec.type == "choice" then %}
+<select name="{{ f.spec.name }}">
+{%- for _, v in ipairs(f.spec.values) do %}
+<option value="{{ v }}"{% if f.value == v then %} selected{% end %}>{{ v }}</option>
+{%- end %}
+</select>
 {%- elseif f.spec.type == "bool" then %}
-<select name="{{ f.spec.name }}"><option value="1"{% if f.value == "1" then %} selected{% end %}>Yes</option><option value="0"{% if f.value == "0" then %} selected{% end %}>No</option></select>
+<select name="{{ f.spec.name }}">
+<option value="1"{% if f.value == "1" then %} selected{% end %}>Yes</option>
+<option value="0"{% if f.value == "0" then %} selected{% end %}>No</option>
+</select>
 {%- else %}
 <input type="text" name="{{ f.spec.name }}" size="{{ f.spec.type == "int" and 6 or 30 }}" value="{{ f.value }}">
 {%- end %}

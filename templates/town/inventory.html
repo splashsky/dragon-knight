@@ -1,0 +1,53 @@
+{#- Inventory (town/inventory.lua). ctx: slots { slot, label, entry, attributes }, cells (bag
+		entries: entry, item, gear, accessory, quest, usable, lines), used, size, empty (free
+		slots to draw), u (fresh users row), s (effective stats), notice (lines) or nil. -#}
+<section class="box inv">
+<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<div class="box-body">
+{%- if notice then %}
+<p class="inv-notice">{% for i, line in ipairs(notice) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+{%- end %}
+<p>Attack Power: <b>{{ s.attack }}</b> &middot; Defense Power: <b>{{ s.defense }}</b> &middot;
+HP: {{ u.currenthp }} / {{ s.maxhp }} &middot; MP: {{ u.currentmp }} / {{ s.maxmp }} &middot; TP: {{ u.currenttp }} / {{ s.maxtp }}</p>
+<h3 class="inv-heading">Equipped</h3>
+<table class="inv-equipped">
+{%- for _, r in ipairs(slots) do %}
+<tr><td class="inv-slot">{{ r.label }}:</td>
+{%- if r.entry then %}
+<td><b>{{ r.entry.item.name }}</b>{% if #r.attributes > 0 then %} <span class="small">({{ table.concat(r.attributes, ", ") }})</span>{% end %}</td>
+<td><form class="inline" method="post" action="/inventory/unequip/{{ r.slot }}">{{{ csrf_field() }}}<button class="link" type="submit">Unequip</button></form></td>
+{%- else %}
+<td><span class="light">None</span></td><td></td>
+{%- end %}
+</tr>
+{%- end %}
+</table>
+<h3 class="inv-heading">Bag ({{ used }} / {{ size }})</h3>
+<div class="inv-bag">
+{%- for _, c in ipairs(cells) do %}
+<div class="inv-cell{% if c.quest then %} inv-quest{% end %}">
+<b>{{ c.item.name }}</b>{% if c.entry.qty > 1 then %} x{{ c.entry.qty }}{% end %}
+{%- if c.quest then %}<br><span class="small light">Quest item (doesn't take a slot)</span>{% end %}
+{%- if #c.lines > 0 then %}<br><span class="small">{{ table.concat(c.lines, ", ") }}</span>{% end %}
+<div class="inv-actions">
+{%- if c.gear then %}
+<form class="inline" method="post" action="/inventory/equip/{{ c.entry.id }}">{{{ csrf_field() }}}
+{%- if c.accessory then %}<select name="slot" aria-label="Accessory slot"><option value="0">First free slot</option><option value="1">Slot 1</option><option value="2">Slot 2</option><option value="3">Slot 3</option></select> {% end -%}
+<button type="submit">Equip</button></form>
+{%- end %}
+{%- if c.usable then %}
+<form class="inline" method="post" action="/inventory/use/{{ c.entry.id }}">{{{ csrf_field() }}}<button type="submit">Use</button></form>
+{%- end %}
+{%- if not c.quest then %}
+<a href="/inventory/discard/{{ c.entry.id }}">Discard</a>
+{%- end %}
+</div>
+</div>
+{%- end %}
+{%- for _ = 1, empty do %}
+<div class="inv-cell inv-free"><span class="light">Free</span></div>
+{%- end %}
+</div>
+<p>Equipped items don't take bag slots; a stack takes one. You may return to <a href="/">town</a> or continue exploring.</p>
+</div>
+</section>

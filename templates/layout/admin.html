@@ -16,16 +16,15 @@
 		<a href="/admin/news">Add News Post</a><br>
 		<a href="/admin/users">Edit Users</a><br><br>
 		<b>Game Data:</b><br>
-		<a href="/admin/items">Edit Items</a><br>
-		<a href="/admin/drops">Edit Drops</a><br>
 		<a href="/admin/towns">Edit Towns</a><br>
 		<a href="/admin/monsters">Edit Monsters</a><br>
 		<a href="/admin/classes">Classes</a><br>
 		<a href="/admin/spells">Spells</a><br>
+		<a href="/admin/items">Items</a><br>
 	</nav>
 	<main class="admin-content">
 {%- if content_error then %}
-<div class="admin-errors"><b>Content files have errors</b> (the game keeps the last good content; see <a href="/admin/classes">Classes</a> or <a href="/admin/spells">Spells</a>):
+<div class="admin-errors"><b>Content files have errors</b> (the game keeps the last good content; see <a href="/admin/classes">Classes</a>, <a href="/admin/spells">Spells</a> or <a href="/admin/items">Items</a>):
 <pre class="error">{{ content_error }}</pre></div>
 {%- end %}
 {{{ content }}}

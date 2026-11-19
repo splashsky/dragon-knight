@@ -1,0 +1,18 @@
+{#- One item (admin/items.lua). ctx: it (items row: effective values), the override form
+		(see admin/content_form), modifiers and use_effects (as text), towns (names), users, saved. -#}
+<h1 class="admin-heading">Edit Item: {{ it.name }}</h1>
+{%- if saved then %}
+<p class="admin-saved">Item updated.</p>
+{%- end %}
+{{{ include("admin/content_form") }}}
+<h2 class="admin-subheading">From the file</h2>
+<p>Read-only here: edit <code>{{ form.file_path }}</code> (the game picks the change up on the next
+page load).</p>
+<table class="admin-form">
+<tr><td class="admin-label">Category:</td><td>{{ it.category }}{% if it.slot then %} (slot: {{ it.slot }}){% end %}</td></tr>
+<tr><td class="admin-label">Max stack:</td><td>{{ it.max_stack }}</td></tr>
+<tr><td class="admin-label">Modifiers:</td><td><code>{{ modifiers }}</code></td></tr>
+<tr><td class="admin-label">Use effects:</td><td><code>{{ use_effects }}</code></td></tr>
+<tr><td class="admin-label">Sold in:</td><td>{% if #towns == 0 then %}<span class="light">No town</span>{% else %}{{ table.concat(towns, ", ") }}{% end %}</td></tr>
+<tr><td class="admin-label">Characters:</td><td>{{ users }} have it</td></tr>
+</table>

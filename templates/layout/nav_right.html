@@ -25,13 +25,14 @@ TP: {{ user.currenttp }}<br>
 <div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
 <div class="box-body">
 <table style="width: 100%">
-<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td style="width: 100%">Weapon: {{ user.weaponname }}</td></tr>
-<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td style="width: 100%">Armor: {{ user.armorname }}</td></tr>
-<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td style="width: 100%">Shield: {{ user.shieldname }}</td></tr>
+<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td style="width: 100%">Weapon: {{ equipment.weapon }}</td></tr>
+<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td style="width: 100%">Armor: {{ equipment.armor }}</td></tr>
+<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td style="width: 100%">Shield: {{ equipment.shield }}</td></tr>
 </table>
-Slot 1: {{ user.slot1name }}<br>
-Slot 2: {{ user.slot2name }}<br>
-Slot 3: {{ user.slot3name }}
+Slot 1: {{ equipment.accessory1 }}<br>
+Slot 2: {{ equipment.accessory2 }}<br>
+Slot 3: {{ equipment.accessory3 }}<br>
+<a href="/inventory">Bag: {{ bag_used }} / {{ bag_size }}</a>
 </div>
 </section>
 

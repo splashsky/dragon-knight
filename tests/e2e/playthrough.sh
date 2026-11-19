@@ -49,7 +49,7 @@ pt_fight() {
 	t_get /;      expect_redirect /fight
 	t_get /fight; expect_status 200; expect_body 'You are fighting a <b>'
 	for i in $(seq 1 60); do
-		[ "$(pq currenthp)" -lt 8 ] && pu "currenthp = maxhp"   # keep the dice from killing us
+		[ "$(pq currenthp)" -lt 8 ] && pu "currenthp = base_maxhp"   # keep the dice from killing us
 		t_post /fight "csrf=$TC&fight=Fight"
 		[ "$STATUS" = 302 ] && break
 		expect_status 200; expect_no_body 'You have died.'
@@ -89,23 +89,27 @@ t_section "playthrough: town, inn, shop, maps"
 t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
 expect_body '>Wanderer</a>'
 TC=$(t_csrf)
-pt_is "gold,currenthp,maxhp,level" "100|15|15|1" "new character"
+pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"
 t_get /inn;      expect_body 'Resting at the inn'
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed and ready for action.'
 t_get /shop;     expect_body 'href="/shop/buy/1">Stick</a>'
 t_get /shop/buy/1; expect_body 'You are buying the Stick, is that ok?'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
+t_get /shop/buy/66; expect_body 'You are buying the Herb for 15 gold each.'
+t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Thank you for purchasing this item.'
 t_get /maps;     expect_body 'href="/maps/buy/2">Roma</a>'
 t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
-pt_is "gold,weaponname,towns" "60|Stick|0,2" "after shopping"
+pt_is "gold,$T_ITEMS,towns" "30|stick@weapon,herbx2|0,2" "after shopping"
+t_get /;         expect_body 'Weapon: Stick'; expect_body 'Bag: 1 / 12</a>'
+expect_stats "15 0 10 5 5 7 5" "a stick adds 2 attack power"
 
 t_section "playthrough: explore, fight, level up"
 pu "experience = 14"   # one kill short of level 2
 pt_explore
 pt_fight
 expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
-pt_is "level,maxmp,$T_KNOWN" "2|5|1" "level up"
+pt_is "level,base_maxmp,$T_KNOWN" "2|5|1" "level up"
 t_get /victory;  expect_redirect /
 pt_walk_home
 
@@ -121,13 +125,26 @@ t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed'
 pt_is "currentmp" "5" "inn restores mp"
 pt_explore
 pt_fight
-if grep -qF 'This monster has dropped an item' "$BODY"; then t_ok; else pu "dropcode = 1"; fi
-t_get /drop;     expect_status 200; expect_body 'Slot 1:'
-t_post /drop "csrf=$TC&submit=Submit&slot=1"; expect_body 'The item has been equipped.'
-[ "$(pq "slot1id > 0 AND dropcode = 0")" = 1 ] && t_ok || t_fail "drop not equipped"
+if grep -qF 'This monster has dropped an item' "$BODY"; then t_ok; else pu "dropcode = 34"; fi
+DROP=$(pq dropcode)
+t_get /drop;     expect_status 200; expect_body 'name="take" value="Take it"'
+t_post /drop "csrf=$TC&take=Take+it"; expect_body 'is in your bag.'
+[ "$(pq "dropcode = 0 AND (SELECT count(*) FROM user_items WHERE user_id = users.id AND item_id = $DROP AND equipped IS NULL)")" = 1 ] \
+	&& t_ok || t_fail "drop not in the bag"
+
+t_section "playthrough: inventory"
+t_get /inventory; expect_status 200; expect_body 'Bag (2 / 12)'; expect_body '<b>Herb</b> x2'
+DROP_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'pthero' AND ui.item_id = $DROP")
+t_post "/inventory/equip/$DROP_E" "csrf=$TC&slot=0"; expect_body 'You equipped the'
+[ "$(pq "(SELECT equipped FROM user_items WHERE id = $DROP_E)")" = accessory1 ] && t_ok || t_fail "drop not equipped in slot 1"
+t_get /;         expect_no_body 'Slot 1: None'
+pu "currenthp = 1"
+HERB_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'pthero' AND ui.item_id = 66")
+t_post "/inventory/use/$HERB_E" "csrf=$TC"; expect_body 'You have used the Herb, and gained'
+pt_is "$T_ITEMS" "stick@weapon,herb,$(t_sql "SELECT key FROM items WHERE id = $DROP")@accessory1" "a herb used"
 
 t_section "playthrough: heal spell"
-[ "$(pq "currenthp < maxhp")" = 1 ] || pu "currenthp = 1"
+[ "$(pq "currenthp < base_maxhp")" = 1 ] || pu "currenthp = 1"
 t_get /;         expect_body 'action="/spell/1"'
 t_post /spell/1 "csrf=$TC"; expect_body 'You have cast the Heal spell'
 pt_is "currentmp" "0" "heal costs 5 mp"

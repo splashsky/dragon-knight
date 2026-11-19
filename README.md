@@ -78,7 +78,7 @@ with status 3 when it doesn't exist.
 | Command | |
 |---|---|
 | `dk serve [--port N] [--bind ADDR]` | run the HTTP server; `--port` (1–65535, or 0 for any free port) and `--bind` (an IPv4 or IPv6 address) override the config |
-| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class ID\|KEY] [--partial] [--force]` | create the schema, load the default game data, sync the content files and create the administrator (`--class`: by id or key, default 1 / `mage`; `--partial`: no game data except the classes and spells; `--force`: drop existing tables first) |
+| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class ID\|KEY] [--partial] [--force]` | create the schema, load the default game data, sync the content files and create the administrator (`--class`: by id or key, default 1 / `mage`; `--partial`: no game data except the classes, spells and items; `--force`: drop existing tables first) |
 | `dk migrate [--status]` | upgrade an existing database to the current schema and sync the content files, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
 | `dk content sync` | load and validate the content files (`app/content/`) and update the database now (the running game does this by itself on the next request after a file changes); fails, changing nothing, when a file is invalid |
 | `dk content status` | content files, database rows (and retired ones) and admin overrides per kind, whether the database is in sync, and any errors |
@@ -95,10 +95,10 @@ with status 3 when it doesn't exist.
 `spares`, paths, request limits) are read at startup. App keys (`dev`, `secret`,
 `pbkdf2_iterations`, `cookie_secure`) are re-read for every fresh VM, so they apply on the
 next request. Game settings (game name, map size, forum, email verification, …) live in
-the database and are edited in the admin panel at `/admin`. Character classes and spells
-are content files (see [Adding a class or a spell](#adding-a-class-or-a-spell)); the admin
-panel can override their names, descriptions, starting stats, MP costs and effect amounts
-per server.
+the database and are edited in the admin panel at `/admin`. Character classes, spells and
+items are content files (see [Adding a class, a spell or an item](#adding-a-class-a-spell-or-an-item));
+the admin panel can override their names, descriptions, starting stats, MP costs, prices,
+power and effect amounts per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -202,7 +202,7 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 - The C code builds warning-free with `-Wall -Wextra`. Lua code uses no globals (in Lua
 	5.5 `global` is a reserved word). The project indents with tabs.
 
-## Adding a class or a spell
+## Adding a class, a spell or an item
 
 Character classes are data files, `app/content/classes/<key>.lua` (Mage, Warrior and
 Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (the file
@@ -217,7 +217,19 @@ Spells work the same way: `app/content/spells/<key>.lua` holds a spell's name,
 description, MP cost, where it can be cast and its effects (heal, damage, sleep, attack or
 defense buffs), for example `effects = { { kind = "damage", max = 20 } }`. A class learns
 it when a class file lists its key in `levels[N].spells`. The formats, the sync and the
-admin overrides are described in `docs/APP.md` ("Content", "Spells").
+admin overrides are described in `docs/APP.md` ("Content", "Spells", "Items").
+
+### Adding an item
+
+Items are data files too, `app/content/items/<key>.lua` (the original weapons, armor and
+shields, the monster drops as accessories, and the Herb, Potion and Ether). Copy one
+(`herb.lua` for a potion-like item, `stick.lua` for a weapon, `life_pebble.lua` for a
+drop) and set its name, category (`weapon`, `armor`, `shield`, `accessory`, `consumable`,
+`quest` or `misc`), price, attack or defense, modifiers while equipped (for example
+`modifiers = { { kind = "stat", stat = "maxhp", amount = 50 } }`), what using it does
+(`use_effects`, consumables) and how many stack in one bag slot (`max_stack`). Give it a
+`drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
+in the admin town editor. `./dk check` validates it; the next page load picks it up.
 
 ## Project layout
 
@@ -228,7 +240,7 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  content/        content files: classes/, spells/ (one Lua data file each), synced into the DB
+  content/        content files: classes/, spells/, items/ (one Lua data file each), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
@@ -286,6 +298,19 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	a type and an attribute; administrators override names, descriptions, MP costs and
 	effect amounts per server (`/admin/spells`). The spells a character knows are a table
 	(`user_spells`) instead of a list in the users row.
+- Items and drops are content files (`app/content/items/`): the drops are accessories
+	(three accessory slots, as the three inventory slots were), and there are consumables:
+	Herbs, Potions and Ethers, sold in towns and usable in town or in fights (taking the
+	turn). Administrators override names, prices, power, modifiers and drop levels per
+	server (`/admin/items`); the town editor lists a shop's items by key.
+- An inventory: besides what is equipped, a bag of 12 slots (a stack counts once; quest
+	items don't count; size in the settings) with an Inventory page to equip, take off, use
+	and discard items. Buying a weapon, armor or shield offers to keep the old one in the bag
+	or sell it; shops buy back bag items for half their price; a monster's drop goes into
+	the bag (or is left behind) instead of replacing an inventory slot's item.
+- Character stats are derived: the database keeps base stats (grown by level-ups) and the
+	equipped items add theirs, instead of adding and subtracting item bonuses on every
+	change.
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread
@@ -303,12 +328,12 @@ in-game `/changelog` page (also linked from the version number in the footer).
 		gold cap warning talks about gold.
 	- Dying on a spell turn keeps the MP spent.
 	- A victory grants every level its experience covers ("You have gained N levels!").
-	- Equipping a drop into an empty slot clamps current HP/MP/TP to the new maxima.
+	- Any equipment change clamps current HP/MP/TP to the new maxima.
 	- "This monster has dropped an item" only shows when there is an item.
 	- The character sheet shows the experience for level 100 at level 99.
 	- Spells of an unknown type are refused in fights.
-	- Shop items with a strength/dexterity special update attack/defense power whatever
-		the slot.
+	- Strength and dexterity from items count toward attack and defense power whatever the
+		slot (stats are derived from the equipment).
 
 	Other fixes of crashes or exploits are commented in the code (`fixed: …`); harmless
 	quirks of the original are kept (`legacy: …`).

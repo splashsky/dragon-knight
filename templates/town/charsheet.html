@@ -16,14 +16,14 @@ Gold: {{ gold }}{% if plusgold then %} <span class="light">{{ plusgold }}</span>
 Experience: {{ experience }}<br>
 Gold: {{ gold }}<br>
 {%- end %}
-Hit Points: {{ u.currenthp }} / {{ u.maxhp }}<br>
-Magic Points: {{ u.currentmp }} / {{ u.maxmp }}<br>
-Travel Points: {{ u.currenttp }} / {{ u.maxtp }}<br><br>
+Hit Points: {{ u.currenthp }} / {{ s.maxhp }}<br>
+Magic Points: {{ u.currentmp }} / {{ s.maxmp }}<br>
+Travel Points: {{ u.currenttp }} / {{ s.maxtp }}<br><br>
 
-Strength: {{ u.strength }}<br>
-Dexterity: {{ u.dexterity }}<br>
-Attack Power: {{ u.attackpower }}<br>
-Defense Power: {{ u.defensepower }}<br>
+Strength: {{ s.strength }}<br>
+Dexterity: {{ s.dexterity }}<br>
+Attack Power: {{ s.attack }}<br>
+Defense Power: {{ s.defense }}<br>
 </div>
 </section>
 
@@ -31,13 +31,13 @@ Defense Power: {{ u.defensepower }}<br>
 <div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
 <div class="box-body">
 <table class="inventory">
-<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td>Weapon: {{ u.weaponname }}</td></tr>
-<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td>Armor: {{ u.armorname }}</td></tr>
-<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td>Shield: {{ u.shieldname }}</td></tr>
+<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td>Weapon: {{ equipment.weapon }}</td></tr>
+<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td>Armor: {{ equipment.armor }}</td></tr>
+<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td>Shield: {{ equipment.shield }}</td></tr>
 </table>
-Slot 1: {{ u.slot1name }}<br>
-Slot 2: {{ u.slot2name }}<br>
-Slot 3: {{ u.slot3name }}
+Slot 1: {{ equipment.accessory1 }}<br>
+Slot 2: {{ equipment.accessory2 }}<br>
+Slot 3: {{ equipment.accessory3 }}
 </div>
 </section>
 {%- if full then %}

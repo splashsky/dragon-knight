@@ -1,8 +1,10 @@
 # Plan: content entities (classes, spells, items) and inventory
 
-Status: approved design, implemented in three phases (A classes + content sync, B spells +
-effects, C items + inventory). Each phase is one schema migration with tests, admin pages,
-help pages and changelog lines.
+Status: **done**. Implemented in three phases, each one schema migration with tests, admin
+pages, help pages and changelog lines: A classes + content sync (schema v4) ✅, B spells +
+effects (v5) ✅, C items + inventory + derived stats (v6) ✅. The developer documentation is
+docs/APP.md ("Content", "Classes", "Spells", "Effects", "Items", "Inventory", "Derived stats");
+the Phase C section below notes where the implementation settled details.
 
 Version: all of this is **2.1** (in development until the project owner says otherwise),
 together with the earlier 2.1 work (difficulty removal, leveling formulas), which already
@@ -56,7 +58,7 @@ app/content/items/<key>.lua
 	once from the current seed, values identical). The SQL seed keeps only towns, monsters,
 	control and news.
 
-## Phase A: classes (schema v4)
+## Phase A: classes (schema v4) ✅
 
 - `classes`: `id, key, name, description, sort, playable, start_hp, start_mp, start_tp,
 	start_strength, start_dexterity, exp_base, exp_stages` (stages as text `"2x2,1.5x8,..."`
@@ -78,7 +80,7 @@ app/content/items/<key>.lua
 - Migration v4: build classes/class_levels/class_spells from control names + levels data +
 	leveling.lua parameters; verify totals equal the pre-migration values.
 
-## Phase B: spells and effects (schema v5)
+## Phase B: spells and effects (schema v5) ✅
 
 - Effects engine `app/lib/effects.lua`: effect specs are small tables, applied to a context
 	(`player`, optional `monster`, `in_fight`) and returning messages:
@@ -94,7 +96,7 @@ app/content/items/<key>.lua
 	it: existing fight/heal tests must pass unchanged except for URLs/ids if any).
 - Migration v5: map spell types to effects, explode `users.spells` into rows.
 
-## Phase C: items, inventory, derived stats (schema v6)
+## Phase C: items, inventory, derived stats (schema v6) ✅
 
 - `items`: `id, key, name, description, category` (`weapon`, `armor`, `shield`,
 	`accessory`, `consumable`, `quest`, `misc`), `slot` (`weapon`, `armor`, `shield`,
@@ -145,3 +147,28 @@ app/content/items/<key>.lua
 - Gameplay equivalence: existing fight/town/playthrough tests keep passing (updated only for
 	intentional UI/URL changes), plus new e2e for inventory, cap, consumables, shop options,
 	drops, accessories.
+
+## Phase C as implemented
+
+- Content: `app/content/items/<key>.lua` (68 files: items 1-33, drops 34-65 as accessories,
+	Herb 66, Potion 67, Ether 68). `slot` follows the category (a file may omit it);
+	`sellable` defaults to "has a price and isn't a quest item". Validation: gear has
+	max_stack 1 and no use effects; only gear has attack/defense/modifiers; consumables need
+	use effects; quest items aren't sellable. Overridable: name, description, price,
+	attack, defense, drop_level, sellable, droppable, modifier stats and amounts (an override
+	may add a modifier), use effect parameters.
+- Shops: Herbs in every town, Potions and Ethers from Roma on. Weapons, armor and shields
+	are equipped when bought; everything else (consumables, accessories) goes into the bag.
+	You can't buy the item you are wearing (the original's "Already purchased"); a copy in
+	the bag doesn't stop you. A plain "Yes" with an old item sells it (the original form).
+- Derived stats (`lib/stats.lua`): besides base_maxhp/mp/tp, strength and dexterity, users
+	have `base_attack`, `base_defense`, `base_exp_bonus` and `base_gold_bonus` (0 normally):
+	what neither strength/dexterity nor gear explains. Migration 6 puts the original game's
+	inconsistencies there (e.g. attack power the old shop never updated) so no character
+	loses power; admins can set them.
+- Migration 6 verifies twice: inside the step (recomputed effective stats must equal the
+	stored ones, or it fails), and after the content sync that ends `dk migrate`
+	(`after_sync`): an edit the item files can't express (a changed item type) changes a
+	character's effective stats, so the base stats are adjusted to keep them, with a warning.
+	Specials on columns that aren't stats (gold, currenthp, ...) are dropped with a warning
+	(they never were lasting stats).

@@ -19,6 +19,13 @@ changelog.RELEASES = {
 			"Replaced the spells editor with a Spells page in the admin panel: names, descriptions, MP costs and effect amounts can be overridden per server.",
 			"The spells a character knows are kept in their own table; the user editor takes spell names by key.",
 			"Warrior and Paladin now use the same experience curve as the Mage (scaled by their own first step); classes can still define their own.",
+			"Items and monster drops are now content files too; drops are accessories, and admins can override names, prices, power, modifiers and drop levels per server on a new Items page (it replaces the items and drops editors).",
+			"Added an inventory: a bag of 12 slots (stacks count once, quest items don't count; size in the main settings) next to the equipped weapon, armor, shield and three accessory slots, with an Inventory page to equip, take off, use and discard items.",
+			"Added Herbs, Potions and Ethers, sold in towns; use them from the inventory or in a fight (it takes your turn).",
+			"When buying a weapon, armor or shield you can keep the old one in your bag or sell it, and shops buy back items from your bag.",
+			"Monster drops go into the bag (or are left behind); with a full bag you can throw something away first.",
+			"Character stats are computed from base stats and the equipped items, so equipping and removing items is always exact.",
+			"The town editor lists the items a shop sells by key; the user editor shows the character's inventory and effective stats.",
 		},
 	},
 	{

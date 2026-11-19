@@ -49,13 +49,13 @@ app/                  Lua application (hot-reloaded)
   routes/             thin route modules: auth, home, town, fight, community, admin
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
                       news, paging, migrations (schema versions), leveling, classes,
-                      spells, effects (the effects engine), content/ (content loader,
-                      schemas, sync)
-  content/            content files: classes/<key>.lua, spells/<key>.lua (synced into the DB)
-  town/               inn, shop, maps, travel, explore, heal, character/map, babble
+                      spells, items, inventory, stats (derived stats), effects (the
+                      effects engine), content/ (content loader, schemas, sync)
+  content/            content files: classes/, spells/, items/ <key>.lua (synced into the DB)
+  town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, classes, spells, generic CRUD editor)
+  admin/              admin control panel (settings, news, classes, spells, items, generic CRUD editor)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
   cli/content.lua     `dk content sync|status`; cli/check.lua: content part of `dk check`
@@ -68,10 +68,10 @@ public/               served at /static/ (images/, css/, js/)
 tests/c/              C unit tests (one main() per file, built by `make test`)
 tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
-tests/e2e/            feature scripts sourced by run.sh (admin, community, fight, migrate,
-                      news, playthrough, town)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v4.sql, seed_v3/v4.sql: frozen old
-                      schemas and data for the migration test
+tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
+                      inventory, migrate, news, playthrough, town, ...)
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v5.sql, seed_v3/v4/v5.sql: frozen
+                      old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
 
@@ -223,12 +223,13 @@ queued cookies), so HEAD never changes state.
 | `users.php?do=lostpassword` | `GET/POST /lostpassword` |
 | `users.php?do=changepassword` | `GET/POST /changepassword` |
 | `index.php?do=inn` | `GET/POST /inn` |
-| `do=buy` / `buy2:id` / `buy3:id` | `GET /shop`, `GET /shop/buy/:id` (confirm), `POST /shop/buy/:id` |
-| `do=sell` | (dead in legacy — towns.php has no `sell()`; omit) |
+| `do=buy` / `buy2:id` / `buy3:id` | `GET /shop`, `GET /shop/buy/:id` (confirm), `POST /shop/buy/:id` (keep / sell the old item; qty for bag items) |
+| `do=sell` | (dead in legacy — towns.php has no `sell()`); new: `POST /shop/sell/:id` (a bag entry, qty) |
+| (new) | `GET /inventory`, `POST /inventory/equip/:id` (slot for accessories), `POST /inventory/unequip/:slot`, `POST /inventory/use/:id`, `GET/POST /inventory/discard/:id` |
 | `do=maps` / `maps2:id` / `maps3:id` | `GET /maps`, `GET /maps/buy/:id`, `POST /maps/buy/:id` |
 | `do=gotown:id` | `POST /travel/:id` |
 | `do=move` | `POST /move` (button name north/south/east/west) |
-| `do=fight` / `victory` / `drop` / `dead` | `GET/POST /fight`, `GET /victory`, `GET/POST /drop`, `GET /dead` |
+| `do=fight` / `victory` / `drop` / `dead` | `GET/POST /fight` (fight, spell, item, run), `GET /victory`, `GET/POST /drop` (take, leave), `GET /dead` |
 | `do=spell:id` | `POST /spell/:id` (heal spells out of combat) |
 | `do=showchar` | `GET /character` (minimal layout, popup-friendly) |
 | `do=onlinechar:id` | `GET /character/:id` |
@@ -238,7 +239,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]` (content overrides), `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -247,9 +248,9 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 
 ## Data model
 
-- Port every legacy table to SQLite without the `dk_` prefix: `babble, control, drops,
-	forum, items, monsters, news, spells, towns, users` (and `levels`, until schema
-	version 4), keeping column names so porting is mechanical. Add `sessions`.
+- Port every legacy table to SQLite without the `dk_` prefix: `babble, control, forum,
+	items, monsters, news, spells, towns, users` (and `levels` until schema version 4,
+	`drops` until 6), keeping column names so porting is mechanical. Add `sessions`.
 - Forum boards: `forums(id, name, description, position, admin_threads)`, seeded with
 	1 General and 2 News (`admin_threads = 1`: only admins start threads). `forum` gains
 	`board` (→ `forums.id`, replies copy their thread's) and `author_id` (→ `users.id`,
@@ -281,6 +282,20 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	keys; `class_spells.spell_id` references `spells.id`. The spells a character knows are
 	`user_spells(user_id → users ON DELETE CASCADE, spell_id → spells, learned_level)`
 	(NULL level: unknown), replacing the `users.spells` comma list.
+- Items (schema version 6, `docs/APP.md` "Items", "Inventory", "Derived stats"): content
+	files `app/content/items/<key>.lua` synced into `items(id, key UNIQUE, name, description,
+	category, slot, price, attack, defense, modifiers, use_effects, max_stack, drop_level,
+	sellable, droppable, retired)` (`modifiers`/`use_effects`: effect lists as text). Items
+	1-33 are the original items, 34-65 the original drops (accessories, `drop_level` = the
+	old mlevel), 66-68 Herb, Potion, Ether; the `drops` table is gone. `town_items(town_id,
+	item_id)` replaces `towns.itemslist`. `user_items(id, user_id → users ON DELETE CASCADE,
+	item_id, qty, equipped)` (equipped: weapon, armor, shield, accessory1-3, or NULL for the
+	bag; UNIQUE (user_id, equipped)) replaces weaponid..slot3id and the names;
+	`control.inventory_size` (12) is the bag size. `users` keeps base stats: `base_maxhp`,
+	`base_maxmp`, `base_maxtp` (were maxhp, maxmp, maxtp), `strength`, `dexterity`,
+	`base_attack`, `base_defense`, `base_exp_bonus`, `base_gold_bonus` (attackpower,
+	defensepower, expbonus, goldbonus are gone: derived from the equipment, `lib/stats.lua`).
+	`users.dropcode` holds a pending drop's item id.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -296,10 +311,10 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
 	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
-- Seed data in `app/sql/seed.sql` plus the class and spell content files match the original
-	install.php "complete setup" exactly (all rows of drops, items, levels, monsters,
-	spells, towns, control), minus the difficulty settings and the levels values that
-	became formulas.
+- Seed data in `app/sql/seed.sql` plus the class, spell and item content files match the
+	original install.php "complete setup" exactly (all rows of drops, items, levels,
+	monsters, spells, towns, control), minus the difficulty settings and the levels values
+	that became formulas, plus the new consumables (Herb, Potion, Ether) in the shops.
 - Email (registration verification, lost password) is written to
 	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 
@@ -310,9 +325,10 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - `php.rand(min, max)`: PHP casts float args to int (truncate toward zero), and swaps if
 	`min > max`; inclusive range via `math.random`.
 - `php.ceil`, `php.number_format(n)`, `php.nl2br`, `php.prettydate(ts)` ("F j, Y").
-- Preserve comma-list columns (`users.towns`, `towns.itemslist`, `drops.attribute1/2`
-	`"stat,value"` / `"X"`) and their semantics (`users.spells` became `user_spells` in
-	schema version 5, migrated with the same matching).
+- Preserve comma-list columns (`users.towns`) and their semantics (`users.spells` became
+	`user_spells` in schema version 5, `towns.itemslist` became `town_items` and the item
+	specials / drop attributes `"stat,value"` became stat modifiers in version 6, migrated
+	with the same matching).
 - When legacy has an obvious bug that affects gameplay, the behavior is kept unless it
 	is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
 	"fixed: …").
@@ -328,11 +344,14 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	- `goldbonus` is a percentage of the gold gained; the gold cap warning mentions gold.
 	- Death saves `currentmp` (no refund for a spell cast on the fatal turn).
 	- A victory grants several levels when the experience covers them (up to 100).
-	- Equipping a drop into an empty slot also clamps current HP/MP/TP.
+	- Any equipment change clamps current HP/MP/TP to the new maxima.
 	- The drop message only shows when a drop was picked.
 	- The character sheet shows the next level's experience at level 99.
 	- Unknown spell types are refused in fights (no MP cost, no monster turn).
-	- Shop strength/dexterity specials update attack/defense power in any slot.
+	- Strength/dexterity from items count toward attack/defense power in any slot (stats
+		are derived from base stats + equipment since schema version 6).
+	- Inventory (version 6): a 12-slot bag, keep-or-sell when buying gear, selling bag
+		items, drops into the bag, consumables (usable in fights, costing the turn).
 - Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
 	forum is only reachable when `control.forumtype = 1`.
 

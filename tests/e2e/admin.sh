@@ -16,9 +16,8 @@ if ! t_has_sql; then
 else
 
 t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
-			 CREATE TABLE adm_snap_items AS SELECT * FROM items WHERE id = 1;
-			 CREATE TABLE adm_snap_drops AS SELECT * FROM drops WHERE id = 1;
 			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
+			 CREATE TABLE adm_snap_town_items AS SELECT * FROM town_items WHERE town_id = 2;
 			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
@@ -45,11 +44,11 @@ expect_body 'href="/admin/settings"'; expect_body 'href="/admin/classes"'; expec
 expect_body '<title>Admin Home</title>'; expect_body 'Queries'
 
 t_section "admin: csrf"
-t_post /admin/items/1 "name=NoToken&type=1&buycost=1&attribute=1&special=X"
+t_post /admin/items/1 "name=NoToken&price=1&attack=1"
 expect_status 403
 t_post /admin/news "csrf=$(printf 'a%.0s' $(seq 64))&content=forged"
 expect_status 403
-admin_eq "SELECT name FROM items WHERE id = 1" "Stick" "item untouched without csrf"
+admin_eq "SELECT name || '|' || (SELECT count(*) FROM content_overrides) FROM items WHERE id = 1" "Stick|0" "item untouched without csrf"
 admin_eq "SELECT count(*) FROM news WHERE content = 'forged'" "0" "news untouched without csrf"
 
 t_section "admin: settings"
@@ -91,45 +90,19 @@ t_get /;                   expect_no_body 'The game is currently closed'
 t_jar admadmin
 t_get /admin/monsters;     expect_body 'Monster level and map size match.'
 
-t_section "admin: items"
-t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items/1">Stick</a>'
-t_get /admin/items/1;      expect_body 'Special Codes:'; expect_body 'value="Stick"'
-t_form_submit /admin/items/1 buycost= attribute=1x type=9
-expect_body 'Cost is required.'; expect_body 'Cost must be a number.'; expect_body 'Attribute must be a number.'
-expect_body 'Type is invalid.'
-t_form_submit /admin/items/1 name= buycost=5
-expect_body 'Name is required.'
-t_get /admin/items/1
-t_form_submit /admin/items/1 "name=<script>alert(1)</script>" type=2 buycost=123 attribute=7.5 "special= " \
-	id=999 password=x unknowncol=1 "name2=y"
-expect_redirect '/admin/items/1\?saved=1'
-t_get /admin/items/1?saved=1; expect_body 'Item updated.'
-admin_eq "SELECT id || '|' || name || '|' || type || '|' || buycost || '|' || attribute || '|' || special FROM items WHERE id = 1" \
-	"1|<script>alert(1)</script>|2|123|8|X" "item saved"
-admin_eq "SELECT count(*) FROM items WHERE id = 999" "0" "no mass-assigned id"
-t_get /admin/items;        expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
-t_get /admin/items/1;      expect_body 'value="&lt;script&gt;alert(1)&lt;/script&gt;"'
-t_get /admin/items/9999;   expect_status 404
-t_get /admin/items/abc;    expect_status 404
-
-t_section "admin: drops"
-t_get /admin/drops;        expect_body '<a href="/admin/drops/1">Life Pebble</a>'
-t_get /admin/drops/1
-t_form_submit /admin/drops/1 attribute1=X mlevel=
-expect_body 'First attribute is required.'; expect_body 'Monster level is required.'; expect_body 'Monster level must be a number.'
-t_form_submit /admin/drops/1 name=Pebble2 mlevel=3 attribute1=maxhp,20 "attribute2="
-expect_redirect '/admin/drops/1\?saved=1'
-admin_eq "SELECT name || '|' || mlevel || '|' || attribute1 || '|' || attribute2 FROM drops WHERE id = 1" \
-	"Pebble2|3|maxhp,20|X" "drop saved"
-
 t_section "admin: towns"
-t_get /admin/towns/2;      expect_body 'Items List:'
-t_form_submit /admin/towns/2 itemslist= latitude=north
-expect_body 'Items List is required.'; expect_body 'Latitude must be a number.'
-t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 itemslist=1,2,3
+t_get /admin/towns/2;      expect_body 'Items:'
+expect_body 'name="items" size="60" maxlength="2000" value="branch, club, dagger, clothes, leather_armor, buckler, herb, potion, ether"'
+t_form_submit /admin/towns/2 "items=stick, nope" latitude=north
+expect_body "Items: there is no item &#39;nope&#39;."; expect_body 'Latitude must be a number.'
+admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "2,3,4,18,19,29,66,67,68" "invalid town not saved"
+t_get /admin/towns/2
+t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 "items=herb,stick  club"
 expect_redirect '/admin/towns/2\?saved=1'
-admin_eq "SELECT name || '|' || latitude || '|' || longitude || '|' || innprice || '|' || mapprice || '|' || travelpoints || '|' || itemslist FROM towns WHERE id = 2" \
-	"Newtown|-31|44|11|22|3|1,2,3" "town saved"
+admin_eq "SELECT name || '|' || latitude || '|' || longitude || '|' || innprice || '|' || mapprice || '|' || travelpoints FROM towns WHERE id = 2" \
+	"Newtown|-31|44|11|22|3" "town saved"
+admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "1,3,66" "shop list saved"
+t_get /admin/towns/2;      expect_body 'name="items" size="60" maxlength="2000" value="stick, club, herb"'
 
 t_section "admin: monsters"
 t_get /admin/monsters/1;   expect_body 'Immunity:'
@@ -180,6 +153,58 @@ t_get /admin/spells/6
 t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=*"
 admin_eq "SELECT name || '|' || mp || '|' || effects FROM spells WHERE id = 6" "Hurt|5|damage max=15" "all reset to file"
 admin_eq "SELECT count(*) FROM content_overrides" "0" "no spell overrides left"
+
+t_section "admin: items"
+# item files app/content/items/*.lua; admins override name, description, price, power,
+# drop settings, modifiers and use effect amounts (the files: tests/lua/test_items.lua)
+t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items/1">Stick</a>'
+expect_body '<td>stick</td><td>weapon</td><td>10</td><td>Attack Power +2</td>'
+expect_body '<td>demons_sin</td><td>accessory</td><td>0</td><td>Max HP -50, Strength +50</td><td></td>'
+expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Heal 30</td>'
+expect_body 'items: 68 files, 68 in the database (0 retired), 0 overrides.'
+t_get /admin/drops;        expect_redirect /admin/items
+t_get /admin/items/46;     expect_status 200; expect_body 'Edit Item: Demon&#39;s Sin'; expect_body 'app/content/items/demons_sin.lua'
+expect_body 'name="modifiers.1.amount" size="6" value="-50"'; expect_body '<option value="maxhp" selected>maxhp</option>'
+expect_body 'name="drop_level" size="6" value="35"'; expect_body '<code>stat stat=maxhp amount=-50; stat stat=strength amount=50</code>'
+expect_no_body 'name="category"'; expect_no_body 'name="max_stack"'; expect_no_body 'name="modifiers.1.kind"'
+t_get /admin/items/66;     expect_body 'Use effect 1 (Heal): amount:'; expect_body 'name="use_effects.1.amount" size="6" value="30"'
+expect_body 'Sold in:</td><td>Midworld, Newtown, Bris'; expect_no_body 'name="attack"'
+t_get /admin/items/9999;   expect_status 404
+t_post /admin/items/46 "name=NoToken"; expect_status 403
+t_get /admin/items/46
+t_form_submit /admin/items/46 name= price=-1 modifiers.1.amount=x
+expect_status 200; expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
+expect_body 'Price must be an integer from 0 to 10000000.'; expect_body 'Modifier 1 amount must be an integer from -1000000 to 1000000.'
+admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid item form not saved"
+t_get /admin/items/46
+t_form_submit /admin/items/46 "name=<script>alert(1)</script>" price=123 drop_level=3 modifiers.1.stat=maxmp \
+	modifiers.1.amount=-20 category=weapon id=7
+expect_redirect '/admin/items/46\?saved=1'
+admin_eq "SELECT id || '|' || name || '|' || category || '|' || price || '|' || drop_level || '|' || modifiers FROM items WHERE key = 'demons_sin'" \
+	"46|<script>alert(1)</script>|accessory|123|3|stat stat=maxmp amount=-20; stat stat=strength amount=50" "item overrides applied"
+admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'items' ORDER BY field)" \
+	"drop_level=3;modifiers.1.amount=-20;modifiers.1.stat=maxmp;name=<script>alert(1)</script>;price=123" "only the changed fields are overridden"
+t_get '/admin/items/46?saved=1'; expect_body 'Item updated.'; expect_body 'File value: maxhp'; expect_body 'File value: -50'
+t_get /admin/items;        expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
+t_get /help/items;         expect_body '>&lt;script&gt;alert(1)&lt;/script&gt;</td><td style="width: 15%">3</td><td style="width: 30%">Max MP -20</td>'
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+admin_eq "SELECT price || '|' || modifiers FROM items WHERE id = 46" "123|stat stat=maxmp amount=-20; stat stat=strength amount=50" "item overrides survive a sync"
+t_get /admin/items/66
+t_form_submit /admin/items/66 "description=$(t_sql "SELECT description FROM items WHERE id = 66")" use_effects.1.amount=45 sellable=0
+admin_eq "SELECT use_effects || '|' || sellable || '|' || (SELECT count(*) FROM content_overrides WHERE key = 'herb') FROM items WHERE id = 66" \
+	"heal_hp amount=45|0|2" "use effect override"
+t_get /admin/items/66
+t_post /admin/items/66/reset "csrf=$(t_csrf)&field=*"
+t_get /admin/items/46
+t_post /admin/items/46/reset "csrf=$(t_csrf)&field=name"
+expect_redirect '/admin/items/46\?saved=1'
+admin_eq "SELECT name || '|' || price FROM items WHERE id = 46" "Demon's Sin|123" "name reset to file"
+t_get /admin/items/46
+t_post /admin/items/46/reset "csrf=$(t_csrf)&field=*"
+admin_eq "SELECT name || '|' || price || '|' || drop_level || '|' || modifiers FROM items WHERE id = 46" \
+	"Demon's Sin|0|35|stat stat=maxhp amount=-50; stat stat=strength amount=50" "all reset to file"
+admin_eq "SELECT use_effects || '|' || sellable FROM items WHERE id = 66" "heal_hp amount=30|1" "herb reset"
+admin_eq "SELECT count(*) FROM content_overrides" "0" "no item overrides left"
 
 t_section "admin: classes"
 # class files app/content/classes/*.lua; admins override some fields (tests/e2e/content.sh
@@ -235,14 +260,14 @@ adm_class_post 2 "playable=1"
 t_jar admreg
 t_register admwarrior pw1 admwarrior@example.com AdmWarrior 2
 expect_body 'Your account was created succesfully'
-admin_eq "SELECT charclass || '|' || currenthp || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || strength || '|' || attackpower FROM users WHERE username = 'admwarrior'" \
+admin_eq "SELECT charclass || '|' || currenthp || '|' || base_maxhp || '|' || base_maxmp || '|' || base_maxtp || '|' || strength || '|' || (strength + base_attack) FROM users WHERE username = 'admwarrior'" \
 	"2|20|20|0|10|5|5" "new character gets the overridden starting stats"
 t_login admwarrior pw1
 t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 68, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"
@@ -324,9 +349,9 @@ t_get /;                   expect_body 'Fresh &lt;b&gt;news&lt;/b&gt; from the a
 
 # restore everything this script touched
 t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; DROP TABLE adm_snap_control;
-			 DELETE FROM items WHERE id = 1; INSERT INTO items SELECT * FROM adm_snap_items; DROP TABLE adm_snap_items;
-			 DELETE FROM drops WHERE id = 1; INSERT INTO drops SELECT * FROM adm_snap_drops; DROP TABLE adm_snap_drops;
 			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
+			 DELETE FROM town_items WHERE town_id = 2; INSERT INTO town_items SELECT * FROM adm_snap_town_items;
+			 DROP TABLE adm_snap_town_items;
 			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
 			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

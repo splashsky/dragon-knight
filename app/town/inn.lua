@@ -1,5 +1,6 @@
 -- town/inn.lua :: legacy towns.php inn(): pay the innprice, refill HP/MP/TP.
 local common = require("town.common")
+local game = require("lib.game")
 local view = require("lib.view")
 
 local inn = {}
@@ -12,8 +13,9 @@ function inn.handle(req)
 	if user.gold < town.innprice then return common.message(req, "Inn", "inn_poor") end
 
 	if req.method == "POST" and req.form.submit ~= nil then
+		local s = game.stats(user)
 		dk.db:exec("UPDATE users SET gold = ?, currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
-							 user.gold - town.innprice, user.maxhp, user.maxmp, user.maxtp, user.id)
+							 user.gold - town.innprice, s.maxhp, s.maxmp, s.maxtp, user.id)
 		return common.message(req, "Inn", "inn_done")
 	elseif req.method == "POST" and req.form.cancel ~= nil then
 		return view.redirect("/")

@@ -49,6 +49,10 @@ local function spec()
 			{ name = "forumaddress", label = "External Forum", size = 30, maxlength = 200,
 				help = "If the above value is set to 'External,' please specify the complete URL to your " ..
 							 "forums here." },
+			{ name = "inventory_size", label = "Bag Size", size = 3, maxlength = 3, int = true,
+				help = "Default is 12. How many stacks of items a character's bag holds (equipped items and " ..
+							 "quest items don't count; a stack of potions counts once). Lowering it never takes " ..
+							 "items away: a bag over the size just can't take new ones." },
 			yesno("verifyemail", "Email Verification", "Make users verify their email address for " ..
 						"added security.", "Disabled", "Enabled"),
 			yesno("shownews", "Show News", "Toggle display of the Latest News box in towns."),
@@ -62,6 +66,8 @@ local function spec()
 			-- PHP: ("abc" % 5) == 0, so a non-number only trips the next check
 			if php.intval(v.gamesize) % 5 ~= 0 then err("Map size must be divisible by five.") end
 			if not common.is_numeric(v.gamesize) then err("Map size must be a number.") end
+			local size = math.tointeger(tonumber(v.inventory_size))
+			if not size or size < 1 or size > 100 then err("Bag size must be a number from 1 to 100.") end
 			if v.forumtype == "2" and v.forumaddress == "" then
 				err("You must specify a forum address when using the External setting.")
 			end

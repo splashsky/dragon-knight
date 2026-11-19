@@ -289,16 +289,15 @@ function T.level_up()
 	eq(combat.level_up(u, MAGE, 14, row), nil)
 	local g = combat.level_up(u, MAGE, 15, row)
 	eq(g.level, 2); eq(g.levels, 1); eq(g.hp, 2); eq(g.mp, 5); eq(g.tp, 1); eq(g.learned, 1)
-	eq(g.maxhp, 17); eq(g.maxmp, 5); eq(g.maxtp, 11)
-	eq(g.newstrength, 5); eq(g.newdexterity, 6); eq(g.attackpower, 5); eq(g.defensepower, 6)
+	eq(g.strength, 0); eq(g.dexterity, 1)
+	-- gains only: the caller adds them to the base stats (attack/defense are derived)
+	eq(g.maxhp, nil); eq(g.attackpower, nil)
 	eq(learned(g), "1@2")
 	-- several levels at once: 2 and 3 (44 < 45 stops at 2; 104 < 105 stops at 3)
 	eq(combat.level_up(u, MAGE, 44, row).level, 2)
 	g = combat.level_up(u, MAGE, 104, row)
 	eq(g.level, 3); eq(g.levels, 2); eq(g.hp, 5); eq(g.mp, 9); eq(g.tp, 3)
 	eq(g.strength, 1); eq(g.dexterity, 3); eq(g.learned, 1); eq(learned(g), "1@2")
-	eq(g.maxhp, 20); eq(g.maxmp, 9); eq(g.maxtp, 13); eq(g.newstrength, 6); eq(g.newdexterity, 8)
-	eq(g.attackpower, 6); eq(g.defensepower, 8)
 	-- all the way, stopping where the rows run out
 	g = combat.level_up(u, MAGE, 10 ^ 6, row)
 	eq(g.level, 4); eq(g.levels, 3); eq(g.learned, 2); eq(learned(g), "1@2 6@4")
@@ -344,38 +343,24 @@ function T.drop_roll_and_pick()
 	eq(combat.pick({}, dice({}).rand), nil)
 end
 
-function T.equip_drop()
-	local pebble = { id = 1, name = "Life Pebble", attribute1 = "maxhp,10", attribute2 = "X" }
-	local sin = { id = 13, name = "Demon's Sin", attribute1 = "maxhp,-50", attribute2 = "strength,50" }
-	local wing = { id = 12, name = "Dragon's Wing", attribute1 = "dexterity,50", attribute2 = "X" }
-	-- empty slot
-	local st = player({ currenthp = 15, maxhp = 15 })
-	combat.equip_drop(st, pebble, nil)
-	eq(st.maxhp, 25); eq(st.currenthp, 15)
-	-- replace pebble with Demon's Sin: -10 then -50 hp, +50 str and attack; HP clamped
-	st = player({ currenthp = 25, maxhp = 25 })
-	combat.equip_drop(st, sin, pebble)
-	eq(st.maxhp, -35); eq(st.currenthp, -35); eq(st.strength, 55); eq(st.attackpower, 55)
-	eq(php.mysql_uint(st.maxhp), 0)
-	-- replace Sin with Wing: str/attack back, dex/defense up
-	st = player({ maxhp = 100, currenthp = 100, strength = 55, attackpower = 55 })
-	combat.equip_drop(st, wing, sin)
-	eq(st.maxhp, 150); eq(st.currenthp, 100); eq(st.strength, 5); eq(st.attackpower, 5)
-	eq(st.dexterity, 55); eq(st.defensepower, 55)
-	-- empty slot with a negative item: clamped too
-	st = player({ currenthp = 15, maxhp = 15 })
-	combat.equip_drop(st, sin, nil)
-	eq(st.maxhp, -35); eq(st.currenthp, -35); eq(php.mysql_uint(st.currenthp), 0)
-	st = player({ currenthp = 100, maxhp = 100, currentmp = 30, maxmp = 60 })
-	combat.equip_drop(st, { id = 99, name = "Curse", attribute1 = "maxhp,-20", attribute2 = "maxmp,-40" }, nil)
-	eq(st.maxhp, 80); eq(st.currenthp, 80); eq(st.maxmp, 20); eq(st.currentmp, 20)
-end
-
-function T.drop_attribute_text()
-	local a = combat.drop_attributes({ attribute1 = "maxhp,-50", attribute2 = "strength,50" })
-	eq(a[1], "Max HP-50"); eq(a[2], "Strength +50")
-	a = combat.drop_attributes({ attribute1 = "goldbonus,10", attribute2 = "X" })
-	eq(#a, 1); eq(a[1], "Gold Bonus +10")
+-- Using a consumable (combat.use_error / combat.use): an items row with decoded effects.
+function T.use_item()
+	local herb = { name = "Herb", category = "consumable", use_effects = { { kind = "heal_hp", amount = 30 } } }
+	local st = player({ currenthp = 5, maxhp = 100, currentmonsterhp = 20 })
+	eq(combat.use_error(st, herb), nil)
+	local lines, killed = combat.use(st, herb, dice({}).rand)
+	eq(lines[1], "You have used the Herb, and gained 30 Hit Points."); eq(killed, false); eq(st.currenthp, 35)
+	-- refusals: full, not a consumable, nothing to do
+	eq(combat.use_error(player({ currenthp = 15, maxhp = 15 }), herb),
+		"Your Hit Points are already full. Please go back and try again.")
+	eq(combat.use_error(player(), { name = "Stick", category = "weapon", use_effects = {} }),
+		"This item cannot be used. Please go back and try again.")
+	-- a damaging item hurts the monster (rolls like a Hurt spell) and may kill it
+	local bomb = { name = "Bomb", category = "consumable", use_effects = { { kind = "damage", max = 12 } } }
+	st = player({ currentmonsterhp = 10 })
+	local d = dice({ 11 })
+	lines, killed = combat.use(st, bomb, d.rand)
+	ranges(d, "10,12"); eq(lines[1], "You have used the Bomb for 11 damage."); eq(killed, true)
 end
 
 return T

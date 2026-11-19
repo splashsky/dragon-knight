@@ -10,6 +10,12 @@ You wake up feeling refreshed and ready for action.<br><br>You may return to <a 
 You do not have enough gold to buy this item.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "shop_done" then %}
 Thank you for purchasing this item.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "shop_bag_full" then %}
+Your bag is full. Make room in your <a href="/inventory">inventory</a> first.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "shop_qty" then %}
+Please enter a quantity from 1 to {{ max }}.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
+{%- elseif key == "shop_sold" then %}
+You sold {% if qty > 1 then %}{{ qty }} x {{ name }}{% else %}the {{ name }}{% end %} for {{ gold }} gold.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "maps_poor" then %}
 You do not have enough gold to buy this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "maps_done" then %}

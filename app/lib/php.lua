@@ -120,8 +120,8 @@ function php.loose_eq(a, b)
 	return tostring(a) == tostring(b)
 end
 
--- in_array($v, explode(",", $list)) for comma-list columns (users.towns, towns.itemslist;
--- users.spells before schema version 5).
+-- in_array($v, explode(",", $list)) for comma-list columns (users.towns; users.spells
+-- before schema version 5, towns.itemslist before 6).
 function php.in_list(list, v)
 	for _, item in ipairs(php.explode(",", list)) do
 		if php.loose_eq(item, v) then return true end

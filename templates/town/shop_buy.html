@@ -1,12 +1,31 @@
-{#- Purchase confirmation (legacy towns.php buy2()). -#}
+{#- Purchase confirmation (legacy towns.php buy2()). ctx: the offer of town/shop.lua's
+		check(): item, slot (gear that is equipped when bought), old (the entry in that slot),
+		sellback, can_keep, keep_full, can_sell; max (bag items: how many). -#}
 <div class="town-message">
-{%- if old then %}
-If you are buying the {{ item.name }}, then I will buy your {{ old.name }} for {{ sellback }} gold. Is that ok?<br><br>
-{%- else %}
-You are buying the {{ item.name }}, is that ok?<br><br>
-{%- end %}
 <form action="/shop/buy/{{ item.id }}" method="post">
 {{{ csrf_field() }}}
+{%- if slot and old then %}
+You are buying the {{ item.name }} for {{ item.price }} gold. What should I do with your {{ old.item.name }}?<br><br>
+{%- if can_keep then %}
+<input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)"><br>
+{%- elseif keep_full then %}
+<span class="light">Your bag is full, so you can't keep your {{ old.item.name }}.</span><br>
+{%- else %}
+<span class="light">You don't have enough gold to buy it and keep your {{ old.item.name }}.</span><br>
+{%- end %}
+{%- if can_sell then %}
+<input type="submit" name="sell" value="Buy and sell my {{ old.item.name }} for {{ sellback }} gold"><br>
+{%- end %}
+<br><input type="submit" name="cancel" value="No">
+{%- elseif slot then %}
+You are buying the {{ item.name }}, is that ok?<br><br>
 <input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
+{%- else %}
+You are buying the {{ item.name }} for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.<br><br>
+{%- if max > 1 then %}
+How many? <input type="text" name="qty" size="3" value="1" aria-label="Quantity"> (1 to {{ max }})<br><br>
+{%- end %}
+<input type="submit" name="submit" value="Buy"> <input type="submit" name="cancel" value="No">
+{%- end %}
 </form>
 </div>

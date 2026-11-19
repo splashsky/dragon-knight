@@ -1,0 +1,201 @@
+-- Unit tests for the items: the item files against the original items and drops tables
+-- (ported values), the items kind's validation, and the display helpers.
+local effects = require("lib.effects")
+local items = require("lib.items")
+local kind = require("lib.content.kinds.items")
+local load = require("lib.content.load")
+local schema = require("lib.content.schema")
+local T = {}
+
+local function eq(a, b, what)
+	if a ~= b then error((what or "value") .. ": expected " .. tostring(b) .. ", got " .. tostring(a), 2) end
+end
+
+local function has(list, text)
+	for _, s in ipairs(list or {}) do
+		if s:find(text, 1, true) then return true end
+	end
+	error("no message containing '" .. text .. "' in: " .. table.concat(list or {}, " | "), 2)
+end
+
+-- The original items (id, type, name, buycost, attribute, special) and drops (id, name,
+-- mlevel, attribute1, attribute2) of install.php.
+local ITEMS = {
+	{ "stick", 1, "Stick", 10, 2, "X" }, { "branch", 1, "Branch", 30, 4, "X" }, { "club", 1, "Club", 40, 5, "X" },
+	{ "dagger", 1, "Dagger", 90, 8, "X" }, { "hatchet", 1, "Hatchet", 150, 12, "X" }, { "axe", 1, "Axe", 200, 16, "X" },
+	{ "brand", 1, "Brand", 300, 25, "X" }, { "poleaxe", 1, "Poleaxe", 500, 35, "X" },
+	{ "broadsword", 1, "Broadsword", 800, 45, "X" }, { "battle_axe", 1, "Battle Axe", 1200, 50, "X" },
+	{ "claymore", 1, "Claymore", 2000, 60, "X" }, { "dark_axe", 1, "Dark Axe", 3000, 100, "expbonus,-5" },
+	{ "dark_sword", 1, "Dark Sword", 4500, 125, "expbonus,-10" },
+	{ "bright_sword", 1, "Bright Sword", 6000, 100, "expbonus,10" },
+	{ "magic_sword", 1, "Magic Sword", 10000, 150, "maxmp,50" },
+	{ "destiny_blade", 1, "Destiny Blade", 50000, 250, "strength,50" },
+	{ "skivvies", 2, "Skivvies", 25, 2, "goldbonus,10" }, { "clothes", 2, "Clothes", 50, 5, "X" },
+	{ "leather_armor", 2, "Leather Armor", 75, 10, "X" }, { "hard_leather_armor", 2, "Hard Leather Armor", 150, 25, "X" },
+	{ "chain_mail", 2, "Chain Mail", 300, 30, "X" }, { "bronze_plate", 2, "Bronze Plate", 900, 50, "X" },
+	{ "iron_plate", 2, "Iron Plate", 2000, 100, "X" }, { "magic_armor", 2, "Magic Armor", 4000, 125, "maxmp,50" },
+	{ "dark_armor", 2, "Dark Armor", 5000, 150, "expbonus,-10" },
+	{ "bright_armor", 2, "Bright Armor", 10000, 175, "expbonus,10" },
+	{ "destiny_raiment", 2, "Destiny Raiment", 50000, 200, "dexterity,50" },
+	{ "reed_shield", 3, "Reed Shield", 50, 2, "X" }, { "buckler", 3, "Buckler", 100, 4, "X" },
+	{ "small_shield", 3, "Small Shield", 500, 10, "X" }, { "large_shield", 3, "Large Shield", 2500, 30, "X" },
+	{ "silver_shield", 3, "Silver Shield", 10000, 60, "X" }, { "destiny_aegis", 3, "Destiny Aegis", 25000, 100, "maxhp,50" },
+}
+local DROPS = {
+	{ "life_pebble", "Life Pebble", 1, "maxhp,10", "X" }, { "life_stone", "Life Stone", 10, "maxhp,25", "X" },
+	{ "life_rock", "Life Rock", 25, "maxhp,50", "X" }, { "magic_pebble", "Magic Pebble", 1, "maxmp,10", "X" },
+	{ "magic_stone", "Magic Stone", 10, "maxmp,25", "X" }, { "magic_rock", "Magic Rock", 25, "maxmp,50", "X" },
+	{ "dragons_scale", "Dragon's Scale", 10, "defensepower,25", "X" },
+	{ "dragons_plate", "Dragon's Plate", 30, "defensepower,50", "X" },
+	{ "dragons_claw", "Dragon's Claw", 10, "attackpower,25", "X" },
+	{ "dragons_tooth", "Dragon's Tooth", 30, "attackpower,50", "X" },
+	{ "dragons_tear", "Dragon's Tear", 35, "strength,50", "X" }, { "dragons_wing", "Dragon's Wing", 35, "dexterity,50", "X" },
+	{ "demons_sin", "Demon's Sin", 35, "maxhp,-50", "strength,50" },
+	{ "demons_fall", "Demon's Fall", 35, "maxmp,-50", "strength,50" },
+	{ "demons_lie", "Demon's Lie", 45, "maxhp,-100", "strength,100" },
+	{ "demons_hate", "Demon's Hate", 45, "maxmp,-100", "strength,100" },
+	{ "angels_joy", "Angel's Joy", 25, "maxhp,25", "strength,25" },
+	{ "angels_rise", "Angel's Rise", 30, "maxhp,50", "strength,50" },
+	{ "angels_truth", "Angel's Truth", 35, "maxhp,75", "strength,75" },
+	{ "angels_love", "Angel's Love", 40, "maxhp,100", "strength,100" },
+	{ "seraphs_joy", "Seraph's Joy", 25, "maxmp,25", "dexterity,25" },
+	{ "seraphs_rise", "Seraph's Rise", 30, "maxmp,50", "dexterity,50" },
+	{ "seraphs_truth", "Seraph's Truth", 35, "maxmp,75", "dexterity,75" },
+	{ "seraphs_love", "Seraph's Love", 40, "maxmp,100", "dexterity,100" },
+	{ "ruby", "Ruby", 50, "maxhp,150", "X" }, { "pearl", "Pearl", 50, "maxmp,150", "X" },
+	{ "emerald", "Emerald", 50, "strength,150", "X" }, { "topaz", "Topaz", 50, "dexterity,150", "X" },
+	{ "obsidian", "Obsidian", 50, "attackpower,150", "X" }, { "diamond", "Diamond", 50, "defensepower,150", "X" },
+	{ "memory_drop", "Memory Drop", 5, "expbonus,10", "X" }, { "fortune_drop", "Fortune Drop", 5, "goldbonus,10", "X" },
+}
+local STAT = { maxhp = "maxhp", maxmp = "maxmp", maxtp = "maxtp", strength = "strength", dexterity = "dexterity",
+	attackpower = "attack", defensepower = "defense", expbonus = "exp_bonus_pct", goldbonus = "gold_bonus_pct" }
+local CATEGORY = { "weapon", "armor", "shield" }
+
+local function modifier_text(codes)
+	local list = {}
+	for _, code in ipairs(codes) do
+		if code ~= "X" then
+			local stat, n = code:match("^(%a+),(-?%d+)$")
+			list[#list + 1] = { kind = "stat", stat = STAT[stat], amount = math.tointeger(tonumber(n)) }
+		end
+	end
+	return effects.encode(list)
+end
+
+function T.item_files_are_the_original_items_and_drops()
+	local k = load.kind("items")
+	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
+	eq(#k.entities, 68)
+	for id, o in ipairs(ITEMS) do
+		local f = assert(k.by_key[o[1]], "no item file " .. o[1])
+		eq(f.name, o[3], o[1]); eq(f.category, CATEGORY[o[2]], o[1]); eq(f.slot, CATEGORY[o[2]], o[1])
+		eq(f.price, o[4], o[1] .. " price")
+		eq(o[2] == 1 and f.attack or f.defense, o[5], o[1] .. " power")
+		eq(o[2] == 1 and f.defense or f.attack, 0, o[1] .. " other power")
+		eq(effects.encode(kind.modifiers(f)), modifier_text({ o[6] }), o[1] .. " modifiers")
+		eq(f.max_stack, 1); eq(f.drop_level, nil); eq(f.sellable, 1)
+		eq(dk.db:value("SELECT id FROM items WHERE key = ?", o[1]), id, o[1] .. " id")
+	end
+	for n, o in ipairs(DROPS) do
+		local f = assert(k.by_key[o[1]], "no item file " .. o[1])
+		eq(f.name, o[2], o[1]); eq(f.category, "accessory"); eq(f.slot, "accessory"); eq(f.drop_level, o[3], o[1])
+		eq(effects.encode(kind.modifiers(f)), modifier_text({ o[4], o[5] }), o[1] .. " modifiers")
+		eq(f.price, 0); eq(f.sellable, 0); eq(f.droppable, 1)
+		eq(dk.db:value("SELECT id FROM items WHERE key = ?", o[1]), 33 + n, o[1] .. " id")
+	end
+	local herb = k.by_key.herb
+	eq(herb.category, "consumable"); eq(herb.slot, nil); eq(herb.price, 15); eq(herb.max_stack, 10)
+	eq(effects.encode(kind.use_effects(herb)), "heal_hp amount=30")
+	eq(effects.encode(kind.use_effects(k.by_key.potion)), "heal_hp amount=100")
+	eq(effects.encode(kind.use_effects(k.by_key.ether)), "heal_mp amount=30")
+	eq(dk.db:value("SELECT group_concat(key) FROM (SELECT key FROM items WHERE id IN (66, 67, 68) ORDER BY id)"),
+		"herb,potion,ether")
+end
+
+local function item(over)
+	local d = { name = "Thing", category = "weapon", price = 10, attack = 3 }
+	for k, v in pairs(over or {}) do d[k] = v end
+	return d
+end
+
+local function errors(over)
+	local flat, errs = schema.validate(kind, item(over))
+	assert(not flat, "expected errors")
+	return errs
+end
+
+function T.validate_items()
+	local f = assert(schema.validate(kind, item()))
+	eq(f.slot, "weapon"); eq(f.max_stack, 1); eq(f.sellable, 1); eq(f.droppable, 1); eq(f.defense, 0)
+	eq(f.description, ""); eq(f.drop_level, nil)
+	f = assert(schema.validate(kind, item({ price = 0 })))
+	eq(f.sellable, 0, "no price: not sellable by default")
+	f = assert(schema.validate(kind, { name = "Map", category = "quest", max_stack = 5 }))
+	eq(f.slot, nil); eq(f.sellable, 0)
+	f = assert(schema.validate(kind, { name = "Rock", category = "misc", price = 2 }))
+	eq(f.sellable, 1)
+	f = assert(schema.validate(kind, item({ category = "accessory", attack = 0, drop_level = 3, slot = "accessory",
+		modifiers = { { kind = "stat", stat = "maxhp", amount = -5 } } })))
+	eq(f["modifiers.1.stat"], "maxhp"); eq(f["modifiers.1.amount"], -5); eq(f.drop_level, 3)
+	f = assert(schema.validate(kind, { name = "Elixir", category = "consumable", price = 5, max_stack = 3,
+		use_effects = { { kind = "heal_hp", amount = 9 }, { kind = "heal_mp", amount = 2 } } }))
+	eq(effects.encode(kind.use_effects(f)), "heal_hp amount=9; heal_mp amount=2")
+	-- category / slot / stacking / effects consistency
+	has(errors({ slot = "armor" }), "field 'slot' must be \"weapon\" for category weapon")
+	has(errors({ category = "consumable", slot = "weapon", attack = 0, use_effects = { { kind = "heal_hp", amount = 1 } } }),
+		"field 'slot' must be absent for category consumable")
+	has(errors({ max_stack = 5 }), "max_stack must be 1 for gear")
+	has(errors({ use_effects = { { kind = "heal_hp", amount = 1 } } }), "use_effects are for consumables")
+	has(errors({ category = "consumable" }), "attack and defense are for gear")
+	has(errors({ category = "consumable", attack = 0 }), "missing field 'use_effects'")
+	has(errors({ category = "misc", attack = 0, modifiers = { { kind = "stat", stat = "maxhp", amount = 1 } } }),
+		"modifiers are for gear")
+	has(errors({ category = "misc", attack = 0, use_effects = { { kind = "heal_hp", amount = 1 } } }),
+		"use_effects are for consumables, not misc")
+	has(errors({ category = "quest", attack = 0, sellable = true }), "quest items can't be sellable")
+	has(errors({ price = 0, sellable = true }), "sellable = true needs a price")
+	has(errors({ category = "sword" }), "field 'category' must be one of weapon, armor, shield, accessory")
+	has(errors({ modifiers = { { kind = "heal_hp", amount = 1 } } }), "modifiers[1].kind must be one of stat")
+	has(errors({ modifiers = { { kind = "stat", stat = "luck", amount = 1 } } }), "modifiers[1].stat must be one of")
+	has(errors({ category = "consumable", attack = 0, use_effects = { { kind = "stat", stat = "maxhp", amount = 1 } } }),
+		"use_effects[1].kind must be one of")
+	has(errors({ drop_level = 0 }), "field 'drop_level' must be an integer from 1")
+	has(errors({ weight = 3 }), "unknown field 'weight'")
+end
+
+function T.item_fields_and_overrides()
+	eq(kind.field("modifiers.1.stat").type, "choice"); eq(kind.field("modifiers.3.amount").min, -1000000)
+	eq(kind.field("modifiers.1.kind"), nil); eq(kind.field("use_effects.1.kind"), nil)
+	eq(kind.field("use_effects.2.amount").type, "int"); eq(kind.field("use_effects.1.power"), nil)
+	eq(kind.field("category").admin, nil); eq(kind.field("max_stack").admin, nil); eq(kind.field("price").admin, true)
+	-- an override can add a modifier the file doesn't have (stat + amount)
+	local f = assert(schema.validate(kind, item()))
+	f["modifiers.1.stat"], f["modifiers.1.amount"] = "strength", 4
+	eq(effects.encode(kind.modifiers(f)), "stat stat=strength amount=4")
+	f["modifiers.2.stat"] = "maxhp"   -- no amount: not a modifier
+	eq(#kind.modifiers(f), 1)
+	local names = {}
+	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.demons_sin)) do names[#names + 1] = spec.name end
+	eq(table.concat(names, ","), "name,description,price,attack,defense,drop_level,sellable,droppable," ..
+		"modifiers.1.stat,modifiers.1.amount,modifiers.2.stat,modifiers.2.amount")
+	names = {}
+	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.herb)) do names[#names + 1] = spec.name end
+	eq(table.concat(names, ","), "name,description,price,sellable,use_effects.1.amount")
+end
+
+function T.display()
+	local blade = items.get(16)
+	eq(table.concat(items.attributes(blade), ", "), "Attack Power +250, Strength +50")
+	eq(table.concat(items.special_lines(blade), ", "), "Strength +50")
+	eq(table.concat(items.attributes(items.get(46)), ", "), "Max HP -50, Strength +50")
+	eq(table.concat(items.attributes(items.get(65)), ", "), "Gold Bonus +10%")
+	eq(table.concat(items.effect_lines(items.get(66)), ", "), "Heal 30")
+	eq(items.sell_price(items.get(17)), 13)
+	assert(items.can_sell(items.get(1)) and not items.can_sell(items.get(34)), "sellable")
+	assert(items.usable(items.get(66), "town") and items.usable(items.get(66), "fight"), "herb usable")
+	assert(not items.usable(items.get(1), "fight"), "a stick is not usable")
+	local bomb = { category = "consumable", use_effects = { { kind = "damage", max = 5 } } }
+	assert(items.usable(bomb, "fight") and not items.usable(bomb, "town"), "fight-only consumable")
+end
+
+return T

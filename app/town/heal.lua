@@ -2,6 +2,7 @@
 -- outside of fights: the heal spells), cast through the effects engine (lib/effects.lua).
 local common = require("town.common")
 local effects = require("lib.effects")
+local game = require("lib.game")
 local php = require("lib.php")
 local spells = require("lib.spells")
 
@@ -21,8 +22,7 @@ function heal.cast(req, params)
 	if user.currentmp < spell.mp then return common.message(req, "Error", "spell_no_mp") end
 	if user.currentaction == "Fighting" then return common.message(req, "Error", "spell_fighting") end
 
-	local st = {}
-	for k, v in pairs(user) do st[k] = v end
+	local st = game.player(user)
 	local refused = effects.refusal(spell.effects, { player = st, in_fight = false })
 	if refused then return common.message(req, "Error", REFUSED[refused] or "spell_not_heal") end
 

@@ -14,7 +14,7 @@ usage: dk install [--partial] [--force]
 									[--class ID|KEY]
 
 	--partial     create tables but load no game data except the control row, the
-								forum boards, the first news post, the classes and the spells
+								forum boards, the first news post, the classes, spells and items
 								(legacy "Partial Setup")
 	--force       drop existing Dragon Knight tables first (DESTROYS ALL DATA)
 	--admin       administrator account; prompted for when omitted
@@ -23,11 +23,11 @@ usage: dk install [--partial] [--force]
 ]]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
--- user_spells/class_levels/class_spells before users/spells/classes; "levels" is the
--- table before schema version 4
-local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "items",
-								 "levels", "monsters", "user_spells", "class_levels", "class_spells", "spells", "towns",
-								 "users", "classes", "content_overrides", "content_adopt", "meta" }
+-- user_spells/user_items/town_items/class_levels/class_spells before users/spells/items/
+-- towns/classes; "levels" (before schema version 4) and "drops" (before 6) are old tables
+local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items",
+								 "town_items", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
+								 "spells", "towns", "users", "classes", "content_overrides", "content_adopt", "meta" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")
@@ -95,15 +95,15 @@ local function existing_tables()
 end
 
 -- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
--- populated those two even for "Partial Setup"), the forum boards and the class and spell
--- ids (structural: content keeps the original ids).
+-- populated those two even for "Partial Setup"), the forum boards and the class, spell and
+-- item ids (structural: content keeps the original ids).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
 	for line in sql:gmatch("[^\n]+") do
 		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
 				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") or
-				line:find("^INSERT INTO spells ") then
+				line:find("^INSERT INTO spells ") or line:find("^INSERT INTO items ") then
 			keep[#keep + 1] = line
 		end
 	end
@@ -166,11 +166,11 @@ local function run(...)
 	local now = dk.now()
 	local _, id = dk.db:exec(
 		"INSERT INTO users (username, password, email, verify, charname, charclass, regdate, onlinetime, " ..
-		"authlevel, currenthp, maxhp, currentmp, maxmp, currenttp, maxtp, strength, dexterity, attackpower, " ..
-		"defensepower) VALUES (?, ?, ?, '1', ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"authlevel, currenthp, base_maxhp, currentmp, base_maxmp, currenttp, base_maxtp, strength, dexterity) " ..
+		"VALUES (?, ?, ?, '1', ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
 		o.username, auth.hash_password(o.password), o.email, o.charname, class.id, now, now,
-		st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp, st.strength, st.dexterity,
-		st.attackpower, st.defensepower)
+		st.currenthp, st.base_maxhp, st.currentmp, st.base_maxmp, st.currenttp, st.base_maxtp, st.strength,
+		st.dexterity)
 	news.adopt({ id = id })
 
 	print(string.format("Database %s created (%s setup).", dk.config.db_path or "data/dk.db",

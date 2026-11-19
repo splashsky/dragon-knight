@@ -90,16 +90,8 @@ CREATE TABLE control (
 	verifyemail   INTEGER NOT NULL DEFAULT 0,
 	shownews      INTEGER NOT NULL DEFAULT 0,
 	showbabble    INTEGER NOT NULL DEFAULT 0,
-	showonline    INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE drops (
-	id          INTEGER PRIMARY KEY AUTOINCREMENT,
-	name        TEXT    NOT NULL DEFAULT '',
-	mlevel      INTEGER NOT NULL DEFAULT 0,
-	type        INTEGER NOT NULL DEFAULT 0,
-	attribute1  TEXT    NOT NULL DEFAULT '',
-	attribute2  TEXT    NOT NULL DEFAULT ''
+	showonline    INTEGER NOT NULL DEFAULT 0,
+	inventory_size INTEGER NOT NULL DEFAULT 12
 );
 
 -- Forum boards. admin_threads = 1: only administrators start threads (replies are open).
@@ -128,13 +120,29 @@ CREATE TABLE forum (
 CREATE INDEX forum_parent ON forum (parent, newpostdate);
 CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 
+-- Items: content files app/content/items/<key>.lua (like classes; never deleted, an item
+-- whose file is gone is retired and players keep it). category: weapon, armor, shield,
+-- accessory (gear: slot is the category), consumable, quest or misc (slot NULL).
+-- modifiers: stat effects while equipped, use_effects: what using it does (effect lists
+-- as text, app/lib/effects.lua). drop_level: monsters of that level and up drop it (NULL:
+-- never). The original items keep ids 1-33 and the original drops are 34-65.
 CREATE TABLE items (
-	id         INTEGER PRIMARY KEY AUTOINCREMENT,
-	type       INTEGER NOT NULL DEFAULT 0,
-	name       TEXT    NOT NULL DEFAULT '',
-	buycost    INTEGER NOT NULL DEFAULT 0,
-	attribute  INTEGER NOT NULL DEFAULT 0,
-	special    TEXT    NOT NULL DEFAULT ''
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	category     TEXT    NOT NULL DEFAULT 'misc',
+	slot         TEXT,
+	price        INTEGER NOT NULL DEFAULT 0,
+	attack       INTEGER NOT NULL DEFAULT 0,
+	defense      INTEGER NOT NULL DEFAULT 0,
+	modifiers    TEXT    NOT NULL DEFAULT '',
+	use_effects  TEXT    NOT NULL DEFAULT '',
+	max_stack    INTEGER NOT NULL DEFAULT 1,
+	drop_level   INTEGER,
+	sellable     INTEGER NOT NULL DEFAULT 0,
+	droppable    INTEGER NOT NULL DEFAULT 1,
+	retired      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE monsters (
@@ -181,13 +189,22 @@ CREATE TABLE towns (
 	longitude     INTEGER NOT NULL DEFAULT 0,
 	innprice      INTEGER NOT NULL DEFAULT 0,
 	mapprice      INTEGER NOT NULL DEFAULT 0,
-	travelpoints  INTEGER NOT NULL DEFAULT 0,
-	itemslist     TEXT    NOT NULL DEFAULT ''
+	travelpoints  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX towns_location ON towns (latitude, longitude);
 
+-- What each town's shop sells (replaces the old towns.itemslist).
+CREATE TABLE town_items (
+	town_id  INTEGER NOT NULL REFERENCES towns (id),
+	item_id  INTEGER NOT NULL REFERENCES items (id),
+	PRIMARY KEY (town_id, item_id)
+) WITHOUT ROWID;
+
 -- password: 'pbkdf2$<iters>$<salt hex>$<hash hex>' (see app/lib/auth.lua).
 -- verify: '1' when verified, otherwise the 8-letter code that was emailed.
+-- base_maxhp .. base_gold_bonus, strength, dexterity: the base stats (app/lib/stats.lua);
+-- the effective ones add the equipped items (user_items). dropcode: the item a monster
+-- just dropped (items.id; 0: none).
 CREATE TABLE users (
 	id                    INTEGER PRIMARY KEY AUTOINCREMENT,
 	username              TEXT    NOT NULL DEFAULT '' COLLATE NOCASE,
@@ -212,32 +229,20 @@ CREATE TABLE users (
 	currenthp             INTEGER NOT NULL DEFAULT 15,
 	currentmp             INTEGER NOT NULL DEFAULT 0,
 	currenttp             INTEGER NOT NULL DEFAULT 10,
-	maxhp                 INTEGER NOT NULL DEFAULT 15,
-	maxmp                 INTEGER NOT NULL DEFAULT 0,
-	maxtp                 INTEGER NOT NULL DEFAULT 10,
+	base_maxhp            INTEGER NOT NULL DEFAULT 15,
+	base_maxmp            INTEGER NOT NULL DEFAULT 0,
+	base_maxtp            INTEGER NOT NULL DEFAULT 10,
 	level                 INTEGER NOT NULL DEFAULT 1,
 	gold                  INTEGER NOT NULL DEFAULT 100,
 	experience            INTEGER NOT NULL DEFAULT 0,
-	goldbonus             INTEGER NOT NULL DEFAULT 0,
-	expbonus              INTEGER NOT NULL DEFAULT 0,
 	strength              INTEGER NOT NULL DEFAULT 5,
 	dexterity             INTEGER NOT NULL DEFAULT 5,
-	attackpower           INTEGER NOT NULL DEFAULT 5,
-	defensepower          INTEGER NOT NULL DEFAULT 5,
-	weaponid              INTEGER NOT NULL DEFAULT 0,
-	armorid               INTEGER NOT NULL DEFAULT 0,
-	shieldid              INTEGER NOT NULL DEFAULT 0,
-	slot1id               INTEGER NOT NULL DEFAULT 0,
-	slot2id               INTEGER NOT NULL DEFAULT 0,
-	slot3id               INTEGER NOT NULL DEFAULT 0,
-	weaponname            TEXT    NOT NULL DEFAULT 'None',
-	armorname             TEXT    NOT NULL DEFAULT 'None',
-	shieldname            TEXT    NOT NULL DEFAULT 'None',
-	slot1name             TEXT    NOT NULL DEFAULT 'None',
-	slot2name             TEXT    NOT NULL DEFAULT 'None',
-	slot3name             TEXT    NOT NULL DEFAULT 'None',
 	dropcode              INTEGER NOT NULL DEFAULT 0,
-	towns                 TEXT    NOT NULL DEFAULT '0'
+	towns                 TEXT    NOT NULL DEFAULT '0',
+	base_attack           INTEGER NOT NULL DEFAULT 0,
+	base_defense          INTEGER NOT NULL DEFAULT 0,
+	base_exp_bonus        INTEGER NOT NULL DEFAULT 0,
+	base_gold_bonus       INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX users_username ON users (username);
 CREATE INDEX users_charname ON users (charname);
@@ -252,6 +257,18 @@ CREATE TABLE user_spells (
 	learned_level  INTEGER,
 	PRIMARY KEY (user_id, spell_id)
 ) WITHOUT ROWID;
+
+-- Items characters have: equipped (weapon, armor, shield, accessory1-3; one item per
+-- slot) or in the bag (equipped NULL; qty up to the item's max_stack per row). The bag
+-- holds control.inventory_size rows, quest items not counted (app/lib/inventory.lua).
+CREATE TABLE user_items (
+	id        INTEGER PRIMARY KEY,
+	user_id   INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	item_id   INTEGER NOT NULL REFERENCES items (id),
+	qty       INTEGER NOT NULL DEFAULT 1,
+	equipped  TEXT
+);
+CREATE UNIQUE INDEX user_items_equipped ON user_items (user_id, equipped);
 
 -- Server-side login sessions (app/lib/session.lua). token_hash = hex(sha256(cookie)).
 CREATE TABLE sessions (

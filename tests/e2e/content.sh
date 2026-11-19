@@ -57,7 +57,7 @@ ct_eq "SELECT id || '|' || key || '|' || name || '|' || start_hp || '|' || exp_b
 	"4|knight|Knight|30|10|0" "class row"
 ct_eq "SELECT count(*) || '|' || sum(hp) FROM class_levels WHERE class_id = 4" "99|198" "class levels"
 ct_eq "SELECT group_concat(spell_id) FROM class_spells WHERE class_id = 4 AND level = 3" "1,6" "class spells"
-grep -qF 'content synced (spells: 19, 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
+grep -qF 'content synced (spells: 19, 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored; items: 68, 0 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
 t_get /help;          expect_body '<b>Knight</b>'; expect_body '<li>Test class.</li>'; expect_body 'There are four character classes'
 t_get /help/levels;   expect_body 'Knight Levels'
 "$BIN" content status --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content status"
@@ -67,7 +67,7 @@ t_section "content: registration and a full level-up"
 t_jar ctknight
 t_register ctknight ctpw1 ctknight@example.com CtKnight 4
 expect_body 'Your account was created succesfully'
-ct_eq "SELECT charclass || '|' || currenthp || '|' || maxhp || '|' || maxmp || '|' || currenttp || '|' || maxtp || '|' || strength || '|' || dexterity || '|' || attackpower || '|' || defensepower FROM users WHERE username = 'ctknight'" \
+ct_eq "SELECT charclass || '|' || currenthp || '|' || base_maxhp || '|' || base_maxmp || '|' || currenttp || '|' || base_maxtp || '|' || strength || '|' || dexterity || '|' || (strength + base_attack) || '|' || (dexterity + base_defense) FROM users WHERE username = 'ctknight'" \
 	"4|30|30|0|12|12|7|3|7|3" "starting stats from the class"
 t_login ctknight ctpw1
 t_get /character;     expect_body 'Class: Knight'; expect_body 'Next Level: 10'
@@ -76,7 +76,7 @@ t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmon
 	experience = 89 WHERE username = 'ctknight'"
 t_get /victory;       expect_status 200; expect_body 'You have gained 9 levels!'; expect_body 'You have learned 2 new spells.'
 # HP: 9 x 2 + 10 (milestone at 10); TP: 1 + 8 x 2; MP, strength, dexterity: 9 x 1
-ct_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || strength || '|' || dexterity || '|' || attackpower || '|' || defensepower FROM users WHERE username = 'ctknight'" \
+ct_eq "SELECT level || '|' || experience || '|' || base_maxhp || '|' || base_maxmp || '|' || base_maxtp || '|' || strength || '|' || dexterity || '|' || (strength + base_attack) || '|' || (dexterity + base_defense) FROM users WHERE username = 'ctknight'" \
 	"10|90|58|9|29|16|12|16|12" "level-up of the new class"
 ct_eq "SELECT group_concat(s.key || '@' || us.learned_level) FROM (SELECT * FROM user_spells ORDER BY spell_id) us
 	JOIN spells s ON s.id = us.spell_id JOIN users u ON u.id = us.user_id WHERE u.username = 'ctknight'" \
@@ -88,7 +88,7 @@ t_section "content: edits sync"
 ct_knight Paladin2 40
 t_wait_for /register '>Paladin2</option>' && t_ok || t_fail "edited name not synced"
 ct_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 4" "Paladin2|40" "edit synced"
-ct_eq "SELECT maxhp FROM users WHERE username = 'ctknight'" "58" "existing characters keep their stats"
+ct_eq "SELECT base_maxhp FROM users WHERE username = 'ctknight'" "58" "existing characters keep their stats"
 
 t_section "content: overrides survive edits"
 t_jar admin
@@ -124,7 +124,7 @@ t_get /character;     expect_body 'Class: Knight'
 t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmonster = 1, currentmonsterhp = 0,
 	experience = 99 WHERE username = 'ctknight'"
 t_get /victory;       expect_status 200; expect_body 'You have gained a level!'
-ct_eq "SELECT level || '|' || maxhp FROM users WHERE username = 'ctknight'" "11|60" "a retired class keeps leveling"
+ct_eq "SELECT level || '|' || base_maxhp FROM users WHERE username = 'ctknight'" "11|60" "a retired class keeps leveling"
 t_get /help;          expect_no_body '<b>Knight</b>'
 t_jar admin
 t_get /admin/classes; expect_body 'Knight</a> <span class="highlight">(retired)</span>'
@@ -169,7 +169,7 @@ rm "$CT_DIR/Bad-Name.lua"
 t_jar admin
 ct_wait_gone /admin 'Content files have errors' && t_ok || t_fail "content error not cleared"
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check after the fix: $(cat "$T/content.log")"
-grep -qF 'content: ok (19 spells, 4 classes)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
+grep -qF 'content: ok (19 spells, 4 classes, 68 items)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
 
 t_section "content: a new spell, learned through a class file"
 cat > "$CT_SPELLS/zap.lua" <<'EOF'
@@ -203,7 +203,7 @@ t_post /spell/20 "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
 # cast in a fight: both effects, MP spent (Red Slime: no immunity)
 t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 2, currentmonsterhp = 50,
 	currentmonstersleep = 0, currentmonsterimmune = 0, currentuberdefense = 0, currentmp = 10, currenthp = 500,
-	maxhp = 500 WHERE username = 'ctknight'"
+	base_maxhp = 500 WHERE username = 'ctknight'"
 t_get /fight;         expect_body '<option value="20">Zap</option>'
 t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
 expect_body 'You have cast the Zap spell for 6 damage.<br>You have cast the Zap spell, and will gain 20% defense until the end of this fight.'
