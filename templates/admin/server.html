@@ -1,0 +1,20 @@
+{#- Server metrics (admin/server.lua). ctx: groups {title, rows {name, value, help}},
+		averages {label, value}, handled. -#}
+<h1 class="admin-heading">Server</h1>
+<p>Live metrics of this server process since it started (the same as <code>dk stats</code>). Counters only grow; times are in microseconds.</p>
+{%- if #averages > 0 then %}
+<h2>Per request ({{ number(handled) }} handled by workers)</h2>
+<table class="admin-list">
+{%- for _, a in ipairs(averages) do %}
+<tr><td>{{ a.label }}</td><td>{{ string.format("%.1f", a.value) }}</td></tr>
+{%- end %}
+</table>
+{%- end %}
+{%- for _, g in ipairs(groups) do %}
+<h2>{{ g.title }}</h2>
+<table class="admin-list">
+{%- for _, row in ipairs(g.rows) do %}
+<tr><td><code>{{ row.name }}</code></td><td>{{ tostring(row.value) }}</td><td>{{ row.help }}</td></tr>
+{%- end %}
+</table>
+{%- end %}

@@ -1,5 +1,6 @@
 {#- Shared header of the help pages; ctx.subtitle is nil on the main page. -#}
 <div class="help-page" id="top">
+{{{ logo() }}}
 <h1>{{ gamename }} Help{% if subtitle then %}: {{ subtitle }}{% end %}</h1>
 [ {% if subtitle then %}<a href="/help">Return to Help</a> | {% end %}<a href="/">Return to the game</a> | <a href="/changelog">Changelog</a> ]
 <br><br><hr>

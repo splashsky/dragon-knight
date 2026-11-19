@@ -30,13 +30,25 @@ int    url_encode(sbuf *out, const char *s, size_t n);
 /* HTML-escape & < > " ' into out. */
 int    html_escape(sbuf *out, const char *s, size_t n);
 
-/* Logging to stderr with ISO-8601 UTC timestamp and level tag. Thread-safe (single write()). */
+/* Logging to stderr with ISO-8601 UTC timestamp and level tag. Thread-safe (single write(),
+ * or one line in the ring of the background writer after log_async_start). */
 void log_info(const char *fmt, ...)  __attribute__((format(printf, 1, 2)));
+/* An access log line: like log_info, but with the async writer it may wait up to ~50 ms
+ * before it is written (and is dropped, counted, if the ring is full). */
+void log_access(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void log_warn(const char *fmt, ...)  __attribute__((format(printf, 1, 2)));
 void log_error(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
+/* Send log lines through a ring of ring_bytes written by a background thread (0 ok). */
+int  log_async_start(size_t ring_bytes);
+void log_async_stop(void);      /* flushes everything, then writes directly again */
+
 int64_t now_unix(void);       /* wall clock, seconds */
 double  now_mono(void);       /* monotonic, seconds (fractional) */
+
+/* Lower the calling thread's scheduling priority by `nice` steps (Linux; elsewhere a
+ * no-op). Background threads use it so they never delay request threads. */
+void thread_background(int nice);
 
 /* Create the directories leading to path (not path itself), like mkdir -p. 0 ok, -1 errno. */
 int   mkdir_parents(const char *path);

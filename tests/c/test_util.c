@@ -1,4 +1,4 @@
-/* test_util.c :: sbuf, url/html encoding, read_file, time. */
+/* test_util.c :: sbuf, url/html encoding, read_file, time, logging. */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -191,6 +191,57 @@ static void test_time_log(void)
 	CHECK(1);
 }
 
+/* The background log writer: order kept, everything written by log_async_stop, access
+ * lines dropped (and counted) only when the ring is full, other lines never. */
+static void test_async_log(void)
+{
+	char path[] = "/tmp/dk-test-log-XXXXXX";
+	int fd = mkstemp(path);
+	CHECK(fd >= 0);
+	if (fd < 0) return;
+	int saved = dup(2);
+	dup2(fd, 2);
+
+	CHECK(log_async_start(1 << 16) == 0);
+	for (int i = 0; i < 500; i++) log_access("access %d", i);
+	log_warn("warn after access");
+	log_async_stop();
+	log_info("direct again");
+
+	/* a tiny ring: access lines overflow, warnings still get through */
+	CHECK(log_async_start(256) == 0);
+	for (int i = 0; i < 200; i++) log_access("flood %d", i);
+	log_warn("must survive");
+	log_async_stop();
+
+	dup2(saved, 2);
+	close(saved);
+	close(fd);
+	size_t len;
+	char *all = read_file(path, &len);
+	unlink(path);
+	CHECK(all != NULL);
+	if (!all) return;
+	int in_order = 1, count = 0;
+	const char *p = all;
+	for (int i = 0; i < 500; i++) {
+		char want[32];
+		snprintf(want, sizeof want, "] access %d\n", i);
+		const char *q = strstr(p, want);
+		if (!q) { in_order = 0; break; }
+		p = q;
+		count++;
+	}
+	CHECK(in_order && count == 500);
+	const char *w = strstr(all, "warn after access");
+	CHECK(w && w > strstr(all, "] access 499\n"));
+	CHECK(strstr(all, "direct again") > w);
+	CHECK(strstr(all, "must survive") != NULL);
+	CHECK(strstr(all, "lines dropped (log ring full)") != NULL);
+	CHECK(strstr(all, "[info] flood 0\n") != NULL);
+	free(all);
+}
+
 int main(void)
 {
 	test_sbuf();
@@ -199,5 +250,6 @@ int main(void)
 	test_html_escape();
 	test_read_file();
 	test_time_log();
+	test_async_log();
 	return TEST_SUMMARY();
 }

@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <title>Internal Server Error</title>
 <link rel="stylesheet" href="/static/css/dk.css">
+{%- if theme then %}
+<link rel="stylesheet" href="{{ theme.stylesheet }}">
+{%- end %}
 </head>
-<body>
+<body{% if theme then %} class="theme-{{ theme.key }}"{% end %}>
 <div class="dk-page">
 <div class="title">Internal Server Error</div>
 <p>Something went wrong while handling your request. Please go back and try again.</p>

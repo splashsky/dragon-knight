@@ -4,7 +4,7 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body class="minimal{% if body_class then %} {{ body_class }}{% end %}">
+<body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
 <div class="dk-content">
 {{{ content }}}
 </div>

@@ -4,7 +4,12 @@
 #   make test            lint + C unit tests + Lua tests + end-to-end tests
 #   make lint            check tab indentation (tests/lint.sh)
 #   make BUILD=build/x   use a separate object dir (parallel builds/CI)
-#   make DEBUG=1         -O0 -g with ASan/UBSan
+#   make DEBUG=1         -O0 -g with ASan/UBSan (and malloc counting for dk stats)
+#   make TSAN=1 CC=clang BUILD=build/tsan BIN=build/tsan/dk ctest
+#                        C unit tests under ThreadSanitizer (make ctest: C tests only)
+#   make bench           release build + tools/dkbench, then tools/bench.sh against a temp
+#                        install (BENCH_SCENARIO=pages|fights|static|mixed|idle|all, see
+#                        docs/PERF.md)
 #   make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]
 #                        build and serve in the foreground; on first use creates CONFIG
 #                        (random secret) and installs the game with ADMIN_USER/ADMIN_PASS
@@ -25,6 +30,8 @@ BUILD   ?= build
 BIN     ?= dk
 CC      ?= cc
 DEBUG   ?= 0
+TSAN    ?= 0
+DEFS    ?=
 RELEASE ?= 0
 CONFIG  ?= config.lua
 DIST    ?= dist
@@ -38,9 +45,13 @@ WARN    := -Wall -Wextra -Wshadow -Wno-unused-parameter -Wstrict-prototypes -Wmi
 CSTD    := -std=c11 -D_GNU_SOURCE
 INCS    := -Isrc -Ivendor/lua/src -Ivendor/sqlite
 
-ifeq ($(DEBUG),1)
+ifeq ($(TSAN),1)
+	OPT     := -O1 -g -fsanitize=thread -fno-omit-frame-pointer
+	LDOPT   := -fsanitize=thread
+else ifeq ($(DEBUG),1)
 	OPT     := -O0 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
-	LDOPT   := -fsanitize=address,undefined
+	LDOPT   := -fsanitize=address,undefined -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc
+	DEFS    := -DDK_COUNT_MALLOC
 else ifeq ($(RELEASE),1)
 	OPT     := -O2
 	LDOPT   :=
@@ -49,7 +60,7 @@ else
 	LDOPT   :=
 endif
 
-CFLAGS_APP    := $(CSTD) $(OPT) $(WARN) $(INCS) -pthread
+CFLAGS_APP    := $(CSTD) $(OPT) $(DEFS) $(WARN) $(INCS) -pthread
 CFLAGS_LUA    := -std=gnu99 $(OPT) -DLUA_USE_POSIX -w
 CFLAGS_SQLITE := $(OPT) -w \
 	-DSQLITE_THREADSAFE=1 -DSQLITE_DQS=0 -DSQLITE_OMIT_LOAD_EXTENSION \
@@ -75,7 +86,7 @@ DIST_NAME     := dk-$(VERSION)
 DIST_TARBALL  := $(DIST)/$(DIST_NAME)-$(PLATFORM).tar.gz
 DIST_FILES    := app templates public config.example.lua README.md LICENSE
 
-.PHONY: all test lint clean distclean run release dist backup migrate migrate-status deploy
+.PHONY: all test ctest lint clean distclean run release dist backup migrate migrate-status deploy bench
 all: $(BIN)
 
 $(BIN): $(APP_OBJS) $(LUA_OBJS) $(SQL_OBJS)
@@ -96,6 +107,9 @@ $(BUILD)/tests/%: tests/c/%.c $(LIB_OBJS) $(LUA_OBJS) $(SQL_OBJS) | $(BUILD)/tes
 lint:
 	@tests/lint.sh
 
+ctest: $(TEST_BINS)
+	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
+
 test: lint $(BIN) $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 	@if [ -x tests/run.sh ]; then BIN=./$(BIN) tests/run.sh; fi
@@ -114,6 +128,13 @@ run: $(BIN)
 release:
 	@echo "release: building $(RELEASE_BIN)"
 	@$(MAKE) -s --no-print-directory BUILD=$(RELEASE_BUILD) BIN=$(RELEASE_BIN) DEBUG=0 RELEASE=1 $(RELEASE_BIN)
+
+$(BUILD)/dkbench: tools/dkbench.c | $(BUILD)/src
+	$(CC) $(CSTD) $(OPT) $(WARN) -pthread -o $@ $< -lm $(LDOPT)
+
+bench: release
+	@$(MAKE) -s --no-print-directory BUILD=$(RELEASE_BUILD) BIN=$(RELEASE_BIN) DEBUG=0 RELEASE=1 $(RELEASE_BUILD)/dkbench
+	@BIN=$(RELEASE_BIN) DKBENCH=$(RELEASE_BUILD)/dkbench tools/bench.sh
 
 dist: release
 	@test -n "$(VERSION)" || { echo "dist: no view.GAME_VERSION in app/lib/view.lua" >&2; exit 1; }

@@ -174,7 +174,7 @@ t_get /news/1;   expect_body "href=\"/forum/thread/$NEWS_THREAD\">$(t_sql "SELEC
 
 t_section "playthrough: help pages"
 for p in /help /help/items /help/spells /help/monsters /help/levels; do
-	t_get "$p"; expect_status 200; expect_body '<body class="minimal help">'; expect_body 'Help'
+	t_get "$p"; expect_status 200; expect_body '<body class="minimal theme-default help">'; expect_body 'Help'
 done
 
 t_section "playthrough: character pages"

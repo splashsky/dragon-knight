@@ -8,12 +8,14 @@
 #include "bind.h"
 #include "codecache.h"
 #include "http.h"
+#include "stats.h"
 #include "util.h"
 #include "vmpool.h"
 
 typedef struct {
 	int      id;
 	sqlite3 *db;
+	dk_vm   *vm;       /* used by the current request; released in app_after */
 } worker_ctx;
 
 static void *app_worker_init(int worker_id, void *ud)
@@ -25,6 +27,7 @@ static void *app_worker_init(int worker_id, void *ud)
 	char err[512];
 	w->db = db_open(cfg->db_path, err, sizeof err);
 	if (!w->db) log_error("worker %d: %s", worker_id, err);
+	else db_tune(w->db, cfg, cfg->db_checkpoint_ms > 0);
 	return w;
 }
 
@@ -53,7 +56,17 @@ static void app_handle(void *wctx, const dk_request *req, dk_response *resp, voi
 		return;
 	}
 	bind_handle(vm_state(vm), cfg, w->db, req, resp);
-	vmpool_release(vm);
+	w->vm = vm;
+}
+
+static void app_after(void *wctx, void *ud)
+{
+	(void)ud;
+	worker_ctx *w = wctx;
+	if (w && w->vm) {
+		vmpool_release(w->vm);
+		w->vm = NULL;
+	}
 }
 
 int app_serve(const dk_config *cfg)
@@ -72,13 +85,26 @@ int app_serve(const dk_config *cfg)
 		.worker_init = app_worker_init,
 		.worker_fini = app_worker_fini,
 		.handle = app_handle,
+		.after = app_after,
 		.ud = (void *)cfg,
 	};
 	log_info("dk listening on http://%s:%d (workers=%d, app=%s, templates=%s)",
-			 cfg->bind, cfg->port, cfg->workers, cfg->app_dir, cfg->template_dir);
+			 cfg->bind, cfg->port, config_workers(cfg), cfg->app_dir, cfg->template_dir);
+	stats_start();
+	if (log_async_start(1u << 20) < 0)
+		log_warn("log writer not running: logging synchronously");
+	if (db_checkpointer_start(cfg) < 0)
+		log_warn("no background checkpoints: SQLite checkpoints on commit");
 	int rc = http_serve(cfg, &hooks);
+	db_checkpointer_stop();
+	sbuf st;
+	sb_init(&st);
+	if (stats_format(&st) == 0)
+		log_info("final stats:\n%s", st.p);
+	sb_free(&st);
 	vmpool_shutdown();
 	codecache_shutdown();
+	log_async_stop();
 	return rc == 0 ? 0 : 1;
 }
 

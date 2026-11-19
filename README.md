@@ -15,13 +15,16 @@ messages and the three-column look are kept as in the original.
 
 ## Architecture
 
-- **One binary, `./dk`.** A hand-written HTTP/1.1 server (one `poll()` I/O thread with
-	keep-alive and pipelining, a pool of worker threads, static files under `/static/` with
-	`Last-Modified`/304). Lua 5.5.1 and SQLite 3.54.1 are vendored under `vendor/` and
-	compiled in, unmodified. Nothing else is needed at runtime.
-- **A fresh Lua VM per request**, share-nothing like PHP. A warmer thread keeps a pool of
-	pre-built spare VMs (libraries, `dk` API, config and app modules already loaded), so a
-	request never pays for VM construction; used VMs are closed off the request path.
+- **One binary, `./dk`.** A hand-written HTTP/1.1 server (one I/O thread on `epoll`
+	— `poll` elsewhere — with keep-alive, pipelining and a timer heap; a worker thread per
+	CPU that writes its response straight to the socket; static files under `/static/`
+	cached in memory or sent with `sendfile`, with `ETag`/`Last-Modified` and 304s; a fast
+	503 when requests queue up). Lua 5.5.1 and SQLite 3.54.1 are vendored under `vendor/`
+	and compiled in, unmodified. Nothing else is needed at runtime.
+- **A fresh Lua VM per request**, share-nothing like PHP. Each pool VM lives in its own
+	memory arena: it is built once (libraries, `dk` API, config and app modules loaded),
+	snapshotted, and after every request restored to that snapshot with one memory copy, so
+	no state survives a request and no request pays for VM construction.
 - **Bytecode cache + hot reload.** Lua modules and templates are compiled once and cached
 	as bytecode. An inotify watcher on `app/`, `templates/` and the config file drops the
 	cache and retires stale spare VMs, so an edit shows up on the next browser refresh, with
@@ -30,7 +33,11 @@ messages and the three-column look are kept as in the original.
 	`{{ expr }}` (HTML-escaped), `{{{ expr }}}` (raw), `{% lua statements %}`,
 	`{# comments #}`, with `-` trim markers. Errors report `template:line`.
 - **SQLite** (WAL), one connection per worker. Every request runs in one transaction
-	(`BEGIN IMMEDIATE … COMMIT`, rolled back on any error), so game updates are atomic.
+	(`BEGIN IMMEDIATE … COMMIT`, rolled back on any error), so game updates are atomic;
+	workers take turns on an in-process lock, and a background thread checkpoints the WAL.
+- **Measured.** `make bench` loads a temporary install with scripted players, and
+	`dk stats` (or `/admin/server`) shows the server's live metrics; `docs/PERF.md` has
+	the numbers.
 
 `PLAN.md` describes the engine and its Lua API in detail; `docs/APP.md` is the guide to
 the Lua app (routes, views, templates, helpers, tests).
@@ -87,12 +94,13 @@ with status 3 when it doesn't exist.
 | `dk user passwd USER NEWPASS` | set a password (ends the user's sessions) |
 | `dk user admin USER` | make a user an administrator |
 | `dk check` | compile every Lua module and template, build a VM and validate the content files; non-zero exit on error (naming the file) |
+| `dk stats` | the running server's metrics (connections, requests and latency buckets, queue, workers, VM pool, database lock waits and checkpoints, static cache, memory), read from its stats socket (`stats_socket`, by default `dk.sock` next to the database); administrators see the same on `/admin/server` |
 | `dk version` | print the version and the Lua/SQLite versions |
 
 ## Configuration
 
 `config.example.lua` documents every key. Server keys (`bind`, `port`, `workers`,
-`spares`, paths, request limits) are read at startup. App keys (`dev`, `secret`,
+`spares`, paths, request limits and the tuning keys below) are read at startup. App keys (`dev`, `secret`,
 `pbkdf2_iterations`, `cookie_secure`) are re-read for every fresh VM, so they apply on the
 next request. Game settings (game name, map size, forum, email verification, …) live in
 the database and are edited in the admin panel at `/admin`. Character classes, spells and
@@ -101,6 +109,38 @@ the admin panel can override their names, descriptions, starting stats, MP costs
 power and messages per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
+
+## Themes and font
+
+Players pick a look in the footer of every page ("Theme: Default · Retro"); the choice is
+a cookie (`dk_theme`, one year), so it works logged in or out and needs no account.
+
+- **Default**: new artwork, a light snow background and the red-dragon "Dragon Knight"
+	logo, with dark red links.
+- **Retro**: the original 2006 background, logo and colours.
+
+Themes only change images and colours: the three-column layout is the same. A theme is a
+stylesheet in `public/css/themes/`, its images in `public/images/themes/<key>/` and an
+entry in `app/lib/themes.lua`; see `docs/APP.md`, "Themes".
+
+The whole site, in every theme, is set in [Vollkorn](https://github.com/FAlthausen/Vollkorn-Typeface)
+by Friedrich Althausen (`public/fonts/vollkorn/`, Regular, Italic, Bold and Bold Italic),
+licensed under the SIL Open Font License 1.1 (`public/fonts/vollkorn/OFL.txt`).
+
+Server tuning keys (the defaults suit a small server; see `docs/PERF.md`):
+
+| Key | Default | |
+|---|---|---|
+| `workers` | `0` | worker threads; 0 = one per CPU the process may use, at least 2 |
+| `spares` | `0` | Lua VMs in the pool; 0 = workers + 1 |
+| `queue_timeout_ms` | `2000` | a request that waited longer for a worker gets a fast `503` with `Retry-After: 1` (0 = never) |
+| `access_log` | `true` | one log line per request, written by a background thread; `false` turns them off |
+| `stats_socket` | next to the database | Unix socket `dk stats` reads; `""` = none |
+| `static_cache_bytes` / `static_cache_file_max` | 8 MiB / 256 KiB | static files kept in memory; larger ones are sent with `sendfile` |
+| `vm_memory_limit` | 256 MiB | address space per Lua VM: a request needing more Lua memory fails with a 500 |
+| `vm_gc_pause` | `1000` | Lua GC pause (%) of request VMs |
+| `db_cache_kb` / `db_mmap_bytes` | 8192 / 0 (off) | SQLite page cache and memory-mapped I/O per connection |
+| `db_checkpoint_ms` | `1000` | background WAL checkpoint interval (0 = SQLite's automatic checkpoints in requests) |
 
 ## Deployment
 
@@ -168,6 +208,7 @@ does the same check, backup and migration.
 | `make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]` | build and serve in the foreground; first use creates the config and installs the game (admin / admin), an old database is backed up and migrated (see [Quick start](#quick-start)) |
 | `make test` | lint, C unit tests, Lua unit tests and end-to-end tests |
 | `make lint` | check tab indentation |
+| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, or `all`; see `docs/PERF.md`) |
 | `make release` | optimized build in `build/release/dk` (`-O2`, no sanitizers) |
 | `make dist` | release tarball `dist/dk-VERSION-OS-ARCH.tar.gz` |
 | `make backup [CONFIG=config.lua]` | `./dk backup` |
@@ -177,7 +218,7 @@ does the same check, backup and migration.
 | `make clean` / `make distclean` | remove the objects and `./dk` / also `build/` and `dist/` |
 
 Variables: `BUILD=dir` (object dir), `BIN=path` (binary), `DEBUG=1` (`-O0 -g`,
-ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make run`
+ASan/UBSan, malloc counting), `TSAN=1` (ThreadSanitizer, with `CC=clang`), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make run`
 `PORT`, `BIND`, `ADMIN_USER`, `ADMIN_EMAIL`, `ADMIN_PASS`.
 
 ## Development
@@ -197,6 +238,8 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 	without `rsync`.
 - `make DEBUG=1 test` builds with `-O0 -g` and AddressSanitizer/UndefinedBehaviorSanitizer;
 	the e2e run fails on any sanitizer report in the server log.
+- `make TSAN=1 CC=clang BUILD=build/tsan BIN=build/tsan/dk ctest` builds and runs the C
+	unit tests under ThreadSanitizer (`make ctest`: just the C tests).
 - `make BUILD=build/x BIN=build/x/dk` keeps objects and the binary in a separate
 	directory (parallel checkouts, CI); run its tests with `BIN=build/x/dk tests/run.sh`.
 - The C code builds warning-free with `-Wall -Wextra`. Lua code uses no globals (in Lua
@@ -318,12 +361,14 @@ app/            Lua application
   content/        content files: classes/, spells/, items/, statuses/, summons/, monsters/ (one Lua file each: data, plus code for spells, consumables, statuses and summons, conditions for monsters), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
-public/         static files served at /static/ (css/, js/, images/)
+public/         static files served at /static/ (css/ with themes/, js/, images/ with themes/, fonts/vollkorn/)
 scripts/        run.sh (`make run`), deploy.sh (`make deploy`)
+tools/          dkbench.c (load generator) and bench.sh (`make bench`)
 deploy/         dk.service (example systemd unit)
 tests/          c/ (C unit tests), lua/ (Lua unit tests), run.sh + e2e/ (end-to-end), fixtures/
 vendor/         Lua 5.5.1 and SQLite 3.54.1, unmodified (see vendor/VERSIONS)
 docs/APP.md     app developer guide
+docs/PERF.md    performance: how to measure, baseline and results
 PLAN.md         design notes: engine API, URL map, data model
 ```
 
@@ -350,6 +395,9 @@ in-game `/changelog` page (also linked from the version number in the footer).
 
 - Clean URLs (`/inn`, `/shop/buy/3`, `/forum/thread/7`, …) and HTML5/CSS markup with the
 	original images and layout.
+- Two themes (2.3): Default, with new artwork, and Retro, the original background and logo,
+	chosen in the page footer; the whole site uses the Vollkorn typeface (15px) instead of
+	11px Verdana, with slightly wider side columns.
 - PBKDF2 password hashes, server-side sessions and CSRF tokens instead of the original
 	cookie scheme; escaping and parameterized SQL throughout.
 - Email (registration verification, lost password) is written as `.eml` files to the
@@ -424,6 +472,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	quirks of the original are kept (`legacy: …`).
 
 ## License
+
+The Vollkorn font files in `public/fonts/vollkorn/` are Copyright 2017 The Vollkorn Project
+Authors and licensed under the SIL Open Font License, Version 1.1 (`public/fonts/vollkorn/OFL.txt`).
+Everything else:
 
 MIT License
 

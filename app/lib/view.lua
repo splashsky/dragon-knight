@@ -3,10 +3,11 @@ local csrf = require("lib.csrf")
 local dbcount = require("lib.dbcount")
 local game = require("lib.game")
 local php = require("lib.php")
+local themes = require("lib.themes")
 
 local view = {}
 
-view.GAME_VERSION = "2.2.0"
+view.GAME_VERSION = "2.3.0-dev"
 view.BUILD = "C/Lua"
 
 -- Base helpers. Templates see these after ctx (names resolve scratch -> ctx -> h).
@@ -54,14 +55,36 @@ end
 
 view.helpers = base
 
+-- The theme selector (a POST form to /theme), returning to this page.
+local function theme_picker(req)
+	local back = req.path
+	if req.method == "GET" or req.method == "HEAD" then back = req.target or back end
+	return view.render("layout/theme_picker", {
+		themes = themes.list,
+		current = themes.current(req).key,
+		back = themes.safe_path(back) or "/",
+	}, req)
+end
+
+-- The theme's logo, linked to the game's home page; its alt text is the game's name
+-- (legacy), else the theme's.
+local function logo(req)
+	local theme = themes.current(req)
+	local name = game.control().gamename
+	if name == nil or name == "" then name = theme.logo.alt end
+	return view.render("layout/logo", { theme = theme, gamename = name }, req)
+end
+
 -- Renders templates/<name>.html with ctx. Per-render helpers: include(name [, ctx])
--- (defaults to this ctx), csrf_field(), csrf_token(), req.
+-- (defaults to this ctx), csrf_field(), csrf_token(), theme_picker(), logo(), req.
 function view.render(name, ctx, req)
 	ctx = ctx or {}
 	local h = setmetatable({ req = req }, { __index = base })
 	function h.include(n, c) return view.render(n, c or ctx, req) end
 	function h.csrf_field() return csrf.field(req) end
 	function h.csrf_token() return csrf.token(req) end
+	function h.theme_picker() return theme_picker(req) end
+	function h.logo() return logo(req) end
 	return dk.render(name, ctx, h)
 end
 
@@ -80,7 +103,8 @@ end
 
 -- Wraps already-rendered HTML in a layout.
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
---       body_class (extra class(es) on <body>, for page-specific CSS),
+--       body_class (extra class(es) on <body>, for page-specific CSS; the layouts add
+--       "theme-<key>"),
 --       status, headers (extra {name, value} pairs), vars (extra layout ctx values).
 function view.layout(req, title, content, opts)
 	opts = opts or {}
@@ -96,6 +120,7 @@ function view.layout(req, title, content, opts)
 		title = title,
 		content = content,
 		body_class = opts.body_class,
+		theme = themes.current(req),
 		gamename = game.control().gamename,
 		nav = (nav and user) and game.nav(user) or nil,
 		logged_in = user ~= nil,
@@ -153,7 +178,7 @@ end
 
 -- 503 page (database not ready); like the 500 page it doesn't touch the DB.
 function view.unavailable(req, message)
-	local ok, body = pcall(view.render, "errors/503", { message = message }, req)
+	local ok, body = pcall(view.render, "errors/503", { message = message, theme = themes.current(req) }, req)
 	if not ok then
 		body = "<!doctype html><title>Service Unavailable</title><h1>Service Unavailable</h1><p>" ..
 					 dk.html(message) .. "</p>"
@@ -164,7 +189,7 @@ end
 -- 500 page; must not depend on the DB or other templates working.
 function view.server_error(req, err)
 	local detail = dk.config.dev and err or nil
-	local ok, body = pcall(view.render, "errors/500", { detail = detail }, req)
+	local ok, body = pcall(view.render, "errors/500", { detail = detail, theme = themes.current(req) }, req)
 	if not ok then
 		body = "<!doctype html><title>Error</title><h1>Internal Server Error</h1>" ..
 					 (detail and ("<pre>" .. dk.html(detail) .. "</pre>") or "")

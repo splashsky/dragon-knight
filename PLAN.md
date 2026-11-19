@@ -36,9 +36,14 @@ src/                  C engine
   crypto.[ch]         sha256, hmac, pbkdf2, getrandom, ct_equal, hex
   tmpl.[ch]           template -> Lua source compiler
   config.[ch]         loads config.lua in a sandboxed throwaway state
-  http.[ch]           poll() I/O thread + worker threads + static files
-  codecache.[ch]      bytecode cache + inotify watcher + generation counter
-  vmpool.[ch]         warm spare VMs, warmer/reaper thread
+  http.[ch]           I/O thread (event loop) + worker threads + backpressure
+  evloop.[ch]         epoll (poll fallback) backend + timer min-heap
+  bufpool.[ch]        size-classed connection buffers + refcounted iobufs
+  static.[ch]         /static/ files: path checks, memory cache, ETag, sendfile
+  stats.[ch]          atomic metrics (dk stats, /admin/server)
+  codecache.[ch]      bytecode cache (read-mostly rwlock) + inotify watcher + generation
+  arena.[ch]          Lua allocator over a reserved range, snapshot/restore
+  vmpool.[ch]         pool of arena VMs restored after each request, warmer/reaper thread
   bind.h              dk Lua API (bind_dk.c), SQLite binding (bind_db.c), db.c
   app.c               dk_hooks glue: worker_init opens DB; handle = acquire VM → bind_handle → release
   main.c              CLI: `dk serve`, `dk install`, `dk migrate`, `dk content`, `dk user`, `dk check`,
@@ -87,30 +92,50 @@ data/                 runtime (gitignored): dk.db, outbox/
 ## Architecture
 
 ```
-            ┌──────────── I/O thread (poll) ────────────┐
- client ──▶ │ accept · read · parse · keep-alive · write │──▶ /static/* served directly
-            └───────┬───────────────────────▲───────────┘
-          request queue                 response + wakeup (eventfd)
-            ┌───────▼───────────────────────┴───────────┐
-            │ worker thread × N (own sqlite3* each)       │
-            │  vm = vmpool_acquire()   ← ready queue      │
-            │  bind_handle(vm, db, req, resp)             │
-            │  vmpool_release(vm)      → reaper           │
-            └───────▲───────────────────────┬────────────┘
-                    │ warm VMs          retired VMs
-            ┌───────┴───────────────────────▼────────────┐
-            │ warmer thread: build spares from codecache, │
-            │ lua_close retired VMs, rebuild on generation │
-            └───────▲────────────────────────────────────┘
+            ┌──────────── I/O thread (epoll, edge-triggered; poll fallback) ────────────┐
+ client ──▶ │ accept4 · read (scratch buffer) · parse · keep-alive · timer heap · writev │──▶ /static/*:
+            │ queue wait > queue_timeout_ms → fast 503        stats socket (dk stats)    │    memory cache /
+            └───────┬───────────────────────────────────────────▲───────────────────────┘    sendfile
+          request queue (mutex/condvar)          completion + wakeup (eventfd): the I/O
+            ┌───────▼───────────────────────────────────────────┴──────────┐  thread takes the
+            │ worker thread × N (default: one per CPU; own sqlite3* each)  │  connection back,
+            │  vm = vmpool_acquire()     ← ready queue                     │  writes the rest
+            │  lock(txn) BEGIN IMMEDIATE · handler · COMMIT unlock(txn)    │
+            │  serialize head; writev(head, body) straight to the socket   │
+            │  vmpool_release(vm): restore arena snapshot, reseed → ready   │
+            └───────▲──────────────────────────────────────────────────────┘
+                    │ built VMs (once per code generation)   retired VMs (stale, surplus)
+            ┌───────┴──────────────────────────────────────────▼────────────┐
+            │ warmer thread (low priority): build VMs into arenas and        │
+            │ snapshot them; lua_close retired ones; rebuild on generation   │
+            └───────▲────────────────────────────────────────────────────────┘
                     │ generation++ / cache drop
-            ┌───────┴────────────────────────────────────┐
-            │ watcher thread: inotify app/ templates/ cfg │
-            └────────────────────────────────────────────┘
+            ┌───────┴────────────────────────────────────┐   checkpointer thread: PASSIVE WAL
+            │ watcher thread: inotify app/ templates/ cfg │   checkpoint every second (the last
+            └────────────────────────────────────────────┘   frames under txn: WAL restarts)
+                                                             log writer thread: log ring → stderr
 ```
 
 - **Per-request transaction**: `bind_handle` wraps the handler in `BEGIN IMMEDIATE …
 	COMMIT` (ROLLBACK on error). This serializes writers (fine: handlers are sub-ms) and
 	makes every request atomic, which the original's read-modify-write fight logic needs.
+	Workers take turns on an in-process mutex around it (a waiting worker wakes the moment
+	the lock is free, instead of SQLite's sleep-and-retry busy handler, which is kept, with
+	short sleeps, for other processes). WAL checkpoints run on a background thread; once
+	the WAL passes 2000 frames the checkpointer copies the last frames while holding the
+	mutex, so the WAL can start over instead of growing forever.
+- **VMs** live in arenas (`arena.c`): built once per code generation, snapshotted, and
+	restored after each request (a memcpy of about 1 MB, on the worker after its response
+	went out). Objects with real finalizers made by a request (an open file, a `__gc`
+	table) are collected before the restore; lauxlib's buffer boxes (which only free
+	memory) are recognised and skipped. `vmpool.c` reads Lua's internal finalizer lists
+	(`lstate.h`, read-only) for this.
+- **Responses**: the worker serializes the head and writes head + body with `writev`;
+	what does not fit in the socket buffer is queued as segments on the connection (head,
+	body, refcounted iobuf, or a file for `sendfile`) and written by the I/O thread. While a
+	job is in flight the I/O thread never writes to or closes that socket. An idle
+	keep-alive connection holds no buffer (input goes through one scratch buffer; partial
+	requests use pooled 2/8/32 KiB buffers).
 - **DB connections** are per worker and persistent (WAL). VMs are ephemeral; `dk.db`
 	is bound to the worker's connection only for the one request. Statements are
 	finalized before `db:query` returns (no statement objects escape to Lua). An optional
@@ -146,7 +171,8 @@ Global `dk` table installed in every VM:
 | `dk.request_start` | `dk.clock()` value when the request began (page timing) |
 | `dk.log(level, msg)` | level: `"info"|"warn"|"error"` |
 | `dk.config` | the table returned by config.lua (re-read per VM build → hot) |
-| `dk.vmstats()` | table of vmpool stats, `generation` (code cache) and `boot_id` (random per process) |
+| `dk.vmstats()` | table of vmpool stats (`built`, `reaped`, `recycled`, `hot_acquires`, ...), `generation` (code cache) and `boot_id` (random per process) |
+| `dk.server_stats()` | the server's metrics (`dk stats`) as `{name = number}`, and a second table `{name = description}` |
 | `dk.list_modules(prefix)` | sorted module names of the `*.lua` files directly under `app/<prefix as path>` (`"content.classes"` → `{"content.classes.mage", ...}`); read live, so new files count at once |
 | `require(name)` | loads `app/<name with . → />.lua` from codecache; `package.path`/`cpath` disabled |
 
@@ -248,6 +274,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
+| (new) | `POST /theme` (theme selector: sets the `dk_theme` cookie, back to the page) |
 | `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/monsters[/:id]` (content overrides since schema version 9), `/admin/{statuses,summons}[/:id]` (new), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
@@ -429,6 +456,9 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 statuses, multi-stage actions, summons, weighted AI, encounters; schema version 8),
 	 ✅ E2 monsters as content with MP, equipment, items, spells and weighted loadouts
 	 (schema version 9).
+7. **2.3 realtime** (`docs/plans/realtime.md`): ✅ R0 measure, then tune the server
+	 (`docs/PERF.md`); R1 SSE hub, R2 chat/presence/notices, R3 smooth fights, R4 load
+	 and soak tests.
 
 ## Definition of done
 

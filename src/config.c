@@ -2,6 +2,7 @@
 #include "config.h"
 
 #include <errno.h>
+#include <sched.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +67,7 @@ void config_defaults(dk_config *c)
 	c->path              = dupstr("config.lua");
 	c->bind              = dupstr("127.0.0.1");
 	c->port              = 8080;
-	c->workers           = 4;
+	c->workers           = 0;
 	c->spares            = 0;
 	c->db_path           = dupstr("data/dk.db");
 	c->app_dir           = dupstr("app");
@@ -80,6 +81,37 @@ void config_defaults(dk_config *c)
 	c->keepalive_timeout = 15;
 	c->request_timeout   = 30;
 	c->max_connections   = 1024;
+	c->queue_timeout_ms  = 2000;
+	c->access_log        = 1;
+	c->static_cache_bytes    = 8u << 20;
+	c->static_cache_file_max = 256u << 10;
+	c->stats_socket      = NULL;
+	c->vm_memory_limit   = 256u << 20;
+	c->vm_gc_pause       = 1000;
+	c->db_cache_kb       = 8192;
+	c->db_mmap_bytes     = 0;
+	c->db_checkpoint_ms  = 1000;
+}
+
+int config_workers(const dk_config *c)
+{
+	if (c->workers > 0)
+		return c->workers;
+	int n = 0;
+	cpu_set_t set;
+	if (sched_getaffinity(0, sizeof set, &set) == 0)
+		n = CPU_COUNT(&set);
+	return n < 2 ? 2 : n;
+}
+
+const char *config_stats_socket(const dk_config *c, char *buf, size_t n)
+{
+	if (c->stats_socket)
+		return *c->stats_socket ? c->stats_socket : NULL;
+	const char *db = c->db_path ? c->db_path : "data/dk.db";
+	const char *slash = strrchr(db, '/');
+	int len = slash ? snprintf(buf, n, "%.*s/dk.sock", (int)(slash - db), db) : snprintf(buf, n, "dk.sock");
+	return len > 0 && (size_t)len < n ? buf : NULL;
 }
 
 void config_free(dk_config *c)
@@ -94,6 +126,7 @@ void config_free(dk_config *c)
 	free(c->public_dir);
 	free(c->outbox_dir);
 	free(c->secret);
+	free(c->stats_socket);
 	memset(c, 0, sizeof *c);
 }
 
@@ -108,7 +141,7 @@ typedef struct {
 static const cfg_key cfg_keys[] = {
 	{ "bind",              K_STR,  OFF(bind),              0, 0 },
 	{ "port",              K_INT,  OFF(port),              0, 65535 },
-	{ "workers",           K_INT,  OFF(workers),           1, 1024 },
+	{ "workers",           K_INT,  OFF(workers),           0, 1024 },
 	{ "spares",            K_INT,  OFF(spares),            0, 4096 },
 	{ "db_path",           K_STR,  OFF(db_path),           0, 0 },
 	{ "app_dir",           K_STR,  OFF(app_dir),           0, 0 },
@@ -122,6 +155,16 @@ static const cfg_key cfg_keys[] = {
 	{ "keepalive_timeout", K_INT,  OFF(keepalive_timeout), 1, 86400 },
 	{ "request_timeout",   K_INT,  OFF(request_timeout),   1, 86400 },
 	{ "max_connections",   K_INT,  OFF(max_connections),   1, 1000000 },
+	{ "queue_timeout_ms",  K_INT,  OFF(queue_timeout_ms),  0, 3600000 },
+	{ "access_log",        K_BOOL, OFF(access_log),        0, 1 },
+	{ "static_cache_bytes",    K_SIZE, OFF(static_cache_bytes),    0, 1LL << 32 },
+	{ "static_cache_file_max", K_SIZE, OFF(static_cache_file_max), 0, 1LL << 30 },
+	{ "stats_socket",      K_STR,  OFF(stats_socket),      0, 0 },
+	{ "vm_memory_limit",   K_SIZE, OFF(vm_memory_limit),   8LL << 20, 1LL << 40 },
+	{ "vm_gc_pause",       K_INT,  OFF(vm_gc_pause),       100, 100000 },
+	{ "db_cache_kb",       K_INT,  OFF(db_cache_kb),       0, 1 << 22 },
+	{ "db_mmap_bytes",     K_SIZE, OFF(db_mmap_bytes),     0, 1LL << 40 },
+	{ "db_checkpoint_ms",  K_INT,  OFF(db_checkpoint_ms),  0, 3600000 },
 };
 #undef OFF
 

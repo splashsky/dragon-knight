@@ -8,6 +8,19 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "2.3.0", date = "unreleased",
+		changes = {
+			"Made the server several times faster: each request's Lua VM is restored from a snapshot instead of being built anew, workers write responses themselves, and requests take turns on the database without sleeping.",
+			"Moved the server to epoll with a timer heap; an idle connection no longer holds a buffer, and static files are served from memory (or with sendfile) with ETags and 304s; fonts (ttf, otf, woff) got their proper types.",
+			"The number of workers follows the CPU count by default (workers = 0); a request that waited too long for a worker gets a quick 503 with Retry-After (queue_timeout_ms).",
+			"Moved log writing to a background thread; added access_log = false to turn off the per-request lines.",
+			"Moved database checkpoints to a background thread, and fixed the database log file growing without bound under steady load.",
+			"Added dk stats and an admin Server page with the server's live metrics, and make bench, a load generator with scripted players.",
+			"Added themes: Default (new artwork: a snowy background and a new logo) and Retro (the original look); choose one in the page footer, logged in or not.",
+			"The whole site now uses the Vollkorn typeface, a little larger than the old 11px Verdana; the side columns are slightly wider to fit.",
+		},
+	},
+	{
 		version = "2.2.0", date = "11.19.2026",
 		changes = {
 			"New fight engine: a fight is a round of turns (yours, your allies', each monster's) with effects that last several turns.",

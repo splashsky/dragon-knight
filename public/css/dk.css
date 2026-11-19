@@ -1,17 +1,50 @@
 /* dk.css :: base look, ported from legacy templates/primary.php.
-	 Feature styles go in town.css / fight.css / community.css / admin.css. */
+	 Feature styles go in town.css / fight.css / community.css / admin.css; a theme's
+	 background, logo and colours in themes/<key>.css (linked last, lib/themes.lua). */
 
+/* Vollkorn (SIL Open Font License, public/fonts/vollkorn/OFL.txt), on every page and theme */
+@font-face {
+	font-family: Vollkorn;
+	src: url(/static/fonts/vollkorn/Vollkorn-Regular.ttf) format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: Vollkorn;
+	src: url(/static/fonts/vollkorn/Vollkorn-Italic.ttf) format("truetype");
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+@font-face {
+	font-family: Vollkorn;
+	src: url(/static/fonts/vollkorn/Vollkorn-Bold.ttf) format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: Vollkorn;
+	src: url(/static/fonts/vollkorn/Vollkorn-BoldItalic.ttf) format("truetype");
+	font-weight: 700;
+	font-style: italic;
+	font-display: swap;
+}
+
+/* legacy: 11px verdana; Vollkorn needs more to read as easily */
 body {
-	background: url(/static/images/background.jpg);
+	background-color: white;
 	color: black;
-	font: 11px verdana, sans-serif;
+	font: 15px/1.4 Vollkorn, Georgia, "Times New Roman", serif;
 	margin: 8px;
 }
 table {
 	border-style: none;
 	padding: 0;
-	font: 11px verdana, sans-serif;
+	font: inherit;
 }
+input, select, textarea, button { font: inherit; }
 td {
 	border-style: none;
 	padding: 3px;
@@ -26,7 +59,7 @@ a, button.link {
 a:hover, button.link:hover {
 	color: #330000;
 }
-.small { font: 10px verdana, sans-serif; }
+.small { font-size: 13px; }
 .highlight { color: red; }
 .light { color: #999999; }
 .title {
@@ -39,7 +72,7 @@ a:hover, button.link:hover {
 .copyright {
 	border: solid 1px black;
 	background-color: #eeeeee;
-	font: 10px verdana, sans-serif;
+	font-size: 13px;
 }
 .error { color: red; }
 
@@ -48,7 +81,8 @@ a:hover, button.link:hover {
 @keyframes dk-blink { 50% { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
 
-/* ---- three-column frame (legacy: table width 90%, 180px side cells) ---- */
+/* ---- three-column frame (legacy: table width 90%, 180px side cells; 210px for the
+	 larger type) ---- */
 .dk-page {
 	width: 90%;
 	margin: 0 auto;
@@ -70,8 +104,8 @@ a:hover, button.link:hover {
 	align-items: stretch;
 }
 .dk-left, .dk-right {
-	flex: 0 0 180px;
-	width: 180px;
+	flex: 0 0 210px;
+	width: 210px;
 	padding: 3px;
 }
 .dk-left { border-right: solid 2px black; }
@@ -91,6 +125,16 @@ a:hover, button.link:hover {
 	text-align: center;
 	padding: 3px;
 }
+.dk-logo img { display: block; max-width: 100%; height: auto; }
+
+/* theme selector (layout/theme_picker.html), under the footer */
+.dk-themes {
+	width: 90%;
+	margin: 6px auto 0;
+	text-align: center;
+}
+.theme-picker { margin: 0; }
+.theme-picker button.link { font-weight: normal; text-decoration: underline; }
 
 /* ---- boxes (legacy <table width=100%><tr><td class=title>...</td></tr><tr><td>...) ---- */
 .box { margin-bottom: 12px; }
@@ -111,7 +155,7 @@ button.link {
 input[type="image"] { vertical-align: middle; }
 
 .compass { text-align: center; margin: 6px 0 0; }
-.compass input { min-width: 48px; }
+.compass input { min-width: 58px; }
 
 /* ---- HP/MP/TP bars ---- */
 table.statbars { width: 100px; }

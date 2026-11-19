@@ -1,8 +1,13 @@
-/* vmpool.h :: fresh Lua VM per request, served from a pool of pre-warmed spares.
+/* vmpool.h :: a pristine Lua VM per request, served from a pool of pre-warmed spares.
  *
- * Lifecycle of a VM:  build (warmer thread) -> ready queue -> acquire (worker)
- *                     -> serve exactly ONE request -> release -> reap (lua_close on
- *                     the warmer thread, off the request path). VMs are never reused.
+ * Lifecycle of a VM:  build (warmer thread, inside an arena; snapshot) -> ready queue
+ *                     -> acquire (worker) -> serve exactly ONE request -> release:
+ *                     restore the snapshot + reseed (on the releasing thread, after the
+ *                     response was handed to the I/O thread) -> ready queue again ...
+ *                     until its code generation is stale or the pool is above its size,
+ *                     then lua_close (warmer, off the request path).
+ * A restored VM is byte for byte the VM as it was right after warm-up, so every request
+ * still sees a fresh VM (no state survives a request), without paying for a rebuild.
  *
  * "Warm" means: lua_newstate with a getrandom() seed, standard libs opened,
  * math.randomseed from getrandom, the dk API installed (bind_install), dk.config
@@ -10,10 +15,10 @@
  * Modules/templates come from codecache bytecode, so building a VM is mostly memcpy.
  *
  * Every VM records codecache_generation() at build time. acquire() discards stale
- * spares (generation changed) and, if no fresh spare is ready, builds one
- * synchronously (cold path). The warmer refills the queue to `spares` after each
- * acquire and immediately after a code change, so a browser refresh lands on a VM
- * that already runs the new code. */
+ * spares (generation changed) and, if no fresh spare is ready or being restored, builds
+ * one synchronously (cold path). The pool holds `spares` VMs (ready + in use + being
+ * restored); after a code change the warmer rebuilds them right away, so a browser
+ * refresh lands on a VM that already runs the new code. */
 #ifndef DK_VMPOOL_H
 #define DK_VMPOOL_H
 
@@ -28,14 +33,14 @@ void       vmpool_shutdown(void);
 
 /* Returns a fresh VM, or NULL with a message in err (e.g. main.lua syntax error). */
 dk_vm     *vmpool_acquire(char *err, size_t errlen);
-void       vmpool_release(dk_vm *vm);            /* retire; never reused */
+void       vmpool_release(dk_vm *vm);            /* restore for the next request, or retire */
 
 lua_State *vm_state(dk_vm *vm);
 uint64_t   vm_generation(const dk_vm *vm);
 
 /* Stats for logging/debug endpoint. */
 typedef struct {
-	uint64_t built, reaped, hot_acquires, cold_acquires, stale_discards;
+	uint64_t built, reaped, hot_acquires, cold_acquires, stale_discards, recycled;
 	int      ready;
 } vmpool_stats;
 void       vmpool_get_stats(vmpool_stats *out);

@@ -11,8 +11,8 @@ body.admin {
 	align-items: stretch;
 }
 .admin-menu {
-	flex: 0 0 150px;
-	width: 150px;
+	flex: 0 0 180px;
+	width: 180px;
 	padding: 3px;
 	border-right: solid 1px black;
 	line-height: 1.4;
@@ -46,6 +46,7 @@ table.admin-list tr:nth-child(even) td { background-color: #ffffff; }
 .admin-subheading { font-size: 1.1em; margin: 1.5em 0 0.5em; }
 table.admin-list th { text-align: left; }
 table.admin-classes, table.admin-levels { width: 90%; }
+.admin-menu .dk-logo { margin-bottom: 8px; }
 .admin-content pre.error { white-space: pre-wrap; margin: 0.3em 0; }
 .admin-footer { width: 90%; }
 

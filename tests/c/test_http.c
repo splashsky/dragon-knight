@@ -1,4 +1,7 @@
-/* test_http.c :: HTTP server + config loader tests (raw sockets against a live server). */
+/* test_http.c :: HTTP server + config loader tests (raw sockets against a live server),
+ * run once on the epoll backend and once on the poll fallback; plus unit tests of the
+ * timer heap and the buffer pool, backpressure, the static file cache (ETag, sendfile),
+ * buffer release on idle connections and the stats socket. */
 #include "minitest.h"
 
 #include <arpa/inet.h>
@@ -14,11 +17,15 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "bufpool.h"
 #include "config.h"
+#include "evloop.h"
 #include "http.h"
+#include "stats.h"
 #include "util.h"
 
 /* ------------------------------------------------------------------ test handler */
@@ -74,7 +81,7 @@ static void h_handle(void *wctx, const dk_request *req, dk_response *resp, void 
 	}
 }
 
-static const dk_hooks hooks = { h_init, h_fini, h_handle, NULL };
+static const dk_hooks hooks = { .worker_init = h_init, .worker_fini = h_fini, .handle = h_handle };
 
 /* ------------------------------------------------------------------ server thread */
 
@@ -603,7 +610,19 @@ static void setup_static(void)
 	write_file("pub/style.css", "body{color:red}\n");
 	write_file("pub/img/a.png", "\x89PNG fake");
 	write_file("pub/weird.xyz", "?");
+	write_file("pub/f.ttf", "t");
+	write_file("pub/f.otf", "o");
+	write_file("pub/f.woff", "w");
+	write_file("pub/f.woff2", "w2");
 	write_file("secret.txt", "TOP SECRET");
+	{
+		char *big = malloc(300001);
+		for (int i = 0; i < 300000; i++)
+			big[i] = (char)('A' + i % 23);
+		big[300000] = '\0';
+		write_file("pub/big.bin", big);
+		free(big);
+	}
 	snprintf(p, sizeof p, "%s/pub/link.txt", tmpdir);
 	snprintf(t, sizeof t, "%s/secret.txt", tmpdir);
 	if (symlink(t, p) != 0)
@@ -661,6 +680,17 @@ static void test_static(int port)
 	CHECK(oneshot(port, "GET /static/weird.xyz HTTP/1.1\r\n\r\n", &r) == 200);
 	CHECK(rhdr(&r, "Content-Type", v, sizeof v) && strcmp(v, "application/octet-stream") == 0);
 	resp_clear(&r);
+	static const char *const fonts[][2] = {
+		{ "/static/f.ttf", "font/ttf" }, { "/static/f.otf", "font/otf" },
+		{ "/static/f.woff", "font/woff" }, { "/static/f.woff2", "font/woff2" },
+	};
+	for (size_t i = 0; i < sizeof fonts / sizeof fonts[0]; i++) {
+		char freq[128];
+		snprintf(freq, sizeof freq, "GET %s HTTP/1.1\r\n\r\n", fonts[i][0]);
+		CHECK(oneshot(port, freq, &r) == 200);
+		CHECK(rhdr(&r, "Content-Type", v, sizeof v) && strcmp(v, fonts[i][1]) == 0);
+		resp_clear(&r);
+	}
 	CHECK(oneshot(port, "GET /static/%73tyle.css HTTP/1.1\r\n\r\n", &r) == 200);
 	resp_clear(&r);
 
@@ -833,6 +863,7 @@ static void test_max_conns(void)
 	s.cfg.port = 0;
 	s.cfg.workers = 1;
 	s.cfg.max_connections = 2;
+	s.cfg.stats_socket = strdup("");
 	CHECK(srv_start(&s) == 0);
 	client a, b, c;
 	resp r;
@@ -870,6 +901,7 @@ static void test_ipv6(void)
 	s.cfg.bind = strdup("::1");
 	s.cfg.port = 0;
 	s.cfg.workers = 1;
+	s.cfg.stats_socket = strdup("");
 	if (srv_start(&s) != 0) {
 		/* no IPv6 on this host: http_serve returned -1 */
 		pthread_join(s.th, NULL);
@@ -920,6 +952,363 @@ static void test_graceful(srv *s)
 	cl_close(&idle);
 }
 
+
+/* ---- many connections with their own deadlines (the timer heap) ---- */
+
+typedef struct {
+	client c;
+	double t0;
+	int    partial;
+} tconn;
+
+static void test_timers_many(int port)
+{
+	enum { N = 40 };
+	tconn t[N];
+	resp r;
+	int ok = 1;
+	for (int i = 0; i < N; i++) {
+		t[i].partial = i % 2;
+		t[i].t0 = now_mono();
+		if (cl_open(&t[i].c, port) < 0) {
+			ok = 0;
+			continue;
+		}
+		if (t[i].partial) {
+			cl_sends(&t[i].c, "GET /partial HTTP/1.1\r\nHost: x\r\n");
+		} else {
+			cl_sends(&t[i].c, "GET /idle HTTP/1.1\r\n\r\n");
+			if (cl_read(&t[i].c, &r, 0) < 0 || r.status != 200)
+				ok = 0;
+			resp_clear(&r);
+			t[i].t0 = now_mono();
+		}
+		usleep(10 * 1000);
+	}
+	CHECK(ok);
+	/* one client that keeps its connection busy outlives everyone's timeout */
+	client busy;
+	CHECK(cl_open(&busy, port) == 0);
+	for (int i = 0; i < 6; i++) {
+		cl_sends(&busy, "GET /busy HTTP/1.1\r\n\r\n");
+		CHECK(cl_read(&busy, &r, 0) == 0 && r.status == 200);
+		resp_clear(&r);
+		usleep(400 * 1000);
+	}
+	cl_close(&busy);
+	int early = 0, late = 0, wrong = 0;
+	for (int i = 0; i < N; i++) {
+		if (t[i].partial) {
+			if (cl_read(&t[i].c, &r, 0) < 0 || r.status != 408)
+				wrong++;
+			resp_clear(&r);
+		}
+		if (!cl_eof(&t[i].c))
+			wrong++;
+		double dt = now_mono() - t[i].t0;
+		if (dt < 0.9)
+			early++;
+		if (dt > 4.0)
+			late++;
+		cl_close(&t[i].c);
+	}
+	if (early || late || wrong)
+		fprintf(stderr, "  timers: %d early, %d late, %d wrong\n", early, late, wrong);
+	CHECK(early == 0 && late == 0 && wrong == 0);
+}
+
+/* ---- static files: ETag, If-None-Match, the memory cache, sendfile ---- */
+
+static void test_static_cache(int port)
+{
+	resp r;
+	char etag[128], v[128], req[512];
+	uint64_t hits0 = stat_get(ST_static_hits);
+	CHECK(oneshot(port, "GET /static/style.css HTTP/1.1\r\n\r\n", &r) == 200);
+	CHECK(rhdr(&r, "ETag", etag, sizeof etag) && etag[0] == '"');
+	resp_clear(&r);
+	CHECK(oneshot(port, "GET /static/style.css HTTP/1.1\r\n\r\n", &r) == 200);
+	CHECK(rhdr(&r, "ETag", v, sizeof v) && strcmp(v, etag) == 0);
+	resp_clear(&r);
+	CHECK(stat_get(ST_static_hits) >= hits0 + 2);
+
+	snprintf(req, sizeof req, "GET /static/style.css HTTP/1.1\r\nIf-None-Match: %s\r\n\r\n", etag);
+	CHECK(oneshot(port, req, &r) == 304);
+	CHECK(rhdr(&r, "ETag", v, sizeof v) && strcmp(v, etag) == 0 && !rhdr(&r, "Content-Length", NULL, 0));
+	resp_clear(&r);
+	snprintf(req, sizeof req, "GET /static/style.css HTTP/1.1\r\nIf-None-Match: \"x\", W/%s\r\n\r\n", etag);
+	CHECK(oneshot(port, req, &r) == 304);
+	resp_clear(&r);
+	CHECK(oneshot(port, "GET /static/style.css HTTP/1.1\r\nIf-None-Match: *\r\n\r\n", &r) == 304);
+	resp_clear(&r);
+	/* If-None-Match wins over If-Modified-Since */
+	CHECK(oneshot(port, "GET /static/style.css HTTP/1.1\r\nIf-None-Match: \"nope\"\r\n"
+						"If-Modified-Since: Thu, 01 Jan 2099 00:00:00 GMT\r\n\r\n", &r) == 200);
+	resp_clear(&r);
+
+	/* a changed file is noticed within a second: new body, new ETag */
+	write_file("pub/style.css", "body{color:blue;margin:0}\n");
+	usleep(1100 * 1000);
+	CHECK(oneshot(port, "GET /static/style.css HTTP/1.1\r\n\r\n", &r) == 200);
+	CHECK_STR_EQ(r.body, "body{color:blue;margin:0}\n");
+	CHECK(rhdr(&r, "ETag", v, sizeof v) && strcmp(v, etag) != 0);
+	resp_clear(&r);
+	write_file("pub/style.css", "body{color:red}\n");
+	usleep(1100 * 1000);
+
+	/* larger than static_cache_file_max: sent with sendfile, intact */
+	uint64_t sf0 = stat_get(ST_static_sendfile);
+	CHECK(oneshot(port, "GET /static/big.bin HTTP/1.1\r\n\r\n", &r) == 200);
+	int ok = r.body_len == 300000;
+	for (size_t i = 0; ok && i < r.body_len; i++)
+		ok = r.body[i] == (char)('A' + i % 23);
+	CHECK(ok);
+	CHECK(rhdr(&r, "Content-Type", v, sizeof v) && strcmp(v, "application/octet-stream") == 0);
+	resp_clear(&r);
+	CHECK(stat_get(ST_static_sendfile) == sf0 + 1);
+	/* HEAD and a following request stay in sync */
+	{
+		client c;
+		CHECK(cl_open(&c, port) == 0);
+		cl_sends(&c, "HEAD /static/big.bin HTTP/1.1\r\n\r\nGET /static/big.bin HTTP/1.1\r\n\r\n");
+		CHECK(cl_read(&c, &r, 1) == 0 && r.status == 200);
+		CHECK(rhdr(&r, "Content-Length", v, sizeof v) && atoi(v) == 300000);
+		resp_clear(&r);
+		CHECK(cl_read(&c, &r, 0) == 0 && r.status == 200 && r.body_len == 300000);
+		resp_clear(&r);
+		cl_close(&c);
+	}
+}
+
+/* ---- an idle keep-alive connection holds no buffer ---- */
+
+static void test_buffers_released(int port)
+{
+	client c;
+	resp r;
+	CHECK(cl_open(&c, port) == 0);
+	/* a large head sent in two parts lands in a pooled input buffer */
+	char *big = malloc(12000);
+	int n = snprintf(big, 12000, "GET /bufs HTTP/1.1\r\nX-Big: ");
+	memset(big + n, 'b', 11000);
+	big[n + 11000] = '\0';
+	cl_sends(&c, big);
+	usleep(50 * 1000);
+	CHECK(stat_get(ST_buf_used_bytes) >= 8192);
+	cl_sends(&c, "\r\n\r\n");
+	CHECK(cl_read(&c, &r, 0) == 0 && r.status == 200);
+	resp_clear(&r);
+	free(big);
+	/* the connection stays open and idle; every buffer is back in the pool */
+	uint64_t used = 1;
+	for (int i = 0; i < 100 && used; i++) {
+		used = stat_get(ST_buf_used_bytes);
+		if (used)
+			usleep(10 * 1000);
+	}
+	CHECK(used == 0);
+	CHECK(stat_get(ST_buf_pooled_bytes) > 0);
+	cl_sends(&c, "GET /again HTTP/1.1\r\n\r\n");
+	CHECK(cl_read(&c, &r, 0) == 0 && r.status == 200);
+	resp_clear(&r);
+	cl_close(&c);
+}
+
+/* ---- backpressure: requests that waited too long for a worker get a fast 503 ---- */
+
+static void test_backpressure(void)
+{
+	srv s;
+	config_defaults(&s.cfg);
+	s.cfg.port = 0;
+	s.cfg.workers = 1;
+	s.cfg.queue_timeout_ms = 100;
+	s.cfg.stats_socket = strdup("");
+	CHECK(srv_start(&s) == 0);
+	uint64_t bp0 = stat_get(ST_backpressure_503);
+	client a, b, c, d;
+	resp r;
+	char v[64];
+	CHECK(cl_open(&a, s.port) == 0 && cl_open(&b, s.port) == 0 && cl_open(&c, s.port) == 0);
+	cl_sends(&a, "GET /sleep HTTP/1.1\r\n\r\n");          /* the only worker: 300 ms */
+	usleep(30 * 1000);
+	cl_sends(&b, "GET /queued HTTP/1.1\r\n\r\n");         /* waits ~270 ms in the queue */
+	usleep(150 * 1000);
+	double t0 = now_mono();
+	cl_sends(&c, "POST /refused HTTP/1.1\r\nContent-Length: 1\r\n\r\nx");   /* queue head too old */
+	CHECK(cl_read(&c, &r, 0) == 0 && r.status == 503);
+	CHECK(now_mono() - t0 < 0.1);
+	CHECK(rhdr(&r, "Retry-After", v, sizeof v) && strcmp(v, "1") == 0);
+	CHECK(rhdr(&r, "Connection", v, sizeof v) && strcmp(v, "keep-alive") == 0);
+	resp_clear(&r);
+	CHECK(cl_read(&a, &r, 0) == 0 && r.status == 200);
+	resp_clear(&r);
+	CHECK(cl_read(&b, &r, 0) == 0 && r.status == 503);   /* refused by the worker */
+	CHECK(rhdr(&r, "Retry-After", v, sizeof v) && strcmp(v, "1") == 0);
+	resp_clear(&r);
+	/* the refused connection is still usable, and the server recovers */
+	cl_sends(&c, "GET /after HTTP/1.1\r\n\r\n");
+	CHECK(cl_read(&c, &r, 0) == 0 && r.status == 200 && strstr(r.body, "path=/after "));
+	resp_clear(&r);
+	CHECK(cl_open(&d, s.port) == 0);
+	cl_sends(&d, "GET /fine HTTP/1.1\r\n\r\n");
+	CHECK(cl_read(&d, &r, 0) == 0 && r.status == 200);
+	resp_clear(&r);
+	CHECK(stat_get(ST_backpressure_503) == bp0 + 2);
+	cl_close(&a);
+	cl_close(&b);
+	cl_close(&c);
+	cl_close(&d);
+	CHECK(srv_stop(&s) == 0);
+	config_free(&s.cfg);
+}
+
+/* ---- `dk stats`: a snapshot on the stats socket ---- */
+
+static void test_stats_socket(void)
+{
+	srv s;
+	config_defaults(&s.cfg);
+	s.cfg.port = 0;
+	s.cfg.workers = 1;
+	char path[512];
+	snprintf(path, sizeof path, "%s/stats.sock", tmpdir);
+	s.cfg.stats_socket = strdup(path);
+	CHECK(srv_start(&s) == 0);
+	resp r;
+	CHECK(oneshot(s.port, "GET /counted HTTP/1.1\r\n\r\n", &r) == 200);
+	resp_clear(&r);
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	struct sockaddr_un a = { 0 };
+	a.sun_family = AF_UNIX;
+	CHECK(strlen(path) < sizeof a.sun_path);
+	memcpy(a.sun_path, path, strlen(path) < sizeof a.sun_path ? strlen(path) : sizeof a.sun_path - 1);
+	CHECK(fd >= 0 && connect(fd, (struct sockaddr *)&a, sizeof a) == 0);
+	char buf[16384];
+	size_t got = 0;
+	ssize_t n;
+	while (got < sizeof buf - 1 && (n = recv(fd, buf + got, sizeof buf - 1 - got, 0)) > 0)
+		got += (size_t)n;
+	buf[got] = '\0';
+	close(fd);
+	CHECK(strstr(buf, "event_backend ") != NULL);
+	CHECK(strstr(buf, "\nworkers 1\n") != NULL);
+	CHECK(strstr(buf, "\nrequests ") != NULL && strstr(buf, "\nconn_open ") != NULL);
+	CHECK(strstr(buf, "\nrss_kb ") != NULL);
+	CHECK(srv_stop(&s) == 0);
+	struct stat st;
+	CHECK(stat(path, &st) < 0);               /* removed at shutdown */
+	config_free(&s.cfg);
+}
+
+/* ---- unit: timer heap ---- */
+
+static void test_timer_heap(void)
+{
+	enum { N = 200 };
+	ev_timers ts = { 0 };
+	ev_timer t[N];
+	unsigned seed = 12345;
+	for (int i = 0; i < N; i++)
+		ev_timer_init(&t[i]);
+	/* random sets, later and earlier moves and clears; then everything must come out in
+	 * deadline order, exactly the armed ones, once */
+	for (int round = 0; round < 2000; round++) {
+		seed = seed * 1103515245u + 12345u;
+		int i = (int)((seed >> 8) % N);
+		seed = seed * 1103515245u + 12345u;
+		int op = (int)((seed >> 8) % 4);
+		double d = 1.0 + (double)((seed >> 12) % 1000);
+		if (op == 3)
+			CHECK(ev_timer_set(&ts, &t[i], 0) == 0);
+		else
+			CHECK(ev_timer_set(&ts, &t[i], d) == 0);
+	}
+	int armed = 0;
+	for (int i = 0; i < N; i++)
+		armed += t[i].deadline > 0;
+	double next = ev_timer_next(&ts), last = 0;
+	int popped = 0, order_ok = 1, deadline_ok = 1;
+	ev_timer *x;
+	CHECK(ev_timer_expired(&ts, 0.5) == NULL);
+	while ((x = ev_timer_expired(&ts, 1e9))) {
+		double d = x->key;
+		(void)d;
+		popped++;
+		if (x->deadline != 0)
+			deadline_ok = 0;
+	}
+	/* pop again checking order with fresh deadlines */
+	for (int i = 0; i < N; i++)
+		ev_timer_set(&ts, &t[i], 1.0 + (double)((i * 7919) % N));
+	while ((x = ev_timer_expired(&ts, 1e9))) {
+		double d = 1.0 + (double)(((x - t) * 7919) % N);
+		if (d < last)
+			order_ok = 0;
+		last = d;
+	}
+	CHECK(next > 0);
+	CHECK(popped == armed);
+	CHECK(deadline_ok && order_ok);
+	CHECK(ts.n == 0);
+	/* moving a deadline later is lazy; expiry still honours the real one */
+	ev_timer a, b;
+	ev_timer_init(&a);
+	ev_timer_init(&b);
+	ev_timer_set(&ts, &a, 5);
+	ev_timer_set(&ts, &b, 6);
+	ev_timer_set(&ts, &a, 10);
+	CHECK(ev_timer_next(&ts) == 6);
+	CHECK(ev_timer_expired(&ts, 7) == &b);
+	CHECK(ev_timer_expired(&ts, 9) == NULL);
+	CHECK(ev_timer_expired(&ts, 10) == &a);
+	ev_timer_set(&ts, &a, 3);
+	ev_timer_set(&ts, &a, 0);
+	CHECK(ev_timer_next(&ts) == 0);
+	ev_timers_free(&ts);
+}
+
+/* ---- unit: buffer pool ---- */
+
+static void test_bufpool(void)
+{
+	bufpool bp;
+	bufpool_init(&bp, 2);
+	pbuf a = { 0 }, b = { 0 }, c = { 0 };
+	CHECK(pbuf_reserve(&bp, &a, 100) == 0 && a.cap == 2048);
+	memcpy(a.p, "hello", 5);
+	a.len = 5;
+	CHECK(pbuf_reserve(&bp, &a, 5000) == 0 && a.cap == 8192 && memcmp(a.p, "hello", 5) == 0);
+	CHECK(bp.nfree[0] == 1);                  /* the 2 KiB one went back */
+	CHECK(pbuf_reserve(&bp, &b, 10) == 0 && b.cap == 2048 && bp.nfree[0] == 0);
+	CHECK(pbuf_reserve(&bp, &c, 100000) == 0 && c.cap == 100001);   /* beyond the classes */
+	pbuf_consume(&a, 2);
+	CHECK(a.len == 3 && memcmp(a.p, "llo", 3) == 0);
+	size_t used = bp.used_bytes;
+	CHECK(used == 8192 + 2048 + 100001);
+	pbuf_release(&bp, &a);
+	pbuf_release(&bp, &b);
+	pbuf_release(&bp, &c);
+	CHECK(a.p == NULL && bp.used_bytes == 0);
+	CHECK(bp.pooled_bytes == 8192 + 2048);
+	/* the per-class cap */
+	pbuf x[4] = { { 0 } };
+	for (int i = 0; i < 4; i++)
+		pbuf_reserve(&bp, &x[i], 10);
+	for (int i = 0; i < 4; i++)
+		pbuf_release(&bp, &x[i]);
+	CHECK(bp.nfree[0] == 2);
+	bufpool_destroy(&bp);
+	CHECK(bp.pooled_bytes == 0);
+
+	iobuf *io = iobuf_new(4);
+	memcpy(io->data, "abcd", 4);
+	iobuf *r2 = iobuf_ref(io);
+	iobuf_unref(io);
+	CHECK(r2->len == 4 && memcmp(r2->data, "abcd", 4) == 0);
+	iobuf_unref(r2);
+}
+
 /* ------------------------------------------------------------------ config tests */
 
 static int load_str(dk_config *c, const char *lua, char *err, size_t errlen)
@@ -937,7 +1326,7 @@ static void test_config(void)
 
 	config_defaults(&c);
 	CHECK_STR_EQ(c.bind, "127.0.0.1");
-	CHECK(c.port == 8080 && c.workers == 4 && c.spares == 0 && c.dev == 1);
+	CHECK(c.port == 8080 && c.workers == 0 && c.spares == 0 && c.dev == 1);
 	CHECK_STR_EQ(c.db_path, "data/dk.db");
 	CHECK_STR_EQ(c.app_dir, "app");
 	CHECK_STR_EQ(c.template_dir, "templates");
@@ -946,6 +1335,15 @@ static void test_config(void)
 	CHECK_STR_EQ(c.secret, "");
 	CHECK(c.max_header_bytes == 16384 && c.max_body_bytes == 1048576);
 	CHECK(c.keepalive_timeout == 15 && c.request_timeout == 30 && c.max_connections == 1024);
+	CHECK(c.queue_timeout_ms == 2000 && c.access_log == 1 && c.stats_socket == NULL);
+	CHECK(c.static_cache_bytes == 8u << 20 && c.static_cache_file_max == 256u << 10);
+	CHECK(c.vm_memory_limit == 256u << 20 && c.vm_gc_pause == 1000);
+	CHECK(c.db_cache_kb == 8192 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 1000);
+	CHECK(config_workers(&c) >= 2);
+	char sp[256];
+	CHECK_STR_EQ(config_stats_socket(&c, sp, sizeof sp), "data/dk.sock");
+	c.workers = 3;
+	CHECK(config_workers(&c) == 3);
 	config_free(&c);
 
 	char p[512];
@@ -962,6 +1360,9 @@ static void test_config(void)
 				   "  outbox_dir = 'o', secret = 's3cr3t', dev = false,\n"
 				   "  max_header_bytes = 4096, max_body_bytes = 10, keepalive_timeout = 5,\n"
 				   "  request_timeout = 7, max_connections = 9,\n"
+				   "  queue_timeout_ms = 0, access_log = false, static_cache_bytes = 0,\n"
+				   "  static_cache_file_max = 1, stats_socket = '', vm_memory_limit = 16777216,\n"
+				   "  vm_gc_pause = 200, db_cache_kb = 0, db_mmap_bytes = 0, db_checkpoint_ms = 0,\n"
 				   "  pbkdf2_iterations = 1000, unknown = { nested = true } }\n",
 				   err, sizeof err) == 0);
 	CHECK_STR_EQ(c.bind, "::1");
@@ -974,11 +1375,15 @@ static void test_config(void)
 	CHECK_STR_EQ(c.secret, "s3cr3t");
 	CHECK(c.max_header_bytes == 4096 && c.max_body_bytes == 10);
 	CHECK(c.keepalive_timeout == 5 && c.request_timeout == 7 && c.max_connections == 9);
+	CHECK(c.queue_timeout_ms == 0 && c.access_log == 0 && c.static_cache_bytes == 0);
+	CHECK(c.static_cache_file_max == 1 && c.vm_memory_limit == 16777216 && c.vm_gc_pause == 200);
+	CHECK(c.db_cache_kb == 0 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 0);
+	CHECK(config_stats_socket(&c, sp, sizeof sp) == NULL);   /* "" = no socket */
 	config_free(&c);
 
 	/* partial: other keys default */
 	CHECK(load_str(&c, "return { port = 1234 }", err, sizeof err) == 0);
-	CHECK(c.port == 1234 && c.workers == 4);
+	CHECK(c.port == 1234 && c.workers == 0);
 	CHECK_STR_EQ(c.bind, "127.0.0.1");
 	config_free(&c);
 	CHECK(load_str(&c, "return {}", err, sizeof err) == 0);
@@ -997,11 +1402,14 @@ static void test_config(void)
 		{ "return { port = 'x' }", "port" },
 		{ "return { port = 1.5 }", "port" },
 		{ "return { port = 70000 }", "port" },
-		{ "return { workers = 0 }", "workers" },
+		{ "return { workers = -1 }", "workers" },
 		{ "return { bind = 1 }", "bind" },
 		{ "return { dev = 1 }", "dev" },
 		{ "return { secret = {} }", "secret" },
 		{ "return { max_body_bytes = -1 }", "max_body_bytes" },
+		{ "return { vm_memory_limit = 1024 }", "vm_memory_limit" },
+		{ "return { access_log = 'no' }", "access_log" },
+		{ "return { queue_timeout_ms = -5 }", "queue_timeout_ms" },
 		{ "return 42", "table" },
 		{ "return", "table" },
 		{ "return {", "" },
@@ -1045,35 +1453,52 @@ int main(void)
 
 	test_config();
 
-	srv s;
-	config_defaults(&s.cfg);
-	s.cfg.port = 0;
-	s.cfg.workers = 4;
-	s.cfg.request_timeout = 1;
-	s.cfg.keepalive_timeout = 1;
-	char pub[512];
-	snprintf(pub, sizeof pub, "%s/pub", tmpdir);
-	free(s.cfg.public_dir);
-	s.cfg.public_dir = strdup(pub);
-	atomic_store(&n_init, 0);
-	atomic_store(&n_fini, 0);
-	CHECK(srv_start(&s) == 0);
-	if (s.port) {
-		test_basic(s.port);
-		test_http10(s.port);
-		test_pipelining(s.port);
-		test_errors(s.port);
-		test_paths(s.port);
-		test_static(s.port);
-		test_expect(s.port);
-		test_timeouts(s.port);
-		test_slow_reader(s.port);
-		test_concurrency(s.port);
-		test_graceful(&s);
-		CHECK(atomic_load(&n_init) == 4 && atomic_load(&n_fini) == 4);
-	}
-	config_free(&s.cfg);
+	test_timer_heap();
+	test_bufpool();
 
+	/* the whole suite on epoll, then the core of it on the poll fallback */
+	for (int use_poll = 0; use_poll < 2; use_poll++) {
+		http_force_poll(use_poll);
+		srv s;
+		config_defaults(&s.cfg);
+		s.cfg.port = 0;
+		s.cfg.workers = 4;
+		s.cfg.request_timeout = 1;
+		s.cfg.keepalive_timeout = 1;
+		s.cfg.stats_socket = strdup("");
+		char pub[512];
+		snprintf(pub, sizeof pub, "%s/pub", tmpdir);
+		free(s.cfg.public_dir);
+		s.cfg.public_dir = strdup(pub);
+		atomic_store(&n_init, 0);
+		atomic_store(&n_fini, 0);
+		CHECK(srv_start(&s) == 0);
+		if (s.port) {
+			printf("  backend: %s\n", use_poll ? "poll" : "default (epoll)");
+			test_basic(s.port);
+			test_http10(s.port);
+			test_pipelining(s.port);
+			test_errors(s.port);
+			test_paths(s.port);
+			test_static(s.port);
+			test_expect(s.port);
+			test_timeouts(s.port);
+			test_slow_reader(s.port);
+			test_concurrency(s.port);
+			if (!use_poll) {
+				test_static_cache(s.port);
+				test_buffers_released(s.port);
+			}
+			test_timers_many(s.port);
+			test_graceful(&s);
+			CHECK(atomic_load(&n_init) == 4 && atomic_load(&n_fini) == 4);
+		}
+		config_free(&s.cfg);
+	}
+	http_force_poll(0);
+
+	test_backpressure();
+	test_stats_socket();
 	test_max_conns();
 	test_ipv6();
 
@@ -1083,6 +1508,7 @@ int main(void)
 		config_defaults(&c);
 		free(c.bind);
 		c.bind = strdup("203.0.113.1"); /* TEST-NET-3: not a local address */
+		c.stats_socket = strdup("");
 		c.port = 0;
 		CHECK(http_serve(&c, &hooks) == -1);
 		config_free(&c);

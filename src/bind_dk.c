@@ -12,6 +12,7 @@
 #include "crypto.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include "stats.h"
 #include "util.h"
 #include "vmpool.h"
 
@@ -120,6 +121,7 @@ static int l_vmstats(lua_State *L)
 	lua_createtable(L, 0, 8);
 	set_int(L, "built", (lua_Integer)s.built);
 	set_int(L, "reaped", (lua_Integer)s.reaped);
+	set_int(L, "recycled", (lua_Integer)s.recycled);
 	set_int(L, "hot_acquires", (lua_Integer)s.hot_acquires);
 	set_int(L, "cold_acquires", (lua_Integer)s.cold_acquires);
 	set_int(L, "stale_discards", (lua_Integer)s.stale_discards);
@@ -128,6 +130,38 @@ static int l_vmstats(lua_State *L)
 	lua_pushstring(L, boot_id);
 	lua_setfield(L, -2, "boot_id");
 	return 1;
+}
+
+/* dk.server_stats() -> { name = number, ... }, { name = description, ... }: the server's
+ * metrics (stats.h), the same snapshot `dk stats` prints. */
+static int l_server_stats(lua_State *L)
+{
+	sbuf b;
+	sb_init(&b);
+	if (stats_format(&b) < 0) {
+		sb_free(&b);
+		return luaL_error(L, "out of memory");
+	}
+	lua_newtable(L);
+	int vals = lua_gettop(L);
+	for (char *p = b.p; p && *p;) {
+		char *nl = strchr(p, '\n');
+		if (nl) *nl = '\0';
+		char *sp = strchr(p, ' ');
+		if (sp) {
+			*sp = '\0';
+			if (lua_stringtonumber(L, sp + 1) == 0) lua_pushstring(L, sp + 1);
+			lua_setfield(L, vals, p);
+		}
+		p = nl ? nl + 1 : NULL;
+	}
+	sb_free(&b);
+	lua_createtable(L, 0, ST_COUNT);
+	for (int k = 0; k < ST_COUNT; k++) {
+		lua_pushstring(L, stat_help(k));
+		lua_setfield(L, -2, stat_name(k));
+	}
+	return 2;
 }
 
 /* dk.list_modules(prefix) -> sorted array of module names under app/<prefix as path>. */
@@ -375,6 +409,7 @@ int bind_install(lua_State *L, const dk_config *cfg)
 		{ "clock", l_clock },
 		{ "log", l_log },
 		{ "vmstats", l_vmstats },
+		{ "server_stats", l_server_stats },
 		{ "list_modules", l_list_modules },
 		{ NULL, NULL }
 	};
@@ -662,17 +697,33 @@ static void txn_rollback(sqlite3 *db)
 	if (db && !sqlite3_get_autocommit(db)) sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
 }
 
+/* Writers in this process take turns on this mutex before BEGIN IMMEDIATE: a waiting
+ * worker is woken the moment the previous transaction ends instead of polling SQLite's
+ * lock with sleeps (SQLite's busy handler still covers other processes). */
+static pthread_mutex_t txn_mu = PTHREAD_MUTEX_INITIALIZER;
+
+void bind_txn_lock(void) { pthread_mutex_lock(&txn_mu); }
+void bind_txn_unlock(void) { pthread_mutex_unlock(&txn_mu); }
+
 /* Run fn(ctx) inside BEGIN IMMEDIATE/COMMIT. Returns 0 ok, else -1 with message in *errmsg
  * (heap). */
-static int run_txn(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx *c, char **errmsg)
+static int run_txn_locked(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx *c, char **errmsg)
 {
 	char err[512];
 	*errmsg = NULL;
 	lua_settop(L, 0);
+	double t0 = now_mono();
 	if (db_exec_simple(db, "BEGIN IMMEDIATE", err, sizeof err) < 0) {
 		*errmsg = strdup(err);
 		return -1;
 	}
+	if (db) {
+		uint64_t us = (uint64_t)((now_mono() - t0) * 1e6);
+		stat_inc(ST_db_txn);
+		stat_add(ST_db_begin_wait_us, us);
+		stat_max(ST_db_begin_wait_max_us, us);
+	}
+	sqlite3_int64 changes0 = db ? sqlite3_total_changes64(db) : 0;
 	lua_pushcfunction(L, msgh);
 	lua_pushcfunction(L, fn);
 	lua_pushlightuserdata(L, c);
@@ -686,13 +737,34 @@ static int run_txn(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx *c, cha
 		return -1;
 	}
 	lua_settop(L, 0);
-	if (db && !sqlite3_get_autocommit(db) &&
-		db_exec_simple(db, "COMMIT", err, sizeof err) < 0) {
-		*errmsg = strdup(err);
-		txn_rollback(db);
-		return -1;
+	if (db && sqlite3_total_changes64(db) == changes0)
+		stat_inc(ST_db_txn_readonly);
+	if (db && !sqlite3_get_autocommit(db)) {
+		t0 = now_mono();
+		int rc = db_exec_simple(db, "COMMIT", err, sizeof err);
+		uint64_t us = (uint64_t)((now_mono() - t0) * 1e6);
+		stat_add(ST_db_commit_us, us);
+		stat_max(ST_db_commit_max_us, us);
+		if (rc < 0) {
+			*errmsg = strdup(err);
+			txn_rollback(db);
+			return -1;
+		}
 	}
 	return 0;
+}
+
+static int run_txn(lua_State *L, sqlite3 *db, lua_CFunction fn, call_ctx *c, char **errmsg)
+{
+	if (!db) return run_txn_locked(L, db, fn, c, errmsg);
+	double t0 = now_mono();
+	pthread_mutex_lock(&txn_mu);
+	uint64_t us = (uint64_t)((now_mono() - t0) * 1e6);
+	stat_add(ST_db_begin_wait_us, us);
+	stat_max(ST_db_begin_wait_max_us, us);
+	int rc = run_txn_locked(L, db, fn, c, errmsg);
+	pthread_mutex_unlock(&txn_mu);
+	return rc;
 }
 
 void bind_error_page(dk_response *resp, const dk_config *cfg, int status, const char *msg)

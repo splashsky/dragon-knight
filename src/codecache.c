@@ -1,10 +1,12 @@
 /* codecache.c :: process-wide bytecode cache + file watcher (see codecache.h).
  *
- * Entries are immutable once inserted and reference counted, so loading bytecode into
- * a caller's state happens outside the lock. Misses compile in the caller's state
- * (the compiled function is returned directly) and the dump is inserted only if the
- * generation did not change while compiling, so a racing invalidation can never leave
- * stale bytecode behind. */
+ * Entries are immutable once inserted. The table is read-mostly: hits (every module
+ * load of a VM build, every template a request renders) take a shared read lock, held
+ * while the bytecode loads, so they never wait for each other; inserts and invalidations
+ * take it exclusively (writers are preferred, so a code change is never starved). Misses
+ * compile in the caller's state (the compiled function is returned directly) and the dump
+ * is inserted only if the generation did not change while compiling, so a racing
+ * invalidation can never leave stale bytecode behind. */
 #include "codecache.h"
 
 #include <dirent.h>
@@ -22,6 +24,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "stats.h"
 #include "tmpl.h"
 #include "util.h"
 
@@ -34,14 +37,45 @@ typedef struct cc_entry {
 	struct cc_entry *next;
 	unsigned  hash;
 	cc_kind   kind;
-	int       refs;        /* 1 for the table + 1 per in-flight load; under mu */
 	size_t    len;
 	char     *bc;
 	char     *chunkname;   /* "@<path>" */
 	char      name[];
 } cc_entry;
 
-static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_rwlock_t lk;
+static pthread_once_t lk_once = PTHREAD_ONCE_INIT;
+
+static void lk_init(void)
+{
+	pthread_rwlockattr_t a;
+	pthread_rwlockattr_init(&a);
+#ifdef __GLIBC__
+	pthread_rwlockattr_setkind_np(&a, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+#endif
+	pthread_rwlock_init(&lk, &a);
+	pthread_rwlockattr_destroy(&a);
+}
+
+static void rdlock(void)
+{
+	pthread_once(&lk_once, lk_init);
+	if (pthread_rwlock_tryrdlock(&lk) != 0) {
+		stat_inc(ST_lock_waits_codecache);
+		pthread_rwlock_rdlock(&lk);
+	}
+}
+
+static void wrlock(void)
+{
+	pthread_once(&lk_once, lk_init);
+	pthread_rwlock_wrlock(&lk);
+}
+
+static void unlock(void)
+{
+	pthread_rwlock_unlock(&lk);
+}
 static cc_entry *buckets[NBUCKETS];
 static _Atomic uint64_t generation = 1;
 static char *app_dir, *template_dir, *config_path;
@@ -97,7 +131,7 @@ static int resolve_path(cc_kind kind, const char *name, char *out, size_t outlen
 	return (n < 0 || (size_t)n >= outlen) ? -1 : 0;
 }
 
-/* ---- table (all under mu) ---- */
+/* ---- table (under lk) ---- */
 
 static cc_entry *find_locked(cc_kind kind, const char *name, unsigned h)
 {
@@ -113,11 +147,6 @@ static void entry_free(cc_entry *e)
 	free(e);
 }
 
-static void unref_locked(cc_entry *e)
-{
-	if (--e->refs == 0) entry_free(e);
-}
-
 static void drop_all_locked(void)
 {
 	for (int i = 0; i < NBUCKETS; i++) {
@@ -125,7 +154,7 @@ static void drop_all_locked(void)
 		buckets[i] = NULL;
 		while (e) {
 			cc_entry *nx = e->next;
-			unref_locked(e);
+			entry_free(e);
 			e = nx;
 		}
 	}
@@ -150,17 +179,16 @@ static void cache_insert(cc_kind kind, const char *name, unsigned h, uint64_t ge
 	memcpy(e->name, name, nl + 1);
 	e->hash = h;
 	e->kind = kind;
-	e->refs = 1;
 	e->len = bc->len;
 	e->bc = sb_steal(bc);
 	e->chunkname = cn;
-	pthread_mutex_lock(&mu);
+	wrlock();
 	if (atomic_load(&generation) == gen && !find_locked(kind, name, h)) {
 		e->next = buckets[h % NBUCKETS];
 		buckets[h % NBUCKETS] = e;
 		e = NULL;
 	}
-	pthread_mutex_unlock(&mu);
+	unlock();
 	if (e) entry_free(e);
 }
 
@@ -175,18 +203,19 @@ int codecache_load(lua_State *L, cc_kind kind, const char *name)
 	}
 	unsigned h = hash_key(kind, name);
 
-	pthread_mutex_lock(&mu);
+	double t0 = now_mono();
+	rdlock();
 	cc_entry *e = find_locked(kind, name, h);
-	if (e) e->refs++;
 	uint64_t gen = atomic_load(&generation);
-	pthread_mutex_unlock(&mu);
 	if (e) {
 		int st = luaL_loadbufferx(L, e->bc, e->len, e->chunkname, "b");
-		pthread_mutex_lock(&mu);
-		unref_locked(e);
-		pthread_mutex_unlock(&mu);
+		unlock();
+		stat_inc(ST_code_loads);
+		stat_add(ST_code_load_us, (uint64_t)((now_mono() - t0) * 1e6));
 		return st;
 	}
+	unlock();
+	stat_inc(ST_code_compiles);
 
 	snprintf(chunkname, sizeof chunkname, "@%s", path);
 	size_t len;
@@ -227,10 +256,10 @@ uint64_t codecache_generation(void) { return atomic_load(&generation); }
 
 void codecache_invalidate(void)
 {
-	pthread_mutex_lock(&mu);
+	wrlock();
 	drop_all_locked();
 	atomic_fetch_add(&generation, 1);
-	pthread_mutex_unlock(&mu);
+	unlock();
 }
 
 /* ---- module listing (dk.list_modules) ---- */
@@ -693,9 +722,9 @@ int codecache_init(const dk_config *cfg)
 void codecache_shutdown(void)
 {
 	watch_stop();
-	pthread_mutex_lock(&mu);
+	wrlock();
 	drop_all_locked();
-	pthread_mutex_unlock(&mu);
+	unlock();
 	free(app_dir);
 	free(template_dir);
 	free(config_path);

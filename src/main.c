@@ -5,15 +5,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include "app.h"
 #include "backup.h"
 #include "config.h"
 #include "lua.h"
 #include "sqlite3.h"
+#include "stats.h"
 
-#define DK_VERSION "2.2.0"
+#define DK_VERSION "2.3.0-dev"
 
 static void usage(FILE *f)
 {
@@ -34,6 +38,8 @@ static void usage(FILE *f)
 			"  user [args...]     user administration (runs app/cli/user.lua)\n"
 			"  check              compile all modules/templates, build a VM and validate the\n"
 			"                     content files; nonzero on error\n"
+			"  stats              live metrics of the running server (its stats socket, by\n"
+			"                     default <db dir>/dk.sock)\n"
 			"  version            print version information\n"
 			"\n"
 			"The config file defaults to ./config.lua. migrate, content, user and backup exit with\n"
@@ -84,6 +90,63 @@ static int serve_options(dk_config *cfg, int argc, char **argv)
 			return 2;
 		}
 	}
+	return 0;
+}
+
+/* dk stats: read one snapshot from the server's stats socket and print it with the
+ * description of each metric. */
+static int stats_cli(const dk_config *cfg, int argc, char **argv)
+{
+	if (argc > 0) {
+		fprintf(stderr, "dk stats: unexpected argument: %s\n", argv[0]);
+		return 2;
+	}
+	char buf[256];
+	const char *path = config_stats_socket(cfg, buf, sizeof buf);
+	struct sockaddr_un a = { 0 };
+	a.sun_family = AF_UNIX;
+	if (!path || strlen(path) >= sizeof a.sun_path) {
+		fprintf(stderr, "dk stats: no stats socket configured (stats_socket)\n");
+		return 1;
+	}
+	strcpy(a.sun_path, path);
+	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (fd < 0 || connect(fd, (struct sockaddr *)&a, sizeof a) < 0) {
+		fprintf(stderr, "dk stats: no server answering at %s: %s\n", path, strerror(errno));
+		if (fd >= 0) close(fd);
+		return 1;
+	}
+	char *text = NULL;
+	size_t len = 0, cap = 0;
+	for (;;) {
+		if (len + 4096 > cap) {
+			cap = cap ? cap * 2 : 16384;
+			char *t = realloc(text, cap);
+			if (!t) break;
+			text = t;
+		}
+		ssize_t n = read(fd, text + len, cap - len - 1);
+		if (n <= 0) break;
+		len += (size_t)n;
+	}
+	close(fd);
+	if (!text || !len) {
+		free(text);
+		fprintf(stderr, "dk stats: empty answer from %s\n", path);
+		return 1;
+	}
+	text[len] = '\0';
+	printf("dk stats from %s\n", path);
+	for (char *line = strtok(text, "\n"); line; line = strtok(NULL, "\n")) {
+		char *sp = strchr(line, ' ');
+		if (!sp) continue;
+		*sp = '\0';
+		const char *help = "";
+		for (int k = 0; k < ST_COUNT; k++)
+			if (!strcmp(stat_name(k), line)) help = stat_help(k);
+		printf("  %-26s %14s  %s\n", line, sp + 1, help);
+	}
+	free(text);
 	return 0;
 }
 
@@ -160,6 +223,8 @@ int main(int argc, char **argv)
 		if (!rc) rc = app_cli(&cfg, "cli.user", nrest, rest);
 	} else if (!strcmp(cmd, "check")) {
 		rc = app_check(&cfg);
+	} else if (!strcmp(cmd, "stats")) {
+		rc = stats_cli(&cfg, nrest, rest);
 	} else {
 		fprintf(stderr, "dk: unknown command '%s'\n\n", cmd);
 		usage(stderr);

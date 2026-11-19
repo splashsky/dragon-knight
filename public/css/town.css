@@ -10,8 +10,8 @@ table.maps-list td:nth-child(3) { width: 35%; }
 table.maps-list td:nth-child(4) { width: 15%; }
 
 /* character sheets */
-.charsheet { width: 200px; }
-body.minimal .charsheet { width: auto; min-width: 180px; }
+.charsheet { width: 240px; }
+body.minimal .charsheet { width: auto; min-width: 210px; }
 table.inventory { width: 100%; }
 table.inventory td + td { width: 100%; }
 

@@ -12,8 +12,8 @@ typedef struct {
 	char  *path;              /* path of the config file itself (may not exist) */
 	char  *bind;              /* "127.0.0.1" */
 	int    port;              /* 8080 */
-	int    workers;           /* 4   : request worker threads */
-	int    spares;            /* 0   : warm spare VMs to keep ready; 0 => workers + 1 */
+	int    workers;           /* 0   : request worker threads; 0 = one per CPU (at least 2) */
+	int    spares;            /* 0   : Lua VMs in the pool (ready + in use); 0 => workers + 1 */
 	char  *db_path;           /* "data/dk.db" */
 	char  *app_dir;           /* "app" */
 	char  *template_dir;      /* "templates" */
@@ -26,11 +26,26 @@ typedef struct {
 	int    keepalive_timeout; /* 15 seconds */
 	int    request_timeout;   /* 30 seconds (time to receive a full request) */
 	int    max_connections;   /* 1024 */
+	int    queue_timeout_ms;  /* 2000: a request waiting longer for a worker gets a fast 503 (0 = never) */
+	int    access_log;        /* 1   : one log line per request (written by a background thread) */
+	size_t static_cache_bytes;    /* 8 MiB: memory for cached /static/ files (0 = no cache) */
+	size_t static_cache_file_max; /* 256 KiB: larger files are sent with sendfile() */
+	char  *stats_socket;      /* NULL: <db dir>/dk.sock; "" = none (`dk stats`) */
+	size_t vm_memory_limit;   /* 256 MiB: address space per Lua VM (its memory limit) */
+	int    vm_gc_pause;       /* 1000: Lua GC pause (%) of request VMs */
+	int    db_cache_kb;       /* 8192: SQLite page cache per connection (KiB) */
+	size_t db_mmap_bytes;     /* 0: SQLite memory-mapped I/O per connection (bytes; 0 = off) */
+	int    db_checkpoint_ms;  /* 1000: background WAL checkpoint interval (0 = SQLite's auto) */
 } dk_config;
 
 void config_defaults(dk_config *c);
 /* 0 ok; -1 error with message in err. Fills defaults first. */
 int  config_load(dk_config *c, const char *path, char *err, size_t errlen);
 void config_free(dk_config *c);
+
+/* Effective worker count: cfg->workers, or the CPUs this process may run on (min 2). */
+int  config_workers(const dk_config *c);
+/* Effective stats socket path (NULL: none). */
+const char *config_stats_socket(const dk_config *c, char *buf, size_t n);
 
 #endif

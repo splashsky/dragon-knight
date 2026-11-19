@@ -1,0 +1,10 @@
+{#- Theme selector (view.lua theme_picker(); POST /theme, routes/theme.lua). Output with {{{ theme_picker() }}}. -#}
+<form class="theme-picker" method="post" action="/theme">
+{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}">
+Theme:
+{%- for i, t in ipairs(themes) do %}{% if i > 1 then %} &middot;{% end %}
+{%- if t.key == current then %} <b aria-current="true">{{ t.name }}</b>
+{%- else %} <button class="link" type="submit" name="theme" value="{{ t.key }}">{{ t.name }}</button>
+{%- end %}
+{%- end %}
+</form>

@@ -28,13 +28,26 @@ void bind_handle(lua_State *L, const dk_config *cfg, sqlite3 *db,
 int  bind_run_cli(lua_State *L, const dk_config *cfg, sqlite3 *db,
 				  const char *module, int argc, char **argv);
 
+/* The in-process writer lock every request transaction holds (the WAL checkpointer
+ * takes it briefly so the WAL can start over). */
+void bind_txn_lock(void);
+void bind_txn_unlock(void);
+
 /* Replace resp with an HTML error page; msg (escaped) is shown only when cfg->dev. */
 void bind_error_page(dk_response *resp, const dk_config *cfg, int status, const char *msg);
 
 /* db.c — open a connection with the standard pragmas:
- * journal_mode=WAL, synchronous=NORMAL, foreign_keys=ON, busy_timeout=5000. */
+ * journal_mode=WAL, synchronous=NORMAL, foreign_keys=ON, a busy handler that waits up to
+ * about 5 s (short sleeps first). */
 sqlite3 *db_open(const char *path, char *err, size_t errlen);
 void     db_close(sqlite3 *db);
+/* Server connections: cache_size, mmap_size, temp_store=MEMORY from cfg; automatic WAL
+ * checkpoints off when a background thread does them (db_checkpointer_start). */
+int      db_tune(sqlite3 *db, const dk_config *cfg, int background_checkpoints);
+/* A thread with its own connection that runs a PASSIVE WAL checkpoint every
+ * cfg->db_checkpoint_ms (so no request pays for one). 0 ok / not needed, -1 error. */
+int      db_checkpointer_start(const dk_config *cfg);
+void     db_checkpointer_stop(void);
 
 /* Per-connection prepared statement cache (keyed by exact SQL text). db_prepare returns
  * a ready-to-bind statement (or NULL for empty SQL) and *tail like sqlite3_prepare;

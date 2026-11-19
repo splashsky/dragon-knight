@@ -11,6 +11,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
+| Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, shop, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
@@ -57,6 +58,35 @@ The whole request runs in one SQLite transaction (`BEGIN IMMEDIATE`). If a Lua e
 escapes, `main.lua` rolls the transaction back, logs the traceback and renders a 500 page
 (with the traceback when `dev = true`). Don't catch errors just to hide them, and never
 issue `BEGIN`/`COMMIT` yourself.
+
+### What the engine does around a request
+
+(The C side; `PLAN.md` "Architecture" has the diagram, `docs/PERF.md` the numbers.)
+
+- **The VM.** Every request runs in a pool VM that was built once for the current code
+	(`require "main"` and everything it requires ran then), snapshotted, and is restored to
+	that snapshot with one memory copy after the request, with `math.random` reseeded. So
+	module-level code runs once per code change, not per request, and nothing a request
+	does (globals, module tables, caches in upvalues) is seen by the next one. A request
+	may use up to `vm_memory_limit` of Lua memory (default 256 MiB): beyond that it fails
+	with a Lua "not enough memory" error (a 500). Its garbage is rarely collected
+	(`vm_gc_pause`): the restore drops it. A file left open is closed by its finalizer
+	before the restore; still, close what you open.
+- **The transaction.** Requests that use the database take turns on one in-process lock
+	around `BEGIN IMMEDIATE … COMMIT`, so a long handler delays every other request:
+	keep handlers short, and never wait inside one. WAL checkpoints happen on a
+	background thread.
+- **Queueing.** A request that waits longer than `queue_timeout_ms` (2 s) for a worker
+	gets a `503` with `Retry-After: 1` without running; it is safe to retry (nothing was
+	done).
+- **Responses.** The worker writes the response to the socket itself; `/static/` files
+	never reach Lua (cached in memory, `ETag`/`Last-Modified`, 304s). Access log lines are
+	written by a background thread (`access_log = false` turns them off); `dk.log` lines
+	too, in order.
+- **Metrics.** `/admin/server` (administrators) and `dk stats` show the server's counters:
+	requests and latency buckets, queue wait, worker time, VM pool, time in SQLite and
+	waiting for the write lock, checkpoints, static cache, memory. `make bench` loads a
+	temporary install with scripted players (`tools/dkbench.c`, `docs/PERF.md`).
 
 ## Routes
 
@@ -128,7 +158,8 @@ Form and query values are raw strings. Validate them, and convert them with
 - `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup and iframe
 	pages (`/character`, `/map`, `/babble`). Any other name uses
 	`templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
-- `body_class`: extra class(es) on `<body>` for page-specific CSS. The help pages pass
+- `body_class`: extra class(es) on `<body>` for page-specific CSS (the layouts also add
+	`theme-<key>`, see [Themes](#themes)). The help pages pass
 	`{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
 	page (`body.minimal.help` in `community.css`).
 - `status`: the HTTP status.
@@ -139,10 +170,11 @@ the handler show up straight away (legacy `display()` did the same). A handler t
 stats itself after changing them reads the row again (`game.user(id)`).
 
 Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class`,
-`gamename`, `nav` (table or nil), `logged_in`, `version`, `build`, `elapsed()`,
-`queries()`. Include
+`theme` (the request's theme, see [Themes](#themes)), `gamename`, `nav` (table or nil),
+`logged_in`, `version`, `build`, `elapsed()`, `queries()`. Include
 `{{{ include("layout/head") }}}` in `<head>` to get the CSS links (`dk.css` + the four
-feature stylesheets) and `dk.js`.
+feature stylesheets + the theme's) and `dk.js`, put `theme-{{ theme.key }}` in the
+`<body>` class, and use `{{{ logo() }}}` and `{{{ theme_picker() }}}`.
 
 ## Templates
 
@@ -155,7 +187,7 @@ starting with `__` are reserved.
 - **HTML-returning helpers need triple braces**: `{{{ csrf_field() }}}`,
 	`{{{ include("x") }}}`, `{{{ nl2br(text) }}}`.
 - Every POST form needs `{{{ csrf_field() }}}`, including the babble iframe form.
-- Popups: `<a href="/character" target="_blank" data-popup="210x500">` (`dk.js` opens a
+- Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
 	sized window; without JS it's a normal link).
 - Images: `/static/images/<file>`. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
@@ -171,6 +203,8 @@ starting with `__` are reserved.
 | `escape` | `dk.html` |
 | `include(name [, ctx])` | renders another template (defaults to the current ctx) → HTML |
 | `csrf_field()` / `csrf_token()` | hidden input / raw token |
+| `logo()` | the theme's logo, linked to `/` → HTML |
+| `theme_picker()` | the theme selector (a POST form to `/theme` that comes back to this page) → HTML |
 | `url(path, seg..., [query_table])` | `url("/forum/thread", 7, {start = 15})` → `/forum/thread/7?start=15` (segments urlencoded) |
 | `number(n)` | PHP `number_format($n)`: `1234567` → `1,234,567` |
 | `date(ts)` | PHP `date("F j, Y")` (legacy `prettydate`) |
@@ -179,6 +213,61 @@ starting with `__` are reserved.
 | `req` | the request (`req.user`, `req.path`, …) |
 | `php` | the `lib.php` module |
 | `ipairs pairs next select type tostring tonumber string table math utf8 os.date os.time dk` | Lua builtins |
+
+## Themes
+
+A theme is a stylesheet and a logo; the layout (columns, sizes, boxes) is the same in
+every theme. `app/lib/themes.lua` lists them:
+
+| Key | Name | Stylesheet | Logo |
+|---|---|---|---|
+| `default` | Default | `/static/css/themes/default.css`: the snow background (`public/images/themes/default/background.jpg`), near-black text and borders, dark red links with a bright red hover, translucent white title boxes | `/static/images/themes/default/logo.png` (shown at 355×120) |
+| `retro` | Retro | `/static/css/themes/retro.css`: the original tiled `background.jpg` and colours | `/static/images/logo.gif` (409×108) |
+
+```lua
+-- an entry of themes.list (the selector lists them in this order)
+{
+	key = "retro",                                  -- [a-z0-9_]: the cookie value, body class theme-retro
+	name = "Retro",                                 -- shown in the selector
+	stylesheet = "/static/css/themes/retro.css",
+	logo = { src = "/static/images/logo.gif", width = 409, height = 108,
+		alt = "Dragon Knight" },                    -- the logo's alt text is the game's name; this if it has none
+}
+```
+
+- **Choosing.** Every page with a footer (main and admin layouts, help and changelog
+	pages) ends with the selector, `{{{ theme_picker() }}}` ("Theme: Default · Retro", the
+	current one in bold): a POST form to `/theme` (`app/routes/theme.lua`) with the CSRF
+	field (the session's token, or the pre-session token when logged out, as on the login
+	form), `theme` (the key, from the button pressed) and `back` (the page's path and query
+	string; on a page answering a POST, its path). The route sets the `dk_theme` cookie
+	(`Path=/`, one year, `SameSite=Lax`) and redirects to `back` if it is a same-site path
+	with a GET route (`themes.safe_path`: no scheme, host, `//`, backslash or control
+	characters), else to `/`. An unknown key is a 400 page and changes nothing. Popups and
+	the babble iframe (minimal layout) have no selector but use the theme. No database: the
+	choice belongs to the browser, logged in or out.
+- **Rendering.** `themes.current(req)` is the cookie's theme, or `themes.DEFAULT`
+	(`default`) when there is none or it names no theme. The layouts get it as ctx `theme`:
+	`layout/head.html` links `theme.stylesheet` after the other stylesheets, `<body>` gets
+	the class `theme-<key>` (before `body_class`), and `{{{ logo() }}}`
+	(`templates/layout/logo.html`) draws `theme.logo` linked to `/` (main layout header, admin
+	menu, help and changelog pages). The 500 and 503 pages link the theme's stylesheet too.
+- **Theme CSS** only overrides `dk.css` and the feature stylesheets: background, colours,
+	borders, logo effects. Since only the current theme's file is linked, plain selectors
+	(`body`, `a`) are enough; `body.theme-<key>` is there for feature CSS that needs to
+	differ by theme. Keep sizes and layout in `dk.css` so every theme fits the same.
+- **Adding a theme**: put its images under `public/images/themes/<key>/`, write
+	`public/css/themes/<key>.css` (copy `default.css`), add an entry to `themes.list`, and
+	add it to `tests/e2e/theme.sh`. No restart: the next page lists it.
+
+**The font.** Every page, whatever the theme, uses Vollkorn (`public/fonts/vollkorn/`,
+Regular, Italic, Bold and Bold Italic; SIL Open Font License 1.1, `OFL.txt` next to the
+fonts): the `@font-face` rules and `font: 15px/1.4 Vollkorn, Georgia, "Times New Roman",
+serif` on `body` are at the top of `dk.css`, tables and form controls inherit it, and
+`layout/head.html` preloads the regular weight. Sizes: 15px text, 13px for `.small`, the
+footer (`.copyright`) and the selector; the side columns are 210px wide (legacy 180px at
+11px Verdana), the admin menu 180px. A weight not in the folder is synthesized by the
+browser; to use SemiBold or Black, add the file and its `@font-face`.
 
 ## Game helpers (`lib/game.lua`)
 
@@ -1206,6 +1295,7 @@ EOF
 ./dk check   --config /tmp/dk-dev/config.lua   # compiles every module + template, validates content
 ./dk content --config /tmp/dk-dev/config.lua status
 ./dk user    --config /tmp/dk-dev/config.lua list
+./dk stats   --config /tmp/dk-dev/config.lua         # metrics of the running server
 ```
 
 Edits to `app/**/*.lua` (content files included), `templates/**/*.html` and the app-level

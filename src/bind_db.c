@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "lauxlib.h"
+#include "stats.h"
+#include "util.h"
 
 #define DB_MT "dk.db"
 
@@ -170,8 +172,10 @@ static int db_run(lua_State *L, int mode)
 	lua_pushcfunction(L, run_inner);
 	lua_pushlightuserdata(L, &c);
 	for (int i = 3; i <= top; i++) lua_pushvalue(L, i);
+	double t0 = now_mono();
 	int status = lua_pcall(L, top - 1, LUA_MULTRET, 0);
 	db_release(db, st);
+	stat_add(ST_db_time_us, (uint64_t)((now_mono() - t0) * 1e6));
 	if (status != LUA_OK) {
 		luaL_where(L, 1);
 		lua_insert(L, -2);

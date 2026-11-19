@@ -1,8 +1,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preload" href="/static/fonts/vollkorn/Vollkorn-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="/static/css/dk.css">
 <link rel="stylesheet" href="/static/css/town.css">
 <link rel="stylesheet" href="/static/css/fight.css">
 <link rel="stylesheet" href="/static/css/community.css">
 <link rel="stylesheet" href="/static/css/admin.css">
+{%- if theme then %}
+<link rel="stylesheet" href="{{ theme.stylesheet }}">
+{%- end %}
 <script src="/static/js/dk.js" defer></script>

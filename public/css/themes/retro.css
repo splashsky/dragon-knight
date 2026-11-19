@@ -1,0 +1,7 @@
+/* themes/retro.css :: the original look (legacy templates/primary.php): the tiled
+	 background and logo.gif. The colours are dk.css's. Linked last by every layout when the
+	 theme is "retro" (lib/themes.lua); body has class theme-retro. */
+
+body {
+	background: url(/static/images/background.jpg);
+}

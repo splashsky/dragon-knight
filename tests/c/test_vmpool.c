@@ -1,4 +1,5 @@
-/* test_vmpool.c :: runtime integration: codecache + watcher + vmpool + dk API + db. */
+/* test_vmpool.c :: runtime integration: codecache + watcher + vmpool + dk API + db, and the
+ * arena allocator behind pool VMs (snapshot/restore). */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,12 +8,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "arena.h"
 #include "bind.h"
 #include "codecache.h"
 #include "config.h"
 #include "http.h"
 #include "lauxlib.h"
 #include "minitest.h"
+#include "stats.h"
 #include "util.h"
 #include "vmpool.h"
 
@@ -136,6 +139,13 @@ static const char *MAIN_LUA =
 	"M['/stats'] = function() local s = dk.vmstats() return s.built .. ',' .. s.generation end\n"
 	"M['/boot'] = function() local s = dk.vmstats() return s.boot_id end\n"
 	"M['/list'] = function(req) return table.concat(dk.list_modules(req.query.p or ''), ',') end\n"
+	"M['/hog'] = function() local t = {} for i = 1, 1e7 do t[i] = i end return 'x' end\n"
+	"M['/fin'] = function(req)\n"
+	"  setmetatable({}, {__gc = function() local f = io.open(req.query.path, 'w') f:write('finalized') f:close() end})\n"
+	"  return 'ok'\n"
+	"end\n"
+	"M['/leak'] = function(req) io.open(req.query.path, 'w'):write('flushed at close') return 'ok' end\n"
+	"M['/buf'] = function() return tostring(#string.rep('ab', 100000) + #table.concat({'x', 'y'}, ',')) end\n"
 	"return function(req)\n"
 	"  local f = M[req.path]\n"
 	"  if not f then return {status = 404, body = 'nf'} end\n"
@@ -193,7 +203,8 @@ static void setup(void)
 	char conf[2048];
 	snprintf(conf, sizeof conf,
 			 "return { app_dir = '%s/app', template_dir = '%s/templates', db_path = '%s/data/t.db',\n"
-			 "  workers = 1, spares = 2, dev = true, custom_key = 'v1' }\n", root, root, root);
+			 "  workers = 1, spares = 2, dev = true, custom_key = 'v1', vm_memory_limit = 16777216 }\n",
+			 root, root, root);
 	put("config.lua", conf);
 	put("app/main.lua", MAIN_LUA);
 	put("app/lib/mod.lua", "return { v = 'one' }\n");
@@ -352,7 +363,8 @@ static void test_api(void)
 	char conf[2048];
 	snprintf(conf, sizeof conf,
 			 "return { app_dir = '%s/app', template_dir = '%s/templates', db_path = '%s/data/t.db',\n"
-			 "  workers = 1, spares = 2, dev = true, custom_key = 'v2' }\n", root, root, root);
+			 "  workers = 1, spares = 2, dev = true, custom_key = 'v2', vm_memory_limit = 16777216 }\n",
+			 root, root, root);
 	CHECK(put_and_wait("config.lua", conf));
 	CHECK(strstr(get("/crypto"), "|v2") != NULL);    /* dk.config hot reload */
 }
@@ -439,6 +451,90 @@ static void test_list_modules(void)
 	CHECK_STR_EQ(get("/boot"), boot);     /* same process, same id */
 }
 
+/* Pool VMs are recycled: restored to their snapshot after each request, not rebuilt. */
+static void test_recycle(void)
+{
+	wait_ready(2);
+	vmpool_stats a, b;
+	vmpool_get_stats(&a);
+	for (int i = 0; i < 5; i++) CHECK_STR_EQ(get("/counter"), "1");
+	wait_ready(2);
+	vmpool_get_stats(&b);
+	CHECK(b.built == a.built);
+	CHECK(b.recycled == a.recycled + 5);
+	CHECK(b.hot_acquires == a.hot_acquires + 5);
+}
+
+/* A request that needs more than vm_memory_limit fails alone; the next one is fine. A
+ * finalizer the request left behind runs before the restore; a file left open is
+ * closed; lauxlib buffers (finalizers that only free memory) need no collection. */
+static void test_arena_limits(void)
+{
+	get("/hog");
+	CHECK(R.status == 500 && strstr(R.body, "not enough memory") != NULL);
+	CHECK_STR_EQ(get("/counter"), "1");
+
+	char path[600], target[700];
+	snprintf(path, sizeof path, "%s/finalized.txt", root);
+	snprintf(target, sizeof target, "/fin?path=%s", path);
+	CHECK_STR_EQ(get(target), "ok");
+	size_t n;
+	char *got = read_file(path, &n);
+	CHECK(got && strcmp(got, "finalized") == 0);
+	free(got);
+	snprintf(path, sizeof path, "%s/leaked.txt", root);
+	snprintf(target, sizeof target, "/leak?path=%s", path);
+	CHECK_STR_EQ(get(target), "ok");
+	got = read_file(path, &n);
+	CHECK(got && strcmp(got, "flushed at close") == 0);
+	free(got);
+
+	uint64_t f0 = stat_get(ST_vm_finalize);
+	CHECK_STR_EQ(get("/buf"), "200003");
+	CHECK(stat_get(ST_vm_finalize) == f0);
+}
+
+/* The allocator itself: classes, free lists, growth in place, snapshot and restore. */
+static void test_arena(void)
+{
+	dk_arena *a = arena_new(4u << 20);
+	CHECK(a != NULL);
+	if (!a) return;
+	CHECK(arena_reserved(a) == (4u << 20));
+	char *p1 = arena_lua_alloc(a, NULL, 0, 24);
+	char *p2 = arena_lua_alloc(a, NULL, 0, 24);
+	CHECK(p1 && p2 && p2 - p1 == 32 && ((uintptr_t)p1 & 15) == 0);
+	memcpy(p1, "first", 6);
+	CHECK(arena_lua_alloc(a, p2, 24, 0) == NULL);           /* free -> class list */
+	CHECK(arena_lua_alloc(a, NULL, 0, 20) == p2);           /* same class, reused */
+	/* the last block grows in place */
+	char *big = arena_lua_alloc(a, NULL, 0, 1000);
+	CHECK(arena_lua_alloc(a, big, 1000, 5000) == big);
+	/* a block that is not last moves, keeping its bytes */
+	char *mid = arena_lua_alloc(a, NULL, 0, 100);
+	memcpy(mid, "move me", 8);
+	arena_lua_alloc(a, NULL, 0, 64);
+	char *moved = arena_lua_alloc(a, mid, 100, 3000);
+	CHECK(moved && moved != mid && strcmp(moved, "move me") == 0);
+	CHECK(arena_lua_alloc(a, moved, 3000, 10) == moved);    /* shrinking keeps the block */
+
+	CHECK(arena_snapshot(a) == 0);
+	size_t used = arena_used(a);
+	uint64_t allocs = arena_allocs(a);
+	CHECK(arena_snapshot_size(a) == used);
+	char *after1 = arena_lua_alloc(a, NULL, 0, 48);
+	memcpy(p1, "SECOND", 7);
+	for (int i = 0; i < 1000; i++) arena_lua_alloc(a, NULL, 0, 2048);   /* 2 MB more */
+	CHECK(arena_used(a) > used + (1u << 20));
+	arena_restore(a);
+	CHECK(strcmp(p1, "first") == 0);
+	CHECK(arena_used(a) == used && arena_allocs(a) == allocs);
+	CHECK(arena_lua_alloc(a, NULL, 0, 48) == after1);       /* same state, same answer */
+	/* out of space is a NULL, not a crash */
+	CHECK(arena_lua_alloc(a, NULL, 0, 8u << 20) == NULL);
+	arena_free(a);
+}
+
 int main(void)
 {
 	setup();
@@ -453,6 +549,9 @@ int main(void)
 	test_api();
 	test_cli();
 	test_list_modules();
+	test_recycle();
+	test_arena_limits();
+	test_arena();
 
 	vmpool_shutdown();
 	codecache_shutdown();

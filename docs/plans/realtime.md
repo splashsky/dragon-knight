@@ -13,7 +13,49 @@ concurrent players, each with one open stream plus normal page/fight requests. O
 thread is enough at this scale; the design keeps per-connection memory small and the hot
 path free of contention rather than adding reactors.
 
-## R0: measure, then tune the server
+## R0: measure, then tune the server — ✅ done
+
+**As implemented** (numbers, method and dropped ideas in `docs/PERF.md`):
+`tools/dkbench.c` + `tools/bench.sh` (`make bench`, scenarios pages, fights, static, mixed,
+idle, plus `jitter` for the machine's noise floor); `src/stats.[ch]` atomic metrics behind
+`dk stats` (a Unix stats socket served by the I/O thread) and `/admin/server`
+(`dk.server_stats()`); malloc counting in `DEBUG=1` builds. Tuning, in order of effect:
+VMs in arenas restored from a snapshot after each request instead of rebuilt
+(`src/arena.c`, `src/vmpool.c`: VM CPU per request from ~2.5 ms to ~0.1 ms); an in-process
+writer lock in front of `BEGIN IMMEDIATE` (no more sleep-and-retry handoffs between
+workers); WAL checkpoints on a background thread that also lets the WAL restart (it grew
+without bound otherwise); `workers = 0` → one per CPU; the I/O loop on epoll (edge
+triggered, poll fallback) with a timer min-heap, `accept4` bursts, cached clock and Date;
+workers write responses themselves with `writev`; pooled 2/8/32 KiB connection buffers
+(an idle connection holds none: ~0.5 KiB each); per-request parse arena; a static file
+cache with ETag + `sendfile` for large files; queue backpressure (`queue_timeout_ms`,
+fast `503 Retry-After: 1`); a background log writer (`access_log`); a read-mostly rwlock
+on the bytecode cache; SQLite `cache_size`/`mmap_size`/`temp_store` settings. Deferred
+transactions were measured and dropped (every logged-in request writes; see PERF.md).
+
+**Notes for R1** (where the SSE hub plugs in):
+- Connections (`src/http.c`, `struct conn`): add a `CS_STREAM` state. A stream is owned by
+	the I/O thread like a keep-alive connection; give it no read/write timeout (the conn's
+	`ev_timer` can carry its next heartbeat, or one shared 15 s timer can append the same
+	`: ping` iobuf to every stream).
+- Output is already a queue of segments: `SEG_IOBUF` takes a reference on a shared
+	`iobuf` (`src/bufpool.h`), so fan-out is one `iobuf_new()` per event and one
+	`q_push()` + `iobuf_ref()` per subscriber, then `conn_flush()` (writev of up to 16
+	segments). Add a per-connection queued-bytes count for the 256 KiB slow-reader cutoff.
+- Workers write ordinary responses straight to the socket (`worker_finish`); an SSE
+	response must skip that path and go through `complete()` on the I/O thread, which then
+	sends the stream head and switches the state.
+- `hub_publish()` from workers: a mutex-protected queue drained by the I/O thread on the
+	existing eventfd wake-up (`process_completions` is the place). Flush a request's
+	buffered publishes after its COMMIT in `run_txn` (`src/bind_dk.c`), drop them on
+	ROLLBACK.
+- Shutdown (`begin_stop`) closes reading connections at once and lets busy ones finish;
+	streams need `event: bye` queued and a final flush before close.
+- Metrics: add stream gauges/counters to `DK_STATS` in `src/stats.h`; they show up in
+	`dk stats` and `/admin/server` automatically (the page lists metrics by group, add the
+	names in `app/admin/server.lua`).
+- Budget measured in R0: ~0.5 KiB per idle connection, 13–16 MiB RSS for the whole
+	server; 1,000 streams should stay well within the 64 MB + 16 KiB × connections target.
 
 Nothing is tuned without a number before and after. All results go into `docs/PERF.md`
 (machine, command, before/after table) so regressions are visible.

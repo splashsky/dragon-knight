@@ -11,6 +11,7 @@ for _, name in ipairs({
 	"routes.fight",      -- fight, victory, drops
 	"routes.community",  -- forum, help
 	"routes.admin",      -- admin panel
+	"routes.theme",      -- POST /theme (theme selector)
 }) do
 	require(name)(r)
 end

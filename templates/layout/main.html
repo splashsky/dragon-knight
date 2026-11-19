@@ -4,10 +4,10 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body{% if body_class then %} class="{{ body_class }}"{% end %}>
+<body class="theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
 <div class="dk-page">
 <header class="dk-top">
-	<a href="/"><img src="/static/images/logo.gif" alt="{{ gamename }}" title="{{ gamename }}"></a>
+	{{{ logo() }}}
 	<nav class="dk-topnav">
 {%- if nav then %}
 		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<input type="image" src="/static/images/button_logout.gif" alt="Log Out" title="Log Out"></form>
@@ -41,5 +41,6 @@
 	<div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
 	<div><a href="/changelog">Version {{ version }}</a> {{ build }}</div>
 </footer>
+<div class="dk-themes small">{{{ theme_picker() }}}</div>
 </body>
 </html>

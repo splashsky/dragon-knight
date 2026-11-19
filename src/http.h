@@ -1,11 +1,14 @@
 /* http.h :: tiny HTTP/1.1 server.
  *
- * Model: one I/O thread runs a poll(2) loop (accept, read, parse, write, keep-alive,
- * timeouts). Fully-parsed requests are pushed to a queue consumed by N worker threads.
- * Each worker calls hooks->handle() synchronously and hands the response back to the
- * I/O thread for writing (eventfd/pipe wakeup). Requests under /static/ are served from
- * cfg->public_dir by the server itself (GET/HEAD only, no traversal, mime by extension,
- * Last-Modified + If-Modified-Since -> 304). Everything else goes to the handler. */
+ * Model: one I/O thread runs an event loop (epoll; poll elsewhere): accept, read, parse,
+ * keep-alive, timeouts (a timer heap), writes. Fully-parsed requests are pushed to a
+ * queue consumed by N worker threads (config `workers`, default one per CPU). Each worker
+ * calls hooks->handle() synchronously, writes the response to the socket itself when it
+ * can, and hands the connection back to the I/O thread (eventfd wakeup). A request that
+ * waited longer than `queue_timeout_ms` for a worker gets a fast 503 with Retry-After.
+ * Requests under /static/ are served from cfg->public_dir by the I/O thread (GET/HEAD
+ * only, no traversal, mime by extension, small files cached in memory, larger ones sent
+ * with sendfile, Last-Modified + ETag -> 304). Everything else goes to the handler. */
 #ifndef DK_HTTP_H
 #define DK_HTTP_H
 
@@ -36,6 +39,7 @@ typedef struct {
 	size_t     nheaders;
 	size_t     cap_headers;
 	sbuf       body;
+	void      *harena;         /* storage of the header strings */
 } dk_response;
 
 /* Look up a request header by lowercase name; NULL if absent. */
@@ -53,6 +57,9 @@ typedef struct {
 	void  (*worker_fini)(void *wctx, void *ud);
 	/* Fill resp. Server adds Content-Length, Date, Server, Connection. HEAD bodies are dropped. */
 	void  (*handle)(void *wctx, const dk_request *req, dk_response *resp, void *ud);
+	/* Optional: called on the worker after the response was handed to the I/O thread
+	 * (clean-up that should not delay the response). */
+	void  (*after)(void *wctx, void *ud);
 	void  *ud;
 } dk_hooks;
 
@@ -64,5 +71,8 @@ void http_stop(void);
 
 /* Actual listening port while http_serve is running (useful with port 0), else 0. */
 int http_bound_port(void);
+
+/* Use the poll(2) backend even where epoll exists (tests; also DK_EVENT_BACKEND=poll). */
+void http_force_poll(int on);
 
 #endif
