@@ -159,12 +159,12 @@ t_jar default
 t_section "changelog"
 t_get /changelog;          expect_status 200
 expect_body '<h1>Dragon Knight Changelog</h1>'
-expect_body 'id="v2-1-0"'; expect_body '<a href="#v2-1-0">2.1.0</a> <span class="light">(unreleased)</span>'
+expect_body 'id="v2-1-0"'; expect_body '<a href="#v2-1-0">2.1.0</a> <span class="light">(11.19.2026)</span>'
 expect_body 'id="v2-0-0"'; expect_body 'TP gains and HP milestones now follow formulas'
 expect_body '<a href="#v1-1-11">1.1.11</a> <span class="light">(3.26.2006)</span>'
 expect_body 'Thanks to r0xes &amp; Adam. :)'
 expect_body 'Fixed problem where goldbonus was added to experience instead of gold.'
 expect_body 'id="vrc1-aero"'
 expect_body 'Initial public release.'
-t_get /login;              expect_body '<a href="/changelog">Version 2.1.0-dev</a>'
+t_get /login;              expect_body '<a href="/changelog">Version 2.1.0</a>'
 t_get /help;               expect_body 'href="/changelog">Changelog</a>'

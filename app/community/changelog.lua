@@ -8,7 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "2.1.0", date = "unreleased",
+		version = "2.1.0", date = "11.19.2026",
 		changes = {
 			"Removed difficulty levels; everyone plays at the original Easy difficulty.",
 			"Experience needed per level, TP gains and HP milestones now follow formulas fitted to the original level table.",
