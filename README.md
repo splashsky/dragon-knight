@@ -78,7 +78,7 @@ with status 3 when it doesn't exist.
 | Command | |
 |---|---|
 | `dk serve [--port N] [--bind ADDR]` | run the HTTP server; `--port` (1–65535, or 0 for any free port) and `--bind` (an IPv4 or IPv6 address) override the config |
-| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class ID\|KEY] [--partial] [--force]` | create the schema, load the default game data, sync the content files and create the administrator (`--class`: by id or key, default 1 / `mage`; `--partial`: no game data except the classes; `--force`: drop existing tables first) |
+| `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class ID\|KEY] [--partial] [--force]` | create the schema, load the default game data, sync the content files and create the administrator (`--class`: by id or key, default 1 / `mage`; `--partial`: no game data except the classes and spells; `--force`: drop existing tables first) |
 | `dk migrate [--status]` | upgrade an existing database to the current schema and sync the content files, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
 | `dk content sync` | load and validate the content files (`app/content/`) and update the database now (the running game does this by itself on the next request after a file changes); fails, changing nothing, when a file is invalid |
 | `dk content status` | content files, database rows (and retired ones) and admin overrides per kind, whether the database is in sync, and any errors |
@@ -95,9 +95,10 @@ with status 3 when it doesn't exist.
 `spares`, paths, request limits) are read at startup. App keys (`dev`, `secret`,
 `pbkdf2_iterations`, `cookie_secure`) are re-read for every fresh VM, so they apply on the
 next request. Game settings (game name, map size, forum, email verification, …) live in
-the database and are edited in the admin panel at `/admin`. Character classes are content
-files (see [Adding a class](#adding-a-class)); the admin panel can override their names,
-descriptions and starting stats per server.
+the database and are edited in the admin panel at `/admin`. Character classes and spells
+are content files (see [Adding a class or a spell](#adding-a-class-or-a-spell)); the admin
+panel can override their names, descriptions, starting stats, MP costs and effect amounts
+per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -201,16 +202,22 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 - The C code builds warning-free with `-Wall -Wextra`. Lua code uses no globals (in Lua
 	5.5 `global` is a reserved word). The project indents with tabs.
 
-## Adding a class
+## Adding a class or a spell
 
 Character classes are data files, `app/content/classes/<key>.lua` (Mage, Warrior and
 Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (the file
 name is the class's permanent key: lowercase letters, digits and `_`), change the name,
-description, starting stats, experience curve and per-level gains, and run `./dk check`.
-The running game picks the file up on the next page load and offers the class at
-registration; on another server, deploy it like any code change. Deleting a file retires
-the class (no longer offered; its characters keep it). The format, the sync and the admin
-overrides are described in `docs/APP.md` ("Content").
+description, starting stats, first experience step (`exp_base`; the rest of the curve is
+global unless the class sets its own `exp_stages`) and per-level gains, and run
+`./dk check`. The running game picks the file up on the next page load and offers the class
+at registration; on another server, deploy it like any code change. Deleting a file retires
+the class (no longer offered; its characters keep it).
+
+Spells work the same way: `app/content/spells/<key>.lua` holds a spell's name,
+description, MP cost, where it can be cast and its effects (heal, damage, sleep, attack or
+defense buffs), for example `effects = { { kind = "damage", max = 20 } }`. A class learns
+it when a class file lists its key in `levels[N].spells`. The formats, the sync and the
+admin overrides are described in `docs/APP.md` ("Content", "Spells").
 
 ## Project layout
 
@@ -221,7 +228,7 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  content/        content files: classes/ (one Lua data file per class), synced into the DB
+  content/        content files: classes/, spells/ (one Lua data file each), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
@@ -267,11 +274,18 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	multiplier on monster HP, damage, experience or gold).
 - The experience needed per level, the TP gained per level and the HP bonus every tenth
 	level (and at 99) are formulas fitted to the original level table (`app/lib/leveling.lua`;
-	experience within 0.44% of it, TP and HP exactly), no longer columns of the levels table.
+	the Mage's experience within 0.44% of it, TP and HP exactly), no longer columns of the
+	levels table.
 - Character classes are content files (`app/content/classes/`) instead of the levels table
 	and the class names in the settings: classes can be added without code changes, and
 	administrators override names, descriptions, availability and starting stats per
-	server (`/admin/classes`).
+	server (`/admin/classes`). All classes share the Mage's experience curve, scaled by
+	their own first step (Warrior and Paladin need up to about 10% more experience than in
+	the original from level 45 and 18 on); a class can define its own curve.
+- Spells are content files too (`app/content/spells/`), with a list of effects instead of
+	a type and an attribute; administrators override names, descriptions, MP costs and
+	effect amounts per server (`/admin/spells`). The spells a character knows are a table
+	(`user_spells`) instead of a list in the users row.
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

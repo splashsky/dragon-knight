@@ -8,7 +8,7 @@
 </thead>
 <tbody>
 {%- for _, r in ipairs(spells) do %}
-<tr><td style="width: 25%">{{ r.spell.name }}</td><td style="width: 25%">{{ r.spell.mp }}</td><td style="width: 25%">{{ r.type }}</td><td style="width: 25%">{{ r.spell.attribute }}</td></tr>
+<tr><td style="width: 25%">{{ r.spell.name }}{% if r.spell.description ~= "" then %}<br><span class="small">{{ r.spell.description }}</span>{% end %}</td><td style="width: 25%">{{ r.spell.mp }}</td><td style="width: 25%">{{ r.type }}</td><td style="width: 25%">{{ r.attribute }}</td></tr>
 {%- end %}
 </tbody>
 </table>

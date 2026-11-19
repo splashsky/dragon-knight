@@ -1,7 +1,7 @@
 # tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
-# (tests/fixtures/schema_v0.sql) and from versions 1, 2 and 3 (tests/fixtures/schema_vN.sql,
-# with the game data of that time, tests/fixtures/seed_v3.sql), the 503 page for an
-# outdated database, and no-op runs.
+# (tests/fixtures/schema_v0.sql) and from versions 1 to 4 (tests/fixtures/schema_vN.sql,
+# with the game data of that time, tests/fixtures/seed_v3.sql and seed_v4.sql), the 503
+# page for an outdated database, and no-op runs.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
@@ -21,6 +21,35 @@ mig_layout() {
 		SELECT m.name, i.name, c.seqno, c.name FROM sqlite_master m, pragma_index_list(m.name) i,
 			pragma_index_info(i.name) c WHERE m.type = 'table' ORDER BY 1, 2, 3;"
 }
+# users columns other than the dropped spells list, as a SELECT list (of database $1).
+mig_user_cols() {
+	mig_sql "$1" "SELECT group_concat('\"' || name || '\"', ', ') FROM pragma_table_info('users') WHERE name <> 'spells'"
+}
+# mig_serve CONFIG LOG: start a server on another database and point the t_* helpers at it;
+# mig_unserve LOG: stop it (failing on errors in its log) and point them back.
+mig_serve() {
+	"$BIN" serve --config "$1" >"$2" 2>&1 &
+	MIG_PID=$!
+	MIG_PORT=
+	for _ in $(seq 1 100); do
+		MIG_PORT=$(sed -n 's/.*http: listening on [^ ]*:\([0-9][0-9]*\)$/\1/p' "$2" | head -n1)
+		[ -n "$MIG_PORT" ] && break
+		sleep 0.05
+	done
+	[ -n "$MIG_PORT" ] && t_ok || t_fail "server on $1 did not start"
+	MAIN_BASE=$BASE
+	BASE="http://127.0.0.1:$MIG_PORT"
+}
+mig_unserve() {
+	BASE=$MAIN_BASE
+	kill "$MIG_PID" 2>/dev/null && wait "$MIG_PID" 2>/dev/null
+	if grep -q '\[error\]' "$1"; then
+		t_fail "errors in the log $1:"; grep -A5 '\[error\]' "$1" | head -20 >&2
+	fi
+	t_jar default
+}
+# The spells as data (the same on a fresh install and a migrated database without edits).
+MIG_SPELLS="SELECT * FROM spells ORDER BY id"
 # The classes as data (the same on a fresh install and a migrated database without edits).
 MIG_CLASSES="SELECT * FROM classes ORDER BY id; SELECT * FROM class_levels ORDER BY class_id, level;
 	SELECT * FROM class_spells ORDER BY class_id, level, spell_id"
@@ -50,7 +79,7 @@ CUR_VERSION=$(t_sql "PRAGMA user_version")
 [ "$CUR_VERSION" -ge 3 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
 "$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
 grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
-grep -qF "Content synced (classes: 3, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
+grep -qF "Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
 [ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
 
 t_section "migrate: version checks on every request"
@@ -123,7 +152,8 @@ grep -qF 'Migrating to version 1: forum boards' "$T/migrate.log" && t_ok || t_fa
 grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && t_ok || t_fail "step 2 not reported"
 grep -qF 'Migrating to version 3: experience, TP and HP milestones' "$T/migrate.log" && t_ok || t_fail "step 3 not reported"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported"
-grep -qF 'Content synced (classes: 3, 0 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
+grep -qF 'Migrating to version 5: spells are content files with effects' "$T/migrate.log" && t_ok || t_fail "step 5 not reported"
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
@@ -136,6 +166,8 @@ mig_layout "$MIG_DB" | grep -q '^forum|8|board|INTEGER|1|1|0$' && t_ok || t_fail
 }
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's"
+mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's"
+mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name = 'spells'" "0" "spells ids are plain rowids now"
 mig_eq "SELECT count(*) FROM content_overrides; SELECT count(*) FROM content_adopt" "0
 0" "stock data: no overrides"
 mig_eq "SELECT value FROM meta WHERE key = 'content_fingerprint'" \
@@ -257,7 +289,7 @@ SQL
 mig_script "$V2_DB" "$MIG/v2_data.sql"
 MIG_DB=$V2_DB
 mig_eq "PRAGMA user_version" "2" "fixture is version 2"
-V2_DATA="SELECT * FROM users ORDER BY id; SELECT id, gamename, gamesize, gameopen, gameurl, adminemail,
+V2_DATA="SELECT $(mig_user_cols "$V2_DB") FROM users ORDER BY id; SELECT id, gamename, gamesize, gameopen, gameurl, adminemail,
 	forumtype, forumaddress, compression, verifyemail, shownews, showbabble, showonline FROM control;
 	SELECT count(*) FROM monsters"
 before=$(mig_sql "$V2_DB" "$V2_DATA")
@@ -283,7 +315,7 @@ warrior|levels.20.hp|3" "edited levels kept as overrides (v2)"
 
 t_section "migrate: version 3 database"
 # version 3 schema + its game data with admin edits to the class names and the levels
-# table, and players of each class; only step 4 runs. Every class value of before the
+# table, and players of each class; steps 4 and 5 run. Every class value of before the
 # migration must come out the same (the edits as overrides), and the game must use them.
 V3_DB="$MIG/v3.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V3_DB\"#" "$CONFIG" > "$MIG/v3.lua"
@@ -305,11 +337,12 @@ mig_script "$V3_DB" "$MIG/v3_data.sql"
 MIG_DB=$V3_DB
 mig_eq "PRAGMA user_version" "3" "fixture is version 3"
 V3_LEVELS=$(mig_sql "$V3_DB" "$MIG_LEVELS_V3")
-V3_USERS=$(mig_sql "$V3_DB" "SELECT * FROM users ORDER BY id")
+V3_COLS=$(mig_user_cols "$V3_DB")
+V3_USERS=$(mig_sql "$V3_DB" "SELECT $V3_COLS FROM users ORDER BY id")
 "$BIN" migrate --config "$MIG/v3.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v3) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported (v3)"
 grep -qE 'Migrating to version [123]:' "$T/migrate.log" && t_fail "steps 1-3 ran on a version 3 database" || t_ok
-grep -qF 'Content synced (classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides).' "$T/migrate.log" \
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides).' "$T/migrate.log" \
 	&& t_ok || t_fail "sync report (v3): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v3 stamped"
 [ "$(mig_layout "$V3_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -331,10 +364,12 @@ mage|name|Wizard
 paladin|levels.50.dexterity|0
 paladin|levels.50.mp|12
 paladin|name|Templar
-warrior|levels.3.spells|7
+warrior|levels.3.spells|pain
 warrior|levels.3.strength|30" "admin edits are overrides"
 mig_eq "SELECT count(*) FROM content_adopt" "0" "adoptions done"
-mig_eq "SELECT * FROM users ORDER BY id" "$V3_USERS" "users unchanged (v3)"
+mig_eq "SELECT $V3_COLS FROM users ORDER BY id" "$V3_USERS" "users unchanged (v3)"
+# War (level 2, "0,1") knows Heal, learned at level 2 like the Warrior schedule says
+mig_eq "SELECT user_id || '|' || spell_id || '|' || learned_level FROM user_spells" "2|1|2" "known spells (v3)"
 # a second sync changes nothing
 before=$(mig_sql "$V3_DB" "$MIG_CLASSES; SELECT * FROM content_overrides")
 "$BIN" content sync --config "$MIG/v3.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk content sync (v3)"
@@ -344,16 +379,7 @@ grep -qF 'classes: 3 files, 3 in the database (0 retired), 8 overrides' "$T/migr
 grep -qF 'The database is in sync with the content files' "$T/migrate.log" && t_ok || t_fail "status in sync: $(cat "$T/migrate.log")"
 # the game on it: names, and a level-up with the migrated (overridden) level 2 gains of a
 # Wizard (HP 9, no spell)
-"$BIN" serve --config "$MIG/v3.lua" >"$MIG/v3server.log" 2>&1 &
-MIG_PID=$!
-MIG_PORT=
-for _ in $(seq 1 100); do
-	MIG_PORT=$(sed -n 's/.*http: listening on [^ ]*:\([0-9][0-9]*\)$/\1/p' "$MIG/v3server.log" | head -n1)
-	[ -n "$MIG_PORT" ] && break
-	sleep 0.05
-done
-MAIN_BASE=$BASE
-BASE="http://127.0.0.1:$MIG_PORT"
+mig_serve "$MIG/v3.lua" "$MIG/v3server.log"
 "$BIN" user --config "$MIG/v3.lua" passwd wiz v3pass1 >/dev/null && t_ok || t_fail "dk user passwd (v3)"
 t_jar migv3
 t_get /register;   expect_body '<option value="1">Wizard</option>'; expect_body '<option value="3">Templar</option>'
@@ -361,14 +387,98 @@ t_login wiz v3pass1; expect_redirect /
 t_get /character;  expect_body 'Class: Wizard'
 mig_sql "$V3_DB" "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmonster = 1, currentmonsterhp = 0 WHERE id = 1"
 t_get /victory;    expect_status 200; expect_body 'You have gained a level!'
-mig_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || spells FROM users WHERE id = 1" \
-	"2|15|24|5|11|0" "level-up with the migrated gains"
-BASE=$MAIN_BASE
-kill "$MIG_PID" 2>/dev/null && wait "$MIG_PID" 2>/dev/null
-if grep -q '\[error\]' "$MIG/v3server.log"; then
-	t_fail "errors in the v3 server's log:"; grep -A5 '\[error\]' "$MIG/v3server.log" | head -20 >&2
-fi
-t_jar default
+mig_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || coalesce($T_KNOWN, '') FROM users WHERE id = 1" \
+	"2|15|24|5|11|" "level-up with the migrated gains"
+mig_unserve "$MIG/v3server.log"
+
+t_section "migrate: version 4 database"
+# version 4 schema + its game data (spells with type and attribute, users.spells lists),
+# admin edits to spells, class level overrides that list spell ids, a pending adoption,
+# and players; only step 5 runs
+V4_DB="$MIG/v4.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V4_DB\"#" "$CONFIG" > "$MIG/v4.lua"
+mig_script "$V4_DB" "$ROOT/tests/fixtures/schema_v4.sql"
+mig_script "$V4_DB" "$ROOT/tests/fixtures/seed_v4.sql"
+cat > "$MIG/v4_data.sql" <<'SQL'
+INSERT INTO class_spells (class_id, level, spell_id) VALUES (1, 2, 1), (1, 4, 6), (2, 2, 1);
+UPDATE spells SET name = 'Mend', mp = 4, attribute = 12 WHERE id = 1;
+UPDATE spells SET type = 4 WHERE id = 7;
+UPDATE spells SET attribute = 99 WHERE id = 11;
+INSERT INTO spells (id, name, mp, attribute, type) VALUES (20, 'Fireball', 9, 40, 2);
+INSERT INTO content_overrides (kind, key, field, value) VALUES ('classes', 'mage', 'name', 'Wizard'),
+	('classes', 'warrior', 'levels.3.spells', '7,99'), ('classes', 'mage', 'levels.2.spells', '');
+INSERT INTO content_adopt (kind, key, field, value) VALUES ('classes', 'paladin', 'levels.5.spells', '7');
+INSERT INTO users (id, username, email, charname, verify, authlevel, charclass, level, currenthp, maxhp, currentmp, maxmp, spells) VALUES
+	(1, 'mag', 'm@example.com', 'Mag', '1', 1, 1, 5, 1, 50, 10, 10, '0,1,6,1,999,abc, 20'),
+	(2, 'war', 'w@example.com', 'War', '1', 0, 2, 1, 15, 15, 0, 0, '0,1,7'),
+	(3, 'nob', 'n@example.com', 'Nob', '1', 0, 3, 1, 15, 15, 0, 0, '0'),
+	(4, 'odd', 'o@example.com', 'Odd', '1', 0, 9, 3, 15, 15, 0, 0, '2');
+PRAGMA user_version = 4;
+SQL
+mig_script "$V4_DB" "$MIG/v4_data.sql"
+MIG_DB=$V4_DB
+mig_eq "PRAGMA user_version" "4" "fixture is version 4"
+V4_COLS=$(mig_user_cols "$V4_DB")
+V4_USERS=$(mig_sql "$V4_DB" "SELECT $V4_COLS FROM users ORDER BY id")
+"$BIN" migrate --config "$MIG/v4.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v4) failed: $(cat "$T/migrate.log")"
+grep -qF 'Migrating to version 5: spells are content files with effects; the spells characters know move to user_spells' \
+	"$T/migrate.log" && t_ok || t_fail "step 5 not reported (v4)"
+grep -qE 'Migrating to version [1234]:' "$T/migrate.log" && t_fail "steps 1-4 ran on a version 4 database" || t_ok
+grep -qF "warning: spell 7 (Pain) had its type changed to 4; it keeps the effect of app/content/spells/pain.lua" \
+	"$T/migrate.log" && t_ok || t_fail "type change not reported: $(cat "$T/migrate.log")"
+grep -qF 'Content synced (spells: 19, 0 new, 1 retired, 3 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides).' \
+	"$T/migrate.log" && t_ok || t_fail "sync report (v4): $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v4 stamped"
+[ "$(mig_layout "$V4_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v4 schema differs from a fresh install:"
+	diff <(mig_layout "$V4_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v4)"
+mig_eq "SELECT count(*) FROM pragma_table_info('users') WHERE name = 'spells'" "0" "users.spells dropped"
+# the unedited spells equal a fresh install's; the edits are overrides (an invalid sleep
+# chance and a changed type are not kept); the extra spell is retired, its data kept
+mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS" | sed 's/^1|heal|Heal|\([^|]*\)|5|both|heal_hp amount=10|0$/1|heal|Mend|\1|4|both|heal_hp amount=12|0/')
+20|spell_20|Fireball||9|fight|damage max=40|1" "spells (v4)"
+mig_eq "SELECT kind || '|' || key || '|' || field || '|' || value FROM content_overrides ORDER BY kind, key, field" \
+	"classes|mage|levels.2.spells|
+classes|mage|name|Wizard
+classes|paladin|levels.5.spells|pain
+classes|warrior|levels.3.spells|pain
+spells|heal|effects.1.amount|12
+spells|heal|mp|4
+spells|heal|name|Mend" "spell edits and class spell ids as keys"
+mig_eq "SELECT count(*) FROM content_adopt" "0" "adoptions done (v4)"
+mig_eq "SELECT class_id || '|' || level || '|' || group_concat(spell_id) FROM class_spells
+	WHERE (class_id, level) IN (VALUES (1, 2), (2, 3), (3, 5)) GROUP BY class_id, level ORDER BY 1" \
+	"2|3|7
+3|5|7" "class spells from the converted overrides"
+# users.spells exploded with legacy's matching (0, unknown ids, junk and duplicates
+# ignored; " 20" matches 20); learned_level from the class schedule when not above the level
+mig_eq "SELECT user_id || '|' || spell_id || '|' || coalesce(learned_level, '-') FROM user_spells ORDER BY user_id, spell_id" \
+	"1|1|2
+1|6|4
+1|20|-
+2|1|-
+2|7|-
+4|2|-" "known spells (v4)"
+mig_eq "SELECT $V4_COLS FROM users ORDER BY id" "$V4_USERS" "users otherwise unchanged (v4)"
+"$BIN" content status --config "$MIG/v4.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk content status (v4)"
+grep -qF 'spells: 19 files, 20 in the database (1 retired), 3 overrides' "$T/migrate.log" && t_ok || t_fail "status (v4): $(cat "$T/migrate.log")"
+grep -qF 'The database is in sync with the content files' "$T/migrate.log" && t_ok || t_fail "status in sync (v4): $(cat "$T/migrate.log")"
+# the game on it: the overridden Heal, the retired Fireball
+mig_serve "$MIG/v4.lua" "$MIG/v4server.log"
+"$BIN" user --config "$MIG/v4.lua" passwd mag v4pass1 >/dev/null && t_ok || t_fail "dk user passwd (v4)"
+t_jar migv4
+t_login mag v4pass1; expect_redirect /
+t_get /character;  expect_body 'Mend<br>'; expect_body 'Hurt<br>'; expect_body 'Fireball<br>'
+t_get /;           expect_body 'action="/spell/1">'
+t_post /spell/1 "csrf=$(t_csrf)"; expect_body 'You have cast the Mend spell, and gained 12 Hit Points.'
+mig_eq "SELECT currenthp || '|' || currentmp FROM users WHERE id = 1" "13|6" "heal with the migrated values"
+mig_sql "$V4_DB" "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 2, currentmonsterhp = 100 WHERE id = 1"
+mig_sql "$V4_DB" "UPDATE users SET currentmp = 9 WHERE id = 1"
+t_get /fight;      expect_body '<option value="20">Fireball</option>'
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'You have cast the Fireball spell for'
+mig_unserve "$MIG/v4server.log"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"
@@ -379,6 +489,7 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "partial install stamped"
 mig_eq "SELECT count(*) FROM forums" "2" "partial install has the boards"
 mig_eq "SELECT count(*) FROM towns" "0" "partial install has no game data"
 mig_eq "SELECT count(*) || '|' || (SELECT count(*) FROM class_levels) FROM classes" "3|297" "partial install has the classes"
+mig_eq "SELECT count(*) || '|' || max(id) || '|' || sum(effects <> '') FROM spells" "19|19|19" "partial install has the spells"
 mig_eq "SELECT f.board || '|' || f.author || '|' || (f.author_id = n.author_id) FROM news n JOIN forum f ON f.id = n.thread_id" \
 	"2|Parter|1" "partial install news thread"
 "$BIN" install --config "$MIG/partial.lua" --force --admin part part@example.com partpw \

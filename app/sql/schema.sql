@@ -43,11 +43,11 @@ CREATE TABLE class_levels (
 	PRIMARY KEY (class_id, level)
 ) WITHOUT ROWID;
 
--- Spells a class learns on reaching a level (spells.id).
+-- Spells a class learns on reaching a level (the class files list spell keys).
 CREATE TABLE class_spells (
 	class_id  INTEGER NOT NULL REFERENCES classes (id),
 	level     INTEGER NOT NULL,
-	spell_id  INTEGER NOT NULL,
+	spell_id  INTEGER NOT NULL REFERENCES spells (id),
 	PRIMARY KEY (class_id, level, spell_id)
 ) WITHOUT ROWID;
 
@@ -160,12 +160,18 @@ CREATE TABLE news (
 	thread_id  INTEGER REFERENCES forum (id) ON DELETE SET NULL
 );
 
+-- Spells: content files app/content/spells/<key>.lua (like classes; never deleted, a spell
+-- whose file is gone is retired). usable_in: 'town', 'fight' or 'both'; effects: the
+-- effects list as text (app/lib/effects.lua, "heal_hp amount=10").
 CREATE TABLE spells (
-	id         INTEGER PRIMARY KEY AUTOINCREMENT,
-	name       TEXT    NOT NULL DEFAULT '',
-	mp         INTEGER NOT NULL DEFAULT 0,
-	attribute  INTEGER NOT NULL DEFAULT 0,
-	type       INTEGER NOT NULL DEFAULT 0
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	mp           INTEGER NOT NULL DEFAULT 0,
+	usable_in    TEXT    NOT NULL DEFAULT 'fight',
+	effects      TEXT    NOT NULL DEFAULT '',
+	retired      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE towns (
@@ -231,13 +237,21 @@ CREATE TABLE users (
 	slot2name             TEXT    NOT NULL DEFAULT 'None',
 	slot3name             TEXT    NOT NULL DEFAULT 'None',
 	dropcode              INTEGER NOT NULL DEFAULT 0,
-	spells                TEXT    NOT NULL DEFAULT '0',
 	towns                 TEXT    NOT NULL DEFAULT '0'
 );
 CREATE UNIQUE INDEX users_username ON users (username);
 CREATE INDEX users_charname ON users (charname);
 CREATE INDEX users_email ON users (email);
 CREATE INDEX users_onlinetime ON users (onlinetime);
+
+-- Spells a character knows. learned_level: the level it was learned at (NULL: unknown,
+-- e.g. known before schema version 5 without a matching class schedule, or given by an admin).
+CREATE TABLE user_spells (
+	user_id        INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	spell_id       INTEGER NOT NULL REFERENCES spells (id),
+	learned_level  INTEGER,
+	PRIMARY KEY (user_id, spell_id)
+) WITHOUT ROWID;
 
 -- Server-side login sessions (app/lib/session.lua). token_hash = hex(sha256(cookie)).
 CREATE TABLE sessions (

@@ -3,9 +3,11 @@
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
 local classes = require("lib.classes")
+local effects = require("lib.effects")
 local game = require("lib.game")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
+local spells = require("lib.spells")
 local view = require("lib.view")
 
 local help = {}
@@ -16,8 +18,6 @@ local SPECIAL_NAMES = {
 	strength = "Strength", dexterity = "Dexterity",
 	attackpower = "Attack Power", defensepower = "Defense Power",
 }
-
-local SPELL_TYPES = { "Heal", "Hurt", "Sleep", "+Damage (%)", "+Defense (%)" }
 
 -- "maxhp,10" -> "Max HP +10"; "X" -> nil (shown as a light "None").
 function help.special(s)
@@ -71,13 +71,18 @@ function help.items(req)
 	return page(req, "Items & Drops", "community/help/items", { items = items, drops = drops })
 end
 
+-- Type and attribute columns per effect (most spells have one).
 function help.spells(req)
-	local spells = {}
-	for _, s in ipairs(dk.db:query("SELECT * FROM spells ORDER BY id")) do
-		-- legacy left $type unset (showing the previous row's type) for unknown types
-		spells[#spells + 1] = { spell = s, type = SPELL_TYPES[s.type] or "" }
+	local list = {}
+	for _, s in ipairs(spells.active()) do
+		local types, attributes = {}, {}
+		for _, e in ipairs(s.effects) do
+			types[#types + 1] = effects.label(e)
+			attributes[#attributes + 1] = effects.attribute(e)
+		end
+		list[#list + 1] = { spell = s, type = table.concat(types, " + "), attribute = table.concat(attributes, ", ") }
 	end
-	return page(req, "Spells", "community/help/spells", { spells = spells })
+	return page(req, "Spells", "community/help/spells", { spells = list })
 end
 
 function help.monsters(req)

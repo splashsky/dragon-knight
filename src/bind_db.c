@@ -161,6 +161,12 @@ static int db_run(lua_State *L, int mode)
 		return luaL_error(L, "SQL error: multiple statements (use exec_script)\nSQL: %s", sql);
 	}
 	run_ctx c = { db, st, sql, mode };
+	/* the function, the context and a copy of every parameter (a C function only gets
+	   LUA_MINSTACK free slots; an UPDATE of many columns needs more) */
+	if (!lua_checkstack(L, top + 2)) {
+		db_release(db, st);
+		return luaL_error(L, "SQL error: too many parameters\nSQL: %s", sql);
+	}
 	lua_pushcfunction(L, run_inner);
 	lua_pushlightuserdata(L, &c);
 	for (int i = 3; i <= top; i++) lua_pushvalue(L, i);

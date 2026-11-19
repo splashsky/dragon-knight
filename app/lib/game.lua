@@ -1,7 +1,8 @@
--- game.lua :: shared game data helpers (control row, towns, spells, nav data, ...).
+-- game.lua :: shared game data helpers (control row, towns, nav data, ...).
 -- Module state lives for one request only (fresh VM per request).
 local classes = require("lib.classes")
 local php = require("lib.php")
+local spells = require("lib.spells")
 
 local game = {}
 
@@ -44,18 +45,6 @@ end
 -- Class name for a users.charclass value (nil for an unknown class, like legacy).
 function game.class_name(n)
 	return classes.name(n)
-end
-
--- Spells the user knows (users.spells comma list), ordered by id; optional type filter
--- (1 = heal, 2 = hurt, 3 = sleep, 4 = uber attack, 5 = uber defense).
-function game.user_spells(user, spell_type)
-	local out = {}
-	for _, s in ipairs(dk.db:query("SELECT * FROM spells ORDER BY id")) do
-		if (spell_type == nil or s.type == spell_type) and php.in_list(user.spells, s.id) then
-			out[#out + 1] = s
-		end
-	end
-	return out
 end
 
 -- Towns on the user's map (users.towns comma list), ordered by id.
@@ -127,7 +116,7 @@ function game.nav(user)
 		hp_low = game.is_low(user.currenthp, user.maxhp),
 		mp_low = game.is_low(user.currentmp, user.maxmp),
 		bars = { hpbar, mpbar, tpbar },
-		spells = game.user_spells(user, 1),
+		spells = spells.known(user, "town"),
 	}
 end
 

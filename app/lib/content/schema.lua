@@ -1,11 +1,12 @@
 -- content/schema.lua :: the content kinds and the field validators they share.
 --
 -- A kind (app/lib/content/kinds/<kind>.lua) describes one sort of content entity
--- (classes now; spells and items later): where its files live, its DB table and the
+-- (classes, spells; items later): where its files live, its DB table and the
 -- fields of its files. Validating a file produces the entity's *flat* form: a table of
 -- field name -> value (integer or string) covering everything the file says, nested data
--- included ("levels.2.hp"). The flat form is what gets fingerprinted, overridden by admins
--- (content_overrides rows hold a field name and its value as text) and written to the DB.
+-- included ("levels.2.hp", "effects.1.amount"). The flat form is what gets fingerprinted,
+-- overridden by admins (content_overrides rows hold a field name and its value as text)
+-- and written to the DB.
 --
 -- Kind module fields:
 --   name, table        "classes", the DB table (id, key, <fields...>, retired)
@@ -17,17 +18,20 @@
 --   extra_keys         { levels = true }: other top-level keys validate_extra handles
 --   field(name)        the spec of any flat field (top-level or nested), or nil
 --   write_children(id, flat)          optional: child tables after the row is written
+--   admin_fields(flat)  { spec, ... } of the fields the admin page edits for an entity
+--                      (spec.name: the flat field name, spec.label)
 --
 -- Field specs: type = "string" (one line; max), "text" (multi-line), "int" (min, max),
--- "bool" (stored 0/1), "stages" (leveling.parse_stages), "ids" (list of positive
--- integers, stored "1,6", "" for none). required = true, or default = value.
+-- "bool" (stored 0/1), "choice" (one of `values`, a list of strings), "stages"
+-- (leveling.parse_stages), "keys" (list of content keys, stored sorted "heal,hurt", ""
+-- for none; refs = "spells": each must be a file of that kind, checked by load.all). required = true, or default = value.
 -- admin = true: editable as an override in the admin panel. label: shown there.
 local leveling = require("lib.leveling")
 
 local schema = {}
 
 -- Sync order: kinds that others reference come first.
-schema.KINDS = { "classes" }
+schema.KINDS = { "spells", "classes" }
 
 local KNOWN = {}
 for _, k in ipairs(schema.KINDS) do KNOWN[k] = true end
@@ -52,7 +56,8 @@ local function describe(spec)
 	elseif t == "string" then return "a one-line string" .. (spec.max and (" of at most " .. spec.max .. " characters") or "")
 	elseif t == "text" then return "a string"
 	elseif t == "stages" then return 'stages like "2x2,1.5x8" (factor x steps)'
-	elseif t == "ids" then return "a list of positive integers, like { 1, 6 }"
+	elseif t == "keys" then return 'a list of keys, like { "heal", "hurt" }'
+	elseif t == "choice" then return "one of " .. table.concat(spec.values, ", ")
 	end
 	return t
 end
@@ -78,18 +83,23 @@ function schema.check(spec, v)
 		local ok, msg = leveling.parse_stages(v)
 		if not ok then return nil, msg end
 		return v
-	elseif t == "ids" then
+	elseif t == "keys" then
 		if type(v) ~= "table" then return nil, "must be " .. describe(spec) end
-		local ids = {}
-		for i, id in pairs(v) do
-			id = math.type(id) == "float" and math.tointeger(id) or id
-			if math.type(i) ~= "integer" or i < 1 or i > #v or math.type(id) ~= "integer" or id < 1 then
+		local keys, seen = {}, {}
+		for i, key in pairs(v) do
+			if math.type(i) ~= "integer" or i < 1 or i > #v or not schema.valid_key(key) then
 				return nil, "must be " .. describe(spec)
 			end
-			ids[#ids + 1] = id
+			if not seen[key] then keys[#keys + 1] = key end
+			seen[key] = true
 		end
-		table.sort(ids)
-		return table.concat(ids, ",")
+		table.sort(keys)
+		return table.concat(keys, ",")
+	elseif t == "choice" then
+		for _, c in ipairs(spec.values) do
+			if v == c then return v end
+		end
+		return nil, "must be " .. describe(spec)
 	end
 	error("unknown field type " .. tostring(t))
 end
@@ -107,14 +117,10 @@ function schema.parse(spec, s)
 		if s == "1" or s == "true" then return 1 end
 		if s == "0" or s == "false" then return 0 end
 		return nil, "must be 0 or 1"
-	elseif t == "ids" then
-		local ids = {}
-		for part in s:gmatch("[^,%s]+") do
-			local n = math.tointeger(tonumber(part))
-			if not n then return nil, "must be a comma-separated list of ids" end
-			ids[#ids + 1] = n
-		end
-		return schema.check(spec, ids)
+	elseif t == "keys" then
+		local keys = {}
+		for part in s:gmatch("[^,%s]+") do keys[#keys + 1] = part end
+		return schema.check(spec, keys)
 	end
 	return schema.check(spec, s)
 end

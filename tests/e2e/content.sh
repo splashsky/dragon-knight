@@ -1,11 +1,13 @@
-# tests/e2e/content.sh :: content files (app/content/classes/*.lua) on the running server:
-# a new file becomes a playable class on the next request, edits sync, a deleted file
-# retires its class (its characters keep playing), a restored file brings it back,
+# tests/e2e/content.sh :: content files (app/content/{classes,spells}/*.lua) on the running
+# server: a new file becomes a playable class on the next request, edits sync, a deleted
+# file retires its class (its characters keep playing), a restored file brings it back,
 # overrides survive, invalid content fails `dk check` (naming the file) while the game
-# keeps the last good content, and a full level-up of a new class. Sourced by
-# tests/run.sh; works on the test server's copy of app/ and cleans up after itself.
+# keeps the last good content, a full level-up of a new class, and a new spell learned
+# through a class file and cast (a class listing an unknown spell fails `dk check`).
+# Sourced by tests/run.sh; works on the test server's copy of app/ and cleans up after itself.
 
 CT_DIR="$T/app/content/classes"
+CT_SPELLS="$T/app/content/spells"
 ct_eq() {  # ct_eq "SQL" expected label
 	local got
 	got=$(t_sql "$1")
@@ -21,19 +23,20 @@ ct_wait_gone() {
 	done
 	return 1
 }
-# ct_knight NAME HP: write the test class file (flat experience: 10 per level; every level
-# +2 HP, +1 MP/strength/dexterity; spells 1 and 6 at level 3)
+# ct_knight NAME HP [LUA]: write the test class file (flat experience, "1x1": 10 per level;
+# every level +2 HP, +1 MP/strength/dexterity; Hurt and Heal at level 3; LUA: more lines)
 ct_knight() {
 	cat > "$CT_DIR/knight.lua.tmp" <<EOF
 local levels = {}
 for level = 2, 100 do levels[level] = { hp = 2, mp = 1, strength = 1, dexterity = 1 } end
-levels[3].spells = { 6, 1 }
+levels[3].spells = { "hurt", "heal" }
+${3:-}
 return {
 	name = "$1",
 	description = "Sturdy.\nTest class.",
 	sort = 0,
 	start_hp = $2, start_mp = 0, start_tp = 12, start_strength = 7, start_dexterity = 3,
-	exp_base = 10, exp_stages = "",
+	exp_base = 10, exp_stages = "1x1",
 	levels = levels,
 }
 EOF
@@ -54,7 +57,7 @@ ct_eq "SELECT id || '|' || key || '|' || name || '|' || start_hp || '|' || exp_b
 	"4|knight|Knight|30|10|0" "class row"
 ct_eq "SELECT count(*) || '|' || sum(hp) FROM class_levels WHERE class_id = 4" "99|198" "class levels"
 ct_eq "SELECT group_concat(spell_id) FROM class_spells WHERE class_id = 4 AND level = 3" "1,6" "class spells"
-grep -qF 'content synced (classes: 4, 1 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
+grep -qF 'content synced (spells: 19, 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
 t_get /help;          expect_body '<b>Knight</b>'; expect_body '<li>Test class.</li>'; expect_body 'There are four character classes'
 t_get /help/levels;   expect_body 'Knight Levels'
 "$BIN" content status --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content status"
@@ -73,8 +76,11 @@ t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmon
 	experience = 89 WHERE username = 'ctknight'"
 t_get /victory;       expect_status 200; expect_body 'You have gained 9 levels!'; expect_body 'You have learned 2 new spells.'
 # HP: 9 x 2 + 10 (milestone at 10); TP: 1 + 8 x 2; MP, strength, dexterity: 9 x 1
-ct_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || strength || '|' || dexterity || '|' || attackpower || '|' || defensepower || '|' || spells FROM users WHERE username = 'ctknight'" \
-	"10|90|58|9|29|16|12|16|12|0,1,6" "level-up of the new class"
+ct_eq "SELECT level || '|' || experience || '|' || maxhp || '|' || maxmp || '|' || maxtp || '|' || strength || '|' || dexterity || '|' || attackpower || '|' || defensepower FROM users WHERE username = 'ctknight'" \
+	"10|90|58|9|29|16|12|16|12" "level-up of the new class"
+ct_eq "SELECT group_concat(s.key || '@' || us.learned_level) FROM (SELECT * FROM user_spells ORDER BY spell_id) us
+	JOIN spells s ON s.id = us.spell_id JOIN users u ON u.id = us.user_id WHERE u.username = 'ctknight'" \
+	"heal@3,hurt@3" "spells learned at level 3"
 t_get /character;     expect_body 'Next Level: 100'
 expect_body "$(t_sql "SELECT name FROM spells WHERE id = 6")"
 
@@ -163,11 +169,81 @@ rm "$CT_DIR/Bad-Name.lua"
 t_jar admin
 ct_wait_gone /admin 'Content files have errors' && t_ok || t_fail "content error not cleared"
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check after the fix: $(cat "$T/content.log")"
-grep -qF 'content: ok (4 classes)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
+grep -qF 'content: ok (19 spells, 4 classes)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
 
-# clean up: the test class is retired (rows stay, like on a real server)
+t_section "content: a new spell, learned through a class file"
+cat > "$CT_SPELLS/zap.lua" <<'EOF'
+return {
+	name = "Zap",
+	description = "A test spell.",
+	mp = 3,
+	effects = { { kind = "damage", max = 6, min = 6 }, { kind = "buff_defense_pct", pct = 20 } },
+}
+EOF
+t_jar ctnew
+t_wait_for /help/spells '>Zap<br>' && t_ok || t_fail "new spell not on the help page"
+expect_body '<td style="width: 25%">Hurt + +Defense (%)</td><td style="width: 25%">6-6, 20</td>'
+ct_eq "SELECT id || '|' || key || '|' || usable_in || '|' || effects || '|' || retired FROM spells WHERE key = 'zap'" \
+	"20|zap|fight|damage max=6 min=6; buff_defense_pct pct=20|0" "spell row"
+# ctknight is level 11 (100 experience, 10 per level): Zap at level 12
+ct_knight Knight 30 'levels[12].spells = { "zap" }'
+for _ in $(seq 1 50); do
+	[ "$(t_sql "SELECT count(*) FROM class_spells WHERE class_id = 4 AND level = 12")" = 1 ] && break
+	t_get /login; sleep 0.1
+done
+ct_eq "SELECT spell_id FROM class_spells WHERE class_id = 4 AND level = 12" "20" "class learns the new spell"
+t_jar ctknight
+t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 3, currentmonster = 1, currentmonsterhp = 0,
+	experience = 109 WHERE username = 'ctknight'"
+t_get /victory;       expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
+ct_eq "SELECT us.learned_level FROM user_spells us JOIN users u ON u.id = us.user_id WHERE u.username = 'ctknight' AND us.spell_id = 20" \
+	"12" "learned at level 12"
+t_get /;              expect_no_body 'action="/spell/20"'   # fight-only: not a Fast Spell
+t_post /spell/20 "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
+# cast in a fight: both effects, MP spent (Red Slime: no immunity)
+t_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 2, currentmonsterhp = 50,
+	currentmonstersleep = 0, currentmonsterimmune = 0, currentuberdefense = 0, currentmp = 10, currenthp = 500,
+	maxhp = 500 WHERE username = 'ctknight'"
+t_get /fight;         expect_body '<option value="20">Zap</option>'
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"
+expect_body 'You have cast the Zap spell for 6 damage.<br>You have cast the Zap spell, and will gain 20% defense until the end of this fight.'
+ct_eq "SELECT currentmonsterhp || '|' || currentuberdefense || '|' || currentmp FROM users WHERE username = 'ctknight'" \
+	"44|20|7" "spell effects saved"
+
+t_section "content: a class listing an unknown or deleted spell fails dk check"
+ct_knight Knight 30 'levels[12].spells = { "zap", "nope" }'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with an unknown spell" || t_ok
+grep -qF "knight.lua: levels.12.spells: no spell 'nope' (" "$T/content.log" && t_ok || t_fail "unknown spell: $(cat "$T/content.log")"
+grep -qF "spells/nope.lua)" "$T/content.log" && t_ok || t_fail "unknown spell path: $(cat "$T/content.log")"
+ct_knight Knight 30 'levels[12].spells = { "zap" }'
+mv "$CT_SPELLS/zap.lua" "$T/zap.lua"
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with a deleted spell" || t_ok
+grep -qF "knight.lua: levels.12.spells: no spell 'zap'" "$T/content.log" && t_ok || t_fail "deleted spell: $(cat "$T/content.log")"
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk content sync passed" || t_ok
+ct_eq "SELECT retired FROM spells WHERE key = 'zap'" "0" "nothing synced"
+
+t_section "content: a deleted spell file retires the spell; characters keep it"
+ct_knight Knight 30
+t_jar ctknight
+for _ in $(seq 1 50); do
+	[ "$(t_sql "SELECT retired FROM spells WHERE key = 'zap'")" = 1 ] && break
+	t_get /login; sleep 0.1
+done
+ct_eq "SELECT retired || '|' || name FROM spells WHERE id = 20" "1|Zap" "retired, row kept"
+t_get /help/spells;   expect_no_body '>Zap<'
+t_get /character;     expect_body 'Zap<br>'
+t_sql "UPDATE users SET currentmp = 10, currentmonsterhp = 50 WHERE username = 'ctknight'"
+t_get /fight;         expect_body '<option value="20">Zap</option>'
+t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'You have cast the Zap spell for 6 damage.'
+t_jar admin
+t_get /admin/spells;  expect_body 'Zap</a> <span class="highlight">(retired)</span>'
+expect_body 'spells: 19 files, 20 in the database (1 retired), 0 overrides.'
+rm -f "$T/zap.lua"
+
+# clean up: the test class and spell are retired (rows stay, like on a real server)
 rm -f "$CT_DIR/knight.lua"
 t_jar ctnew
 ct_wait_gone /register '>Knight</option>' && t_ok || t_fail "cleanup"
-t_sql "DELETE FROM users WHERE username = 'ctknight'"
+t_sql "DELETE FROM user_spells WHERE user_id = (SELECT id FROM users WHERE username = 'ctknight');
+	DELETE FROM users WHERE username = 'ctknight'"
 fi

@@ -105,7 +105,7 @@ pu "experience = 14"   # one kill short of level 2
 pt_explore
 pt_fight
 expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
-pt_is "level,maxmp,spells" "2|5|0,1" "level up"
+pt_is "level,maxmp,$T_KNOWN" "2|5|1" "level up"
 t_get /victory;  expect_redirect /
 pt_walk_home
 

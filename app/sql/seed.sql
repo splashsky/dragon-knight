@@ -2,7 +2,8 @@
 -- Differences: control.verifyemail = 0 (PLAN.md) and no difficulty names/modifiers
 -- (difficulty levels were removed); news.postdate is unix time (2004-01-01 12:00:00 UTC).
 -- The original levels table and class names are content files now (app/content/classes/;
--- experience, TP and the milestone HP are formulas in app/lib/leveling.lua).
+-- experience, TP and the milestone HP are formulas in app/lib/leveling.lua), and so are
+-- the spells (app/content/spells/).
 -- Dragon's -> Dragon''s (SQL quoting).
 
 -- classes: the original classes keep their ids; the content sync (end of dk install)
@@ -243,26 +244,27 @@ INSERT INTO news (id, postdate, content) VALUES (1, 1072958400, 'This is the fir
 INSERT INTO forums (id, name, description, position, admin_threads) VALUES (1, 'General', 'Talk about anything.', 1, 0);
 INSERT INTO forums (id, name, description, position, admin_threads) VALUES (2, 'News', 'Game news and announcements. Reply to discuss.', 2, 1);
 
--- spells
-INSERT INTO spells VALUES (1, 'Heal', 5, 10, 1);
-INSERT INTO spells VALUES (2, 'Revive', 10, 25, 1);
-INSERT INTO spells VALUES (3, 'Life', 25, 50, 1);
-INSERT INTO spells VALUES (4, 'Breath', 50, 100, 1);
-INSERT INTO spells VALUES (5, 'Gaia', 75, 150, 1);
-INSERT INTO spells VALUES (6, 'Hurt', 5, 15, 2);
-INSERT INTO spells VALUES (7, 'Pain', 12, 35, 2);
-INSERT INTO spells VALUES (8, 'Maim', 25, 70, 2);
-INSERT INTO spells VALUES (9, 'Rend', 40, 100, 2);
-INSERT INTO spells VALUES (10, 'Chaos', 50, 130, 2);
-INSERT INTO spells VALUES (11, 'Sleep', 10, 5, 3);
-INSERT INTO spells VALUES (12, 'Dream', 30, 9, 3);
-INSERT INTO spells VALUES (13, 'Nightmare', 60, 13, 3);
-INSERT INTO spells VALUES (14, 'Craze', 10, 10, 4);
-INSERT INTO spells VALUES (15, 'Rage', 20, 25, 4);
-INSERT INTO spells VALUES (16, 'Fury', 30, 50, 4);
-INSERT INTO spells VALUES (17, 'Ward', 10, 10, 5);
-INSERT INTO spells VALUES (18, 'Fend', 20, 25, 5);
-INSERT INTO spells VALUES (19, 'Barrier', 30, 50, 5);
+-- spells: the original spells keep their ids; the content sync (end of dk install) fills
+-- in the rest from app/content/spells/*.lua. Loaded by partial setups too.
+INSERT INTO spells (id, key, name) VALUES (1, 'heal', 'Heal');
+INSERT INTO spells (id, key, name) VALUES (2, 'revive', 'Revive');
+INSERT INTO spells (id, key, name) VALUES (3, 'life', 'Life');
+INSERT INTO spells (id, key, name) VALUES (4, 'breath', 'Breath');
+INSERT INTO spells (id, key, name) VALUES (5, 'gaia', 'Gaia');
+INSERT INTO spells (id, key, name) VALUES (6, 'hurt', 'Hurt');
+INSERT INTO spells (id, key, name) VALUES (7, 'pain', 'Pain');
+INSERT INTO spells (id, key, name) VALUES (8, 'maim', 'Maim');
+INSERT INTO spells (id, key, name) VALUES (9, 'rend', 'Rend');
+INSERT INTO spells (id, key, name) VALUES (10, 'chaos', 'Chaos');
+INSERT INTO spells (id, key, name) VALUES (11, 'sleep', 'Sleep');
+INSERT INTO spells (id, key, name) VALUES (12, 'dream', 'Dream');
+INSERT INTO spells (id, key, name) VALUES (13, 'nightmare', 'Nightmare');
+INSERT INTO spells (id, key, name) VALUES (14, 'craze', 'Craze');
+INSERT INTO spells (id, key, name) VALUES (15, 'rage', 'Rage');
+INSERT INTO spells (id, key, name) VALUES (16, 'fury', 'Fury');
+INSERT INTO spells (id, key, name) VALUES (17, 'ward', 'Ward');
+INSERT INTO spells (id, key, name) VALUES (18, 'fend', 'Fend');
+INSERT INTO spells (id, key, name) VALUES (19, 'barrier', 'Barrier');
 
 -- towns
 INSERT INTO towns VALUES (1, 'Midworld', 0, 0, 5, 0, 0, '1,2,3,17,18,19,28,29');

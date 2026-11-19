@@ -5,6 +5,7 @@ local common = require("admin.common")
 local crud = require("admin.crud")
 local news = require("admin.news")
 local settings = require("admin.settings")
+local spells = require("admin.spells")
 local view = require("lib.view")
 
 local function home(req)
@@ -22,9 +23,13 @@ return function(r)
 	r:get("/admin/classes/#id", guard, classes.edit)
 	r:post("/admin/classes/#id", guard, classes.save)
 	r:post("/admin/classes/#id/reset", guard, classes.reset)
+	r:get("/admin/spells", guard, spells.index)
+	r:get("/admin/spells/#id", guard, spells.edit)
+	r:post("/admin/spells/#id", guard, spells.save)
+	r:post("/admin/spells/#id/reset", guard, spells.reset)
 	-- the levels editor became the per-class level tables
 	r:get("/admin/levels", guard, function() return view.redirect("/admin/classes") end)
-	for _, key in ipairs({ "items", "drops", "towns", "monsters", "spells", "users" }) do
+	for _, key in ipairs({ "items", "drops", "towns", "monsters", "users" }) do
 		r:get("/admin/" .. key, guard, crud.list(key))
 		r:get("/admin/" .. key .. "/#id", guard, crud.edit(key))
 		r:post("/admin/" .. key .. "/#id", guard, crud.save(key))

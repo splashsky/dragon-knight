@@ -1,0 +1,58 @@
+{#- The override form of a content entity (admin/content.lua), included by admin/class and
+		admin/spell. ctx: action (the entity's admin URL), entity (its row: id, key, retired),
+		form (content.form: fields, others, file_path), errors, sync_error, retired_note,
+		others_note. -#}
+{%- if errors then %}
+<div class="admin-errors"><b>Errors:</b><br>
+<div class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</div></div>
+{%- end %}
+{%- if sync_error then %}
+<div class="admin-errors"><b>Saved, but the content files have errors</b>, so the change applies once they are fixed:
+<pre class="error">{{ sync_error }}</pre></div>
+{%- end %}
+<p>ID {{ entity.id }}, key <b>{{ entity.key }}</b>, file <code>{{ form.file_path }}</code>.
+{%- if entity.retired ~= 0 then %} <span class="highlight">Retired:</span> {{ retired_note }}{% end %}</p>
+<p>Values here override the file on this server; a field equal to the file's value has no
+override. "Reset to file" removes an override.</p>
+<form action="{{ action }}" method="post">
+{{{ csrf_field() }}}
+<table class="admin-form">
+{%- for _, f in ipairs(form.fields) do %}
+<tr><td class="admin-label">{{ f.spec.label }}:</td><td>
+{%- if f.spec.type == "text" then %}
+<textarea name="{{ f.spec.name }}" rows="6" cols="40">{{ f.value }}</textarea>
+{%- elseif f.spec.type == "bool" then %}
+<select name="{{ f.spec.name }}"><option value="1"{% if f.value == "1" then %} selected{% end %}>Yes</option><option value="0"{% if f.value == "0" then %} selected{% end %}>No</option></select>
+{%- else %}
+<input type="text" name="{{ f.spec.name }}" size="{{ f.spec.type == "int" and 6 or 30 }}" value="{{ f.value }}">
+{%- end %}
+{%- if f.override then %}
+<br><span class="small highlight">Overridden.</span> <span class="small">File value: {% if f.file then %}{{ f.file }}{% else %}(none){% end %}</span>
+{%- end %}
+{%- if f.spec.help then %}
+<br><span class="small">{{ f.spec.help }}</span>
+{%- end %}
+</td></tr>
+{%- end %}
+</table>
+<input type="submit" name="submit" value="Save">
+</form>
+{%- for _, f in ipairs(form.fields) do %}
+{%- if f.override then %}
+<form class="inline" method="post" action="{{ action }}/reset">{{{ csrf_field() }}}<input type="hidden" name="field" value="{{ f.spec.name }}"><button class="link">Reset {{ f.spec.label }} to file</button></form><br>
+{%- end %}
+{%- end %}
+{%- if #form.others > 0 then %}
+<h2 class="admin-subheading">Other overrides</h2>
+<p>{{ others_note }}</p>
+<table class="admin-list">
+<tr><th>Field</th><th>Value</th><th>File value</th><th></th></tr>
+{%- for _, o in ipairs(form.others) do %}
+<tr><td>{{ o.field }}</td><td>{{ o.value }}</td><td>{{ o.file }}</td><td><form class="inline" method="post" action="{{ action }}/reset">{{{ csrf_field() }}}<input type="hidden" name="field" value="{{ o.field }}"><button class="link">Reset to file</button></form></td></tr>
+{%- end %}
+</table>
+{%- end %}

@@ -35,12 +35,17 @@ local function player(over)
 		id = 1, level = 1, charclass = 1, experience = 0, gold = 100,
 		currenthp = 15, maxhp = 15, currentmp = 0, maxmp = 0, currenttp = 10, maxtp = 10,
 		strength = 5, dexterity = 5, attackpower = 5, defensepower = 5,
-		expbonus = 0, goldbonus = 0, spells = "0", latitude = 0, longitude = 0,
+		expbonus = 0, goldbonus = 0, latitude = 0, longitude = 0,
 		currentfight = 1, currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0,
 		currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0, dropcode = 0,
 	}
 	for k, v in pairs(over or {}) do p[k] = v end
 	return p
+end
+
+-- a spells row as lib/spells.lua returns it: one effect
+local function spell(name, mp, usable_in, kind, param, value)
+	return { name = name, mp = mp, usable_in = usable_in, effects = { { kind = kind, [param] = value } } }
 end
 
 -- seed rows
@@ -158,7 +163,7 @@ function T.monster_sleep_and_wake()
 end
 
 function T.spells()
-	local heal = { id = 1, name = "Heal", mp = 5, attribute = 10, type = 1 }
+	local heal = spell("Heal", 5, "both", "heal_hp", "amount", 10)
 	local st = player({ currenthp = 10, maxhp = 15, currentmp = 9 })
 	local d = dice({})
 	local lines = combat.cast(st, heal, d.rand)
@@ -166,7 +171,7 @@ function T.spells()
 	eq(st.currenthp, 15); eq(st.currentmp, 4)
 
 	-- Hurt 15: rand((15/6)*5 = 12.5 -> 12, 15)
-	local hurt = { id = 6, name = "Hurt", mp = 5, attribute = 15, type = 2 }
+	local hurt = spell("Hurt", 5, "fight", "damage", "max", 15)
 	st = player({ currentmonsterhp = 20, currentmp = 5 })
 	d = dice({ 13 })
 	local killed
@@ -176,7 +181,7 @@ function T.spells()
 	-- Pain 35: (35/6)*5 = 29.166.. -> 29
 	st = player({ currentmonsterhp = 20, currentmp = 12 })
 	d = dice({ 29 })
-	lines, killed = combat.cast(st, { id = 7, name = "Pain", mp = 12, attribute = 35, type = 2 }, d.rand)
+	lines, killed = combat.cast(st, spell("Pain", 12, "fight", "damage", "max", 35), d.rand)
 	ranges(d, "29,35"); eq(killed, true)
 	-- immune (1 or 2) to hurt: no roll, MP still spent
 	st = player({ currentmonsterhp = 20, currentmp = 5, currentmonsterimmune = 1 })
@@ -185,7 +190,7 @@ function T.spells()
 	eq(lines[1], "You have cast the Hurt spell, but the monster is immune to it.")
 	eq(st.currentmonsterhp, 20); eq(st.currentmp, 0)
 
-	local sleep = { id = 11, name = "Sleep", mp = 10, attribute = 5, type = 3 }
+	local sleep = spell("Sleep", 10, "fight", "sleep", "chance", 5)
 	st = player({ currentmp = 10, currentmonsterimmune = 1 })   -- immune 1 doesn't stop sleep
 	lines = combat.cast(st, sleep, dice({}).rand)
 	eq(lines[1], "You have cast the Sleep spell. The monster is asleep."); eq(st.currentmonstersleep, 5)
@@ -195,27 +200,31 @@ function T.spells()
 	eq(st.currentmonstersleep, 0); eq(st.currentmp, 0)
 
 	st = player({ currentmp = 30 })
-	lines = combat.cast(st, { id = 15, name = "Rage", mp = 20, attribute = 25, type = 4 }, dice({}).rand)
+	lines = combat.cast(st, spell("Rage", 20, "fight", "buff_attack_pct", "pct", 25), dice({}).rand)
 	eq(lines[1], "You have cast the Rage spell, and will gain 25% damage until the end of this fight.")
 	eq(st.currentuberdamage, 25); eq(st.currentmp, 10)
-	lines = combat.cast(st, { id = 17, name = "Ward", mp = 10, attribute = 10, type = 5 }, dice({}).rand)
+	lines = combat.cast(st, spell("Ward", 10, "fight", "buff_defense_pct", "pct", 10), dice({}).rand)
 	eq(lines[1], "You have cast the Ward spell, and will gain 10% defense until the end of this fight.")
 	eq(st.currentuberdefense, 10); eq(st.currentmp, 0)
 end
 
 function T.cast_refusals()
-	local heal = { id = 1, name = "Heal", mp = 5, attribute = 10, type = 1 }
+	local heal = spell("Heal", 5, "both", "heal_hp", "amount", 10)
 	local full = "Your Hit Points are already full. Please go back and try again."
 	eq(combat.cast_error(player({ currenthp = 14, maxhp = 15 }), heal), nil)
 	eq(combat.cast_error(player({ currenthp = 15, maxhp = 15 }), heal), full)
 	eq(combat.cast_error(player({ currenthp = 20, maxhp = 15 }), heal), full)   -- above max (a drop)
-	for t = 2, 5 do
-		eq(combat.cast_error(player(), { id = 6, name = "X", mp = 5, attribute = 15, type = t }), nil)
+	for _, e in ipairs({ { "damage", "max" }, { "sleep", "chance" }, { "buff_attack_pct", "pct" },
+											 { "buff_defense_pct", "pct" } }) do
+		eq(combat.cast_error(player(), spell("X", 5, "fight", e[1], e[2], 1)), nil)
 	end
-	for _, t in ipairs({ 0, 6, 99 }) do
-		eq(combat.cast_error(player(), { id = 20, name = "Odd", mp = 5, attribute = 1, type = t }),
-			"This spell cannot be cast. Please go back and try again.")
-	end
+	-- unknown effects, no effects, a passive effect or a town-only spell: refused
+	local cannot = "This spell cannot be cast. Please go back and try again."
+	eq(combat.cast_error(player(), spell("Odd", 5, "fight", "fireball", "amount", 1)), cannot)
+	eq(combat.cast_error(player(), { name = "Empty", mp = 5, usable_in = "fight", effects = {} }), cannot)
+	eq(combat.cast_error(player(), { name = "Ring", mp = 5, usable_in = "fight",
+		effects = { { kind = "stat", stat = "maxhp", amount = 5 } } }), cannot)
+	eq(combat.cast_error(player({ currenthp = 1 }), spell("Mend", 5, "town", "heal_hp", "amount", 10)), cannot)
 end
 
 function T.run_chance()
@@ -255,10 +264,17 @@ function T.victory_rewards()
 	eq(r.newexp, 16777214)
 end
 
--- the classes' experience curves (app/content/classes/*.lua)
-local MAGE = { exp_base = 15, exp_stages = "2x2,1.5x8,1.25x5,1.125x28" }
-local WARRIOR = { exp_base = 18, exp_stages = "2x2,1.5x8,1.25x5,1.125x27" }
-local PALADIN = { exp_base = 20, exp_stages = "2x2,1.5x8,1.25x6,1.125x25" }
+-- the classes' experience curves (app/content/classes/*.lua: the global stages)
+local MAGE = { exp_base = 15, exp_stages = "" }
+local WARRIOR = { exp_base = 18, exp_stages = "" }
+local PALADIN = { exp_base = 20, exp_stages = "" }
+
+-- The spells a level-up teaches, as "id@level ...".
+local function learned(g)
+	local out = {}
+	for _, s in ipairs(g.spells or {}) do out[#out + 1] = s.id .. "@" .. s.level end
+	return table.concat(out, " ")
+end
 
 function T.level_up()
 	-- seed gains for levels 2-4, Mage (exp 15/45/105 from lib/leveling.lua, tp 1/2/2):
@@ -275,24 +291,24 @@ function T.level_up()
 	eq(g.level, 2); eq(g.levels, 1); eq(g.hp, 2); eq(g.mp, 5); eq(g.tp, 1); eq(g.learned, 1)
 	eq(g.maxhp, 17); eq(g.maxmp, 5); eq(g.maxtp, 11)
 	eq(g.newstrength, 5); eq(g.newdexterity, 6); eq(g.attackpower, 5); eq(g.defensepower, 6)
-	eq(g.spells, "0,1")
+	eq(learned(g), "1@2")
 	-- several levels at once: 2 and 3 (44 < 45 stops at 2; 104 < 105 stops at 3)
 	eq(combat.level_up(u, MAGE, 44, row).level, 2)
 	g = combat.level_up(u, MAGE, 104, row)
 	eq(g.level, 3); eq(g.levels, 2); eq(g.hp, 5); eq(g.mp, 9); eq(g.tp, 3)
-	eq(g.strength, 1); eq(g.dexterity, 3); eq(g.learned, 1); eq(g.spells, "0,1")
+	eq(g.strength, 1); eq(g.dexterity, 3); eq(g.learned, 1); eq(learned(g), "1@2")
 	eq(g.maxhp, 20); eq(g.maxmp, 9); eq(g.maxtp, 13); eq(g.newstrength, 6); eq(g.newdexterity, 8)
 	eq(g.attackpower, 6); eq(g.defensepower, 8)
 	-- all the way, stopping where the rows run out
 	g = combat.level_up(u, MAGE, 10 ^ 6, row)
-	eq(g.level, 4); eq(g.levels, 3); eq(g.learned, 2); eq(g.spells, "0,1,6")
+	eq(g.level, 4); eq(g.levels, 3); eq(g.learned, 2); eq(learned(g), "1@2 6@4")
 	-- from level 3 only row 4 counts
-	g = combat.level_up(player({ level = 3, spells = "0,1" }), MAGE, 10 ^ 6, row)
-	eq(g.level, 4); eq(g.levels, 1); eq(g.hp, 3); eq(g.spells, "0,1,6")
+	g = combat.level_up(player({ level = 3 }), MAGE, 10 ^ 6, row)
+	eq(g.level, 4); eq(g.levels, 1); eq(g.hp, 3); eq(learned(g), "6@4")
 	-- several spells on one level (content classes may list more than one)
 	rows[4].spells = { 6, 11 }
-	g = combat.level_up(player({ level = 3, spells = "0,1" }), MAGE, 10 ^ 6, row)
-	eq(g.learned, 2); eq(g.spells, "0,1,6,11")
+	g = combat.level_up(player({ level = 3 }), MAGE, 10 ^ 6, row)
+	eq(g.learned, 2); eq(learned(g), "6@4 11@4")
 	-- no spell learned: spells stays nil
 	rows[2].spells = {}
 	g = combat.level_up(u, MAGE, 15, row)

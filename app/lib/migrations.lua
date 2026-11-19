@@ -208,6 +208,131 @@ ALTER TABLE control DROP COLUMN class3name;
 ]])
 end
 
+-- 5: spells become content (app/content/spells/<key>.lua, synced into spells; what they do
+-- is a list of effects, lib/effects.lua) and the spells a character knows move from the
+-- users.spells comma list to user_spells. The original spells keep ids 1-19 and get their
+-- keys; type + attribute become one effect (1 heal_hp amount, 2 damage max, 3 sleep chance,
+-- 4 buff_attack_pct pct, 5 buff_defense_pct pct). Admin edits of the name, MP and attribute
+-- go to content_adopt (kept as overrides by the sync at the end of `dk migrate` where they
+-- differ from the files and are valid); a changed type can't be kept (the file's effect
+-- wins; reported). Other spell rows (ids from 20, no file) get the key spell_<id> and are
+-- retired by the sync; characters keep them. A known spell's learned_level is the level at
+-- which the character's class learns it, if that is not above the character's level, else
+-- NULL (unknown). Class level overrides listing spell ids now list keys.
+local V5_SPELLS = {
+	{ "heal", "Heal", 1 }, { "revive", "Revive", 1 }, { "life", "Life", 1 }, { "breath", "Breath", 1 },
+	{ "gaia", "Gaia", 1 }, { "hurt", "Hurt", 2 }, { "pain", "Pain", 2 }, { "maim", "Maim", 2 },
+	{ "rend", "Rend", 2 }, { "chaos", "Chaos", 2 }, { "sleep", "Sleep", 3 }, { "dream", "Dream", 3 },
+	{ "nightmare", "Nightmare", 3 }, { "craze", "Craze", 4 }, { "rage", "Rage", 4 }, { "fury", "Fury", 4 },
+	{ "ward", "Ward", 5 }, { "fend", "Fend", 5 }, { "barrier", "Barrier", 5 },
+}
+local V5_EFFECTS = {
+	{ "heal_hp", "amount" }, { "damage", "max" }, { "sleep", "chance" }, { "buff_attack_pct", "pct" },
+	{ "buff_defense_pct", "pct" },
+}
+
+local function v5_spells_content()
+	local db = dk.db
+	local php = require("lib.php")
+	local old = db:query("SELECT * FROM spells ORDER BY id")
+	db:exec_script([[
+CREATE TABLE spells_new (
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	mp           INTEGER NOT NULL DEFAULT 0,
+	usable_in    TEXT    NOT NULL DEFAULT 'fight',
+	effects      TEXT    NOT NULL DEFAULT '',
+	retired      INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE user_spells (
+	user_id        INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	spell_id       INTEGER NOT NULL REFERENCES spells (id),
+	learned_level  INTEGER,
+	PRIMARY KEY (user_id, spell_id)
+) WITHOUT ROWID;
+]])
+	local key_of = {}
+	for _, s in ipairs(old) do
+		local orig = V5_SPELLS[s.id]
+		local key = orig and orig[1] or ("spell_" .. s.id)
+		local attribute = php.mysql_int(s.attribute)
+		local effect = V5_EFFECTS[s.type]
+		db:exec("INSERT INTO spells_new (id, key, name, mp, usable_in, effects) VALUES (?, ?, ?, ?, ?, ?)",
+						s.id, key, s.name, s.mp, s.type == 1 and "both" or "fight",
+						effect and (effect[1] .. " " .. effect[2] .. "=" .. attribute) or "")
+		key_of[s.id] = key
+		if orig then
+			local function adopt(field, value)
+				db:exec("INSERT INTO content_adopt (kind, key, field, value) VALUES ('spells', ?, ?, ?)",
+								key, field, tostring(value))
+			end
+			adopt("name", s.name)
+			adopt("mp", s.mp)
+			if s.type == orig[3] then
+				adopt("effects.1." .. effect[2], attribute)
+			else
+				print(("warning: spell %d (%s) had its type changed to %s; it keeps the effect of %s"):format(
+					s.id, s.name, tostring(s.type), "app/content/spells/" .. key .. ".lua"))
+			end
+		end
+	end
+	-- partial installs had no spells: the original ids get their keys (the sync fills in the rest)
+	for id, orig in ipairs(V5_SPELLS) do
+		if not key_of[id] then
+			db:exec("INSERT INTO spells_new (id, key, name) VALUES (?, ?, ?)", id, orig[1], orig[2])
+			key_of[id] = orig[1]
+		end
+	end
+	db:exec_script([[
+DROP TABLE spells;
+ALTER TABLE spells_new RENAME TO spells;
+DELETE FROM sqlite_sequence WHERE name = 'spells';
+CREATE TABLE class_spells_new (
+	class_id  INTEGER NOT NULL REFERENCES classes (id),
+	level     INTEGER NOT NULL,
+	spell_id  INTEGER NOT NULL REFERENCES spells (id),
+	PRIMARY KEY (class_id, level, spell_id)
+) WITHOUT ROWID;
+INSERT INTO class_spells_new (class_id, level, spell_id)
+	SELECT class_id, level, spell_id FROM class_spells WHERE spell_id IN (SELECT id FROM spells);
+DROP TABLE class_spells;
+ALTER TABLE class_spells_new RENAME TO class_spells;
+]])
+
+	-- users.spells -> user_spells, with legacy's matching (php.in_list: "0" and unknown ids
+	-- match no spell, duplicates count once)
+	local ids = {}
+	for id in pairs(key_of) do ids[#ids + 1] = id end
+	table.sort(ids)
+	for _, u in ipairs(db:query("SELECT id, charclass, level, spells FROM users ORDER BY id")) do
+		for _, id in ipairs(ids) do
+			if php.in_list(u.spells, id) then
+				db:exec("INSERT INTO user_spells (user_id, spell_id, learned_level) VALUES (?, ?, " ..
+								"(SELECT min(level) FROM class_spells WHERE class_id = ? AND spell_id = ? AND level <= ?))",
+								u.id, id, u.charclass, id, u.level)
+			end
+		end
+	end
+
+	-- class level spells (overrides and pending adoptions of version 4) as keys
+	for _, tbl in ipairs({ "content_overrides", "content_adopt" }) do
+		for _, r in ipairs(db:query("SELECT key, field, value FROM " .. tbl ..
+																" WHERE kind = 'classes' AND field LIKE 'levels.%.spells'")) do
+			local keys = {}
+			for id in r.value:gmatch("%d+") do
+				local key = key_of[math.tointeger(tonumber(id))]
+				if key then keys[#keys + 1] = key end
+			end
+			table.sort(keys)
+			db:exec("UPDATE " .. tbl .. " SET value = ? WHERE kind = 'classes' AND key = ? AND field = ?",
+							table.concat(keys, ","), r.key, r.field)
+		end
+	end
+	db:exec("ALTER TABLE users DROP COLUMN spells")
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -215,6 +340,8 @@ migrations.STEPS = {
 		up = v3_leveling_formulas },
 	{ name = "character classes are content files (class names and level data become classes, " ..
 		"class_levels and class_spells; admin edits are kept as overrides)", up = v4_classes_content },
+	{ name = "spells are content files with effects; the spells characters know move to user_spells " ..
+		"(admin edits are kept as overrides)", up = v5_spells_content },
 }
 
 migrations.VERSION = #migrations.STEPS

@@ -1,0 +1,14 @@
+{#- Content sync status (admin/classes, admin/spells). ctx: status (content_sync.status()). -#}
+<h2 class="admin-subheading">Content sync</h2>
+{%- for _, k in ipairs(status.kinds) do %}
+<p>{{ k.name }}: {{ k.files }} files, {{ k.active + k.retired }} in the database ({{ k.retired }} retired), {{ k.overrides }} overrides.</p>
+{%- end %}
+{%- if #status.errors > 0 then %}
+<div class="admin-errors"><b>Content errors</b> (the game keeps the last good content):
+<pre class="error">{% for _, e in ipairs(status.errors) do %}{{ e }}
+{% end %}</pre></div>
+{%- elseif status.in_sync then %}
+<p>The database is in sync with the content files.</p>
+{%- else %}
+<p>The database is not in sync with the content files yet; the next page load (or <code>dk content sync</code>) updates it.</p>
+{%- end %}

@@ -191,6 +191,15 @@ t_login() {
 # t_logout (current jar)
 t_logout() { t_get /changepassword; t_post /logout "csrf=$(t_csrf)"; }
 
+# t_spells USERNAME "1,6": the user knows exactly these spell ids ("" for none).
+t_spells() {
+	t_sql "DELETE FROM user_spells WHERE user_id = (SELECT id FROM users WHERE username = '$1');
+		INSERT INTO user_spells (user_id, spell_id) SELECT u.id, s.id FROM users u, spells s
+		WHERE u.username = '$1' AND s.id IN (${2:-0})"
+}
+# SQL expression for a users row's known spell ids, "1,6" (in a SELECT ... FROM users).
+T_KNOWN="(SELECT group_concat(spell_id) FROM (SELECT spell_id FROM user_spells WHERE user_id = users.id ORDER BY spell_id))"
+
 # Wait (max ~5 s) until GET PATH contains TEXT; for hot-reload checks.
 t_wait_for() {
 	local i

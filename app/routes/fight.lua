@@ -7,8 +7,8 @@
 local auth = require("lib.auth")
 local classes = require("lib.classes")
 local combat = require("fight.combat")
-local game = require("lib.game")
 local php = require("lib.php")
+local spells = require("lib.spells")
 local view = require("lib.view")
 
 local rand = php.rand
@@ -112,8 +112,7 @@ local function fight(req)
 		end
 		-- Validated server-side: an integer id the user knows that exists in spells.
 		local spell_id = math.tointeger(tonumber(picked))
-		local spell = spell_id and php.in_list(user.spells, spell_id) and
-									dk.db:first("SELECT * FROM spells WHERE id = ?", spell_id) or nil
+		local spell = spell_id and spells.knows(user, spell_id) and spells.get(spell_id) or nil
 		if not spell then
 			return error_page(req, "You have not yet learned this spell. Please go back and try again.")
 		end
@@ -145,7 +144,7 @@ local function fight(req)
 	if died then
 		page.dead = true
 	else
-		page.spells = game.user_spells(user)
+		page.spells = spells.known(user, "fight")
 		dk.db:exec([[UPDATE users SET currentaction = 'Fighting', currenthp = ?, currentmp = ?,
 			currentfight = ?, currentmonster = ?, currentmonsterhp = ?, currentmonstersleep = ?,
 			currentmonsterimmune = ?, currentuberdamage = ?, currentuberdefense = ? WHERE id = ?]],
@@ -178,13 +177,13 @@ local function victory(req)
 	local s = {
 		level = user.level, maxhp = user.maxhp, maxmp = user.maxmp, maxtp = user.maxtp,
 		strength = user.strength, dexterity = user.dexterity, attackpower = user.attackpower,
-		defensepower = user.defensepower, spells = user.spells, dropcode = user.dropcode,
+		defensepower = user.defensepower, dropcode = user.dropcode,
 	}
 	if up then
 		s.level, s.maxhp, s.maxmp, s.maxtp = up.level, up.maxhp, up.maxmp, up.maxtp
 		s.strength, s.dexterity = up.newstrength, up.newdexterity
 		s.attackpower, s.defensepower = up.attackpower, up.defensepower
-		if up.spells then s.spells = up.spells end
+		for _, learned in ipairs(up.spells or {}) do spells.learn(user.id, learned.id, learned.level) end
 		ctx.levelup = up
 		title = "Courage and Wit have served thee well!"
 	else
@@ -201,12 +200,12 @@ local function victory(req)
 	-- experience/gold were MEDIUMINT UNSIGNED: a bonus below -100% made them negative and
 	-- MySQL stored 0.
 	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, maxhp = ?, maxmp = ?,
-		maxtp = ?, strength = ?, dexterity = ?, attackpower = ?, defensepower = ?, spells = ?,
+		maxtp = ?, strength = ?, dexterity = ?, attackpower = ?, defensepower = ?,
 		currentfight = 0, currentmonster = 0, currentmonsterhp = 0, currentmonstersleep = 0,
 		currentmonsterimmune = 0, currentuberdamage = 0, currentuberdefense = 0, dropcode = ?,
 		experience = ?, gold = ? WHERE id = ?]],
 		s.level, s.maxhp, s.maxmp, s.maxtp, s.strength, s.dexterity, s.attackpower,
-		s.defensepower, s.spells, s.dropcode, php.mysql_uint(r.newexp), php.mysql_uint(r.newgold),
+		s.defensepower, s.dropcode, php.mysql_uint(r.newexp), php.mysql_uint(r.newgold),
 		user.id)
 	return view.page(req, title, "fight/victory", ctx)
 end

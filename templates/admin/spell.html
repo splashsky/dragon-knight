@@ -1,0 +1,16 @@
+{#- One spell (admin/spells.lua). ctx: s (spells row: effective values), the override form
+		(see admin/content_form), effects (as text), learned_by, users, saved. -#}
+<h1 class="admin-heading">Edit Spell: {{ s.name }}</h1>
+{%- if saved then %}
+<p class="admin-saved">Spell updated.</p>
+{%- end %}
+{{{ include("admin/content_form") }}}
+<h2 class="admin-subheading">Effects and learning</h2>
+<p>Read-only here: edit <code>{{ form.file_path }}</code> (the game picks the change up on the next
+page load).</p>
+<table class="admin-form">
+<tr><td class="admin-label">Usable in:</td><td>{{ s.usable_in }}</td></tr>
+<tr><td class="admin-label">Effects:</td><td><code>{{ effects }}</code></td></tr>
+<tr><td class="admin-label">Learned by:</td><td>{% if #learned_by == 0 then %}<span class="light">No class</span>{% else %}{{ table.concat(learned_by, ", ") }}{% end %}</td></tr>
+<tr><td class="admin-label">Characters:</td><td>{{ users }} know it</td></tr>
+</table>

@@ -19,8 +19,7 @@ t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
 			 CREATE TABLE adm_snap_items AS SELECT * FROM items WHERE id = 1;
 			 CREATE TABLE adm_snap_drops AS SELECT * FROM drops WHERE id = 1;
 			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
-			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;
-			 CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;"
+			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
 
@@ -143,13 +142,44 @@ admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune FROM mon
 t_get /admin/monsters/1;   expect_body '<option value="2" selected>Hurt &amp; Sleep Spells</option>'
 
 t_section "admin: spells"
-t_get /admin/spells/1
-t_form_submit /admin/spells/1 mp=
-expect_body 'MP is required.'; expect_body 'MP must be a number.'
-t_form_submit /admin/spells/1 name=Mend mp=4 attribute=12 type=4
-expect_redirect '/admin/spells/1\?saved=1'
-admin_eq "SELECT name || '|' || mp || '|' || attribute || '|' || type FROM spells WHERE id = 1" \
-	"Mend|4|12|4" "spell saved"
+# spell files app/content/spells/*.lua; admins override name, description, MP and effect
+# amounts (tests/e2e/content.sh covers the files themselves)
+t_get /admin/spells;       expect_status 200; expect_body '<a href="/admin/spells/1">Heal</a>'
+expect_body '<td>heal</td><td>5</td><td>both</td><td>heal_hp amount=10</td>'
+expect_body '<td>hurt</td><td>5</td><td>fight</td><td>damage max=15</td>'
+expect_body 'spells: 19 files, 19 in the database (0 retired), 0 overrides.'
+t_get /admin/spells/6;     expect_status 200; expect_body 'Edit Spell: Hurt'; expect_body 'app/content/spells/hurt.lua'
+expect_body 'Effect 1 (Hurt): maximum damage:'; expect_body 'name="effects.1.max" size="6" value="15"'
+expect_body 'name="mp" size="6" value="5"'; expect_body '<code>damage max=15</code>'
+expect_body 'Mage (level 4), Warrior (level 5), Paladin (level 5)'
+expect_no_body 'name="usable_in"'; expect_no_body 'name="effects.1.kind"'
+t_get /admin/spells/99;    expect_status 404
+t_post /admin/spells/6 "name=NoToken"; expect_status 403
+ADM_HURT_DESC=$(t_sql "SELECT description FROM spells WHERE id = 6")
+t_get /admin/spells/6
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" mp=-1 effects.1.max=x name=
+expect_status 200; expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
+expect_body 'MP must be an integer from 0 to 1000000.'; expect_body 'Effect 1 (Hurt): maximum damage must be an integer from 0 to 1000000.'
+admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid spell form not saved"
+t_get /admin/spells/6
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" name=Smite mp=4 effects.1.max=20 effects.1.kind=sleep usable_in=both
+expect_redirect '/admin/spells/6\?saved=1'
+admin_eq "SELECT name || '|' || mp || '|' || usable_in || '|' || effects FROM spells WHERE id = 6" \
+	"Smite|4|fight|damage max=20" "spell overrides applied"
+admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'spells' ORDER BY field)" \
+	"effects.1.max=20;mp=4;name=Smite" "only the changed fields are overridden"
+t_get '/admin/spells/6?saved=1'; expect_body 'Spell updated.'; expect_body 'File value: Hurt'; expect_body 'File value: 15'
+t_get /help/spells;        expect_body '<td style="width: 25%">Smite<br>'; expect_body '<td style="width: 25%">20</td>'
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+admin_eq "SELECT effects FROM spells WHERE id = 6" "damage max=20" "spell overrides survive a sync"
+t_get /admin/spells/6
+t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=name"
+expect_redirect '/admin/spells/6\?saved=1'
+admin_eq "SELECT name || '|' || mp FROM spells WHERE id = 6" "Hurt|4" "name reset to file"
+t_get /admin/spells/6
+t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=*"
+admin_eq "SELECT name || '|' || mp || '|' || effects FROM spells WHERE id = 6" "Hurt|5|damage max=15" "all reset to file"
+admin_eq "SELECT count(*) FROM content_overrides" "0" "no spell overrides left"
 
 t_section "admin: classes"
 # class files app/content/classes/*.lua; admins override some fields (tests/e2e/content.sh
@@ -164,7 +194,7 @@ expect_body '<option value="1" selected>Yes</option>'; expect_body 'name="start_
 expect_body '<textarea name="description" rows="6" cols="40">Medium level-ups'
 # experience and level gains are read-only (level 2: exp 18, HP 2, bonus 0, MP 4, TP 1,
 # strength 2, dexterity 1, Heal; level 10: the milestone bonus)
-expect_body 'Experience base 18, stages 2x2,1.5x8,1.25x5,1.125x27'
+expect_body 'Experience base 18, stages global (2x2,1.5x8,1.25x5,1.125x28)'
 expect_body "<tr><td>2</td><td>18</td><td>2</td><td>0</td><td>4</td><td>1</td><td>2</td><td>1</td><td>$(t_sql "SELECT name FROM spells WHERE id = 1")</td></tr>"
 expect_body '<tr><td>10</td><td>2,368</td><td>0</td><td>10</td>'
 expect_no_body 'name="exp_base"'; expect_no_body 'name="levels'
@@ -212,7 +242,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (classes: 3, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF 'Content synced (spells: 19, 0 new, 0 retired; classes: 3, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"
@@ -235,10 +265,18 @@ t_form_submit /admin/users/$ADM_UID email= gold=lots
 expect_body 'Email is required.'; expect_body 'Gold must be a number.'
 t_get /admin/users/$ADM_UID
 t_form_submit /admin/users/$ADM_UID "charname=<i>Hero</i>" gold=5000 level=7 authlevel=2 currentaction=Exploring \
-	spells=0,1,2 username=evil password=plain regdate=1 id=4242 onlinetime=3
+	"spells=revive, heal" username=evil password=plain regdate=1 id=4242 onlinetime=3
 expect_redirect "/admin/users/$ADM_UID\\?saved=1"
-admin_eq "SELECT username || '|' || charname || '|' || gold || '|' || level || '|' || authlevel || '|' || currentaction || '|' || spells || '|' || (regdate > 1) FROM users WHERE id = $ADM_UID" \
-	"admtester|<i>Hero</i>|5000|7|2|Exploring|0,1,2|1" "user saved"
+admin_eq "SELECT username || '|' || charname || '|' || gold || '|' || level || '|' || authlevel || '|' || currentaction || '|' || $T_KNOWN || '|' || (regdate > 1) FROM users WHERE id = $ADM_UID" \
+	"admtester|<i>Hero</i>|5000|7|2|Exploring|1,2|1" "user saved"
+admin_eq "SELECT count(*) FROM user_spells WHERE user_id = $ADM_UID AND learned_level IS NULL" "2" "admin-given spells: level unknown"
+t_get /admin/users/$ADM_UID; expect_body 'name="spells" size="50" maxlength="1000" value="heal, revive"'
+t_form_submit /admin/users/$ADM_UID "spells=heal, fireball"
+expect_body "Spells: there is no spell &#39;fireball&#39;."
+admin_eq "SELECT $T_KNOWN FROM users WHERE id = $ADM_UID" "1,2" "invalid spells not saved"
+t_get /admin/users/$ADM_UID
+t_form_submit /admin/users/$ADM_UID "spells=revive"
+admin_eq "SELECT $T_KNOWN FROM users WHERE id = $ADM_UID" "2" "spells forgotten"
 admin_eq "SELECT password FROM users WHERE id = $ADM_UID" "$ADM_HASH" "password not mass-assigned"
 admin_eq "SELECT count(*) FROM users WHERE id = 4242" "0" "user id not mass-assigned"
 t_jar admtester
@@ -290,6 +328,5 @@ t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; 
 			 DELETE FROM drops WHERE id = 1; INSERT INTO drops SELECT * FROM adm_snap_drops; DROP TABLE adm_snap_drops;
 			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
 			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
-			 DELETE FROM spells WHERE id = 1; INSERT INTO spells SELECT * FROM adm_snap_spells; DROP TABLE adm_snap_spells;
 			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

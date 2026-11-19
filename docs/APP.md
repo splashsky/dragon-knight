@@ -15,11 +15,12 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
-| Content (classes) | `app/content/classes/*.lua`, `app/lib/content/*`, `app/lib/classes.lua`, `app/cli/{content,check}.lua`, `app/admin/classes.lua` | `templates/admin/class{,es}.html` | `tests/e2e/content.sh`, `tests/lua/test_content.lua` |
+| Content (classes, spells) | `app/content/{classes,spells}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,content}.lua` | `templates/admin/{class,classes,spell,spells,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_content.lua` |
+| Effects (what spells and items do) | `app/lib/effects.lua` | | `tests/lua/test_effects.lua` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3}.sql`) |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,seed_v4}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -183,7 +184,6 @@ starting with `__` are reserved.
 | `game.user(id)` | fresh users row |
 | `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
 | `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
-| `game.user_spells(user [, type])` | spell rows in `users.spells`, ordered by id (type 1 heal, 2 hurt, 3 sleep, 4 uber damage, 5 uber defense) |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
@@ -204,24 +204,28 @@ Rows of the `classes` table (synced from `app/content/classes/*.lua`, see
 | `classes.all()` | every class, retired ones too (admin) |
 | `classes.get(id)`, `classes.find(id_or_key)`, `classes.name(id)` | a class row / its name, or nil |
 | `classes.start_stats(c)` | the `users` columns of a new character of class `c` |
-| `classes.levels(c)` | `{ [level] = { hp, mp, strength, dexterity, spells = { id, ... } } }` for levels 2-100 |
+| `classes.levels(c)` | `{ [level] = { hp, mp, strength, dexterity, spells = { spell id, ... } } }` for levels 2-100 |
 | `classes.reload()` | forget the cache (after a sync in the same request) |
 
 ## Leveling (`lib/leveling.lua`)
 
 The experience needed per level, the TP gained per level and the HP bonus at milestone
 levels are formulas, fitted to the original 1.1.11 levels table. The experience curve's
-parameters and the other per-level gains (base HP, MP, strength, dexterity, spells) are
+first step and the other per-level gains (base HP, MP, strength, dexterity, spells) are
 per class, in the class content files; the admin panel shows them read-only per class.
 
-- **Experience**, per class: `step(n)`, the experience from level n to n + 1, starts at the
-	class's `exp_base` (Mage 15, Warrior 18, Paladin 20); every later step is the previous
-	one times a stage factor, rounded down, per `exp_stages` (`"2x2,1.5x8,1.25x5,1.125x28"`:
-	×2 for 2 steps, ×1.5 for 8, ×1.25 for 5 (Paladin 6), ×1.125 for 28 / 27 / 25), then
-	flat. `exp_for(class, level)` (`class`: a classes row or anything with `exp_base` and
-	`exp_stages`) is the sum of the steps below the level (0 at level 1); level 100 is the
-	cap, 16777215 (rewards stop just below it). Within 0.44% of the original table at
-	every level.
+- **Experience**: `step(n)`, the experience from level n to n + 1, starts at the class's
+	`exp_base` (Mage 15, Warrior 18, Paladin 20); every later step is the previous one
+	times a stage factor, rounded down, per the stages: `leveling.GLOBAL_STAGES`,
+	`"2x2,1.5x8,1.25x5,1.125x28"` (×2 for 2 steps, ×1.5 for 8, ×1.25 for 5, ×1.125 for 28,
+	the original Mage curve), then flat. A class file may set its own `exp_stages` (rare;
+	`"1x1"` is a flat curve); empty or absent means the global stages, in the files, the
+	`classes` table and overrides alike (`leveling.stages_of(class)`). `exp_for(class,
+	level)` (`class`: a classes row or anything with `exp_base` and `exp_stages`) is the sum
+	of the steps below the level (0 at level 1); level 100 is the cap, 16777215 (rewards
+	stop just below it). The Mage is within 0.44% of the original table at every level; the
+	Warrior and Paladin match the original up to level 44 and 17 (where the original gave
+	them stages of their own) and need up to about 10% more after that.
 - **TP** gained on reaching a level: `floor(level / 30) + 2`, except +1 at level 2 (level 1
 	shows the table's starting 5, level 100 gains nothing). Exactly the original. The same
 	for every class.
@@ -229,8 +233,8 @@ per class, in the class content files; the admin panel shows them read-only per 
 	40/50/60, +20 at 70/80/90, +50 at 99 (the class files hold 0 there). Exactly the
 	original. The same for every class.
 
-The global rules are plain data at the top of the module (`leveling.TP`,
-`leveling.HP_MILESTONES`); edit them and the next request uses them (hot reload): victory
+The global rules are plain data at the top of the module (`leveling.GLOBAL_STAGES`,
+`leveling.TP`, `leveling.HP_MILESTONES`); edit them and the next request uses them (hot reload): victory
 level-ups (`combat.level_up`), "Next Level" on the character sheets, `/help/levels` and
 the admin class pages. `tests/lua/test_leveling.lua` pins them and the stock class files
 against a frozen copy of the original table (`tests/lua/levels_original.lua`), so update
@@ -239,7 +243,7 @@ experience already covers the next level gets it (or several) on the next victor
 
 ## Content
 
-Classes (and, later, spells and items) are **content**: Lua data files in git, one per
+Classes and spells (and, later, items) are **content**: Lua data files in git, one per
 entity, hot-reloaded like the code and synced into the database, where players' rows
 reference them by id.
 
@@ -247,7 +251,7 @@ reference them by id.
 -- app/content/classes/knight.lua: the file name is the key ("knight")
 local levels = {}
 for level = 2, 100 do levels[level] = { hp = 3, mp = 1, strength = 2, dexterity = 1 } end
-levels[4].spells = { 1 }                 -- spell ids learned on reaching that level
+levels[4].spells = { "heal" }            -- keys of the spells learned on reaching that level
 return {
 	name = "Knight",
 	description = [[
@@ -256,7 +260,8 @@ High hit points]],                       -- one line per point on the help page
 	sort = 4,                                -- registration/help order (default 0)
 	playable = true,                         -- offered when registering (default true)
 	start_hp = 20, start_mp = 0, start_tp = 10, start_strength = 6, start_dexterity = 4,
-	exp_base = 22, exp_stages = "2x2,1.5x8,1.25x6,1.125x25",
+	exp_base = 22,                           -- the first experience step; exp_stages (optional,
+	                                         -- "factor x steps,...") replaces the global curve
 	levels = levels,                         -- every level 2-100: hp, mp, strength, dexterity
 }                                          -- (default 0), spells (default none)
 ```
@@ -268,11 +273,15 @@ High hit points]],                       -- one line per point on the help page
 	`dk.list_modules("content.classes")` (new files count without a restart) and validates
 	them with the kind's schema (`lib/content/kinds/<kind>.lua`, field validators in
 	`lib/content/schema.lua`): wrong types, missing or unknown fields and missing levels
-	are errors naming the file. `./dk check` validates every content file.
+	are errors naming the file, and so is a reference to an entity of another kind that
+	has no file (a class listing an unknown or deleted spell key). `./dk check` validates
+	every content file.
 - **Sync** (`lib/content/sync.lua`): upsert every file entity by key (a new key gets the
 	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
 	deleted: players keep their class), un-retire keys whose file is back, then apply the
-	admin overrides. The original classes keep ids 1-3 (seeded in `seed.sql`).
+	admin overrides. Kinds sync in `schema.KINDS` order (spells before classes, whose
+	`class_spells` rows need the spell ids). The original classes keep ids 1-3 and the
+	original spells 1-19 (seeded in `seed.sql`).
 - **When**: every request (`main.lua`) compares `meta.content_seen` with
 	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
 	After a restart or any app file change, the files are loaded and fingerprinted (sha256
@@ -284,22 +293,113 @@ High hit points]],                       -- one line per point on the help page
 	page, and the next file change checks again. `dk content sync`, `dk migrate` and
 	`dk install` fail (and change nothing) instead.
 - **Overrides**: `content_overrides(kind, key, field, value)` hold per-server values that
-	win over the file and survive syncs. The admin class page (`/admin/classes/#id`)
-	writes them for the fields marked `admin` in the kind (name, description, sort,
-	playable, starting stats; a value equal to the file's deletes the override) and
-	offers "reset to file". Field names are those of the flat form: `name`,
-	`levels.17.hp`, `levels.17.spells` (`"1,6"`).
+	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
+	`/admin/spells/#id`, shared code in `admin/content.lua` and
+	`templates/admin/content_form.html`) write them for the kind's `admin_fields` (classes:
+	name, description, sort, playable, starting stats; spells: name, description, MP and
+	the effects' amounts; a value equal to the file's deletes the override) and offer
+	"reset to file". Field names are those of the flat form: `name`, `levels.17.hp`,
+	`levels.17.spells` (`"heal,hurt"`), `effects.1.amount`.
 - **Migrations into content**: a migration that turns old rows into content writes the
 	old values into `content_adopt(kind, key, field, value)`; the next sync turns those
-	that differ from the file into overrides (that is how schema version 4 kept edited
-	class names and levels data).
+	that differ from the file (and are valid) into overrides (that is how schema version 4
+	kept edited class names and levels data, and version 5 edited spell names, MP and
+	amounts).
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
 load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` module
-(`fields` with types, `field(name)`, optional `validate_extra`/`write_children`), its
-table (`id`, `key` UNIQUE, the field columns, `retired`) and an entry in `schema.KINDS`
-(in sync order).
+(`fields` with types, `field(name)`, `admin_fields(flat)`, optional
+`validate_extra`/`write_children`), its table (`id`, `key` UNIQUE, the field columns,
+`retired`) and an entry in `schema.KINDS` (in sync order: kinds others reference first).
+A field of type `keys` with `refs = "<kind>"` lists keys of another kind (checked by
+`load.all`); `write_children` maps them to ids. Bump `load.FORMAT` when the flat form
+changes meaning.
+
+## Spells
+
+Spells are content (see [Content](#content)): `app/content/spells/<key>.lua`, synced into
+`spells`. The original 19 keep ids 1-19 (keys from the names: `heal`, `revive`, `life`,
+`breath`, `gaia`, `hurt`, `pain`, `maim`, `rend`, `chaos`, `sleep`, `dream`, `nightmare`,
+`craze`, `rage`, `fury`, `ward`, `fend`, `barrier`).
+
+```lua
+-- app/content/spells/hurt.lua
+return {
+	name = "Hurt",
+	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
+	mp = 5,                                   -- MP it costs
+	usable_in = "fight",                      -- "fight" (default), "town" or "both"
+	effects = { { kind = "damage", max = 15 } },   -- applied in order (see Effects)
+}
+```
+
+- `usable_in`: where it can be cast. `"town"` and `"both"` need effects that work outside
+	fights (the heals); `"town"` and `"both"` spells are the Fast Spells in the right column
+	(`POST /spell/#id`, `town/heal.lua`), and the fight's spell list shows `"fight"` and
+	`"both"` spells.
+- A class learns a spell when its file lists the key in `levels[N].spells`; victory
+	level-ups (`combat.level_up`) add a `user_spells(user_id, spell_id, learned_level)` row.
+	The admin user editor edits a character's spells as a list of keys (`learned_level`
+	NULL: unknown).
+- Deleting a spell file retires the spell: no class file may list it any more (`dk check`
+	fails), characters who know it keep it and can still cast it, and the help page no
+	longer lists it.
+- Casting: `combat.cast_error` / `combat.cast` in fights, `town/heal.lua` outside; both
+	check the spell is known (`spells.knows`), affordable and castable there, then run its
+	effects. Messages are the original game's.
+
+`lib/spells.lua`: rows come back with `effects` decoded into a list.
+
+| Function | Returns |
+|---|---|
+| `spells.get(id)` | a spells row (retired or not), or nil |
+| `spells.active()`, `spells.all()` | non-retired spells (help) / every spell (admin), by id |
+| `spells.known(user [, place])` | the spells `user` knows, by id; `place` `"town"` or `"fight"` keeps those castable there |
+| `spells.knows(user, id)`, `spells.usable(spell, place)` | booleans |
+| `spells.learn(user_id, id, level)`, `spells.set_known(user_id, ids)` | teach one (known ones keep their level) / set the whole list |
+
+Adding a spell: copy a file in `app/content/spells/` to `<key>.lua`, edit it, list the key
+in a class file's `levels[N].spells`, run `./dk check`. The next page load syncs both; the
+spell appears on `/help/spells` and characters of that class learn it on reaching level N
+(existing characters already past N don't get it retroactively; give it to them in the
+admin user editor).
+
+## Effects (`lib/effects.lua`)
+
+What spells (and, with items, consumables and gear) do is a list of effects: small tables
+`{ kind = ..., <parameters> }`, validated by `effects.validate(list [, passive])` (used by
+the content kinds), stored as text (`effects.encode`: `"damage max=15; sleep chance=5"`)
+and applied by a pure engine (no DB), unit-tested in `tests/lua/test_effects.lua`.
+
+| Kind | Parameters | Does (the original spell type) |
+|---|---|---|
+| `heal_hp` | `amount` | restores up to `amount` HP, never above the maximum, never lowering it (1, Heal) |
+| `heal_mp`, `heal_tp` | `amount` | the same for MP / TP |
+| `damage` | `max`, optional `min` | hurts the monster by `rand(min, max)`; `min` defaults to `max * 5/6` (`rand((max / 6) * 5, max)`, as the original); nothing if it is immune (2, Hurt) |
+| `sleep` | `chance` (1-15) | the monster sleeps, staying asleep while `rand(1, 15) <= chance`; not if immune to sleep (3, Sleep) |
+| `buff_attack_pct` | `pct` | +pct% damage dealt until the end of the fight (4, +Damage) |
+| `buff_defense_pct` | `pct` | -pct% damage taken until the end of the fight (5, +Defense) |
+| `stat` (passive) | `stat`, `amount` (may be negative) | a modifier while gear is equipped: `maxhp`, `maxmp`, `maxtp`, `strength`, `dexterity`, `attack`, `defense`, `exp_bonus_pct`, `gold_bonus_pct` (summed by `effects.modifiers(list)`) |
+
+- Context: `{ player = <users row copy, changed in place>, in_fight = bool, rand =
+	php.rand, intro = "You have cast the Heal spell" }`. The fight state lives on the
+	player row (`currentmonsterhp`, `currentmonstersleep`, `currentmonsterimmune`,
+	`currentuberdamage`, `currentuberdefense`), as in the original game.
+- `effects.refusal(list, ctx)`: nil, or why the list can't be used now: `"cannot"`
+	(empty, unknown, invalid or passive effects), `"fight_only"` (outside a fight, an
+	effect needs a monster), `"hp_full"`/`"mp_full"`/`"tp_full"` (only heals, none would
+	restore anything). Callers map these to their messages.
+- `effects.apply(list, ctx)`: applies the effects in order; returns one message line per
+	effect (`intro` + the effect's ending: ", and gained 10 Hit Points.") and the set of
+	player fields that changed. Costs (MP) are the caller's.
+- `effects.flatten(list, prefix, flat)` / `effects.unflatten(flat, prefix)`: the content
+	flat form (`effects.1.kind`, `effects.1.max`); `effects.label(e)` / `effects.attribute(e)`:
+	the help page's type and attribute columns.
+
+Adding an effect kind: an entry in `effects.KINDS` (label, parameters, `town` when it works
+outside fights, `heals` for "already full"), its parameter specs, an `APPLY` function, and
+tests.
 
 ## Forum and news
 
@@ -338,7 +438,7 @@ Game mechanics must match legacy exactly. Use these helpers rather than ad-hoc L
 - `php.number_format(n)`, `php.prettydate(ts)`, `php.datetime(ts)`.
 - `php.nl2br(s)` does **not** escape. Templates use `h.nl2br`.
 - `php.explode(sep, s)`, `php.implode(sep, t)`, `php.in_list(list, v)`: comma-list
-	columns (`users.spells`, `users.towns`, `towns.itemslist`) with PHP loose equality
+	columns (`users.towns`, `towns.itemslist`) with PHP loose equality
 	(`"3" == 3`). For example `"29.30"` matches neither 29 nor 30. Keep those columns'
 	formats, including the leading `"0"`.
 - `php.loose_eq(a, b)`, `php.trim(s)`, `php.is_email(s)`.
@@ -393,8 +493,8 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v3.sql` (version 3) with the
-	 game data of that time (`seed_v3.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v4.sql` (version 4) with the
+	 game data of that time (`seed_v3.sql`, `seed_v4.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -447,6 +547,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_ok` / `t_fail msg` | custom assertions |
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
+| `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |

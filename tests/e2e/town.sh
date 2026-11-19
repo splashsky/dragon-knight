@@ -199,9 +199,9 @@ t_post /move "csrf=$TC&north=North"; expect_redirect /fight
 expect_db "latitude" "3" "move while fighting"
 
 t_section "town: heal spells"
-tu "$TOWN_HOME, spells='0', currenthp=5, maxhp=20, currentmp=20, maxmp=20"
+tu "$TOWN_HOME, currenthp=5, maxhp=20, currentmp=20, maxmp=20"; t_spells townie ""
 t_post /spell/1 "csrf=$TC";       expect_body 'You have not yet learned this spell.'
-tu "spells='0,1,6'"
+t_spells townie 1,6
 t_get /;                          expect_body 'action="/spell/1"'
 t_post /spell/6 "csrf=$TC";       expect_body 'This is not a healing spell.'
 t_post /spell/2 "csrf=$TC";       expect_body 'You have not yet learned this spell.'

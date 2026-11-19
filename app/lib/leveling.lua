@@ -2,12 +2,14 @@
 --
 -- The original game (1.1.11) listed every level's total experience, TP gain and HP gain
 -- per class in its levels table. Those columns follow simple rules, fitted here to the
--- original table: the experience totals come within 0.44% of it (the rest is hand-tweaked
--- noise), and the TP and HP milestone gains match it exactly. The experience curve's
--- parameters and the other per-level gains (base HP, MP, strength, dexterity, spells) are
--- per class, in the class content files (app/content/classes/*.lua). Pure module (no DB
--- access): edit the rules below and the game picks them up on the next request;
--- tests/lua/test_leveling.lua compares them with a frozen copy of the original table.
+-- original table: the Mage's experience totals come within 0.44% of it (the rest is
+-- hand-tweaked noise), and the TP and HP milestone gains match it exactly. The experience
+-- curve's stages are global (GLOBAL_STAGES, the original Mage curve; a class may define
+-- its own); its first step and the other per-level gains (base HP, MP, strength,
+-- dexterity, spells) are per class, in the class content files (app/content/classes/
+-- *.lua). Pure module (no DB access): edit the rules below and the game picks them up on
+-- the next request; tests/lua/test_leveling.lua compares them with a frozen copy of the
+-- original table.
 local leveling = {}
 
 leveling.MAX_LEVEL = 100
@@ -16,13 +18,24 @@ leveling.MAX_LEVEL = 100
 leveling.MAX_EXPERIENCE = 16777215
 
 -- Experience curve: per class, from the class's content file (app/content/classes/
--- <key>.lua, synced into the classes table): `exp_base` and `exp_stages`. step(n) is the
--- experience from level n to level n + 1: step(1) = base, then each step is the previous
--- one times the stage's factor, rounded down (step(n) = floor(step(n - 1) * factor)).
--- Stages ("2x2,1.5x8,1.25x5,1.125x28": factor x steps) apply in order to steps 2, 3, ...;
--- after the last stage the steps stay flat. exp_for(level) is the sum of the steps below
--- it (0 at level 1), except exp_for(MAX_LEVEL) = MAX_EXPERIENCE. `class` arguments below
--- are tables with those two fields (a classes row or a content entity).
+-- <key>.lua, synced into the classes table): `exp_base` and, rarely, `exp_stages` (empty
+-- or absent: GLOBAL_STAGES). step(n) is the experience from level n to level n + 1:
+-- step(1) = base, then each step is the previous one times the stage's factor, rounded
+-- down (step(n) = floor(step(n - 1) * factor)). Stages ("2x2,1.5x8,1.25x5,1.125x28":
+-- factor x steps) apply in order to steps 2, 3, ...; after the last stage the steps stay
+-- flat (a class with a flat curve says "1x1"). exp_for(level) is the sum of the steps
+-- below it (0 at level 1), except exp_for(MAX_LEVEL) = MAX_EXPERIENCE. `class` arguments
+-- below are tables with those two fields (a classes row or a content entity).
+
+-- The stages of every class that has none of its own (the original Mage curve).
+leveling.GLOBAL_STAGES = "2x2,1.5x8,1.25x5,1.125x28"
+
+-- The stages `class` levels by: its own, or GLOBAL_STAGES when it has none ("" or nil).
+function leveling.stages_of(class)
+	local own = class.exp_stages
+	if own == nil or own == "" then return leveling.GLOBAL_STAGES end
+	return own
+end
 
 -- "2x2,1.5x8" -> { { factor = 2, steps = 2 }, { factor = 1.5, steps = 8 } }, or nil and
 -- an error message. "" means no stages (flat from the start).
@@ -62,9 +75,10 @@ local curves = {}
 local function curve(class)
 	assert(type(class) == "table", "bad class")
 	local base = math.tointeger(class.exp_base)
-	local stages = leveling.parse_stages(class.exp_stages)
+	local text = leveling.stages_of(class)
+	local stages = leveling.parse_stages(text)
 	assert(base and base >= 1 and stages, "bad class experience parameters")
-	local id = base .. "|" .. class.exp_stages
+	local id = base .. "|" .. text
 	local c = curves[id]
 	if c then return c end
 	local steps = { base }

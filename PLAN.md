@@ -49,12 +49,13 @@ app/                  Lua application (hot-reloaded)
   routes/             thin route modules: auth, home, town, fight, community, admin
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount,
                       news, paging, migrations (schema versions), leveling, classes,
-                      content/ (content loader, schemas, sync)
-  content/            content files: classes/<key>.lua (synced into the DB)
+                      spells, effects (the effects engine), content/ (content loader,
+                      schemas, sync)
+  content/            content files: classes/<key>.lua, spells/<key>.lua (synced into the DB)
   town/               inn, shop, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, classes, generic CRUD editor)
+  admin/              admin control panel (settings, news, classes, spells, generic CRUD editor)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
   cli/content.lua     `dk content sync|status`; cli/check.lua: content part of `dk check`
@@ -69,7 +70,7 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, fight, migrate,
                       news, playthrough, town)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v3.sql, seed_v3.sql: frozen old
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v4.sql, seed_v3/v4.sql: frozen old
                       schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
@@ -237,7 +238,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,spells,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{items,drops,towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]` (content overrides), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -268,9 +269,18 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	field, value)` are admin values that win over the files; `content_adopt` carries values
 	of a migration into overrides; `meta(key, value)` holds the content fingerprint, the
 	last check (`content_seen`) and error. Experience, TP gains and the milestone HP bonus
-	are formulas in `app/lib/leveling.lua` (per-class experience parameters from the class
-	files); version 3 dropped the old levels table's `_exp`/`_tp` columns, version 4 the
-	table and `control.class1name..class3name`.
+	are formulas in `app/lib/leveling.lua` (the first experience step per class, the stages
+	global unless a class file sets `exp_stages`; an empty value means global); version 3
+	dropped the old levels table's `_exp`/`_tp` columns, version 4 the table and
+	`control.class1name..class3name`.
+- Spells (schema version 5, `docs/APP.md` "Spells"): content files
+	`app/content/spells/<key>.lua` synced into `spells(id, key UNIQUE, name, description,
+	mp, usable_in ('town' | 'fight' | 'both'), effects, retired)`; `effects` is the spell's
+	effect list as text (`app/lib/effects.lua`, e.g. `heal_hp amount=10`), replacing the
+	old `type` and `attribute`. The original 19 spells keep ids 1-19. Class files list spell
+	keys; `class_spells.spell_id` references `spells.id`. The spells a character knows are
+	`user_spells(user_id → users ON DELETE CASCADE, spell_id → spells, learned_level)`
+	(NULL level: unknown), replacing the `users.spells` comma list.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -286,7 +296,7 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
 	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
-- Seed data in `app/sql/seed.sql` plus the class content files match the original
+- Seed data in `app/sql/seed.sql` plus the class and spell content files match the original
 	install.php "complete setup" exactly (all rows of drops, items, levels, monsters,
 	spells, towns, control), minus the difficulty settings and the levels values that
 	became formulas.
@@ -300,8 +310,9 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - `php.rand(min, max)`: PHP casts float args to int (truncate toward zero), and swaps if
 	`min > max`; inclusive range via `math.random`.
 - `php.ceil`, `php.number_format(n)`, `php.nl2br`, `php.prettydate(ts)` ("F j, Y").
-- Preserve comma-list columns (`users.spells`, `users.towns`, `towns.itemslist`,
-	`drops.attribute1/2` `"stat,value"` / `"X"`) and their semantics.
+- Preserve comma-list columns (`users.towns`, `towns.itemslist`, `drops.attribute1/2`
+	`"stat,value"` / `"X"`) and their semantics (`users.spells` became `user_spells` in
+	schema version 5, migrated with the same matching).
 - When legacy has an obvious bug that affects gameplay, the behavior is kept unless it
 	is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
 	"fixed: …").

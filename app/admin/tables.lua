@@ -1,8 +1,10 @@
 -- admin/tables.lua :: field specs for the simple "list + edit one row" tables
--- (legacy admin.php items/edititem, drops, towns, monsters, spells, users). See
+-- (legacy admin.php items/edititem, drops, towns, monsters, users; spells and classes are
+-- content, see admin/spells.lua and admin/classes.lua). See
 -- admin/editor.lua for the spec format. Column lists here are the UPDATE whitelists.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
+local spells = require("lib.spells")
 
 local tables = {}
 
@@ -119,34 +121,20 @@ tables.monsters = function()
 	}
 end
 
-tables.spells = function()
-	return {
-		table = "spells", path = "/admin/spells", column = "name",
-		heading = "Edit Spells", saved = "Spell updated.",
-		list_intro = "Click an spell's name to edit it.", none = "No spells found.",
-		fields = {
-			ID,
-			text("name", "Name"),
-			num("mp", "Magic Points", 5, 10, {
-				required = "MP is required.", numeric = "MP must be a number.",
-				help = "MP required to cast spell." }),
-			num("attribute", "Attribute", 5, 10, {
-				help = "Numeric value of the spell's effect. Ties with type, below." }),
-			{ name = "type", label = "Type", kind = "select", int = true,
-				options = { { 1, "Heal" }, { 2, "Hurt" }, { 3, "Sleep" }, { 4, "Uber Attack" },
-										{ 5, "Uber Defense" } },
-				help = "- Heal gives player back [attribute] hit points.<br>" ..
-							 "- Hurt deals [attribute] damage to monster.<br>" ..
-							 "- Sleep keeps monster from attacking ([attribute] is monster's chance out of 15 " ..
-							 "to stay asleep each turn).<br>" ..
-							 "- Uber Attack increases total attack damage by [attribute] percent.<br>" ..
-							 "- Uber Defense increases total defense from attack by [attribute] percent." },
-		},
-	}
+-- Spell keys typed in the user editor -> spell ids, or nil and the unknown key.
+local function spell_ids(text)
+	local ids = {}
+	for key in text:gmatch("[^,%s]+") do
+		local id = dk.db:value("SELECT id FROM spells WHERE key = ?", key)
+		if not id then return nil, key end
+		ids[#ids + 1] = id
+	end
+	return ids
 end
 
 -- legacy edituser: every column except id/username/password/regdate/onlinetime is editable.
--- The password hash is never shown; "New Password" (optional) sets a new one.
+-- The password hash is never shown; "New Password" (optional) sets a new one. Spells are
+-- edited as a list of spell keys (user_spells).
 tables.users = function()
 	local class_options = {}
 	for _, c in ipairs(classes.all()) do
@@ -159,8 +147,11 @@ tables.users = function()
 		grouped = true,
 		validate = function(v, errors)
 			if #v.newpassword > 200 then errors[#errors + 1] = "New Password is too long." end
+			local _, unknown = spell_ids(v.spells)
+			if unknown then errors[#errors + 1] = "Spells: there is no spell '" .. unknown .. "'." end
 		end,
 		after_save = function(req, row, v)
+			spells.set_known(row.id, spell_ids(v.spells))
 			if v.newpassword == "" then return end
 			dk.db:exec("UPDATE users SET password = ? WHERE id = ?",
 								 auth.hash_password(v.newpassword), row.id)
@@ -231,7 +222,14 @@ tables.users = function()
 			text("slot3name", "Slot 3 Name"),
 			SEP,
 			num("dropcode", "Drop Code", 5, 8),
-			text("spells", "Spells", 50, 200),
+			{ name = "spells", label = "Spells", virtual = true, size = 50, maxlength = 1000,
+				get = function(row)
+					local keys = {}
+					for _, s in ipairs(spells.known(row)) do keys[#keys + 1] = s.key end
+					return table.concat(keys, ", ")
+				end,
+				help = 'Keys of the spells the character knows, comma-separated (see <a href="/admin/spells">Spells</a>). ' ..
+							 "Spells added here count as learned at an unknown level." },
 			text("towns", "Towns", 50, 200),
 		},
 	}

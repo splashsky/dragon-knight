@@ -5,8 +5,10 @@
 -- one), and is called with exactly the legacy arguments so the distributions match.
 -- `st` is a mutable copy of the users row (the legacy in-memory $userrow); messages are
 -- returned as lists of plain-text lines (escaped by the templates).
+local effects = require("lib.effects")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
+local spells = require("lib.spells")
 
 local combat = {}
 
@@ -118,62 +120,30 @@ function combat.attack(st, monster, rand)
 	return lines, st.currentmonsterhp <= 0
 end
 
--- Why `spell` (known and affordable) can't be cast in combat, or nil when it can.
+-- Why `spell` (known and affordable; a spells row with decoded effects, lib/spells.lua)
+-- can't be cast in combat, or nil when it can.
 -- fixed: legacy let a heal spell cost MP at full HP (and heal a negative amount above max
 -- HP), and spells of an unknown type were a free no-op turn.
+local FULL = {
+	hp_full = "Your Hit Points are already full. Please go back and try again.",
+	mp_full = "Your Magic Points are already full. Please go back and try again.",
+	tp_full = "Your Travel Points are already full. Please go back and try again.",
+}
+
 function combat.cast_error(st, spell)
-	local t = spell.type
-	if t == 1 and st.currenthp >= st.maxhp then
-		return "Your Hit Points are already full. Please go back and try again."
-	end
-	if t ~= 1 and t ~= 2 and t ~= 3 and t ~= 4 and t ~= 5 then
-		return "This spell cannot be cast. Please go back and try again."
-	end
-	return nil
+	local refused = not spells.usable(spell, "fight") and "cannot" or
+									effects.refusal(spell.effects, { player = st, in_fight = true })
+	if refused == nil then return nil end
+	return FULL[refused] or "This spell cannot be cast. Please go back and try again."
 end
 
--- Casting `spell` (a spells row) in combat; the caller has checked it is known and
--- affordable and that combat.cast_error allows it. Returns lines, monster_killed.
+-- Casting `spell` in combat (lib/effects.lua does the work); the caller has checked it is
+-- known and affordable and that combat.cast_error allows it. Returns lines, monster_killed.
 function combat.cast(st, spell, rand)
-	local lines = {}
-	local t, name, attr = spell.type, spell.name, spell.attribute
-	if t == 1 then -- Heal spell.
-		local newhp = st.currenthp + attr
-		if st.maxhp < newhp then
-			attr = st.maxhp - st.currenthp
-			newhp = st.currenthp + attr
-		end
-		st.currenthp = newhp
-		st.currentmp = st.currentmp - spell.mp
-		lines[1] = "You have cast the " .. name .. " spell, and gained " .. attr .. " Hit Points."
-	elseif t == 2 then -- Hurt spell.
-		if st.currentmonsterimmune == 0 then
-			local damage = rand((attr / 6) * 5, attr)
-			st.currentmonsterhp = st.currentmonsterhp - damage
-			lines[1] = "You have cast the " .. name .. " spell for " .. damage .. " damage."
-		else
-			lines[1] = "You have cast the " .. name .. " spell, but the monster is immune to it."
-		end
-		st.currentmp = st.currentmp - spell.mp
-	elseif t == 3 then -- Sleep spell.
-		if st.currentmonsterimmune ~= 2 then
-			st.currentmonstersleep = attr
-			lines[1] = "You have cast the " .. name .. " spell. The monster is asleep."
-		else
-			lines[1] = "You have cast the " .. name .. " spell, but the monster is immune to it."
-		end
-		st.currentmp = st.currentmp - spell.mp
-	elseif t == 4 then -- +Damage spell.
-		st.currentuberdamage = attr
-		st.currentmp = st.currentmp - spell.mp
-		lines[1] = "You have cast the " .. name .. " spell, and will gain " .. attr ..
-							 "% damage until the end of this fight."
-	elseif t == 5 then -- +Defense spell.
-		st.currentuberdefense = attr
-		st.currentmp = st.currentmp - spell.mp
-		lines[1] = "You have cast the " .. name .. " spell, and will gain " .. attr ..
-							 "% defense until the end of this fight."
-	end
+	local lines = effects.apply(spell.effects, {
+		player = st, in_fight = true, rand = rand, intro = "You have cast the " .. spell.name .. " spell",
+	})
+	st.currentmp = st.currentmp - spell.mp
 	return lines, st.currentmonsterhp <= 0
 end
 
@@ -216,15 +186,16 @@ end
 -- `gains(level)` returns the class's gains for that level ({ hp, mp, strength, dexterity,
 -- spells = { spell id, ... } }, classes.levels; nil stops the loop); TP and the HP
 -- milestone bonus are added from lib/leveling.lua. Returns nil (no level gained) or the
--- summed gains (hp, mp, tp, strength, dexterity), `levels` (how many), `learned` (spells
--- learned) and the new stats.
+-- summed gains (hp, mp, tp, strength, dexterity), `levels` (how many), `learned` (how many
+-- spells the schedule taught, known ones included, like legacy), `spells` ({ { id, level },
+-- ... } or nil) and the new stats.
 -- fixed: legacy granted at most one level per victory.
 function combat.level_up(user, cls, newexp, gains)
 	local g = {
 		level = user.level, levels = 0, learned = 0,
 		hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0,
 	}
-	local spells = user.spells
+	local learned = {}
 	-- fixed: legacy left every column unset (and MySQL stored 0) for level >= 100 or a
 	-- missing levels row, wiping the character; those victories now just don't level.
 	while g.level < combat.MAX_LEVEL do
@@ -241,7 +212,7 @@ function combat.level_up(user, cls, newexp, gains)
 		g.strength = g.strength + row.strength
 		g.dexterity = g.dexterity + row.dexterity
 		for _, spell in ipairs(row.spells or {}) do
-			spells = spells .. "," .. spell
+			learned[#learned + 1] = { id = spell, level = level }
 			g.learned = g.learned + 1
 		end
 	end
@@ -253,7 +224,7 @@ function combat.level_up(user, cls, newexp, gains)
 	g.newdexterity = user.dexterity + g.dexterity
 	g.attackpower = user.attackpower + g.strength
 	g.defensepower = user.defensepower + g.dexterity
-	if g.learned > 0 then g.spells = spells end
+	if g.learned > 0 then g.spells = learned end
 	return g
 end
 

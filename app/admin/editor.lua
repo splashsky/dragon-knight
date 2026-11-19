@@ -25,6 +25,8 @@
 --   default = "X", default_if = { "", " " },   -- replaced before validation
 --   options = { { 1, "Weapon" }, ... },        -- select: anything else is rejected
 --   size, maxlength, suffix, help (trusted HTML), highlight, format = "datetime"
+--   virtual = true,               -- a text field that is not a column: shown as get(row),
+--   get = function(row) end,      -- read from the form, saved by the spec's after_save
 -- }
 local common = require("admin.common")
 local php = require("lib.php")
@@ -32,7 +34,7 @@ local php = require("lib.php")
 local editor = {}
 
 local function stored(f)
-	return f.kind ~= "static" and f.kind ~= "separator" and f.kind ~= "password"
+	return f.kind ~= "static" and f.kind ~= "separator" and f.kind ~= "password" and not f.virtual
 end
 
 local function column(f)
@@ -62,7 +64,9 @@ end
 function editor.values_from_row(spec, row)
 	local v = {}
 	for _, f in ipairs(spec.fields) do
-		if f.kind ~= "separator" and f.kind ~= "password" then
+		if f.virtual then
+			v[f.name] = f.get(row)
+		elseif f.kind ~= "separator" and f.kind ~= "password" then
 			local raw = row[column(f)]
 			if f.format == "datetime" then
 				v[f.name] = (raw and raw ~= 0) and php.datetime(raw) or "Never"
@@ -78,7 +82,7 @@ end
 function editor.values_from_form(spec, req)
 	local v = {}
 	for _, f in ipairs(spec.fields) do
-		if stored(f) or f.kind == "password" then
+		if stored(f) or f.kind == "password" or f.virtual then
 			local s = common.field(req, f.name)
 			if f.default and in_list(f.default_if or { "" }, s) then s = f.default end
 			v[f.name] = s

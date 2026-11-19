@@ -1,69 +1,15 @@
-{#- One class (admin/classes.lua). ctx: c (classes row: effective values), file_path,
-		has_file, fields { spec, file, override, value }, others { field, value, file },
-		levels (rows), errors, saved, sync_error. -#}
+{#- One class (admin/classes.lua). ctx: c (classes row: effective values), the override form
+		(see admin/content_form), levels (rows), saved. -#}
 <h1 class="admin-heading">Edit Class: {{ c.name }}</h1>
 {%- if saved then %}
 <p class="admin-saved">Class updated.</p>
 {%- end %}
-{%- if errors then %}
-<div class="admin-errors"><b>Errors:</b><br>
-<div class="error">
-{%- for _, e in ipairs(errors) do %}
-{{ e }}<br>
-{%- end %}
-</div></div>
-{%- end %}
-{%- if sync_error then %}
-<div class="admin-errors"><b>Saved, but the content files have errors</b>, so the change applies once they are fixed:
-<pre class="error">{{ sync_error }}</pre></div>
-{%- end %}
-<p>ID {{ c.id }}, key <b>{{ c.key }}</b>, file <code>{{ file_path }}</code>.
-{%- if c.retired ~= 0 then %} <span class="highlight">Retired:</span> the file is gone, so the class is no longer offered; characters of this class keep it.{% end %}</p>
-<p>Values here override the file on this server; a field equal to the file's value has no
-override. "Reset to file" removes an override.</p>
-<form action="/admin/classes/{{ c.id }}" method="post">
-{{{ csrf_field() }}}
-<table class="admin-form">
-{%- for _, f in ipairs(fields) do %}
-<tr><td class="admin-label">{{ f.spec.label }}:</td><td>
-{%- if f.spec.type == "text" then %}
-<textarea name="{{ f.spec.name }}" rows="6" cols="40">{{ f.value }}</textarea>
-{%- elseif f.spec.type == "bool" then %}
-<select name="{{ f.spec.name }}"><option value="1"{% if f.value == "1" then %} selected{% end %}>Yes</option><option value="0"{% if f.value == "0" then %} selected{% end %}>No</option></select>
-{%- else %}
-<input type="text" name="{{ f.spec.name }}" size="{{ f.spec.type == "int" and 6 or 30 }}" value="{{ f.value }}">
-{%- end %}
-{%- if f.override then %}
-<br><span class="small highlight">Overridden.</span> <span class="small">File value: {% if f.file then %}{{ f.file }}{% else %}(none){% end %}</span>
-{%- end %}
-{%- if f.spec.help then %}
-<br><span class="small">{{ f.spec.help }}</span>
-{%- end %}
-</td></tr>
-{%- end %}
-</table>
-<input type="submit" name="submit" value="Save">
-</form>
-{%- for _, f in ipairs(fields) do %}
-{%- if f.override then %}
-<form class="inline" method="post" action="/admin/classes/{{ c.id }}/reset">{{{ csrf_field() }}}<input type="hidden" name="field" value="{{ f.spec.name }}"><button class="link">Reset {{ f.spec.label }} to file</button></form><br>
-{%- end %}
-{%- end %}
-{%- if #others > 0 then %}
-<h2 class="admin-subheading">Other overrides</h2>
-<p>Kept from before classes were content files (admin edits of the old levels table).</p>
-<table class="admin-list">
-<tr><th>Field</th><th>Value</th><th>File value</th><th></th></tr>
-{%- for _, o in ipairs(others) do %}
-<tr><td>{{ o.field }}</td><td>{{ o.value }}</td><td>{{ o.file }}</td><td><form class="inline" method="post" action="/admin/classes/{{ c.id }}/reset">{{{ csrf_field() }}}<input type="hidden" name="field" value="{{ o.field }}"><button class="link">Reset to file</button></form></td></tr>
-{%- end %}
-</table>
-{%- end %}
+{{{ include("admin/content_form") }}}
 <h2 class="admin-subheading">Experience and levels</h2>
-<p>Read-only here: edit <code>{{ file_path }}</code> (the game picks the change up on the next
-page load). Experience base {{ c.exp_base }}, stages {{ c.exp_stages }}; the TP gain and the
+<p>Read-only here: edit <code>{{ form.file_path }}</code> (the game picks the change up on the next
+page load). Experience base {{ c.exp_base }}, stages {% if c.exp_stages == "" then %}global ({{ global_stages }}){% else %}{{ c.exp_stages }}{% end %}; the TP gain and the
 HP bonus at milestone levels are the same for every class (<code>app/lib/leveling.lua</code>).
-{%- if #others > 0 then %} Values marked * are overridden.{% end %}</p>
+{%- if #form.others > 0 then %} Values marked * are overridden.{% end %}</p>
 <p>Starting values (level 1): HP {{ c.start_hp }}, MP {{ c.start_mp }}, TP {{ c.start_tp }}, Strength {{ c.start_strength }}, Dexterity {{ c.start_dexterity }}.</p>
 <table class="admin-list admin-levels">
 <tr><th>Level</th><th>Exp.</th><th>HP</th><th>HP Bonus</th><th>MP</th><th>TP</th><th>Strength</th><th>Dexterity</th><th>Spells</th></tr>

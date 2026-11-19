@@ -5,6 +5,7 @@ local common = require("town.common")
 local game = require("lib.game")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
+local spells = require("lib.spells")
 local view = require("lib.view")
 
 local character = {}
@@ -22,8 +23,8 @@ local function sheet(user)
 	if user.level < leveling.MAX_LEVEL and class then
 		nextlevel = php.number_format(leveling.exp_for(class, user.level + 1) or 0)
 	end
-	local spells = {}
-	for _, s in ipairs(game.user_spells(user)) do spells[#spells + 1] = s.name end
+	local names = {}
+	for _, s in ipairs(spells.known(user)) do names[#names + 1] = s.name end
 	return {
 		u = user,
 		experience = php.number_format(user.experience),
@@ -32,7 +33,7 @@ local function sheet(user)
 		plusgold = bonus(user.goldbonus),
 		nextlevel = nextlevel,
 		charclass = class and class.name,
-		spells = spells,
+		spells = names,
 	}
 end
 

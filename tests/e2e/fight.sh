@@ -78,7 +78,7 @@ expect_body 'Congratulations. You have defeated the'; expect_body 'You have gain
 expect_body 'You gain 2 hit points.'; expect_body 'You gain 4 magic points.'; expect_body 'You have learned a new spell.'
 expect_body '<title>Courage and Wit have served thee well!</title>'
 f_is level 2; f_is maxhp 502; f_is maxmp 4; f_is maxtp 11; f_is strength 7; f_is dexterity 6
-f_is attackpower 502; f_is defensepower 6; f_is spells 0,1
+f_is attackpower 502; f_is defensepower 6; f_is "$T_KNOWN" 1
 f_is currentaction Exploring; f_is currentfight 0; f_is currentmonster 0
 [ "$(f_col experience)" -ge 18 ] && t_ok || t_fail "experience not awarded"
 [ "$(f_col gold)" -gt 100 ] && t_ok || t_fail "gold not awarded"
@@ -118,16 +118,17 @@ f_sql "UPDATE users SET currenthp = maxhp + 5"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 f_is currentmp 10; f_is "currenthp = maxhp + 5" 1
 # a spell of an unknown type: refused the same way
-t_sql "UPDATE spells SET type = 9 WHERE id = 1"
+t_sql "UPDATE spells SET effects = 'fireball power=9' WHERE id = 1"
 f_sql "UPDATE users SET currenthp = 100"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'This spell cannot be cast.'
 f_is currentmp 10; f_is currenthp 100; f_is currentfight "$FIGHT"
-t_sql "UPDATE spells SET type = 1 WHERE id = 1"
+t_sql "UPDATE spells SET effects = 'heal_hp amount=10' WHERE id = 1"
 f_sql "UPDATE users SET currentmp = 4"
 t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'You do not have enough Magic Points'
 f_is currentmp 4
 # sleep spell, then a hurt spell that kills
-f_sql "UPDATE users SET spells = '0,1,6,11', currentmp = 50, currentmonster = 2, currentmonsterhp = 50, currentmonsterimmune = 0"
+t_spells fighter 1,6,11
+f_sql "UPDATE users SET currentmp = 50, currentmonster = 2, currentmonsterhp = 50, currentmonsterimmune = 0"
 t_post /fight "csrf=$CS&spell=Spell&userspell=11"
 expect_body 'You have cast the Sleep spell. The monster is asleep.'
 if grep -qF 'The monster is still asleep.' "$BODY"; then f_is currentmonstersleep 5
@@ -151,9 +152,10 @@ f_is currentfight 0; f_is currentmonster 0
 t_get /; expect_status 200; expect_body 'Town Options'
 
 t_section "fight: death on a spell turn keeps the MP spent, clears buffs"
+t_spells fighter 1,6,11,14
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
 	currentmonsterhp = 30000, currentmonstersleep = 0, currenthp = 1, currentmp = 30, maxmp = 50,
-	spells = '0,1,6,11,14', currentuberdamage = 0, currentuberdefense = 25, gold = 100"
+	currentuberdamage = 0, currentuberdefense = 25, gold = 100"
 t_post /fight "csrf=$CS&spell=Spell&userspell=14"
 expect_status 200; expect_body 'You have cast the Craze spell'; expect_body '<b>You have died.</b>'
 f_is currentaction 'In Town'; f_is currentmp 20; f_is currentuberdamage 0; f_is currentuberdefense 0
@@ -212,23 +214,25 @@ t_section "fight: several levels at once"
 # Blue Slime gives exactly 1 exp: 53 + 1 = 54 reaches Warrior levels 2 (18) and 3 (54)
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
 	currentmonsterhp = 0, experience = 53, level = 1, maxhp = 15, maxmp = 0, maxtp = 10,
-	strength = 5, dexterity = 5, attackpower = 5, defensepower = 5, spells = '0',
+	strength = 5, dexterity = 5, attackpower = 5, defensepower = 5,
 	expbonus = 0, goldbonus = 0"
+t_spells fighter ""
 t_get /victory; expect_body '<title>Courage and Wit have served thee well!</title>'
 expect_body 'You have gained 2 levels!'; expect_no_body 'gained a level'
 expect_body 'You gain 4 hit points.'; expect_body 'You gain 7 magic points.'
 expect_body 'You gain 3 travel points.'; expect_body 'You gain 5 strength.'
 expect_body 'You gain 3 dexterity.'; expect_body 'You have learned a new spell.'
 f_is level 3; f_is maxhp 19; f_is maxmp 7; f_is maxtp 13; f_is strength 10; f_is dexterity 8
-f_is attackpower 10; f_is defensepower 8; f_is spells 0,1; f_is experience 54
+f_is attackpower 10; f_is defensepower 8; f_is "$T_KNOWN" 1; f_is experience 54
 
 t_section "fight: milestone level (formula experience, TP and HP bonus)"
 # Warrior level 10 needs 2368 (lib/leveling.lua; the original table said 2369): 2367 + 1.
 # Gains: HP 0 + milestone 10, MP 2, TP floor(10/30) + 2, strength 6, dexterity 3.
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
 	currentmonsterhp = 0, experience = 2366, level = 9, maxhp = 50, maxmp = 20, maxtp = 20,
-	strength = 30, dexterity = 30, attackpower = 30, defensepower = 30, spells = '0,1',
+	strength = 30, dexterity = 30, attackpower = 30, defensepower = 30,
 	expbonus = 0, goldbonus = 0"
+t_spells fighter 1
 t_get /victory; expect_body 'You gain 1 experience.'; expect_no_body 'gained a level'
 f_is level 9; f_is experience 2367
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1, currentmonsterhp = 0"

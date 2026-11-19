@@ -8,7 +8,7 @@ local schema = require("lib.content.schema")
 local load = {}
 
 -- Bumped when the flat form or the sync changes meaning, to force a resync.
-load.FORMAT = "dk-content-1"
+load.FORMAT = "dk-content-2"
 
 function load.path(kind, key)
 	return (dk.config.app_dir or "app") .. "/" .. kind.dir:gsub("%.", "/") .. "/" .. key .. ".lua"
@@ -55,12 +55,37 @@ function load.kind(name)
 	return out
 end
 
+-- References between kinds: every key in a "keys" field with `refs` (a class's
+-- levels.N.spells) must be a file of that kind. Checked against the files, not the
+-- database, so a reference to a deleted (retired) entity is an error too. Skipped while
+-- the referenced kind has errors of its own (those are reported instead).
+local function check_refs(all, k)
+	for _, e in ipairs(k.entities) do
+		local fields = {}
+		for f in pairs(e.flat) do fields[#fields + 1] = f end
+		table.sort(fields)
+		for _, f in ipairs(fields) do
+			local spec = k.kind.field(f)
+			local target = spec and spec.type == "keys" and spec.refs and all.kinds[spec.refs]
+			if target and #target.errors == 0 then
+				for key in tostring(e.flat[f]):gmatch("[^,]+") do
+					if not target.by_key[key] then
+						k.errors[#k.errors + 1] = ("%s: %s: no %s '%s' (%s)"):format(load.path(k.kind, e.key), f,
+							target.kind.label, key, load.path(target.kind, key))
+					end
+				end
+			end
+		end
+	end
+end
+
 -- Every kind: { kinds = { name -> load.kind(name) }, errors = { ... } }.
 function load.all()
 	local all = { kinds = {}, errors = {} }
+	for _, name in ipairs(schema.KINDS) do all.kinds[name] = load.kind(name) end
 	for _, name in ipairs(schema.KINDS) do
-		local k = load.kind(name)
-		all.kinds[name] = k
+		local k = all.kinds[name]
+		check_refs(all, k)
 		for _, e in ipairs(k.errors) do all.errors[#all.errors + 1] = e end
 	end
 	return all

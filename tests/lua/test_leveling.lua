@@ -1,7 +1,9 @@
 -- Unit tests for app/lib/leveling.lua with the class content files' parameters
 -- (app/content/classes/{mage,warrior,paladin}.lua): the formulas against a frozen copy of
 -- the original 1.1.11 levels table (tests/lua/levels_original.lua), and the synced
--- class_levels table.
+-- class_levels table. The three classes use the global experience stages (the original
+-- Mage curve) with their own first step, so Warrior and Paladin follow the original table
+-- only up to level 44 and 17.
 local leveling = require("lib.leveling")
 local load = require("lib.content.load")
 local original = require("tests.levels_original")
@@ -27,8 +29,8 @@ function T.parameters()
 	-- the flat steps at the top (the original table's: 126760, 135211, 148382)
 	eq(step(1, 45), 126203); eq(step(1, 44), step(1, 43) * 9 // 8)
 	eq(step(1, 98), 126203)
-	eq(step(2, 44), 135042); eq(step(2, 98), 135042)
-	eq(step(3, 43), 148227); eq(step(3, 98), 148227)
+	eq(step(2, 43), 135042); eq(step(2, 44), 151922); eq(step(2, 98), 151922)
+	eq(step(3, 43), 150049); eq(step(3, 44), 168805); eq(step(3, 98), 168805)
 	for class = 1, 3 do
 		eq(exp_for(class, 1), 0, "exp_for(1)")
 		eq(exp_for(class, MAX), 16777215, "exp_for(100)")
@@ -41,8 +43,16 @@ function T.parameters()
 	assert(not pcall(leveling.exp_for, nil, 2), "no class accepted")
 	assert(not pcall(leveling.exp_for, { exp_base = 15, exp_stages = "2x" }, 2), "bad stages accepted")
 	assert(not pcall(leveling.exp_for, { exp_base = 0, exp_stages = "" }, 2), "base 0 accepted")
-	-- no stages: flat steps
-	eq(leveling.exp_for({ exp_base = 10, exp_stages = "" }, 4), 30)
+	-- no stages of its own: the global curve; a flat curve is "1x1"
+	eq(leveling.GLOBAL_STAGES, "2x2,1.5x8,1.25x5,1.125x28")
+	for _, own in ipairs({ "", false }) do
+		local c = { exp_base = 15, exp_stages = own or nil }
+		eq(leveling.stages_of(c), leveling.GLOBAL_STAGES)
+		for level = 1, MAX do eq(leveling.exp_for(c, level), exp_for(1, level), "global curve") end
+	end
+	eq(leveling.exp_for({ exp_base = 10, exp_stages = "1x1" }, 4), 30)
+	eq(leveling.stages_of({ exp_base = 10, exp_stages = "3x1" }), "3x1")
+	eq(leveling.exp_for({ exp_base = 10, exp_stages = "3x1" }, 4), 10 + 30 + 30)
 end
 
 function T.parse_stages()
@@ -78,19 +88,31 @@ function T.tp_and_hp_rules()
 	eq(leveling.hp_bonus(99), 50); eq(leveling.hp_bonus(100), 0)
 end
 
--- Every experience total within 0.5% of the original table, TP identical.
+-- Experience totals within 0.5% of the original table (the Mage's at every level; the
+-- Warrior's and Paladin's, which use the Mage's stages from their own first step, up to
+-- the level where the original gave them their own stages), TP identical for all.
+local ORIGINAL_UNTIL = { MAX, 44, 17 }
+
 function T.matches_original_table()
 	for class = 1, 3 do
 		local o = original[class]
 		for level = 1, MAX do
 			local want, got = o.exp[level], exp_for(class, level)
-			assert(math.abs(got - want) <= want * 0.005,
-						 ("class %d level %d: exp %d, original %d"):format(class, level, got, want))
+			if level <= ORIGINAL_UNTIL[class] then
+				assert(math.abs(got - want) <= want * 0.005,
+							 ("class %d level %d: exp %d, original %d"):format(class, level, got, want))
+			end
+			eq(got, leveling.exp_for({ exp_base = CLASS[class].exp_base, exp_stages = leveling.GLOBAL_STAGES }, level),
+				 ("class %d level %d: the global curve"):format(class, level))
 			eq(leveling.tp_gain(level), o.tp[level], ("class %d level %d tp"):format(class, level))
 		end
+		eq(CLASS[class].exp_stages, "", "class " .. class .. " has no stages of its own")
 		-- exact where the original follows the rule without tweaks
 		eq(exp_for(class, 2), o.exp[2]); eq(exp_for(class, 3), o.exp[3])
 	end
+	-- past those levels they need more than the original (up to 10.6% and 10.4% at 99)
+	assert(exp_for(2, 99) > original[2].exp[99] and exp_for(2, 99) <= original[2].exp[99] * 1.107)
+	assert(exp_for(3, 99) > original[3].exp[99] and exp_for(3, 99) <= original[3].exp[99] * 1.105)
 end
 
 -- The class files' HP plus the milestone bonus is the original HP gain; the synced

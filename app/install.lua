@@ -14,8 +14,8 @@ usage: dk install [--partial] [--force]
 									[--class ID|KEY]
 
 	--partial     create tables but load no game data except the control row, the
-								forum boards, the first news post and the classes (legacy
-								"Partial Setup")
+								forum boards, the first news post, the classes and the spells
+								(legacy "Partial Setup")
 	--force       drop existing Dragon Knight tables first (DESTROYS ALL DATA)
 	--admin       administrator account; prompted for when omitted
 	--charname    administrator character name (default: the username)
@@ -23,10 +23,11 @@ usage: dk install [--partial] [--force]
 ]]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
--- class_levels/class_spells before classes; "levels" is the table before schema version 4
+-- user_spells/class_levels/class_spells before users/spells/classes; "levels" is the
+-- table before schema version 4
 local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "items",
-								 "levels", "monsters", "spells", "towns", "users", "class_levels", "class_spells",
-								 "classes", "content_overrides", "content_adopt", "meta" }
+								 "levels", "monsters", "user_spells", "class_levels", "class_spells", "spells", "towns",
+								 "users", "classes", "content_overrides", "content_adopt", "meta" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")
@@ -94,14 +95,15 @@ local function existing_tables()
 end
 
 -- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
--- populated those two even for "Partial Setup"), the forum boards and the class ids
--- (structural).
+-- populated those two even for "Partial Setup"), the forum boards and the class and spell
+-- ids (structural: content keeps the original ids).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
 	for line in sql:gmatch("[^\n]+") do
 		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
-				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") then
+				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") or
+				line:find("^INSERT INTO spells ") then
 			keep[#keep + 1] = line
 		end
 	end

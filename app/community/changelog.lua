@@ -15,6 +15,10 @@ changelog.RELEASES = {
 			"Classes are now content files that can be edited and added without code changes; admins can override names, descriptions and starting stats per server.",
 			"Replaced the levels editor and the class name settings with a Classes page in the admin panel.",
 			"Added dk content sync and dk content status; dk check also validates the content files.",
+			"Spells are now content files too, each with a description and a list of effects; new spells can be added and taught through a class file without code changes.",
+			"Replaced the spells editor with a Spells page in the admin panel: names, descriptions, MP costs and effect amounts can be overridden per server.",
+			"The spells a character knows are kept in their own table; the user editor takes spell names by key.",
+			"Warrior and Paladin now use the same experience curve as the Mage (scaled by their own first step); classes can still define their own.",
 		},
 	},
 	{

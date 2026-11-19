@@ -1,7 +1,9 @@
 -- Unit tests for the content infrastructure (app/lib/content/): loading and validating
--- the class files, the canonical serialization and fingerprint, and the sync (inside a
--- savepoint that is rolled back, so the test database is unchanged).
+-- the class and spell files, the canonical serialization and fingerprint, and the sync
+-- (inside a savepoint that is rolled back, so the test database is unchanged).
 local kind = require("lib.content.kinds.classes")
+local spell_kind = require("lib.content.kinds.spells")
+local effects = require("lib.effects")
 local load = require("lib.content.load")
 local schema = require("lib.content.schema")
 local sync = require("lib.content.sync")
@@ -37,24 +39,28 @@ function T.load_classes()
 	eq(k.entities[1].key, "mage"); eq(k.entities[2].key, "paladin"); eq(k.entities[3].key, "warrior")
 	local m = k.by_key.mage
 	eq(m.name, "Mage"); eq(m.sort, 1); eq(m.playable, 1); eq(m.start_hp, 15); eq(m.start_tp, 10)
-	eq(m.exp_base, 15); eq(m.exp_stages, "2x2,1.5x8,1.25x5,1.125x28")
-	eq(m["levels.2.hp"], 2); eq(m["levels.2.spells"], "1"); eq(m["levels.3.spells"], "")
+	eq(m.exp_base, 15); eq(m.exp_stages, "")
+	eq(m["levels.2.hp"], 2); eq(m["levels.2.spells"], "heal"); eq(m["levels.3.spells"], "")
 	eq(m["levels.100.mp"], 0)
 	assert(m.description:find("Fast level%-ups\nHigh hit points"), "description lines")
-	eq(k.by_key.warrior.exp_base, 18); eq(k.by_key.paladin.exp_stages, "2x2,1.5x8,1.25x6,1.125x25")
+	eq(k.by_key.warrior.exp_base, 18); eq(k.by_key.paladin.exp_stages, "")
 end
 
 function T.validate_defaults_and_flat_form()
 	local flat, errs = schema.validate(kind, class_data({ levels = (function()
 		local l = {}
 		for level = 2, 100 do l[level] = {} end
-		l[5] = { hp = 3, spells = { 12, 2.0, 7 } }
+		l[5] = { hp = 3, spells = { "sleep", "heal", "hurt", "heal" } }
 		return l
 	end)() }))
 	assert(flat, errs and table.concat(errs, "; "))
 	eq(flat.description, ""); eq(flat.sort, 0); eq(flat.playable, 1)
-	eq(flat["levels.5.hp"], 3); eq(flat["levels.5.mp"], 0); eq(flat["levels.5.spells"], "2,7,12")
+	eq(flat["levels.5.hp"], 3); eq(flat["levels.5.mp"], 0); eq(flat["levels.5.spells"], "heal,hurt,sleep")
 	eq(flat["levels.2.spells"], "")
+	-- no exp_stages: the global curve
+	local d = class_data()
+	d.exp_stages = nil
+	eq(assert(schema.validate(kind, d)).exp_stages, "")
 end
 
 function T.validate_errors()
@@ -75,11 +81,11 @@ function T.validate_errors()
 	local l = {}
 	for level = 2, 99 do l[level] = {} end
 	l[101] = {}
-	l[7] = { hp = "lots", str = 1, spells = { "heal" } }
+	l[7] = { hp = "lots", str = 1, spells = { 1 } }
 	local errs = errors({ levels = l })
 	has(errs, "levels: missing level 100"); has(errs, "unexpected key [101]")
 	has(errs, "levels[7]: unknown field 'str'"); has(errs, "levels[7].hp must be an integer")
-	has(errs, "levels[7].spells must be a list of positive integers")
+	has(errs, 'levels[7].spells must be a list of keys, like { "heal", "hurt" }')
 	local _, e = schema.validate(kind, "nope")
 	has(e, "must return a table")
 	local missing = class_data()
@@ -92,14 +98,16 @@ function T.keys_and_override_parsing()
 	assert(schema.valid_key("mage") and schema.valid_key("dark_knight2"))
 	assert(not schema.valid_key("Mage") and not schema.valid_key("dark-knight") and not schema.valid_key(""))
 	eq(kind.field("name").type, "string"); eq(kind.field("levels.17.hp").type, "int")
-	eq(kind.field("levels.17.spells").type, "ids")
+	eq(kind.field("levels.17.spells").type, "keys"); eq(kind.field("levels.17.spells").refs, "spells")
 	eq(kind.field("levels.1.hp"), nil); eq(kind.field("levels.101.hp"), nil); eq(kind.field("nope"), nil)
 	eq(schema.parse(kind.field("start_hp"), "25"), 25); eq(schema.parse(kind.field("start_hp"), "0"), nil)
 	eq(schema.parse(kind.field("playable"), "0"), 0); eq(schema.parse(kind.field("playable"), "maybe"), nil)
-	eq(schema.parse(kind.field("levels.2.spells"), "6, 1"), "1,6"); eq(schema.parse(kind.field("levels.2.spells"), ""), "")
+	eq(schema.parse(kind.field("levels.2.spells"), "hurt, heal"), "heal,hurt"); eq(schema.parse(kind.field("levels.2.spells"), ""), "")
+	eq(schema.parse(kind.field("levels.2.spells"), "Heal"), nil)
 	eq(schema.parse(kind.field("name"), "Wizard"), "Wizard")
 end
 
+-- load.all()-like content: the given classes and the spell files.
 local function all_of(entities)
 	local k = { kind = kind, entities = {}, by_key = {}, errors = {} }
 	for _, e in ipairs(entities) do
@@ -107,7 +115,7 @@ local function all_of(entities)
 		k.by_key[e.key] = e.flat
 	end
 	table.sort(k.entities, function(a, b) return a.key < b.key end)
-	return { kinds = { classes = k }, errors = {} }
+	return { kinds = { classes = k, spells = load.kind("spells") }, errors = {} }
 end
 
 function T.fingerprint_stability()
@@ -126,7 +134,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-1\n"), "format line first")
+	assert(c1:find("^dk%-content%-2\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it
@@ -156,7 +164,7 @@ function T.sync_apply()
 		end
 		local tester = schema.validate(kind, class_data({ sort = 9, levels = (function()
 			local l = {}
-			for level = 2, 100 do l[level] = { hp = 1, spells = level == 3 and { 1, 6 } or nil } end
+			for level = 2, 100 do l[level] = { hp = 1, spells = level == 3 and { "hurt", "heal" } or nil } end
 			return l
 		end)() }))
 		-- a new key gets the next id; existing ids are kept
@@ -204,6 +212,69 @@ function T.sync_apply()
 		eq(dk.db:value("SELECT hp FROM class_levels WHERE class_id = 2 AND level = 20"), 13)
 	end)
 	eq(dk.db:value("SELECT count(*) FROM classes"), 3, "rolled back")
+end
+
+-- The spell files are the original spells table (id, name, MP, type, attribute), ported.
+local ORIGINAL_SPELLS = {
+	{ "heal", "Heal", 5, 10, 1 }, { "revive", "Revive", 10, 25, 1 }, { "life", "Life", 25, 50, 1 },
+	{ "breath", "Breath", 50, 100, 1 }, { "gaia", "Gaia", 75, 150, 1 }, { "hurt", "Hurt", 5, 15, 2 },
+	{ "pain", "Pain", 12, 35, 2 }, { "maim", "Maim", 25, 70, 2 }, { "rend", "Rend", 40, 100, 2 },
+	{ "chaos", "Chaos", 50, 130, 2 }, { "sleep", "Sleep", 10, 5, 3 }, { "dream", "Dream", 30, 9, 3 },
+	{ "nightmare", "Nightmare", 60, 13, 3 }, { "craze", "Craze", 10, 10, 4 }, { "rage", "Rage", 20, 25, 4 },
+	{ "fury", "Fury", 30, 50, 4 }, { "ward", "Ward", 10, 10, 5 }, { "fend", "Fend", 20, 25, 5 },
+	{ "barrier", "Barrier", 30, 50, 5 },
+}
+local TYPE_EFFECT = { "heal_hp amount=", "damage max=", "sleep chance=", "buff_attack_pct pct=", "buff_defense_pct pct=" }
+
+function T.load_spells()
+	local k = load.kind("spells")
+	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
+	eq(#k.entities, #ORIGINAL_SPELLS)
+	for id, o in ipairs(ORIGINAL_SPELLS) do
+		local f = assert(k.by_key[o[1]], "no spell file " .. o[1])
+		eq(f.name, o[2], o[1]); eq(f.mp, o[3], o[1] .. " mp")
+		eq(effects.encode(spell_kind.effects(f)), TYPE_EFFECT[o[5]] .. o[4], o[1] .. " effects")
+		eq(f.usable_in, o[5] == 1 and "both" or "fight", o[1] .. " usable_in")
+		assert(f.description ~= "", o[1] .. " description")
+		-- the installed database keeps the original ids
+		eq(dk.db:value("SELECT id FROM spells WHERE key = ?", o[1]), id, o[1] .. " id")
+		eq(dk.db:value("SELECT effects FROM spells WHERE key = ?", o[1]), TYPE_EFFECT[o[5]] .. o[4], o[1] .. " stored")
+	end
+end
+
+function T.validate_spells()
+	local function spell(over)
+		local d = { name = "Zap", mp = 3, effects = { { kind = "damage", max = 9 } } }
+		for k, v in pairs(over or {}) do d[k] = v end
+		return d
+	end
+	local flat = assert(schema.validate(spell_kind, spell()))
+	eq(flat.usable_in, "fight"); eq(flat.description, "")
+	eq(flat["effects.1.kind"], "damage"); eq(flat["effects.1.max"], 9); eq(flat["effects.1.min"], nil)
+	flat = assert(schema.validate(spell_kind, spell({ usable_in = "both", effects = { { kind = "heal_mp", amount = 4 } } })))
+	eq(flat.usable_in, "both")
+	local function errors(over)
+		local ok, errs = schema.validate(spell_kind, spell(over))
+		assert(not ok, "expected errors")
+		return errs
+	end
+	has(errors({ usable_in = "town" }), 'usable_in = "town" needs effects that work outside fights')
+	has(errors({ usable_in = "anywhere" }), "field 'usable_in' must be one of town, fight, both")
+	has(errors({ effects = {} }), "effects must list at least one effect")
+	local none = spell()
+	none.effects = nil
+	has(select(2, schema.validate(spell_kind, none)), "effects must be a list of effects")
+	has(errors({ effects = { { kind = "damage", max = -1 } } }), "effects[1].max must be an integer from 0")
+	has(errors({ effects = { { kind = "stat", stat = "maxhp", amount = 1 } } }), "effects[1].kind must be one of")
+	has(errors({ mp = -1 }), "field 'mp' must be an integer from 0")
+	has(errors({ power = 3 }), "unknown field 'power'")
+	-- overridable fields: name, description, MP and effect parameters (not the kinds)
+	eq(spell_kind.field("effects.1.max").type, "int"); eq(spell_kind.field("effects.2.chance").max, 15)
+	eq(spell_kind.field("effects.1.kind"), nil); eq(spell_kind.field("effects.1.power"), nil)
+	eq(spell_kind.field("usable_in").admin, nil)
+	local names = {}
+	for _, f in ipairs(spell_kind.admin_fields(load.kind("spells").by_key.hurt)) do names[#names + 1] = f.name end
+	eq(table.concat(names, ","), "name,description,mp,effects.1.max")
 end
 
 return T

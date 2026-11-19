@@ -25,13 +25,14 @@ classes.fields = {
 	{ name = "start_dexterity", type = "int", required = true, min = 0, max = 100000, admin = true,
 		label = "Starting Dexterity" },
 	{ name = "exp_base", type = "int", required = true, min = 1, max = 1000000, label = "Experience base" },
-	{ name = "exp_stages", type = "stages", required = true, label = "Experience stages" },
+	{ name = "exp_stages", type = "stages", default = "", label = "Experience stages",
+		help = "Empty: the global curve (leveling.GLOBAL_STAGES)." },
 }
 
--- Per-level gains (levels 2 .. MAX_LEVEL); spells: ids of the spells table.
+-- Per-level gains (levels 2 .. MAX_LEVEL); spells: keys of spell files.
 classes.LEVEL_STATS = { "hp", "mp", "strength", "dexterity" }
 local STAT = { type = "int", min = 0, max = 100000 }
-local SPELLS = { type = "ids" }
+local SPELLS = { type = "keys", refs = "spells" }
 local LEVEL_FIELDS = { hp = STAT, mp = STAT, strength = STAT, dexterity = STAT, spells = SPELLS }
 
 local by_name = {}
@@ -83,20 +84,34 @@ function classes.validate_extra(data, flat, err)
 	end
 end
 
--- class_levels / class_spells from the flat entity.
+-- class_levels / class_spells from the flat entity. Spell keys become spells.id (spells
+-- sync first; a key without a row, possible only through an override, is skipped).
 function classes.write_children(id, flat)
 	local db = dk.db
+	local spell_ids = {}
+	for _, s in ipairs(db:query("SELECT id, key FROM spells")) do spell_ids[s.key] = s.id end
 	db:exec("DELETE FROM class_levels WHERE class_id = ?", id)
 	db:exec("DELETE FROM class_spells WHERE class_id = ?", id)
 	for level = 2, leveling.MAX_LEVEL do
 		local function f(stat) return flat[classes.level_field(level, stat)] end
 		db:exec("INSERT INTO class_levels (class_id, level, hp, mp, strength, dexterity) VALUES (?, ?, ?, ?, ?, ?)",
 						id, level, f("hp"), f("mp"), f("strength"), f("dexterity"))
-		for spell in tostring(f("spells") or ""):gmatch("%d+") do
-			db:exec("INSERT OR IGNORE INTO class_spells (class_id, level, spell_id) VALUES (?, ?, ?)",
-							id, level, math.tointeger(tonumber(spell)))
+		for key in tostring(f("spells") or ""):gmatch("[^,]+") do
+			if spell_ids[key] then
+				db:exec("INSERT OR IGNORE INTO class_spells (class_id, level, spell_id) VALUES (?, ?, ?)",
+								id, level, spell_ids[key])
+			end
 		end
 	end
+end
+
+-- Admin page fields: the top-level fields marked admin (level gains are read-only there).
+function classes.admin_fields()
+	local out = {}
+	for _, f in ipairs(classes.fields) do
+		if f.admin then out[#out + 1] = f end
+	end
+	return out
 end
 
 return classes
