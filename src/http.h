@@ -14,28 +14,28 @@
 #include "util.h"
 
 typedef struct {
-    char *name;   /* request headers: name lowercased */
-    char *value;
+	char *name;   /* request headers: name lowercased */
+	char *value;
 } dk_header;
 
 typedef struct {
-    const char *method;        /* "GET", "POST", ... */
-    const char *target;        /* raw request-target, e.g. "/shop/buy/3?x=1" */
-    const char *path;          /* percent-decoded path without query, e.g. "/shop/buy/3" */
-    const char *query;         /* raw query string without '?', "" if none */
-    const dk_header *headers;
-    size_t       nheaders;
-    const char  *body;         /* raw body bytes (Content-Length only; chunked => 501) */
-    size_t       body_len;
-    const char  *remote_addr;  /* "1.2.3.4" or "::1" */
+	const char *method;        /* "GET", "POST", ... */
+	const char *target;        /* raw request-target, e.g. "/shop/buy/3?x=1" */
+	const char *path;          /* percent-decoded path without query, e.g. "/shop/buy/3" */
+	const char *query;         /* raw query string without '?', "" if none */
+	const dk_header *headers;
+	size_t       nheaders;
+	const char  *body;         /* raw body bytes (Content-Length only; chunked => 501) */
+	size_t       body_len;
+	const char  *remote_addr;  /* "1.2.3.4" or "::1" */
 } dk_request;
 
 typedef struct {
-    int        status;         /* default 200 */
-    dk_header *headers;        /* response headers (name as given), owned by response */
-    size_t     nheaders;
-    size_t     cap_headers;
-    sbuf       body;
+	int        status;         /* default 200 */
+	dk_header *headers;        /* response headers (name as given), owned by response */
+	size_t     nheaders;
+	size_t     cap_headers;
+	sbuf       body;
 } dk_response;
 
 /* Look up a request header by lowercase name; NULL if absent. */
@@ -48,12 +48,12 @@ int  resp_add_header(dk_response *r, const char *name, const char *value); /* co
 void resp_error(dk_response *r, int status, const char *message);
 
 typedef struct {
-    /* Called once on each worker thread at startup; return per-worker context (e.g. a DB connection). */
-    void *(*worker_init)(int worker_id, void *ud);
-    void  (*worker_fini)(void *wctx, void *ud);
-    /* Fill resp. Server adds Content-Length, Date, Server, Connection. HEAD bodies are dropped. */
-    void  (*handle)(void *wctx, const dk_request *req, dk_response *resp, void *ud);
-    void  *ud;
+	/* Called once on each worker thread at startup; return per-worker context (e.g. a DB connection). */
+	void *(*worker_init)(int worker_id, void *ud);
+	void  (*worker_fini)(void *wctx, void *ud);
+	/* Fill resp. Server adds Content-Length, Date, Server, Connection. HEAD bodies are dropped. */
+	void  (*handle)(void *wctx, const dk_request *req, dk_response *resp, void *ud);
+	void  *ud;
 } dk_hooks;
 
 /* Bind, listen, run until SIGINT/SIGTERM, then drain and return 0. -1 on startup failure. */

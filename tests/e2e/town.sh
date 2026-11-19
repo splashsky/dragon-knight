@@ -2,14 +2,14 @@
 # Sourced by tests/run.sh (helpers documented in docs/APP.md).
 
 if ! t_has_sql; then
-  t_section "town (skipped: needs sqlite3 or python3)"
+	t_section "town (skipped: needs sqlite3 or python3)"
 else
 
 tu() { t_sql "UPDATE users SET $1 WHERE username = 'townie'"; }
 tq() { t_sql "SELECT $1 FROM users WHERE username = 'townie'"; }
 expect_db() { # expect_db "col,col" "v|v" label
-  local got; got=$(tq "$1")
-  if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: $1 = '$got', expected '$2'"; fi
+	local got; got=$(tq "$1")
+	if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: $1 = '$got', expected '$2'"; fi
 }
 TOWN_HOME="currentaction='In Town', latitude=0, longitude=0"
 
@@ -156,26 +156,26 @@ t_post /move "north=North";       expect_status 403
 t_post /move "csrf=$TC&north=North"
 expect_db "latitude,longitude,dropcode" "11|10|0" "move north"
 case $(tq currentaction) in
-  Exploring) expect_redirect / ;;
-  Fighting)  expect_redirect /fight; expect_db currentfight 1 "fight started" ;;
-  *) t_fail "move set currentaction to $(tq currentaction)" ;;
+	Exploring) expect_redirect / ;;
+	Fighting)  expect_redirect /fight; expect_db currentfight 1 "fight started" ;;
+	*) t_fail "move set currentaction to $(tq currentaction)" ;;
 esac
 fights=0 explores=0
 for _ in $(seq 1 40); do
-  tu "currentaction='Exploring', latitude=10, longitude=10, currentfight=0"
-  t_post /move "csrf=$TC&east=East"
-  case $(tq "currentaction||','||currentfight||','||longitude") in
-    Exploring,0,11) explores=$((explores + 1)) ;;
-    Fighting,1,11)  fights=$((fights + 1)) ;;
-    *) t_fail "unexpected move result $(tq "currentaction||','||currentfight||','||longitude")" ;;
-  esac
+	tu "currentaction='Exploring', latitude=10, longitude=10, currentfight=0"
+	t_post /move "csrf=$TC&east=East"
+	case $(tq "currentaction||','||currentfight||','||longitude") in
+		Exploring,0,11) explores=$((explores + 1)) ;;
+		Fighting,1,11)  fights=$((fights + 1)) ;;
+		*) t_fail "unexpected move result $(tq "currentaction||','||currentfight||','||longitude")" ;;
+	esac
 done
 [ "$fights" -gt 0 ] && [ "$explores" -gt "$fights" ] && t_ok || t_fail "fight odds: $fights fights / $explores explores"
 for dir in "north 250 5 250|5" "south -250 5 -250|5" "east 5 250 5|250" "west 5 -250 5|-250"; do
-  read -r d lat lon want <<< "$dir"
-  tu "currentaction='Exploring', latitude=$lat, longitude=$lon"
-  t_post /move "csrf=$TC&$d=x"
-  expect_db "latitude||'|'||longitude" "$want" "clamp $d"
+	read -r d lat lon want <<< "$dir"
+	tu "currentaction='Exploring', latitude=$lat, longitude=$lon"
+	t_post /move "csrf=$TC&$d=x"
+	expect_db "latitude||'|'||longitude" "$want" "clamp $d"
 done
 tu "currentaction='Exploring', latitude=0, longitude=1, towns='0', currenttp=4"
 t_post /move "csrf=$TC&west=West"; expect_body 'You have travelled to Midworld.'
@@ -244,7 +244,7 @@ t_get /babble
 [ "$(grep -c 'class="babble-post"' "$BODY")" = 20 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post"' "$BODY") posts"
 expect_no_body '] msg2<'; expect_body '] msg3<'
 [ "$(grep -o '] msg[0-9]*<' "$BODY" | head -n1)" = '] msg3<' ] && [ "$(grep -o '] msg[0-9]*<' "$BODY" | tail -n1)" = '] msg22<' ] \
-  && t_ok || t_fail "babble order (oldest first)"
+	&& t_ok || t_fail "babble order (oldest first)"
 
 t_section "town: ninja"
 t_get /ninja;                     expect_redirect 'http://www\.se7enet\.com/img/shirtninja\.jpg'

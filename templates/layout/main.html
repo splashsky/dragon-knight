@@ -7,39 +7,39 @@
 <body{% if body_class then %} class="{{ body_class }}"{% end %}>
 <div class="dk-page">
 <header class="dk-top">
-  <a href="/"><img src="/static/images/logo.gif" alt="{{ gamename }}" title="{{ gamename }}"></a>
-  <nav class="dk-topnav">
+	<a href="/"><img src="/static/images/logo.gif" alt="{{ gamename }}" title="{{ gamename }}"></a>
+	<nav class="dk-topnav">
 {%- if nav then %}
-    <form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<input type="image" src="/static/images/button_logout.gif" alt="Log Out" title="Log Out"></form>
-    <a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
+		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<input type="image" src="/static/images/button_logout.gif" alt="Log Out" title="Log Out"></form>
+		<a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
 {%- else %}
-    <a href="/login"><img src="/static/images/button_login.gif" alt="Log In" title="Log In"></a>
-    <a href="/register"><img src="/static/images/button_register.gif" alt="Register" title="Register"></a>
-    <a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
+		<a href="/login"><img src="/static/images/button_login.gif" alt="Log In" title="Log In"></a>
+		<a href="/register"><img src="/static/images/button_register.gif" alt="Register" title="Register"></a>
+		<a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
 {%- end %}
-  </nav>
+	</nav>
 </header>
 <div class="dk-cols">
-  <aside class="dk-left">
+	<aside class="dk-left">
 {%- if nav then %}
 {{{ include("layout/nav_left", nav) }}}
 {%- end %}
-  </aside>
-  <main class="dk-middle">
+	</aside>
+	<main class="dk-middle">
 {{{ content }}}
-  </main>
-  <aside class="dk-right">
+	</main>
+	<aside class="dk-right">
 {%- if nav then %}
 {{{ include("layout/nav_right", nav) }}}
 {%- end %}
-  </aside>
+	</aside>
 </div>
 </div>
 <footer class="dk-footer copyright">
-  <div>Powered by <a href="http://dragon.se7enet.com/dev.php" target="_blank" rel="noopener">Dragon Knight</a></div>
-  <div>&copy; 2003-2006 by renderse7en</div>
-  <div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
-  <div>Version {{ version }} {{ build }}</div>
+	<div>Powered by <a href="http://dragon.se7enet.com/dev.php" target="_blank" rel="noopener">Dragon Knight</a></div>
+	<div>&copy; 2003-2006 by renderse7en</div>
+	<div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
+	<div>Version {{ version }} {{ build }}</div>
 </footer>
 </body>
 </html>

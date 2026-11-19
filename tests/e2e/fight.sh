@@ -9,8 +9,8 @@ FQ="WHERE username = 'fighter'"
 f_sql() { t_sql "$1 $FQ"; }
 f_col() { t_sql "SELECT $1 FROM users $FQ"; }
 f_is() { # f_is COLUMN EXPECTED
-  local got; got=$(f_col "$1")
-  if [ "$got" = "$2" ]; then t_ok; else t_fail "users.$1: expected '$2', got '$got'"; fi
+	local got; got=$(f_col "$1")
+	if [ "$got" = "$2" ]; then t_ok; else t_fail "users.$1: expected '$2', got '$got'"; fi
 }
 t_get /fight;   expect_status 200; expect_body 'Cheat attempt detected.'
 t_get /victory; expect_redirect /
@@ -25,7 +25,7 @@ t_get /;        expect_redirect /fight
 
 t_section "fight: monster selection"
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, latitude = -50, longitude = 7,
-  currenthp = 1000, maxhp = 1000"
+	currenthp = 1000, maxhp = 1000"
 t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b>'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 f_is currentfight 2
@@ -45,11 +45,11 @@ t_get /fight; expect_body 'Cheat attempt detected.'
 
 t_section "fight: victory + level up"
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, latitude = 0, longitude = 0,
-  attackpower = 500, currenthp = 500, maxhp = 500, experience = 17, gold = 100"
+	attackpower = 500, currenthp = 500, maxhp = 500, experience = 17, gold = 100"
 t_get /fight; CS=$(t_csrf)
 for _ in $(seq 1 30); do
-  t_post /fight "csrf=$CS&fight=Fight"
-  [ "$STATUS" = 302 ] && break
+	t_post /fight "csrf=$CS&fight=Fight"
+	[ "$STATUS" = 302 ] && break
 done
 expect_redirect /victory
 f_is currentmonsterhp 0
@@ -68,8 +68,8 @@ t_section "fight: victory without level up"
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 1, currentuberdamage = 10"
 t_get /fight; CS=$(t_csrf)
 for _ in $(seq 1 30); do
-  t_post /fight "csrf=$CS&fight=Fight"
-  [ "$STATUS" = 302 ] && break
+	t_post /fight "csrf=$CS&fight=Fight"
+	[ "$STATUS" = 302 ] && break
 done
 expect_redirect /victory
 t_get /victory; expect_body '<title>Victory!</title>'; expect_no_body 'gained a level'
@@ -105,8 +105,8 @@ t_get /victory; expect_body 'You have defeated the Red Slime.'
 
 t_section "fight: death"
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 151,
-  currentmonsterhp = 30000, currentmonstersleep = 0, attackpower = 1, currenthp = 1, maxhp = 30,
-  dexterity = 0, defensepower = 0, gold = 101, latitude = 40, longitude = -40"
+	currentmonsterhp = 30000, currentmonstersleep = 0, attackpower = 1, currenthp = 1, maxhp = 30,
+	dexterity = 0, defensepower = 0, gold = 101, latitude = 40, longitude = -40"
 t_get /fight; CS=$(t_csrf)
 t_post /fight "csrf=$CS&fight=Fight"
 expect_status 200; expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'
@@ -137,7 +137,7 @@ t_get /drop; t_post /drop "csrf=$CS&submit=Submit&slot=3"; f_is goldbonus 10; f_
 t_section "fight: victory stores negative experience as 0 (MySQL UNSIGNED)"
 # Blue Slime: exp rand(0,1) -> at least 1; -500% bonus: 1 + ceil(-5) = -4; gold 1
 f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
-  currentmonsterhp = 0, experience = 0, gold = 0, expbonus = -500, goldbonus = 0, level = 2"
+	currentmonsterhp = 0, experience = 0, gold = 0, expbonus = -500, goldbonus = 0, level = 2"
 t_get /victory; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
 f_is experience 0; f_is gold 1; f_is level 2
 f_sql "UPDATE users SET expbonus = 0"

@@ -1,45 +1,45 @@
 /* dk.css :: base look, ported from legacy templates/primary.php.
-   Feature styles go in town.css / fight.css / community.css / admin.css. */
+	 Feature styles go in town.css / fight.css / community.css / admin.css. */
 
 body {
-  background: url(/static/images/background.jpg);
-  color: black;
-  font: 11px verdana, sans-serif;
-  margin: 8px;
+	background: url(/static/images/background.jpg);
+	color: black;
+	font: 11px verdana, sans-serif;
+	margin: 8px;
 }
 table {
-  border-style: none;
-  padding: 0;
-  font: 11px verdana, sans-serif;
+	border-style: none;
+	padding: 0;
+	font: 11px verdana, sans-serif;
 }
 td {
-  border-style: none;
-  padding: 3px;
-  vertical-align: top;
+	border-style: none;
+	padding: 3px;
+	vertical-align: top;
 }
 img { border: 0; }
 a, button.link {
-  color: #663300;
-  text-decoration: none;
-  font-weight: bold;
+	color: #663300;
+	text-decoration: none;
+	font-weight: bold;
 }
 a:hover, button.link:hover {
-  color: #330000;
+	color: #330000;
 }
 .small { font: 10px verdana, sans-serif; }
 .highlight { color: red; }
 .light { color: #999999; }
 .title {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font-weight: bold;
-  padding: 5px;
-  margin: 3px;
+	border: solid 1px black;
+	background-color: #eeeeee;
+	font-weight: bold;
+	padding: 5px;
+	margin: 3px;
 }
 .copyright {
-  border: solid 1px black;
-  background-color: #eeeeee;
-  font: 10px verdana, sans-serif;
+	border: solid 1px black;
+	background-color: #eeeeee;
+	font: 10px verdana, sans-serif;
 }
 .error { color: red; }
 
@@ -50,46 +50,46 @@ a:hover, button.link:hover {
 
 /* ---- three-column frame (legacy: table width 90%, 180px side cells) ---- */
 .dk-page {
-  width: 90%;
-  margin: 0 auto;
+	width: 90%;
+	margin: 0 auto;
 }
 .dk-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: solid 2px black;
-  padding: 6px 3px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: solid 2px black;
+	padding: 6px 3px;
 }
 .dk-topnav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
 .dk-cols {
-  display: flex;
-  align-items: stretch;
+	display: flex;
+	align-items: stretch;
 }
 .dk-left, .dk-right {
-  flex: 0 0 180px;
-  width: 180px;
-  padding: 3px;
+	flex: 0 0 180px;
+	width: 180px;
+	padding: 3px;
 }
 .dk-left { border-right: solid 2px black; }
 .dk-right { border-left: solid 2px black; }
 .dk-middle {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 3px;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 3px;
 }
 .dk-footer {
-  width: 90%;
-  margin: 12px auto 0;
-  display: flex;
+	width: 90%;
+	margin: 12px auto 0;
+	display: flex;
 }
 .dk-footer > div {
-  flex: 1 1 25%;
-  text-align: center;
-  padding: 3px;
+	flex: 1 1 25%;
+	text-align: center;
+	padding: 3px;
 }
 
 /* ---- boxes (legacy <table width=100%><tr><td class=title>...</td></tr><tr><td>...) ---- */
@@ -101,12 +101,12 @@ a:hover, button.link:hover {
 /* inline POST forms that look like links / plain buttons */
 form.inline { display: inline; margin: 0; }
 button.link {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  font-weight: bold;
-  cursor: pointer;
+	background: none;
+	border: 0;
+	padding: 0;
+	font: inherit;
+	font-weight: bold;
+	cursor: pointer;
 }
 input[type="image"] { vertical-align: middle; }
 
@@ -117,12 +117,12 @@ input[type="image"] { vertical-align: middle; }
 table.statbars { width: 100px; }
 table.statbars td { width: 33%; text-align: left; }
 .statbar {
-  width: 15px;
-  height: 100px;
-  border: solid 1px black;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+	width: 15px;
+	height: 100px;
+	border: solid 1px black;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
 }
 .statbar-fill { border-top: solid 1px black; }
 .statbar-fill.green { background-image: url(/static/images/bars_green.gif); }

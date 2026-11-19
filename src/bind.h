@@ -21,12 +21,12 @@ void bind_attach_db(lua_State *L, sqlite3 *db);
  *   - converts the returned response table into resp
  *   - on error: 500 (traceback in body if cfg->dev, always logged) */
 void bind_handle(lua_State *L, const dk_config *cfg, sqlite3 *db,
-                 const dk_request *req, dk_response *resp);
+				 const dk_request *req, dk_response *resp);
 
 /* Run a CLI command: require(module).run(args...) inside a transaction.
  * Returns process exit code. Used by `dk install`, `dk user ...`. */
 int  bind_run_cli(lua_State *L, const dk_config *cfg, sqlite3 *db,
-                  const char *module, int argc, char **argv);
+				  const char *module, int argc, char **argv);
 
 /* Replace resp with an HTML error page; msg (escaped) is shown only when cfg->dev. */
 void bind_error_page(dk_response *resp, const dk_config *cfg, int status, const char *msg);

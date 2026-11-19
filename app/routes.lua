@@ -5,13 +5,13 @@ local router = require("lib.router")
 
 local r = router.new()
 for _, name in ipairs({
-  "routes.auth",       -- login/logout/register/verify/lostpassword/changepassword
-  "routes.home",       -- GET /
-  "routes.town",       -- town, explore, heal spells, character/map, babble
-  "routes.fight",      -- fight, victory, drops
-  "routes.community",  -- forum, help
-  "routes.admin",      -- admin panel
+	"routes.auth",       -- login/logout/register/verify/lostpassword/changepassword
+	"routes.home",       -- GET /
+	"routes.town",       -- town, explore, heal spells, character/map, babble
+	"routes.fight",      -- fight, victory, drops
+	"routes.community",  -- forum, help
+	"routes.admin",      -- admin panel
 }) do
-  require(name)(r)
+	require(name)(r)
 end
 return r

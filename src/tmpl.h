@@ -15,6 +15,6 @@
 /* Returns 0 on success (Lua source appended to out), -1 on syntax error with
  * err = "<name>:<line>: <message>". */
 int tmpl_compile(const char *src, size_t len, const char *name,
-                 sbuf *out, char *err, size_t errlen);
+				 sbuf *out, char *err, size_t errlen);
 
 #endif

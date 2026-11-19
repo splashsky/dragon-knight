@@ -8,46 +8,46 @@ local session = require("lib.session")
 local view = require("lib.view")
 
 local function dispatch(req)
-  session.load(req)
-  local route, params, allowed = routes:match(req.method, req.path)
-  if not route then
-    if params == "405" then return view.method_not_allowed(req, allowed) end
-    return view.not_found(req)
-  end
-  if req.method == "POST" and not csrf.verify(req) then
-    return view.csrf_failed(req)
-  end
-  return router.run(route, req, params)
+	session.load(req)
+	local route, params, allowed = routes:match(req.method, req.path)
+	if not route then
+		if params == "405" then return view.method_not_allowed(req, allowed) end
+		return view.not_found(req)
+	end
+	if req.method == "POST" and not csrf.verify(req) then
+		return view.csrf_failed(req)
+	end
+	return router.run(route, req, params)
 end
 
 local function normalize(res)
-  if type(res) == "string" then
-    return { status = 200, headers = { { "Content-Type", "text/html; charset=utf-8" } }, body = res }
-  end
-  if type(res) ~= "table" then error("handler returned " .. type(res) .. " instead of a response") end
-  res.headers = res.headers or {}
-  return res
+	if type(res) == "string" then
+		return { status = 200, headers = { { "Content-Type", "text/html; charset=utf-8" } }, body = res }
+	end
+	if type(res) ~= "table" then error("handler returned " .. type(res) .. " instead of a response") end
+	res.headers = res.headers or {}
+	return res
 end
 
 return function(req)
-  req.out_headers = {}
-  dbcount.install()
-  local ok, res = xpcall(function() return normalize(dispatch(req)) end, debug.traceback)
-  if ok and req.method == "HEAD" then
-    -- HEAD runs the GET handler for accurate headers, but must not change state
-    -- (GET /fight and /victory advance the game): discard the request's writes.
-    -- Queued cookies go too: the session/CSRF state behind them was not saved.
-    dbcount.raw():exec("ROLLBACK")
-    req.out_headers = {}
-  end
-  if not ok then
-    -- undo this request's writes ourselves so we can still render a friendly page
-    -- (the engine skips COMMIT when no transaction is open)
-    pcall(function() dbcount.raw():exec("ROLLBACK") end)
-    dk.log("error", req.method .. " " .. req.target .. " -> 500\n" .. tostring(res))
-    req.out_headers = {}
-    res = view.server_error(req, tostring(res))
-  end
-  for _, hd in ipairs(req.out_headers) do table.insert(res.headers, hd) end
-  return res
+	req.out_headers = {}
+	dbcount.install()
+	local ok, res = xpcall(function() return normalize(dispatch(req)) end, debug.traceback)
+	if ok and req.method == "HEAD" then
+		-- HEAD runs the GET handler for accurate headers, but must not change state
+		-- (GET /fight and /victory advance the game): discard the request's writes.
+		-- Queued cookies go too: the session/CSRF state behind them was not saved.
+		dbcount.raw():exec("ROLLBACK")
+		req.out_headers = {}
+	end
+	if not ok then
+		-- undo this request's writes ourselves so we can still render a friendly page
+		-- (the engine skips COMMIT when no transaction is open)
+		pcall(function() dbcount.raw():exec("ROLLBACK") end)
+		dk.log("error", req.method .. " " .. req.target .. " -> 500\n" .. tostring(res))
+		req.out_headers = {}
+		res = view.server_error(req, tostring(res))
+	end
+	for _, hd in ipairs(req.out_headers) do table.insert(res.headers, hd) end
+	return res
 end

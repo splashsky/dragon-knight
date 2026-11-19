@@ -10,18 +10,18 @@ conventions).
 ## Goals
 
 - One self-contained binary `./dk`: a hand-written HTTP/1.1 server in C, embedding
-  **Lua 5.5.1** and **SQLite 3.54.1** (both vendored under `vendor/`, unmodified).
-  Those are the only two dependencies. No libc extras beyond POSIX + Linux syscalls
-  (getrandom, inotify, eventfd are fine).
+	**Lua 5.5.1** and **SQLite 3.54.1** (both vendored under `vendor/`, unmodified).
+	Those are the only two dependencies. No libc extras beyond POSIX + Linux syscalls
+	(getrandom, inotify, eventfd are fine).
 - All game behavior lives in Lua under `app/`; all markup lives in templates under
-  `templates/`. **Editing either takes effect on the next browser refresh** — no rebuild,
-  no restart.
+	`templates/`. **Editing either takes effect on the next browser refresh** — no rebuild,
+	no restart.
 - **Fresh Lua VM per request** (share-nothing, like PHP), served from a pool of
-  pre-warmed spare VMs, so the hot path never pays for VM construction.
+	pre-warmed spare VMs, so the hot path never pays for VM construction.
 - Clean URLs + modern HTML5/CSS, same look & feel (three-column layout, original image
-  assets) and **identical game mechanics** (formulas, odds, data).
+	assets) and **identical game mechanics** (formulas, odds, data).
 - Fix the original's security problems: parameterized SQL everywhere, HTML escaping by
-  default, PBKDF2 passwords, server-side sessions, CSRF tokens on every POST.
+	default, PBKDF2 passwords, server-side sessions, CSRF tokens on every POST.
 
 ## Repository layout
 
@@ -91,16 +91,16 @@ data/                 runtime (gitignored): dk.db, outbox/
 ```
 
 - **Per-request transaction**: `bind_handle` wraps the handler in `BEGIN IMMEDIATE …
-  COMMIT` (ROLLBACK on error). This serializes writers (fine: handlers are sub-ms) and
-  makes every request atomic, which the original's read-modify-write fight logic needs.
+	COMMIT` (ROLLBACK on error). This serializes writers (fine: handlers are sub-ms) and
+	makes every request atomic, which the original's read-modify-write fight logic needs.
 - **DB connections** are per worker and persistent (WAL). VMs are ephemeral; `dk.db`
-  is bound to the worker's connection only for the one request. Statements are
-  finalized before `db:query` returns (no statement objects escape to Lua). An optional
-  per-connection prepared-statement cache keyed by SQL text is welcome.
+	is bound to the worker's connection only for the one request. Statements are
+	finalized before `db:query` returns (no statement objects escape to Lua). An optional
+	per-connection prepared-statement cache keyed by SQL text is welcome.
 - **RNG**: `lua_newstate(alloc, ud, seed)` gets a getrandom() seed (5.5 API has a seed
-  param) and `math.randomseed` is called with getrandom values on every VM build.
+	param) and `math.randomseed` is called with getrandom values on every VM build.
 - **Errors**: Lua errors → 500 with traceback when `config.dev`, otherwise a generic
-  page; always logged with traceback.
+	page; always logged with traceback.
 - **Templates are compiled to Lua by C** (`tmpl.c`), then cached as bytecode like modules.
 
 ## Lua API (contract between C engine and Lua app)
@@ -139,13 +139,13 @@ SQL errors raise a Lua error with the SQLite message and the SQL text.
 
 ```lua
 req = {
-  method = "POST", path = "/shop/buy/3", target = "/shop/buy/3?x=1",
-  query = { x = "1" },          -- decoded; duplicate keys: last wins
-  form = { ... },               -- decoded application/x-www-form-urlencoded body
-  cookies = { name = "value" },
-  headers = { ["user-agent"] = "..." },   -- lowercase names
-  remote = "127.0.0.1",
-  body = "raw body",
+	method = "POST", path = "/shop/buy/3", target = "/shop/buy/3?x=1",
+	query = { x = "1" },          -- decoded; duplicate keys: last wins
+	form = { ... },               -- decoded application/x-www-form-urlencoded body
+	cookies = { name = "value" },
+	headers = { ["user-agent"] = "..." },   -- lowercase names
+	remote = "127.0.0.1",
+	body = "raw body",
 }
 ```
 
@@ -153,9 +153,9 @@ req = {
 
 ```lua
 return {
-  status = 200,                                    -- default 200
-  headers = { {"Content-Type", "text/html; charset=utf-8"}, {"Set-Cookie", "..."} },
-  body = "...",
+	status = 200,                                    -- default 200
+	headers = { {"Content-Type", "text/html; charset=utf-8"}, {"Set-Cookie", "..."} },
+	body = "...",
 }
 ```
 
@@ -177,17 +177,17 @@ urlencoded (e.g. multipart) → the C side passes `form = {}`; the app doesn't n
 ```
 
 - Name resolution inside a template: `ctx` first, then helpers `h`, then nothing (globals
-  like `ipairs`, `string`, `math`, `os.date`, `tostring`, `dk` are included in `h` by the
-  Lua view layer). Assigning to a bare name writes to a template-local scratch table.
+	like `ipairs`, `string`, `math`, `os.date`, `tostring`, `dk` are included in `h` by the
+	Lua view layer). Assigning to a bare name writes to a template-local scratch table.
 - Helpers provided by `app/lib/view.lua` (`h`): `include(name [, ctx])` (renders another
-  template, defaulting to the current ctx), `url(...)`, `csrf_field()`, `number(n)`
-  (thousands separators, like PHP `number_format`), `date(ts)` ("F j, Y"),
-  `nl2br(s)` (escapes, then converts newlines), plus the Lua globals above.
+	template, defaulting to the current ctx), `url(...)`, `csrf_field()`, `number(n)`
+	(thousands separators, like PHP `number_format`), `date(ts)` ("F j, Y"),
+	`nl2br(s)` (escapes, then converts newlines), plus the Lua globals above.
 - Generated Lua must keep line numbers aligned with the template and use the chunk name
-  `@templates/<name>.html`; a syntax error reports `<name>:<line>: message`.
+	`@templates/<name>.html`; a syntax error reports `<name>:<line>: message`.
 - Layout pattern: handlers call `view.page(req, title, "town/index", ctx)` which renders
-  the inner template then `layout/main` with nav columns. Popup-style pages use
-  `layout/minimal`.
+	the inner template then `layout/main` with nav columns. Popup-style pages use
+	`layout/minimal`.
 
 ## URL map (legacy → new)
 
@@ -196,9 +196,9 @@ from the original; guarded by game state so a reload is harmless):
 
 - every authenticated request touches `users.onlinetime` and slides the session expiry;
 - `GET /fight` picks the monster when an encounter has just started (`currentfight = 1`),
-  runs the monster's first strike, and bumps the `currentfight` counter;
+	runs the monster's first strike, and bumps the `currentfight` counter;
 - `GET /victory` pays the rewards (exp, gold, level-up or drop roll) once: it then resets
-  `currentfight`/`currentmonster`, so a reload redirects.
+	`currentfight`/`currentmonster`, so a reload redirects.
 
 HEAD is routed like GET, but `main.lua` rolls the request's transaction back (and drops
 queued cookies), so HEAD never changes state.
@@ -237,75 +237,75 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 ## Data model
 
 - Port every legacy table to SQLite without the `dk_` prefix: `babble, control, drops,
-  forum, items, levels, monsters, news, spells, towns, users`, keeping column names so
-  porting is mechanical. Add `sessions`.
+	forum, items, levels, monsters, news, spells, towns, users`, keeping column names so
+	porting is mechanical. Add `sessions`.
 - Times: store unix seconds INTEGER (`regdate`, `onlinetime`, `postdate`, `newpostdate`,
-  `posttime`). Format in Lua.
+	`posttime`). Format in Lua.
 - `users.password` = `pbkdf2$<iters>$<salt hex>$<hash hex>` (iters default 210000,
-  overridable via `dk.config.pbkdf2_iterations` so tests can use a low value).
+	overridable via `dk.config.pbkdf2_iterations` so tests can use a low value).
 - CSRF: logged in, the token is the per-session random `sessions.csrf`; logged out
-  (login/register/verify/lostpassword forms), a signed double-submit: HttpOnly cookie
-  `dk_csrf` (random) plus `hmac_sha256(config.secret, "csrf:" .. cookie)` in the form.
-  `main.lua` verifies every POST (field `csrf` or header `X-CSRF-Token`) before guards run.
+	(login/register/verify/lostpassword forms), a signed double-submit: HttpOnly cookie
+	`dk_csrf` (random) plus `hmac_sha256(config.secret, "csrf:" .. cookie)` in the form.
+	`main.lua` verifies every POST (field `csrf` or header `X-CSRF-Token`) before guards run.
 - `sessions(token_hash TEXT PRIMARY KEY, user_id INTEGER, csrf TEXT, created INTEGER,
-  expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
-  `HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
-  session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
+	expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
+	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
+	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
 - Seed data in `app/sql/seed.sql` matches the original install.php "complete setup"
-  exactly (all rows of drops, items, levels, monsters, spells, towns, control).
+	exactly (all rows of drops, items, levels, monsters, spells, towns, control).
 - Email (registration verification, lost password) is written to
-  `<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
+	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 
 ## Mechanics fidelity
 
 Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 
 - `php.rand(min, max)`: PHP casts float args to int (truncate toward zero), and swaps if
-  `min > max`; inclusive range via `math.random`.
+	`min > max`; inclusive range via `math.random`.
 - `php.ceil`, `php.number_format(n)`, `php.nl2br`, `php.prettydate(ts)` ("F j, Y").
 - Preserve comma-list columns (`users.spells`, `users.towns`, `towns.itemslist`,
-  `drops.attribute1/2` `"stat,value"` / `"X"`) and their semantics.
+	`drops.attribute1/2` `"stat,value"` / `"X"`) and their semantics.
 - When legacy has an obvious bug that affects gameplay, the behavior is kept unless it
-  is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
-  "fixed: …").
+	is a security hole or breaks the game, with a comment at the spot ("legacy: …" /
+	"fixed: …").
 - Deliberate gameplay changes (requested): Bris sells its full item list; in the shop the
-  sell-back value of the replaced item counts toward the price; heal spells do nothing
-  when HP is already at or above max.
+	sell-back value of the replaced item counts toward the price; heal spells do nothing
+	when HP is already at or above max.
 - Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
-  forum is only reachable when `control.forumtype = 1`.
+	forum is only reachable when `control.forumtype = 1`.
 
 ## Coding rules
 
 - C11, `-Wall -Wextra` clean (warnings are bugs), no new dependencies, check every
-  allocation and syscall result, no global mutable state without a mutex (except
-  I/O-thread-only state). Keep functions small; comment only the non-obvious.
+	allocation and syscall result, no global mutable state without a mutex (except
+	I/O-thread-only state). Keep functions small; comment only the non-obvious.
 - Lua 5.5: `global` is a **reserved word**; for-loop control variables are **read-only**.
-  Use `local` everywhere; modules return tables; no globals from app code.
+	Use `local` everywhere; modules return tables; no globals from app code.
 - Never build SQL with string concatenation of user data. Always `?` params.
-  (Identifiers like the level column `1_exp` may be chosen from a whitelist.)
+	(Identifiers like the level column `1_exp` may be chosen from a whitelist.)
 - Templates escape by default; use `{{{ }}}` only for HTML built by trusted code.
 - Indent with tabs.
 
 ## Phases
 
 1. ✅ **Engine**: E1 base (`util`, `crypto`, `tmpl` + tests), E2 server (`config`, `http`
-   + tests), E3 runtime (`codecache`, `vmpool`, `bind_*`, `db`, `app`, `main` + tests).
+	 + tests), E3 runtime (`codecache`, `vmpool`, `bind_*`, `db`, `app`, `main` + tests).
 2. ✅ **App foundation**: schema + seed, `dk install`, router, sessions, CSRF, auth pages,
-   layouts/nav, CSS, static assets, `lib/php.lua`, home dispatcher, `tests/run.sh`,
-   `docs/APP.md`.
+	 layouts/nav, CSS, static assets, `lib/php.lua`, home dispatcher, `tests/run.sh`,
+	 `docs/APP.md`.
 3. ✅ **Features**: F1 town/explore/heal/character/map/babble, F2 fight, F3 forum/help/news,
-   F4 admin.
+	 F4 admin.
 4. ✅ **Integration & QA**: playthrough + concurrency e2e, mechanics review against legacy,
-   HEAD made read-only, hot-reload checks, ASan/UBSan run, README rewrite, `.gitignore`;
-   `legacy/` deleted last.
+	 HEAD made read-only, hot-reload checks, ASan/UBSan run, README rewrite, `.gitignore`;
+	 `legacy/` deleted last.
 
 ## Definition of done
 
 - `make && make test` green with `-Wall -Wextra` and no warnings; `make DEBUG=1 test`
-  green under ASan/UBSan.
+	green under ASan/UBSan.
 - `./dk install --admin <user> <email> <password>` then `./dk serve` gives a fully
-  playable game: register, log in, explore, fight, level up, drops, inn, shop, maps,
-  travel, heal spells, babble box, forum, help, admin panel.
+	playable game: register, log in, explore, fight, level up, drops, inn, shop, maps,
+	travel, heal spells, babble box, forum, help, admin panel.
 - Editing any `app/**/*.lua`, `templates/**/*.html`, or app keys in `config.lua` is
-  visible on the next refresh without restart.
+	visible on the next refresh without restart.
 - No SQL built from user input; every POST checks CSRF; output escaped by default.

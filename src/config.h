@@ -9,23 +9,23 @@
 #include <stddef.h>
 
 typedef struct {
-    char  *path;              /* path of the config file itself (may not exist) */
-    char  *bind;              /* "127.0.0.1" */
-    int    port;              /* 8080 */
-    int    workers;           /* 4   : request worker threads */
-    int    spares;            /* 0   : warm spare VMs to keep ready; 0 => workers + 1 */
-    char  *db_path;           /* "data/dk.db" */
-    char  *app_dir;           /* "app" */
-    char  *template_dir;      /* "templates" */
-    char  *public_dir;        /* "public"  (served at /static/) */
-    char  *outbox_dir;        /* "data/outbox" */
-    char  *secret;            /* HMAC key for signed values; `dk install` prints a random one if empty */
-    int    dev;               /* 1 : show Lua tracebacks in 500 pages */
-    size_t max_header_bytes;  /* 16384 */
-    size_t max_body_bytes;    /* 1048576 */
-    int    keepalive_timeout; /* 15 seconds */
-    int    request_timeout;   /* 30 seconds (time to receive a full request) */
-    int    max_connections;   /* 1024 */
+	char  *path;              /* path of the config file itself (may not exist) */
+	char  *bind;              /* "127.0.0.1" */
+	int    port;              /* 8080 */
+	int    workers;           /* 4   : request worker threads */
+	int    spares;            /* 0   : warm spare VMs to keep ready; 0 => workers + 1 */
+	char  *db_path;           /* "data/dk.db" */
+	char  *app_dir;           /* "app" */
+	char  *template_dir;      /* "templates" */
+	char  *public_dir;        /* "public"  (served at /static/) */
+	char  *outbox_dir;        /* "data/outbox" */
+	char  *secret;            /* HMAC key for signed values; `dk install` prints a random one if empty */
+	int    dev;               /* 1 : show Lua tracebacks in 500 pages */
+	size_t max_header_bytes;  /* 16384 */
+	size_t max_body_bytes;    /* 1048576 */
+	int    keepalive_timeout; /* 15 seconds */
+	int    request_timeout;   /* 30 seconds (time to receive a full request) */
+	int    max_connections;   /* 1024 */
 } dk_config;
 
 void config_defaults(dk_config *c);

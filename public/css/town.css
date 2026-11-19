@@ -20,19 +20,19 @@ table.inventory td + td { width: 100%; }
 
 /* babble box iframe: fills the frame, starts scrolled to the newest post */
 .babble {
-  position: fixed;
-  inset: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column-reverse;
-  text-align: left;
+	position: fixed;
+	inset: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column-reverse;
+	text-align: left;
 }
 .babble-post {
-  padding: 2px;
-  border: solid 1px black;
-  margin: 2px;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
+	padding: 2px;
+	border: solid 1px black;
+	margin: 2px;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
 }
 /* legacy alternated from the newest post (#eeeeee) upwards */
 .babble-post:nth-last-child(odd) { background-color: #eeeeee; }

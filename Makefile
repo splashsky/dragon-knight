@@ -1,8 +1,9 @@
 # Dragon Knight (C + Lua) — single binary, two vendored deps (Lua 5.5, SQLite 3).
 #
 #   make                 build ./dk (objects in $(BUILD))
-#   make test            build + run C unit tests and Lua tests
-#   make BUILD=build/x   use a separate object dir (parallel agents/CI)
+#   make test            lint + C unit tests + Lua tests + end-to-end tests
+#   make lint            check tab indentation (tests/lint.sh)
+#   make BUILD=build/x   use a separate object dir (parallel builds/CI)
 #   make DEBUG=1         -O0 -g with ASan/UBSan
 
 BUILD   ?= build
@@ -15,19 +16,19 @@ CSTD    := -std=c11 -D_GNU_SOURCE
 INCS    := -Isrc -Ivendor/lua/src -Ivendor/sqlite
 
 ifeq ($(DEBUG),1)
-  OPT     := -O0 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
-  LDOPT   := -fsanitize=address,undefined
+	OPT     := -O0 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
+	LDOPT   := -fsanitize=address,undefined
 else
-  OPT     := -O2 -g
-  LDOPT   :=
+	OPT     := -O2 -g
+	LDOPT   :=
 endif
 
 CFLAGS_APP    := $(CSTD) $(OPT) $(WARN) $(INCS) -pthread
 CFLAGS_LUA    := -std=gnu99 $(OPT) -DLUA_USE_POSIX -w
 CFLAGS_SQLITE := $(OPT) -w \
-  -DSQLITE_THREADSAFE=1 -DSQLITE_DQS=0 -DSQLITE_OMIT_LOAD_EXTENSION \
-  -DSQLITE_DEFAULT_FOREIGN_KEYS=1 -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 \
-  -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_OMIT_DEPRECATED -DSQLITE_USE_ALLOCA
+	-DSQLITE_THREADSAFE=1 -DSQLITE_DQS=0 -DSQLITE_OMIT_LOAD_EXTENSION \
+	-DSQLITE_DEFAULT_FOREIGN_KEYS=1 -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 \
+	-DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_OMIT_DEPRECATED -DSQLITE_USE_ALLOCA
 LDLIBS        := -pthread -lm $(LDOPT)
 
 LUA_SRCS  := $(filter-out vendor/lua/src/lua.c vendor/lua/src/luac.c,$(wildcard vendor/lua/src/*.c))
@@ -40,7 +41,7 @@ LIB_OBJS  := $(filter-out $(BUILD)/src/main.o,$(APP_OBJS))
 TEST_SRCS := $(wildcard tests/c/*.c)
 TEST_BINS := $(patsubst tests/c/%.c,$(BUILD)/tests/%,$(TEST_SRCS))
 
-.PHONY: all test clean distclean
+.PHONY: all test lint clean distclean
 all: $(BIN)
 
 $(BIN): $(APP_OBJS) $(LUA_OBJS) $(SQL_OBJS)
@@ -58,7 +59,10 @@ $(BUILD)/sqlite/sqlite3.o: vendor/sqlite/sqlite3.c | $(BUILD)/sqlite
 $(BUILD)/tests/%: tests/c/%.c $(LIB_OBJS) $(LUA_OBJS) $(SQL_OBJS) | $(BUILD)/tests
 	$(CC) $(CFLAGS_APP) -Itests/c -o $@ $^ $(LDLIBS)
 
-test: $(BIN) $(TEST_BINS)
+lint:
+	@tests/lint.sh
+
+test: lint $(BIN) $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 	@if [ -x tests/run.sh ]; then BIN=./$(BIN) tests/run.sh; fi
 

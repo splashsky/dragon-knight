@@ -3,22 +3,22 @@
 # (admin.sh runs before the other feature scripts).
 
 admin_eq() {  # admin_eq "SQL" expected label
-  local got
-  got=$(t_sql "$1")
-  if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: expected '$2', got '$got'"; fi
+	local got
+	got=$(t_sql "$1")
+	if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: expected '$2', got '$got'"; fi
 }
 
 if ! t_has_sql; then
-  echo "admin.sh: skipped (needs sqlite3 or python3)"
+	echo "admin.sh: skipped (needs sqlite3 or python3)"
 else
 
 t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
-       CREATE TABLE adm_snap_items AS SELECT * FROM items WHERE id = 1;
-       CREATE TABLE adm_snap_drops AS SELECT * FROM drops WHERE id = 1;
-       CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
-       CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;
-       CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;
-       CREATE TABLE adm_snap_levels AS SELECT * FROM levels WHERE id = 5;"
+			 CREATE TABLE adm_snap_items AS SELECT * FROM items WHERE id = 1;
+			 CREATE TABLE adm_snap_drops AS SELECT * FROM drops WHERE id = 1;
+			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
+			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;
+			 CREATE TABLE adm_snap_spells AS SELECT * FROM spells WHERE id = 1;
+			 CREATE TABLE adm_snap_levels AS SELECT * FROM levels WHERE id = 5;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 
 t_section "admin: access"
@@ -68,12 +68,12 @@ admin_eq "SELECT gamename || '|' || gamesize FROM control" "Dragon Knight|250" "
 
 t_get /admin/settings
 t_form_submit /admin/settings "gamename=Realm <&> Test" gameopen=0 gamesize=200 diff2mod=1.3 diff3mod=2 \
-  shownews=1 compression=1 id=5 bogus=1
+	shownews=1 compression=1 id=5 bogus=1
 expect_redirect '/admin/settings\?saved=1'
 t_get '/admin/settings?saved=1'; expect_body 'Settings updated.'
 expect_body 'value="Realm &lt;&amp;&gt; Test"'; expect_body 'name="diff3mod" size="3" maxlength="3" value="2"'
 admin_eq "SELECT id || '|' || gamename || '|' || gameopen || '|' || gamesize || '|' || diff2mod || '|' || diff3mod || '|' || compression FROM control" \
-  "1|Realm <&> Test|0|200|1.3|2.0|1" "settings saved (compression untouched)"
+	"1|Realm <&> Test|0|200|1.3|2.0|1" "settings saved (compression untouched)"
 admin_eq "SELECT typeof(diff2mod) || typeof(gamesize) FROM control" "realinteger" "settings types"
 t_get /login;              expect_body 'alt="Realm &lt;&amp;&gt; Test"'
 t_jar admtester
@@ -99,11 +99,11 @@ t_form_submit /admin/items/1 name= buycost=5
 expect_body 'Name is required.'
 t_get /admin/items/1
 t_form_submit /admin/items/1 "name=<script>alert(1)</script>" type=2 buycost=123 attribute=7.5 "special= " \
-  id=999 password=x unknowncol=1 "name2=y"
+	id=999 password=x unknowncol=1 "name2=y"
 expect_redirect '/admin/items/1\?saved=1'
 t_get /admin/items/1?saved=1; expect_body 'Item updated.'
 admin_eq "SELECT id || '|' || name || '|' || type || '|' || buycost || '|' || attribute || '|' || special FROM items WHERE id = 1" \
-  "1|<script>alert(1)</script>|2|123|8|X" "item saved"
+	"1|<script>alert(1)</script>|2|123|8|X" "item saved"
 admin_eq "SELECT count(*) FROM items WHERE id = 999" "0" "no mass-assigned id"
 t_get /admin/items;        expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
 t_get /admin/items/1;      expect_body 'value="&lt;script&gt;alert(1)&lt;/script&gt;"'
@@ -118,7 +118,7 @@ expect_body 'First attribute is required.'; expect_body 'Monster level is requir
 t_form_submit /admin/drops/1 name=Pebble2 mlevel=3 attribute1=maxhp,20 "attribute2="
 expect_redirect '/admin/drops/1\?saved=1'
 admin_eq "SELECT name || '|' || mlevel || '|' || attribute1 || '|' || attribute2 FROM drops WHERE id = 1" \
-  "Pebble2|3|maxhp,20|X" "drop saved"
+	"Pebble2|3|maxhp,20|X" "drop saved"
 
 t_section "admin: towns"
 t_get /admin/towns/2;      expect_body 'Items List:'
@@ -127,7 +127,7 @@ expect_body 'Items List is required.'; expect_body 'Latitude must be a number.'
 t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 itemslist=1,2,3
 expect_redirect '/admin/towns/2\?saved=1'
 admin_eq "SELECT name || '|' || latitude || '|' || longitude || '|' || innprice || '|' || mapprice || '|' || travelpoints || '|' || itemslist FROM towns WHERE id = 2" \
-  "Newtown|-31|44|11|22|3|1,2,3" "town saved"
+	"Newtown|-31|44|11|22|3|1,2,3" "town saved"
 
 t_section "admin: monsters"
 t_get /admin/monsters/1;   expect_body 'Immunity:'
@@ -136,7 +136,7 @@ expect_body 'Max HP is required.'; expect_body 'Max HP must be a number.'; expec
 t_form_submit /admin/monsters/1 name=Slimer maxhp=1.6 maxdam=9 armor=2 level=1 maxexp=3 maxgold=4 immune=2
 expect_redirect '/admin/monsters/1\?saved=1'
 admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune FROM monsters WHERE id = 1" \
-  "Slimer|2|9|2" "monster saved"
+	"Slimer|2|9|2" "monster saved"
 t_get /admin/monsters/1;   expect_body '<option value="2" selected>Hurt &amp; Sleep Spells</option>'
 
 t_section "admin: spells"
@@ -146,7 +146,7 @@ expect_body 'MP is required.'; expect_body 'MP must be a number.'
 t_form_submit /admin/spells/1 name=Mend mp=4 attribute=12 type=4
 expect_redirect '/admin/spells/1\?saved=1'
 admin_eq "SELECT name || '|' || mp || '|' || attribute || '|' || type FROM spells WHERE id = 1" \
-  "Mend|4|12|4" "spell saved"
+	"Mend|4|12|4" "spell saved"
 
 t_section "admin: levels"
 t_get /admin/levels;       expect_body '<option value="2">2</option>'; expect_body '<option value="99">99</option>'
@@ -173,10 +173,10 @@ t_form_submit /admin/users/$ADM_UID email= gold=lots
 expect_body 'Email is required.'; expect_body 'Gold must be a number.'
 t_get /admin/users/$ADM_UID
 t_form_submit /admin/users/$ADM_UID "charname=<i>Hero</i>" gold=5000 level=7 authlevel=2 currentaction=Exploring \
-  spells=0,1,2 username=evil password=plain regdate=1 id=4242 onlinetime=3
+	spells=0,1,2 username=evil password=plain regdate=1 id=4242 onlinetime=3
 expect_redirect "/admin/users/$ADM_UID\\?saved=1"
 admin_eq "SELECT username || '|' || charname || '|' || gold || '|' || level || '|' || authlevel || '|' || currentaction || '|' || spells || '|' || (regdate > 1) FROM users WHERE id = $ADM_UID" \
-  "admtester|<i>Hero</i>|5000|7|2|Exploring|0,1,2|1" "user saved"
+	"admtester|<i>Hero</i>|5000|7|2|Exploring|0,1,2|1" "user saved"
 admin_eq "SELECT password FROM users WHERE id = $ADM_UID" "$ADM_HASH" "password not mass-assigned"
 admin_eq "SELECT count(*) FROM users WHERE id = 4242" "0" "user id not mass-assigned"
 t_jar admtester
@@ -194,8 +194,8 @@ t_get /admin;              expect_status 200       # the admin's own session sur
 
 t_section "admin: users paging"
 t_sql "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 120)
-       INSERT INTO users (username, email, charname) SELECT 'admbulk' || i, 'admbulk' || i || '@example.com', 'AdmBulk' || i FROM n;
-       UPDATE users SET username = '<b>bold</b>' WHERE username = 'admbulk1';"
+			 INSERT INTO users (username, email, charname) SELECT 'admbulk' || i, 'admbulk' || i || '@example.com', 'AdmBulk' || i FROM n;
+			 UPDATE users SET username = '<b>bold</b>' WHERE username = 'admbulk1';"
 t_get /admin/users;        expect_body 'Next &raquo;'; expect_body 'href="/admin/users?start=100"'; expect_no_body 'Previous'
 expect_body '&lt;b&gt;bold&lt;/b&gt;'; expect_no_body '<b>bold</b>'
 t_get '/admin/users?start=100'; expect_body 'Showing 101'; expect_body '&laquo; Previous'
@@ -209,18 +209,18 @@ t_post /admin/news "csrf=$(t_csrf)&submit=Submit&content=$(t_enc 'Fresh <b>news<
 expect_redirect '/admin/news\?saved=1'
 t_get /admin/news?saved=1; expect_body 'News post added.'
 admin_eq "SELECT content || '|' || (abs(postdate - strftime('%s','now')) < 60) FROM news ORDER BY id DESC LIMIT 1" \
-  "Fresh <b>news</b> from the admin|1" "news saved"
+	"Fresh <b>news</b> from the admin|1" "news saved"
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 WHERE id = $ADM_UID"
 t_jar admtester
 t_get /;                   expect_body 'Fresh &lt;b&gt;news&lt;/b&gt; from the admin'
 
 # restore everything this script touched
 t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; DROP TABLE adm_snap_control;
-       DELETE FROM items WHERE id = 1; INSERT INTO items SELECT * FROM adm_snap_items; DROP TABLE adm_snap_items;
-       DELETE FROM drops WHERE id = 1; INSERT INTO drops SELECT * FROM adm_snap_drops; DROP TABLE adm_snap_drops;
-       DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
-       DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
-       DELETE FROM spells WHERE id = 1; INSERT INTO spells SELECT * FROM adm_snap_spells; DROP TABLE adm_snap_spells;
-       DELETE FROM levels WHERE id = 5; INSERT INTO levels SELECT * FROM adm_snap_levels; DROP TABLE adm_snap_levels;
-       DELETE FROM news WHERE id > $ADM_NEWS_MAX;"
+			 DELETE FROM items WHERE id = 1; INSERT INTO items SELECT * FROM adm_snap_items; DROP TABLE adm_snap_items;
+			 DELETE FROM drops WHERE id = 1; INSERT INTO drops SELECT * FROM adm_snap_drops; DROP TABLE adm_snap_drops;
+			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
+			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
+			 DELETE FROM spells WHERE id = 1; INSERT INTO spells SELECT * FROM adm_snap_spells; DROP TABLE adm_snap_spells;
+			 DELETE FROM levels WHERE id = 5; INSERT INTO levels SELECT * FROM adm_snap_levels; DROP TABLE adm_snap_levels;
+			 DELETE FROM news WHERE id > $ADM_NEWS_MAX;"
 fi

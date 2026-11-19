@@ -1,39 +1,39 @@
 /* admin.css :: admin panel. Linked by every layout; rules are scoped to
-   body.admin (templates/layout/admin.html, port of legacy templates/admin.php). */
+	 body.admin (templates/layout/admin.html, port of legacy templates/admin.php). */
 
 body.admin {
-  background: white;
+	background: white;
 }
 .admin-page {
-  width: 90%;
-  margin: 0 auto;
-  display: flex;
-  align-items: stretch;
+	width: 90%;
+	margin: 0 auto;
+	display: flex;
+	align-items: stretch;
 }
 .admin-menu {
-  flex: 0 0 150px;
-  width: 150px;
-  padding: 3px;
-  border-right: solid 1px black;
-  line-height: 1.4;
+	flex: 0 0 150px;
+	width: 150px;
+	padding: 3px;
+	border-right: solid 1px black;
+	line-height: 1.4;
 }
 .admin-content {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 3px 3px 3px 9px;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 3px 3px 3px 9px;
 }
 .admin-content p { margin: 0 0 1em; }
 .admin-heading {
-  font-size: inherit;
-  font-weight: bold;
-  text-decoration: underline;
-  margin: 0 0 1em;
+	font-size: inherit;
+	font-weight: bold;
+	text-decoration: underline;
+	margin: 0 0 1em;
 }
 .admin-saved {
-  font-weight: bold;
+	font-weight: bold;
 }
 .admin-errors {
-  margin: 0 0 1em;
+	margin: 0 0 1em;
 }
 table.admin-form { width: 90%; }
 table.admin-form td.admin-label { width: 20%; white-space: nowrap; }
@@ -46,7 +46,7 @@ table.admin-list tr:nth-child(even) td { background-color: #ffffff; }
 .admin-footer { width: 90%; }
 
 @media (max-width: 640px) {
-  .admin-page { flex-direction: column; }
-  .admin-menu { width: auto; border-right: 0; border-bottom: solid 1px black; }
-  table.admin-form, table.admin-list { width: 100%; }
+	.admin-page { flex-direction: column; }
+	.admin-menu { width: auto; border-right: 0; border-bottom: solid 1px black; }
+	table.admin-form, table.admin-list { width: 100%; }
 }

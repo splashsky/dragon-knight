@@ -2,16 +2,16 @@
 
 /* ---- forum (legacy: black 1px grid, #dddddd headers, white/#eeeeee rows) ---- */
 table.forum {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 1px;
-  background-color: black;
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 1px;
+	background-color: black;
 }
 table.forum th,
 table.forum td {
-  padding: 3px;
-  background-color: #ffffff;
-  vertical-align: top;
+	padding: 3px;
+	background-color: #ffffff;
+	vertical-align: top;
 }
 table.forum th { background-color: #dddddd; }
 table.forum tbody tr:nth-child(even) td { background-color: #eeeeee; }
@@ -29,30 +29,30 @@ body.minimal.help { text-align: left; }
 body.minimal.help .dk-content { display: block; }
 .help-page h3 { margin-top: 1em; }
 table.help-table {
-  border: solid 1px black;
-  border-collapse: collapse;
+	border: solid 1px black;
+	border-collapse: collapse;
 }
 table.help-table th {
-  text-align: left;
-  padding: 3px;
+	text-align: left;
+	padding: 3px;
 }
 table.help-table th.help-caption {
-  text-align: center;
-  background-color: #ffffff;
+	text-align: center;
+	background-color: #ffffff;
 }
 table.help-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
 .help-w50 { width: 50%; }
 .help-w60 { width: 60%; }
 .help-w75 { width: 75%; }
 .help-copyright {
-  display: flex;
-  width: 100%;
+	display: flex;
+	width: 100%;
 }
 .help-copyright > div {
-  flex: 1 1 50%;
-  text-align: center;
-  padding: 3px;
+	flex: 1 1 50%;
+	text-align: center;
+	padding: 3px;
 }
 @media (max-width: 700px) {
-  .help-w50, .help-w60, .help-w75 { width: 100%; }
+	.help-w50, .help-w60, .help-w75 { width: 100%; }
 }

@@ -33,13 +33,13 @@ The project indents with tabs.
 for one request only):
 
 1. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
-   row) and `req.session`, and updates `users.onlinetime`.
+	 row) and `req.session`, and updates `users.onlinetime`.
 2. The router matches the method and path. No match gives a 404 page; the wrong method
-   gives a 405 page with an `Allow` header.
+	 gives a 405 page with an `Allow` header.
 3. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
-   runs before any guard or handler.
+	 runs before any guard or handler.
 4. Guards run, then the handler runs. The handler returns a response table (or an HTML
-   string).
+	 string).
 5. HEAD requests: the transaction is rolled back and queued cookies are dropped.
 6. Cookies queued on `req.out_headers` are added to the response.
 
@@ -58,25 +58,25 @@ local inn = require("town.inn")
 local shop = require("town.shop")
 
 return function(r)
-  r:route({ "GET", "POST" }, "/inn", auth.game, common.not_fighting, inn.handle)
-  r:get("/shop/buy/#id", auth.game, common.not_fighting, shop.confirm)   -- params.id
-  r:post("/shop/buy/#id", auth.game, common.not_fighting, shop.buy)
+	r:route({ "GET", "POST" }, "/inn", auth.game, common.not_fighting, inn.handle)
+	r:get("/shop/buy/#id", auth.game, common.not_fighting, shop.confirm)   -- params.id
+	r:post("/shop/buy/#id", auth.game, common.not_fighting, shop.buy)
 end
 ```
 
 - `r:get(pattern, guard..., handler)`, `r:post(...)`, `r:route({"GET","POST"}, ...)`.
-  A trailing `/` is ignored. HEAD requests run the GET route, then `main.lua` rolls the
-  transaction back and drops queued cookies, so HEAD never changes state.
+	A trailing `/` is ignored. HEAD requests run the GET route, then `main.lua` rolls the
+	transaction back and drops queued cookies, so HEAD never changes state.
 - GETs should not change state. The deliberate exceptions are guarded by game state, so
-  a reload is harmless: the `onlinetime`/session touch, `GET /fight` (monster pick, first
-  strike, `currentfight` counter) and `GET /victory` (pays out once).
+	a reload is harmless: the `onlinetime`/session touch, `GET /fight` (monster pick, first
+	strike, `currentfight` counter) and `GET /victory` (pays out once).
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
-  only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
-  handler's second argument and also as `req.params`.
+	only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
+	handler's second argument and also as `req.params`.
 - A guard is `function(req) -> nil | response`. Guards run left to right, and the first
-  response stops the chain.
+	response stops the chain.
 - Route modules run once at VM warm-up: **do not touch `dk.db` at module load or route
-  registration time**.
+	registration time**.
 
 ### Guards (`lib/auth.lua`)
 
@@ -112,13 +112,13 @@ Form and query values are raw strings. Validate them, and convert them with
 `opts`:
 
 - `nav`: show the side columns and the logged-in top nav. Defaults to true when logged
-  in. Legacy pages called with `display(..., false, false, false)` pass `nav = false`.
+	in. Legacy pages called with `display(..., false, false, false)` pass `nav = false`.
 - `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup and iframe
-  pages (`/character`, `/map`, `/babble`). Any other name uses
-  `templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
+	pages (`/character`, `/map`, `/babble`). Any other name uses
+	`templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
 - `body_class`: extra class(es) on `<body>` for page-specific CSS. The help pages pass
-  `{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
-  page (`body.minimal.help` in `community.css`).
+	`{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
+	page (`body.minimal.help` in `community.css`).
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -138,18 +138,18 @@ helpers `h`. `ctx` and `h` are not names you can use in a template, and identifi
 starting with `__` are reserved.
 
 - `{{ expr }}` escapes the value; `nil` prints as an empty string. Use `{{{ expr }}}` only
-  for HTML your own code built.
+	for HTML your own code built.
 - **HTML-returning helpers need triple braces**: `{{{ csrf_field() }}}`,
-  `{{{ include("x") }}}`, `{{{ nl2br(text) }}}`.
+	`{{{ include("x") }}}`, `{{{ nl2br(text) }}}`.
 - Every POST form needs `{{{ csrf_field() }}}`, including the babble iframe form.
 - Popups: `<a href="/character" target="_blank" data-popup="210x500">` (`dk.js` opens a
-  sized window; without JS it's a normal link).
+	sized window; without JS it's a normal link).
 - Images: `/static/images/<file>`. A link-styled submit button:
-  `<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
+	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
-  `<blink>`.
+	`<blink>`.
 - Shared CSS classes: `.title`, `.box` / `.box-body`, `.small`, `.light`, `.highlight`,
-  `.error`, `.copyright`, `button.link`, `form.inline`.
+	`.error`, `.copyright`, `button.link`, `form.inline`.
 
 ### Helpers `h`
 
@@ -191,21 +191,21 @@ starting with `__` are reserved.
 Game mechanics must match legacy exactly. Use these helpers rather than ad-hoc Lua:
 
 - `php.rand(min, max)`: like PHP, casts both arguments to int by truncating toward zero
-  (`rand(maxdam * .5, maxdam)`), swaps them when `min > max`, and is inclusive. Uses
-  `math.random`, which the engine seeds per VM.
+	(`rand(maxdam * .5, maxdam)`), swaps them when `min > max`, and is inclusive. Uses
+	`math.random`, which the engine seeds per VM.
 - `php.ceil`, `php.floor` return integers. `php.round(x)` rounds half away from zero.
-  `php.intval(x)` matches PHP's `(int)`: truncates and parses a leading numeric prefix.
+	`php.intval(x)` matches PHP's `(int)`: truncates and parses a leading numeric prefix.
 - `php.mysql_int(x)` / `php.mysql_uint(x)`: the value MySQL **stored** when legacy wrote a
-  float into an integer column (rounded; the unsigned version clamps to 0). SQLite would
-  keep `12.5` as REAL, so convert floats before writing them to INTEGER columns.
+	float into an integer column (rounded; the unsigned version clamps to 0). SQLite would
+	keep `12.5` as REAL, so convert floats before writing them to INTEGER columns.
 - `php.str(v)`: PHP number-to-string (`1.0` → `"1"`, `1.2` → `"1.2"`). Use it to display
-  REAL columns such as `control.diff2mod`.
+	REAL columns such as `control.diff2mod`.
 - `php.number_format(n)`, `php.prettydate(ts)`, `php.datetime(ts)`.
 - `php.nl2br(s)` does **not** escape. Templates use `h.nl2br`.
 - `php.explode(sep, s)`, `php.implode(sep, t)`, `php.in_list(list, v)`: comma-list
-  columns (`users.spells`, `users.towns`, `towns.itemslist`) with PHP loose equality
-  (`"3" == 3`). For example `"29.30"` matches neither 29 nor 30. Keep those columns'
-  formats, including the leading `"0"`.
+	columns (`users.spells`, `users.towns`, `towns.itemslist`) with PHP loose equality
+	(`"3" == 3`). For example `"29.30"` matches neither 29 nor 30. Keep those columns'
+	formats, including the leading `"0"`.
 - `php.loose_eq(a, b)`, `php.trim(s)`, `php.is_email(s)`.
 
 When legacy has a gameplay bug, keep the behaviour unless it's a security hole, and say so
@@ -214,34 +214,34 @@ in a comment.
 ## Database
 
 - `dk.db:query(sql, ...)` returns rows, `:first` one row or nil, `:value` a scalar,
-  `:exec` returns `changes, last_id`. Always use `?` parameters and **never concatenate
-  user input**. Column identifiers come from whitelists only (`game.level_column`, or a
-  table of allowed `slotN` names).
+	`:exec` returns `changes, last_id`. Always use `?` parameters and **never concatenate
+	user input**. Column identifiers come from whitelists only (`game.level_column`, or a
+	table of allowed `slotN` names).
 - Always call `dk.db` at call time. Don't cache it in a module-level local: it's attached
-  per request and wrapped to count queries.
+	per request and wrapped to count queries.
 - Times are unix seconds (`dk.now()`): `regdate`, `onlinetime`, `postdate`,
-  `newpostdate`, `posttime`.
+	`newpostdate`, `posttime`.
 - `username`, `charname` and `email` compare case-insensitively (`COLLATE NOCASE`, like
-  MySQL). `users.verify` is TEXT: `'1'` means verified, anything else is the pending code.
+	MySQL). `users.verify` is TEXT: `'1'` means verified, anything else is the pending code.
 - Store user text raw and escape it on output. Legacy HTML-escaped on input; we don't, so
-  never put DB text in `{{{ }}}`.
+	never put DB text in `{{{ }}}`.
 - Schema: `app/sql/schema.sql`. Default data: `app/sql/seed.sql`.
 
 ## Sessions, CSRF, accounts
 
 - `lib/session.lua`: `session.create(req, user_id, remember)`, `session.destroy(req)`,
-  `session.destroy_user(user_id)`. The cookie `dk_session` holds 32 random bytes as hex
-  (HttpOnly, SameSite=Lax, Path=/, plus Secure when `cookie_secure = true`). The DB
-  stores only `sha256(token)`. Expiry slides: 1 day normally, 1 year with "remember me"
-  (`Max-Age=31536000`).
+	`session.destroy_user(user_id)`. The cookie `dk_session` holds 32 random bytes as hex
+	(HttpOnly, SameSite=Lax, Path=/, plus Secure when `cookie_secure = true`). The DB
+	stores only `sha256(token)`. Expiry slides: 1 day normally, 1 year with "remember me"
+	(`Max-Age=31536000`).
 - `lib/csrf.lua`: logged in, the token is `sessions.csrf`. Logged out, the forms use a
-  signed double-submit: an HttpOnly `dk_csrf` cookie plus
-  `hmac_sha256(config.secret, "csrf:" .. cookie)` in the form. The field is named
-  `csrf`; the `X-CSRF-Token` header also works.
+	signed double-submit: an HttpOnly `dk_csrf` cookie plus
+	`hmac_sha256(config.secret, "csrf:" .. cookie)` in the form. The field is named
+	`csrf`; the `X-CSRF-Token` header also works.
 - `lib/auth.lua`: `auth.hash_password(pw)` → `pbkdf2$<iters>$<salt>$<hash>`,
-  `auth.verify_password(pw, stored)` (constant time), `auth.random_letters(n)`.
+	`auth.verify_password(pw, stored)` (constant time), `auth.random_letters(n)`.
 - `lib/mail.lua`: `mail.send(to, subject, body)` writes `<outbox_dir>/<unix>-<rand>.eml`
-  and returns true or false.
+	and returns true or false.
 
 ## End-to-end tests
 
@@ -293,8 +293,8 @@ A throwaway config keeps experiments away from your main database:
 mkdir -p /tmp/dk-dev
 cat > /tmp/dk-dev/config.lua <<'EOF'
 return { port = 8081, db_path = "/tmp/dk-dev/dk.db",
-         outbox_dir = "/tmp/dk-dev/outbox", secret = "dev", dev = true,
-         pbkdf2_iterations = 1000 }
+				 outbox_dir = "/tmp/dk-dev/outbox", secret = "dev", dev = true,
+				 pbkdf2_iterations = 1000 }
 EOF
 ./dk install --config /tmp/dk-dev/config.lua --admin admin admin@example.com secret
 ./dk serve   --config /tmp/dk-dev/config.lua

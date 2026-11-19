@@ -35,8 +35,8 @@ uint64_t   vm_generation(const dk_vm *vm);
 
 /* Stats for logging/debug endpoint. */
 typedef struct {
-    uint64_t built, reaped, hot_acquires, cold_acquires, stale_discards;
-    int      ready;
+	uint64_t built, reaped, hot_acquires, cold_acquires, stale_discards;
+	int      ready;
 } vmpool_stats;
 void       vmpool_get_stats(vmpool_stats *out);
 

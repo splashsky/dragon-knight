@@ -7,10 +7,10 @@
 #include <stdint.h>
 
 typedef struct {
-    uint32_t state[8];
-    uint64_t bitlen;
-    uint8_t  buf[64];
-    size_t   buflen;
+	uint32_t state[8];
+	uint64_t bitlen;
+	uint8_t  buf[64];
+	size_t   buflen;
 } sha256_ctx;
 
 void sha256_init(sha256_ctx *c);
@@ -21,7 +21,7 @@ void sha256(const void *data, size_t n, uint8_t out[32]);
 void hmac_sha256(const void *key, size_t keylen, const void *msg, size_t msglen, uint8_t out[32]);
 
 void pbkdf2_hmac_sha256(const void *pw, size_t pwlen, const void *salt, size_t saltlen,
-                        uint32_t iterations, uint8_t *out, size_t outlen);
+						uint32_t iterations, uint8_t *out, size_t outlen);
 
 /* Cryptographically secure random bytes via getrandom(2). 0 ok, -1 error. */
 int  random_bytes(void *buf, size_t n);

@@ -7,9 +7,9 @@
 
 /* Growable byte buffer. Always NUL-terminated after any append (p may be NULL while len==0). */
 typedef struct {
-    char  *p;
-    size_t len;
-    size_t cap;
+	char  *p;
+	size_t len;
+	size_t cap;
 } sbuf;
 
 void  sb_init(sbuf *b);

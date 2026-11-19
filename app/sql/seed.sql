@@ -1,4 +1,4 @@
--- Default game data, ported 1:1 from legacy/install.php ("Complete Setup").
+-- Default game data, ported 1:1 from the original install.php ("Complete Setup").
 -- Differences: control.verifyemail = 0 (PLAN.md); news.postdate is unix time
 -- (2004-01-01 12:00:00 UTC). Dragon's -> Dragon''s (SQL quoting).
 

@@ -42,7 +42,7 @@ void     codecache_prewarm(void);
 /* Same, reporting each compile failure (what = path relative to its root dir).
  * Returns the number of failures (used by `dk check`). */
 int      codecache_prewarm_ex(void (*on_error)(const char *what, const char *msg, void *ud),
-                              void *ud);
+							  void *ud);
 
 /* Drop everything and bump the generation (also used by tests). */
 void     codecache_invalidate(void);

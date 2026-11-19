@@ -9,28 +9,28 @@
 static int mt_checks, mt_fails;
 
 #define CHECK(cond) do { \
-    mt_checks++; \
-    if (!(cond)) { mt_fails++; fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); } \
+	mt_checks++; \
+	if (!(cond)) { mt_fails++; fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); } \
 } while (0)
 
 #define CHECK_STR_EQ(a, b) do { \
-    const char *mt_a = (a), *mt_b = (b); \
-    mt_checks++; \
-    if (!mt_a || !mt_b || strcmp(mt_a, mt_b) != 0) { \
-        mt_fails++; \
-        fprintf(stderr, "FAIL %s:%d: %s == %s\n  got:      \"%s\"\n  expected: \"%s\"\n", \
-                __FILE__, __LINE__, #a, #b, mt_a ? mt_a : "(null)", mt_b ? mt_b : "(null)"); \
-    } \
+	const char *mt_a = (a), *mt_b = (b); \
+	mt_checks++; \
+	if (!mt_a || !mt_b || strcmp(mt_a, mt_b) != 0) { \
+		mt_fails++; \
+		fprintf(stderr, "FAIL %s:%d: %s == %s\n  got:      \"%s\"\n  expected: \"%s\"\n", \
+				__FILE__, __LINE__, #a, #b, mt_a ? mt_a : "(null)", mt_b ? mt_b : "(null)"); \
+	} \
 } while (0)
 
 #define CHECK_MEM_EQ(a, b, n) do { \
-    mt_checks++; \
-    if (memcmp((a), (b), (n)) != 0) { \
-        mt_fails++; fprintf(stderr, "FAIL %s:%d: memcmp(%s, %s, %s)\n", __FILE__, __LINE__, #a, #b, #n); \
-    } \
+	mt_checks++; \
+	if (memcmp((a), (b), (n)) != 0) { \
+		mt_fails++; fprintf(stderr, "FAIL %s:%d: memcmp(%s, %s, %s)\n", __FILE__, __LINE__, #a, #b, #n); \
+	} \
 } while (0)
 
 #define TEST_SUMMARY() \
-    (printf("%s: %d checks, %d failed\n", __FILE__, mt_checks, mt_fails), mt_fails ? 1 : 0)
+	(printf("%s: %d checks, %d failed\n", __FILE__, mt_checks, mt_fails), mt_fails ? 1 : 0)
 
 #endif
