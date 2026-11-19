@@ -1,0 +1,44 @@
+{#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). -#}
+<section class="box">
+<div class="title"><img src="/static/images/button_location.gif" alt="Location" title="Location"></div>
+<div class="box-body">
+Currently: {{ user.currentaction }}<br>
+Latitude: {{ latitude }}<br>
+Longitude: {{ longitude }}<br>
+<a href="/map" target="_blank" data-popup="520x520">View Map</a><br>
+<form class="compass" method="post" action="/move">
+{{{ csrf_field() }}}
+<input name="north" type="submit" value="North"><br>
+<input name="west" type="submit" value="West"><input name="east" type="submit" value="East"><br>
+<input name="south" type="submit" value="South">
+</form>
+</div>
+</section>
+
+<section class="box">
+<div class="title"><img src="/static/images/button_towns.gif" alt="Towns" title="Towns"></div>
+<div class="box-body">
+{%- if town then %}
+Welcome to <b>{{ town.name }}</b>.<br><br>
+{%- end %}
+Travel To:<br>
+{%- for _, t in ipairs(towns) do %}
+<form class="inline" method="post" action="/travel/{{ t.id }}">{{{ csrf_field() }}}<button class="link" type="submit">{{ t.name }}</button></form><br>
+{%- end %}
+</div>
+</section>
+
+<section class="box">
+<div class="title"><img src="/static/images/button_functions.gif" alt="Functions" title="Functions"></div>
+<div class="box-body">
+{%- if forum then %}
+<a href="{{ forum }}">Forum</a><br>
+{%- end %}
+{%- if is_admin then %}
+<a href="/admin">Admin</a><br>
+{%- end %}
+<a href="/changepassword">Change Password</a><br>
+<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<button class="link" type="submit">Log Out</button></form><br>
+<a href="/help">Help</a>
+</div>
+</section>

@@ -1,0 +1,48 @@
+{#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). -#}
+<section class="box">
+<div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
+<div class="box-body">
+<b>{{ user.charname }}</b><br>
+Level: {{ user.level }}<br>
+Exp: {{ experience }}<br>
+Gold: {{ gold }}<br>
+HP: {% if hp_low then %}<span class="highlight blink"><b>*{{ user.currenthp }}*</b></span>{% else %}{{ user.currenthp }}{% end %}<br>
+MP: {% if mp_low then %}<span class="highlight blink"><b>*{{ user.currentmp }}*</b></span>{% else %}{{ user.currentmp }}{% end %}<br>
+TP: {{ user.currenttp }}<br>
+<table class="statbars">
+<tr>
+{%- for _, b in ipairs(bars) do %}
+<td><div class="statbar"><div class="statbar-fill {{ b.color }}" style="height: {{ b.height }}px"></div></div></td>
+{%- end %}
+</tr>
+<tr><td>HP</td><td>MP</td><td>TP</td></tr>
+</table>
+<a href="/character" target="_blank" data-popup="210x500">Extended Stats</a>
+</div>
+</section>
+
+<section class="box">
+<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<div class="box-body">
+<table style="width: 100%">
+<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td style="width: 100%">Weapon: {{ user.weaponname }}</td></tr>
+<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td style="width: 100%">Armor: {{ user.armorname }}</td></tr>
+<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td style="width: 100%">Shield: {{ user.shieldname }}</td></tr>
+</table>
+Slot 1: {{ user.slot1name }}<br>
+Slot 2: {{ user.slot2name }}<br>
+Slot 3: {{ user.slot3name }}
+</div>
+</section>
+
+<section class="box">
+<div class="title"><img src="/static/images/button_fastspells.gif" alt="Fast Spells" title="Fast Spells"></div>
+<div class="box-body">
+{%- if #spells == 0 then %}
+None
+{%- end %}
+{%- for _, s in ipairs(spells) do %}
+<form class="inline" method="post" action="/spell/{{ s.id }}">{{{ csrf_field() }}}<button class="link" type="submit">{{ s.name }}</button></form><br>
+{%- end %}
+</div>
+</section>

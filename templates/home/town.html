@@ -1,0 +1,34 @@
+{#- Town screen (legacy templates/towns.php + index.php dotown()). -#}
+<section class="box">
+<div class="title"><img src="/static/images/town_{{ town.id }}.gif" alt="Welcome to {{ town.name }}" title="Welcome to {{ town.name }}"></div>
+<div class="box-body">
+<b>Town Options:</b><br>
+<ul>
+<li><a href="/inn">Rest at the Inn</a></li>
+<li><a href="/shop">Buy Weapons/Armor</a></li>
+<li><a href="/maps">Buy Maps</a></li>
+</ul>
+</div>
+</section>
+{%- if news then %}
+<section class="panel">
+<div class="title">Latest News</div>
+<div class="box-body"><span class="light">[{{ date(news.postdate) }}]</span><br>{{{ nl2br(news.content) }}}</div>
+</section>
+{%- end %}
+<div class="panel-row">
+<div>
+{%- if online then %}
+<div class="title">Who's Online</div>
+<div class="box-body">There are <b>{{ #online }}</b> user(s) online within the last 10 minutes:
+{%- for i, u in ipairs(online) do %}{% if i > 1 then %},{% end %} <a href="/character/{{ u.id }}">{{ u.charname }}</a>{% end %}
+</div>
+{%- end %}
+</div>
+<div>
+{%- if babble then %}
+<div class="title">Babble Box</div>
+<div class="box-body"><iframe src="/babble" name="sbox" id="bbox" class="babble-frame" title="Babble Box"></iframe></div>
+{%- end %}
+</div>
+</div>

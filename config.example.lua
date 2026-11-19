@@ -26,7 +26,8 @@ return {
   public_dir   = "public",        -- served at /static/
   outbox_dir   = "data/outbox",   -- outgoing mail is written here as .eml files
 
-  -- HMAC key for signed values. `dk install` writes a random one if empty.
+  -- HMAC key for signed values (CSRF tokens for logged-out forms). `dk install`
+  -- prints a random one if this is empty; paste it here.
   secret = "",
 
   -- Development mode: show Lua tracebacks on 500 pages (boolean).
@@ -39,6 +40,11 @@ return {
   request_timeout   = 30,         -- seconds to receive a complete request (-> 408)
   max_connections   = 1024,       -- concurrent connections; extra ones are closed
 
-  -- App-level keys (read by the Lua app via dk.config), e.g.:
-  -- pbkdf2_iterations = 210000,
+  -- App-level keys (read by the Lua app via dk.config; hot-reloaded).
+
+  -- PBKDF2-HMAC-SHA256 iterations for new password hashes. Existing hashes keep their
+  -- own count and are upgraded on the next successful login.
+  pbkdf2_iterations = 210000,
+  -- Add "Secure" to cookies (set true when the game is served over HTTPS).
+  cookie_secure = false,
 }

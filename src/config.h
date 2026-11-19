@@ -19,7 +19,7 @@ typedef struct {
     char  *template_dir;      /* "templates" */
     char  *public_dir;        /* "public"  (served at /static/) */
     char  *outbox_dir;        /* "data/outbox" */
-    char  *secret;            /* HMAC key for signed values; `dk install` writes a random one if empty */
+    char  *secret;            /* HMAC key for signed values; `dk install` prints a random one if empty */
     int    dev;               /* 1 : show Lua tracebacks in 500 pages */
     size_t max_header_bytes;  /* 16384 */
     size_t max_body_bytes;    /* 1048576 */

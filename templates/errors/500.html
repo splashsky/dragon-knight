@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Internal Server Error</title>
+<link rel="stylesheet" href="/static/css/dk.css">
+</head>
+<body>
+<div class="dk-page">
+<div class="title">Internal Server Error</div>
+<p>Something went wrong while handling your request. Please go back and try again.</p>
+{%- if detail then %}
+<pre>{{ detail }}</pre>
+{%- end %}
+</div>
+</body>
+</html>

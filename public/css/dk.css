@@ -1,0 +1,143 @@
+/* dk.css :: base look, ported from legacy templates/primary.php (owned by P2).
+   Feature styles go in town.css / fight.css / community.css / admin.css. */
+
+body {
+  background: url(/static/images/background.jpg);
+  color: black;
+  font: 11px verdana, sans-serif;
+  margin: 8px;
+}
+table {
+  border-style: none;
+  padding: 0;
+  font: 11px verdana, sans-serif;
+}
+td {
+  border-style: none;
+  padding: 3px;
+  vertical-align: top;
+}
+img { border: 0; }
+a, button.link {
+  color: #663300;
+  text-decoration: none;
+  font-weight: bold;
+}
+a:hover, button.link:hover {
+  color: #330000;
+}
+.small { font: 10px verdana, sans-serif; }
+.highlight { color: red; }
+.light { color: #999999; }
+.title {
+  border: solid 1px black;
+  background-color: #eeeeee;
+  font-weight: bold;
+  padding: 5px;
+  margin: 3px;
+}
+.copyright {
+  border: solid 1px black;
+  background-color: #eeeeee;
+  font: 10px verdana, sans-serif;
+}
+.error { color: red; }
+
+/* replaces <blink> */
+.blink { animation: dk-blink 1s step-start infinite; }
+@keyframes dk-blink { 50% { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
+
+/* ---- three-column frame (legacy: table width 90%, 180px side cells) ---- */
+.dk-page {
+  width: 90%;
+  margin: 0 auto;
+}
+.dk-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: solid 2px black;
+  padding: 6px 3px;
+}
+.dk-topnav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dk-cols {
+  display: flex;
+  align-items: stretch;
+}
+.dk-left, .dk-right {
+  flex: 0 0 180px;
+  width: 180px;
+  padding: 3px;
+}
+.dk-left { border-right: solid 2px black; }
+.dk-right { border-left: solid 2px black; }
+.dk-middle {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px;
+}
+.dk-footer {
+  width: 90%;
+  margin: 12px auto 0;
+  display: flex;
+}
+.dk-footer > div {
+  flex: 1 1 25%;
+  text-align: center;
+  padding: 3px;
+}
+
+/* ---- boxes (legacy <table width=100%><tr><td class=title>...</td></tr><tr><td>...) ---- */
+.box { margin-bottom: 12px; }
+.box-body { padding: 3px; }
+.box .title { margin: 0 0 3px; }
+.box .title img { display: block; }
+
+/* inline POST forms that look like links / plain buttons */
+form.inline { display: inline; margin: 0; }
+button.link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+input[type="image"] { vertical-align: middle; }
+
+.compass { text-align: center; margin: 6px 0 0; }
+.compass input { min-width: 48px; }
+
+/* ---- HP/MP/TP bars ---- */
+table.statbars { width: 100px; }
+table.statbars td { width: 33%; text-align: left; }
+.statbar {
+  width: 15px;
+  height: 100px;
+  border: solid 1px black;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.statbar-fill { border-top: solid 1px black; }
+.statbar-fill.green { background-image: url(/static/images/bars_green.gif); }
+.statbar-fill.yellow { background-image: url(/static/images/bars_yellow.gif); }
+.statbar-fill.red { background-image: url(/static/images/bars_red.gif); }
+
+/* ---- forms on account pages ---- */
+.form-table td:first-child { white-space: nowrap; }
+
+/* ---- town page panels ---- */
+.panel { width: 95%; margin: 0 auto; }
+.panel-row { display: flex; width: 95%; margin: 12px auto 0; gap: 6px; }
+.panel-row > div { flex: 1 1 50%; min-width: 0; }
+.babble-frame { width: 100%; height: 250px; border: 0; }
+
+/* ---- minimal (popup / iframe) layout ---- */
+body.minimal { text-align: center; }
+body.minimal .dk-content { display: inline-block; text-align: left; }

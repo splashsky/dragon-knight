@@ -1,0 +1,31 @@
+{%- if errors then %}
+<p>The following error(s) occurred when your account was being made:<br>
+<span class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</span><br>Please correct them and try again.</p>
+{%- end %}
+<form action="/register" method="post">
+{{{ csrf_field() }}}
+<table class="form-table" style="width: 80%">
+<tr><td style="width: 20%">Username:</td><td><input type="text" name="username" size="30" maxlength="30" value="{{ v.username }}" autocomplete="username" required><br>Usernames must be 30 alphanumeric characters or less.<br><br><br></td></tr>
+<tr><td>Password:</td><td><input type="password" name="password1" size="30" autocomplete="new-password" required></td></tr>
+<tr><td>Verify Password:</td><td><input type="password" name="password2" size="30" autocomplete="new-password" required><br><br><br></td></tr>
+<tr><td>Email Address:</td><td><input type="email" name="email1" size="30" maxlength="100" value="{{ v.email1 }}" autocomplete="email" required></td></tr>
+<tr><td>Verify Email:</td><td><input type="email" name="email2" size="30" maxlength="100" value="{{ v.email2 }}" required>
+{%- if verifyemail then %}
+<br><span class="small">A verification code will be sent to the address above, and you will not be able to log in without first entering the code. Please be sure to enter your correct email address.</span>
+{%- end %}
+<br><br><br></td></tr>
+<tr><td>Character Name:</td><td><input type="text" name="charname" size="30" maxlength="30" value="{{ v.charname }}" required></td></tr>
+<tr><td>Character Class:</td><td><select name="charclass">
+{%- for i, name in ipairs(classes) do %}<option value="{{ i }}"{% if v.charclass == tostring(i) then %} selected{% end %}>{{ name }}</option>{% end -%}
+</select></td></tr>
+<tr><td>Difficulty:</td><td><select name="difficulty">
+{%- for i, name in ipairs(difficulties) do %}<option value="{{ i }}"{% if v.difficulty == tostring(i) then %} selected{% end %}>{{ name }}</option>{% end -%}
+</select></td></tr>
+<tr><td colspan="2">See <a href="/help">Help</a> for more information about character classes and difficulty levels.<br><br></td></tr>
+<tr><td colspan="2"><input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset"></td></tr>
+</table>
+</form>
