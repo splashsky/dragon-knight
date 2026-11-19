@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #include "util.h"
 
@@ -28,23 +27,6 @@ typedef struct {
 	int      n;
 	uint64_t tick;
 } stmt_cache;
-
-static int mkdir_parents(const char *path)
-{
-	char buf[PATH_MAX];
-	if (snprintf(buf, sizeof buf, "%s", path) >= (int)sizeof buf) return -1;
-	char *slash = strrchr(buf, '/');
-	if (!slash || slash == buf) return 0;
-	*slash = '\0';
-	for (char *p = buf + 1; *p; p++) {
-		if (*p != '/') continue;
-		*p = '\0';
-		if (mkdir(buf, 0755) < 0 && errno != EEXIST) return -1;
-		*p = '/';
-	}
-	if (mkdir(buf, 0755) < 0 && errno != EEXIST) return -1;
-	return 0;
-}
 
 sqlite3 *db_open(const char *path, char *err, size_t errlen)
 {

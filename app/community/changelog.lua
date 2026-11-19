@@ -16,6 +16,7 @@ changelog.RELEASES = {
 			"New template language, compiled to Lua; everything shown is HTML-escaped by default.",
 			"Clean URLs (/inn, /shop/buy/3, /forum/thread/7, ...) and HTML5/CSS markup with the original images and layout.",
 			"Installer and upgrade scripts replaced by the dk install command.",
+			"Added dk backup and make targets for releases, deployment and migrations (make dist, make deploy, make migrate), and make run to play locally in one step.",
 			"Passwords are stored as PBKDF2-SHA256 hashes; the alphanumeric/10 character password rules are gone.",
 			"Logins use server-side sessions; changing or resetting a password logs out other sessions.",
 			"Added CSRF protection to every form.",

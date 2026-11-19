@@ -43,6 +43,19 @@ and `sqlite3` or `python3`.)
 ## Quick start
 
 ```sh
+make run PORT=8080                     # then open http://127.0.0.1:8080/ and log in as admin / admin
+```
+
+`make run` builds `./dk` and serves the game in the foreground (Ctrl-C stops it). The first
+time, it creates `config.lua` from `config.example.lua` with a random `secret` and installs
+the game with an administrator `admin` / `admin` (`ADMIN_USER`, `ADMIN_EMAIL`, `ADMIN_PASS`
+change that); later runs reuse both, and an out-of-date database is backed up and migrated
+first, so pulling new code and `make run` just works. `BIND=0.0.0.0` listens on every
+interface (default: the config's `bind`); `CONFIG=path` uses another config file.
+
+By hand:
+
+```sh
 make                                   # builds ./dk
 cp config.example.lua config.lua       # then edit: port, paths, secret, dev = false
 ./dk install --admin admin admin@example.com 'a-good-password'
@@ -52,17 +65,22 @@ cp config.example.lua config.lua       # then edit: port, paths, secret, dev = f
 `dk install` prints a random `secret` if the config has none; paste it into `config.lua`.
 The database and the mail outbox go to `data/` by default. Serve over HTTPS through a
 reverse proxy in production and set `cookie_secure = true`. After updating the game, run
-`./dk migrate` to bring an existing database up to date (it does nothing when it already is).
+`make migrate` (check, back up, then `./dk migrate`) to bring an existing database up to
+date; it does nothing when it already is. To run the game on a server, see
+[Deployment](#deployment).
 
 ## Command line
 
-Every command accepts `--config PATH` (default `./config.lua`).
+Every command accepts `--config PATH` (default `./config.lua`). Only `dk install` and
+`dk serve` create the database; `dk migrate`, `dk user` and `dk backup` exit with status 3
+when it doesn't exist.
 
 | Command | |
 |---|---|
-| `dk serve` | run the HTTP server |
+| `dk serve [--port N] [--bind ADDR]` | run the HTTP server; `--port` (1–65535, or 0 for any free port) and `--bind` (an IPv4 or IPv6 address) override the config |
 | `dk install [--admin USER EMAIL PASS] [--charname NAME] [--class 1-3] [--difficulty 1-3] [--partial] [--force]` | create the schema, load the default game data and create the administrator (`--partial`: no game data; `--force`: drop existing tables first) |
 | `dk migrate [--status]` | upgrade an existing database to the current schema, in one transaction (`--status`: show the versions only). Until it runs, the game answers every page with a 503 "run `dk migrate`" page |
+| `dk backup [OUTPUT]` | copy the database, safely while `dk serve` runs (SQLite backup API, one consistent snapshot), check the copy with `PRAGMA integrity_check` and print its path. OUTPUT defaults to `<db dir>/backups/<db name>-YYYYMMDD-HHMMSS.db` (UTC); an existing file is never overwritten. Exit status 3 if the database does not exist |
 | `dk user list` | list accounts |
 | `dk user passwd USER NEWPASS` | set a password (ends the user's sessions) |
 | `dk user admin USER` | make a user an administrator |
@@ -79,6 +97,84 @@ difficulty names, …) live in the database and are edited in the admin panel at
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
+## Deployment
+
+A server needs only the `dk` binary, `app/`, `templates/`, `public/` and a `config.lua`;
+the game writes to `data/` (database, mail outbox, backups). The binary has to be built
+for the server's OS and CPU: build on the same kind of machine (or on the server).
+
+**Release tarball.** `make dist` builds an optimized binary (in `build/release/`, apart from
+the development build) and packs `dist/dk-VERSION-OS-ARCH.tar.gz` with a `dk-VERSION/`
+directory: `dk`, `app/`, `templates/`, `public/`, `config.example.lua`, `README.md`,
+`LICENSE`. It never contains a `config.lua` or `data/`.
+
+**`make deploy`** installs the working tree into a directory, locally or over ssh:
+
+```sh
+make deploy DEST=/srv/dk                                   # local directory
+make deploy DEST=dk@game.example.org:/srv/dk RESTART='sudo systemctl restart dk'
+make deploy DEST=game:dk CONFIG=prod.lua                   # ~/dk on host "game"
+```
+
+It builds the release binary and runs `dk check` on the working tree, then copies the
+binary (under a temporary name, renamed into place, so a running server is never handed
+a half-written file), syncs `app/`, `templates/` and `public/` (deleting files that are
+gone from them) and copies `config.example.lua`, `README.md` and `LICENSE`. Nothing else
+in DEST is touched: not `config.lua`, not `data/`. In DEST it then runs `./dk check`,
+`./dk backup` and `./dk migrate` with `--config CONFIG` (default `config.lua`, relative
+to DEST), and finally `RESTART` if given. DEST is remote when it has a `:` before its
+first `/` (as with `rsync` and `scp`); remote steps run over `ssh`, and `rsync` is needed
+on both machines. If the server's `uname -sm` differs from this machine's, the binary is
+not copied (with a warning) and the server keeps its own. The deployment assumes the
+default `app_dir`, `template_dir` and `public_dir`.
+
+First-time setup on the server, after a first `make deploy` (which stops with these
+steps because there is no database yet):
+
+```sh
+cd /srv/dk
+cp config.example.lua config.lua      # set secret, dev = false, cookie_secure, bind/port
+./dk install --admin admin admin@example.com 'a-good-password'
+./dk serve                            # or the systemd unit: deploy/dk.service
+```
+
+[`deploy/dk.service`](deploy/dk.service) is an example systemd unit: a dedicated `dk`
+user, `WorkingDirectory=/srv/dk`, `Restart=on-failure`, and sandboxing that leaves only
+`/srv/dk/data` writable. Deploy as that user (`DEST=dk@host:/srv/dk`) so the files and
+the database keep one owner.
+
+**Upgrades** are the same `make deploy DEST=... [RESTART=...]`: sync, check, back up,
+migrate. Lua and template changes are live as soon as the files land (hot reload), so
+no restart is needed for them; a changed binary runs after a restart (the script says
+which case it is). The files land before the migration runs: in between, if the new
+code expects a newer schema, requests get the "run `dk migrate`" 503 page rather than
+new code running against the old schema. Each deploy leaves a backup in
+`data/backups/`; to restore one, stop the server and copy it over `data/dk.db`
+(removing `data/dk.db-wal` and `data/dk.db-shm`).
+
+On a server that builds from a source checkout instead, `make` then `make migrate`
+does the same check, backup and migration.
+
+## Make targets
+
+| Target | |
+|---|---|
+| `make` | build `./dk` (objects in `build/`) |
+| `make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]` | build and serve in the foreground; first use creates the config and installs the game (admin / admin), an old database is backed up and migrated (see [Quick start](#quick-start)) |
+| `make test` | lint, C unit tests, Lua unit tests and end-to-end tests |
+| `make lint` | check tab indentation |
+| `make release` | optimized build in `build/release/dk` (`-O2`, no sanitizers) |
+| `make dist` | release tarball `dist/dk-VERSION-OS-ARCH.tar.gz` |
+| `make backup [CONFIG=config.lua]` | `./dk backup` |
+| `make migrate [CONFIG=config.lua]` | `./dk check`, then `./dk backup`, then `./dk migrate`; stops at the first failure |
+| `make migrate-status [CONFIG=config.lua]` | `./dk migrate --status` |
+| `make deploy DEST=dir\|[user@]host:dir [CONFIG=config.lua] [RESTART='command']` | see [Deployment](#deployment) |
+| `make clean` / `make distclean` | remove the objects and `./dk` / also `build/` and `dist/` |
+
+Variables: `BUILD=dir` (object dir), `BIN=path` (binary), `DEBUG=1` (`-O0 -g`,
+ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make run`
+`PORT`, `BIND`, `ADMIN_USER`, `ADMIN_EMAIL`, `ADMIN_PASS`.
+
 ## Development
 
 - Edit `app/**/*.lua` or `templates/**/*.html` and refresh the browser.
@@ -88,6 +184,11 @@ The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or
 	feature scripts in `tests/e2e/` (including a full playthrough and a concurrency check).
 - `E2E_ONLY=town,fight tests/run.sh` runs only some feature scripts; `tests/run.sh -k`
 	keeps the temp dir (database, server log) for inspection.
+- `tests/e2e/quickstart.sh` covers `make run` and `dk serve --port/--bind`;
+	`tests/e2e/backup.sh` and `tests/e2e/deploy.sh` cover `dk backup`, `make dist` and
+	`make deploy` (to a temporary directory, and to a "remote" one through a stand-in
+	`ssh`); the first run builds `build/release/dk`, and the deploy checks are skipped
+	without `rsync`.
 - `make DEBUG=1 test` builds with `-O0 -g` and AddressSanitizer/UndefinedBehaviorSanitizer;
 	the e2e run fails on any sanitizer report in the server log.
 - `make BUILD=build/x BIN=build/x/dk` keeps objects and the binary in a separate
@@ -98,7 +199,7 @@ The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or
 ## Project layout
 
 ```
-src/            C engine: http, vmpool, codecache, tmpl, config, crypto, util, Lua/SQLite bindings, CLI
+src/            C engine: http, vmpool, codecache, tmpl, config, crypto, util, Lua/SQLite bindings, backup, CLI
 app/            Lua application
   main.lua        request entry point (sessions, routing, CSRF, errors)
   routes/         route registration per area
@@ -107,6 +208,8 @@ app/            Lua application
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
+scripts/        run.sh (`make run`), deploy.sh (`make deploy`)
+deploy/         dk.service (example systemd unit)
 tests/          c/ (C unit tests), lua/ (Lua unit tests), run.sh + e2e/ (end-to-end), fixtures/
 vendor/         Lua 5.5.1 and SQLite 3.54.1, unmodified (see vendor/VERSIONS)
 docs/APP.md     app developer guide
@@ -140,8 +243,8 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	cookie scheme; escaping and parameterized SQL throughout.
 - Email (registration verification, lost password) is written as `.eml` files to the
 	outbox directory instead of being sent; email verification is off by default.
-- Installation and upgrades are the `dk install` and `dk migrate` commands; there is no web
-	installer.
+- Installation and upgrades are the `dk install`, `dk migrate` and `dk backup` commands
+	(and `make deploy`); there is no web installer.
 - The admin "page compression" setting is gone (the server doesn't gzip).
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.

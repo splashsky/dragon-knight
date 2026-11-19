@@ -38,6 +38,9 @@ void log_error(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 int64_t now_unix(void);       /* wall clock, seconds */
 double  now_mono(void);       /* monotonic, seconds (fractional) */
 
+/* Create the directories leading to path (not path itself), like mkdir -p. 0 ok, -1 errno. */
+int   mkdir_parents(const char *path);
+
 /* Read a whole file into a heap buffer (NUL-terminated). Returns NULL on error (errno set). */
 char *read_file(const char *path, size_t *len_out);
 

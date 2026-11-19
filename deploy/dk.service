@@ -1,0 +1,50 @@
+# deploy/dk.service :: example systemd unit for Dragon Knight installed in /srv/dk.
+#
+#   sudo useradd --system --home /srv/dk --shell /usr/sbin/nologin dk
+#   sudo cp deploy/dk.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#   sudo systemctl enable --now dk
+#
+# The game only writes to /srv/dk/data (database, mail outbox, backups). Deploy as the
+# dk user (make deploy DEST=dk@host:/srv/dk) so the files and the database stay owned
+# by it, and allow that user `sudo systemctl restart dk` to use
+# RESTART='sudo systemctl restart dk'. Lua and template changes don't need a restart.
+
+[Unit]
+Description=Dragon Knight game server
+After=network.target
+
+[Service]
+Type=simple
+User=dk
+Group=dk
+WorkingDirectory=/srv/dk
+ExecStart=/srv/dk/dk serve --config /srv/dk/config.lua
+Restart=on-failure
+RestartSec=2
+UMask=0027
+
+# Hardening: read-only system and code, writable data directory only.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/dk/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

@@ -144,15 +144,30 @@ t_form_submit() {
 	t_post "$path" "$data"
 }
 # Run SQL against the test database (sqlite3 CLI or python3). Prints rows '|'-separated.
-t_sql() {
+t_sql() { t_sql_db "$T/dk.db" "$1"; }
+# Same against another database file: t_sql_db DB "SQL"
+t_sql_db() {
 	if command -v sqlite3 >/dev/null; then
-		sqlite3 "$T/dk.db" "$1"
+		sqlite3 "$1" "$2"
 	else
-		python3 - "$T/dk.db" "$1" <<'PY'
+		python3 - "$1" "$2" <<'PY'
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1])
 for row in con.execute(sys.argv[2]):
 		print("|".join("" if v is None else str(v) for v in row))
+con.commit()
+PY
+	fi
+}
+# Run an SQL file against a database: t_sql_script DB FILE
+t_sql_script() {
+	if command -v sqlite3 >/dev/null; then
+		sqlite3 "$1" < "$2"
+	else
+		python3 - "$1" "$2" <<'PY'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.executescript(open(sys.argv[2]).read())
 con.commit()
 PY
 	fi

@@ -263,6 +263,13 @@ before versioning are version 0. `dk migrate` runs the missing steps of
 runs `PRAGMA foreign_key_check`. `main.lua` compares the version on every request and
 serves a 503 page until the database matches.
 
+Upgrade a server with `make migrate` (`dk check`, then `dk backup`, then `dk migrate`;
+stops at the first failure) or `make deploy DEST=...`, which syncs the files and does the
+same in DEST; `make run` does it before serving. `dk backup` writes a consistent copy to
+`<db dir>/backups/<name>-YYYYMMDD-HHMMSS.db` even while the server runs; to roll back a
+migration, stop the server and copy the backup over the database (see README
+"Deployment").
+
 To change the schema:
 
 1. Edit `schema.sql` (and `seed.sql` if new rows are needed; write `INSERT INTO t (cols)

@@ -5,11 +5,34 @@
 #   make lint            check tab indentation (tests/lint.sh)
 #   make BUILD=build/x   use a separate object dir (parallel builds/CI)
 #   make DEBUG=1         -O0 -g with ASan/UBSan
+#   make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]
+#                        build and serve in the foreground; on first use creates CONFIG
+#                        (random secret) and installs the game with ADMIN_USER/ADMIN_PASS
+#                        (admin/admin); migrates an out-of-date database (scripts/run.sh)
+#
+# Releases, deployment and migrations (CONFIG defaults to config.lua):
+#   make release         optimized build in build/release/dk (-O2, no sanitizers)
+#   make dist            dist/dk-VERSION-OS-ARCH.tar.gz: binary, app/, templates/, public/,
+#                        config.example.lua, README.md, LICENSE (never config.lua or data/)
+#   make backup [CONFIG=path]           ./dk backup: online copy to <db dir>/backups/
+#   make migrate [CONFIG=path]          ./dk check, then a backup, then ./dk migrate
+#   make migrate-status [CONFIG=path]   ./dk migrate --status
+#   make deploy DEST=dir|[user@]host:dir [CONFIG=config.lua] [RESTART='command']
+#                        release build + check, sync to DEST (never its config.lua or
+#                        data/), then check, backup and migrate there (scripts/deploy.sh)
 
 BUILD   ?= build
 BIN     ?= dk
 CC      ?= cc
 DEBUG   ?= 0
+RELEASE ?= 0
+CONFIG  ?= config.lua
+DIST    ?= dist
+PORT    ?= 8080
+BIND    ?=
+ADMIN_USER  ?= admin
+ADMIN_EMAIL ?= admin@example.com
+ADMIN_PASS  ?= admin
 
 WARN    := -Wall -Wextra -Wshadow -Wno-unused-parameter -Wstrict-prototypes -Wmissing-prototypes
 CSTD    := -std=c11 -D_GNU_SOURCE
@@ -18,6 +41,9 @@ INCS    := -Isrc -Ivendor/lua/src -Ivendor/sqlite
 ifeq ($(DEBUG),1)
 	OPT     := -O0 -g3 -fsanitize=address,undefined -fno-omit-frame-pointer
 	LDOPT   := -fsanitize=address,undefined
+else ifeq ($(RELEASE),1)
+	OPT     := -O2
+	LDOPT   :=
 else
 	OPT     := -O2 -g
 	LDOPT   :=
@@ -41,7 +67,15 @@ LIB_OBJS  := $(filter-out $(BUILD)/src/main.o,$(APP_OBJS))
 TEST_SRCS := $(wildcard tests/c/*.c)
 TEST_BINS := $(patsubst tests/c/%.c,$(BUILD)/tests/%,$(TEST_SRCS))
 
-.PHONY: all test lint clean distclean
+RELEASE_BUILD := build/release
+RELEASE_BIN   := $(RELEASE_BUILD)/dk
+VERSION       := $(shell sed -n 's/^view\.GAME_VERSION = "\(.*\)"$$/\1/p' app/lib/view.lua)
+PLATFORM      := $(shell uname -s | tr A-Z a-z)-$(shell uname -m | tr A-Z a-z)
+DIST_NAME     := dk-$(VERSION)
+DIST_TARBALL  := $(DIST)/$(DIST_NAME)-$(PLATFORM).tar.gz
+DIST_FILES    := app templates public config.example.lua README.md LICENSE
+
+.PHONY: all test lint clean distclean run release dist backup migrate migrate-status deploy
 all: $(BIN)
 
 $(BIN): $(APP_OBJS) $(LUA_OBJS) $(SQL_OBJS)
@@ -66,6 +100,51 @@ test: lint $(BIN) $(TEST_BINS)
 	@set -e; for t in $(TEST_BINS); do echo "== $$t"; $$t; done
 	@if [ -x tests/run.sh ]; then BIN=./$(BIN) tests/run.sh; fi
 
+run: export DK_BIN := ./$(BIN)
+run: export CONFIG := $(CONFIG)
+run: export PORT := $(PORT)
+run: export BIND := $(BIND)
+run: export ADMIN_USER := $(ADMIN_USER)
+run: export ADMIN_EMAIL := $(ADMIN_EMAIL)
+run: export ADMIN_PASS := $(ADMIN_PASS)
+run: $(BIN)
+	@scripts/run.sh
+
+# release builds have their own object dir, so they never clobber the dev build
+release:
+	@echo "release: building $(RELEASE_BIN)"
+	@$(MAKE) -s --no-print-directory BUILD=$(RELEASE_BUILD) BIN=$(RELEASE_BIN) DEBUG=0 RELEASE=1 $(RELEASE_BIN)
+
+dist: release
+	@test -n "$(VERSION)" || { echo "dist: no view.GAME_VERSION in app/lib/view.lua" >&2; exit 1; }
+	rm -rf $(DIST)/.stage $(DIST_TARBALL)
+	mkdir -p $(DIST)/.stage/$(DIST_NAME)
+	cp $(RELEASE_BIN) $(DIST)/.stage/$(DIST_NAME)/dk
+	cp -R $(DIST_FILES) $(DIST)/.stage/$(DIST_NAME)/
+	tar -C $(DIST)/.stage -czf $(DIST_TARBALL) $(DIST_NAME)
+	rm -rf $(DIST)/.stage
+	@echo "dist: $(DIST_TARBALL)"
+
+backup: $(BIN)
+	./$(BIN) backup --config $(CONFIG)
+
+migrate: $(BIN)
+	./$(BIN) check --config $(CONFIG)
+	./$(BIN) backup --config $(CONFIG)
+	./$(BIN) migrate --config $(CONFIG)
+
+migrate-status: $(BIN)
+	./$(BIN) migrate --config $(CONFIG) --status
+
+deploy: export DEST := $(DEST)
+deploy: export CONFIG := $(CONFIG)
+deploy: export RESTART := $(RESTART)
+deploy: export DK_BIN := $(RELEASE_BIN)
+deploy:
+	@scripts/deploy.sh --preflight
+	@$(MAKE) --no-print-directory release
+	@scripts/deploy.sh
+
 $(BUILD)/src $(BUILD)/lua $(BUILD)/sqlite $(BUILD)/tests:
 	mkdir -p $@
 
@@ -73,4 +152,4 @@ clean:
 	rm -rf $(BUILD)/src $(BUILD)/tests $(BIN)
 
 distclean:
-	rm -rf build $(BIN)
+	rm -rf build $(DIST) $(BIN)

@@ -3,31 +3,8 @@
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
-mig_sql() {  # mig_sql DB "SQL"
-	if command -v sqlite3 >/dev/null; then
-		sqlite3 "$1" "$2"
-	else
-		python3 - "$1" "$2" <<'PY'
-import sqlite3, sys
-con = sqlite3.connect(sys.argv[1])
-for row in con.execute(sys.argv[2]):
-		print("|".join("" if v is None else str(v) for v in row))
-con.commit()
-PY
-	fi
-}
-mig_script() {  # mig_script DB FILE
-	if command -v sqlite3 >/dev/null; then
-		sqlite3 "$1" < "$2"
-	else
-		python3 - "$1" "$2" <<'PY'
-import sqlite3, sys
-con = sqlite3.connect(sys.argv[1])
-con.executescript(open(sys.argv[2]).read())
-con.commit()
-PY
-	fi
-}
+mig_sql() { t_sql_db "$@"; }  # mig_sql DB "SQL"
+mig_script() { t_sql_script "$@"; }  # mig_script DB FILE
 mig_eq() {  # mig_eq "SQL" expected label   (on the migrated database)
 	local got
 	got=$(mig_sql "$MIG_DB" "$1")

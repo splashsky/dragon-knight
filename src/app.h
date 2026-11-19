@@ -4,6 +4,10 @@
 
 #include "config.h"
 
+/* Exit status of `dk migrate`, `dk user` and `dk backup` when the database file does not
+ * exist (they never create it; `dk install` does). */
+#define DK_EXIT_NO_DB 3
+
 /* codecache + watcher + vmpool + HTTP server; returns when the server stops. 0 ok. */
 int app_serve(const dk_config *cfg);
 
