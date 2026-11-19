@@ -8,7 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "2.2.0", date = "unreleased",
+		version = "2.2.0", date = "11.19.2026",
 		changes = {
 			"New fight engine: a fight is a round of turns (yours, your allies', each monster's) with effects that last several turns.",
 			"Added statuses, a new kind of content file: timed effects on anyone in a fight, like poison or regeneration, shown on the fight page with the turns they have left; casting one again replaces it.",

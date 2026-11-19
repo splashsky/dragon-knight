@@ -6,7 +6,7 @@ local php = require("lib.php")
 
 local view = {}
 
-view.GAME_VERSION = "2.2.0-dev"
+view.GAME_VERSION = "2.2.0"
 view.BUILD = "C/Lua"
 
 -- Base helpers. Templates see these after ctx (names resolve scratch -> ctx -> h).
