@@ -29,7 +29,7 @@ return function(r)
 	r:get("/admin/spells/#id", guard, spells.edit)
 	r:post("/admin/spells/#id", guard, spells.save)
 	r:post("/admin/spells/#id/reset", guard, spells.reset)
-	for _, name in ipairs({ "statuses", "summons" }) do
+	for _, name in ipairs({ "statuses", "summons", "monsters" }) do
 		r:get("/admin/" .. name, guard, effects.index(name))
 		r:get("/admin/" .. name .. "/#id", guard, effects.edit(name))
 		r:post("/admin/" .. name .. "/#id", guard, effects.save(name))
@@ -42,7 +42,7 @@ return function(r)
 	-- the levels editor became the per-class level tables, the drops are items
 	r:get("/admin/levels", guard, function() return view.redirect("/admin/classes") end)
 	r:get("/admin/drops", guard, function() return view.redirect("/admin/items") end)
-	for _, key in ipairs({ "towns", "monsters", "users" }) do
+	for _, key in ipairs({ "towns", "users" }) do
 		r:get("/admin/" .. key, guard, crud.list(key))
 		r:get("/admin/" .. key .. "/#id", guard, crud.edit(key))
 		r:post("/admin/" .. key .. "/#id", guard, crud.save(key))

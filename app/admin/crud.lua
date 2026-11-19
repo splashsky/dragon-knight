@@ -2,7 +2,6 @@
 local common = require("admin.common")
 local editor = require("admin.editor")
 local php = require("lib.php")
-local game = require("lib.game")
 local tables = require("admin.tables")
 local view = require("lib.view")
 
@@ -13,16 +12,6 @@ crud.USERS_PER_PAGE = 100
 local function quote(ident)
 	assert(ident:find("^[%w_]+$"), "bad identifier")
 	return '"' .. ident .. '"'
-end
-
--- Monsters page note (legacy monsters()): highest monster level vs. gamesize / 5.
-local function monster_note(control)
-	local top = dk.db:value("SELECT level FROM monsters ORDER BY level DESC LIMIT 1")
-	local want = control.gamesize / 5
-	if top == nil or want ~= top then
-		return { mismatch = true, want = php.str(want), have = php.str(top) }
-	end
-	return { mismatch = false }
 end
 
 -- GET /admin/<key>: legacy lists the whole table (id + name). Users are paged
@@ -43,9 +32,6 @@ function crud.list(key)
 			ctx.total, ctx.first, ctx.last = total, start + 1, start + #ctx.rows
 		else
 			ctx.rows = dk.db:query(sql)
-		end
-		if key == "monsters" then
-			ctx.monster_note = monster_note(game.control())
 		end
 		return common.page(req, spec.heading, "admin/list", ctx)
 	end

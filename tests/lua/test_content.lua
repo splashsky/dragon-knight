@@ -115,7 +115,7 @@ local function all_of(entities)
 	end
 	table.sort(k.entities, function(a, b) return a.key < b.key end)
 	return { kinds = { classes = k, spells = load.kind("spells"), items = load.kind("items"),
-		statuses = load.kind("statuses"), summons = load.kind("summons") }, errors = {} }
+		statuses = load.kind("statuses"), summons = load.kind("summons"), monsters = load.kind("monsters") }, errors = {} }
 end
 
 function T.fingerprint_stability()
@@ -134,7 +134,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-5\n"), "format line first")
+	assert(c1:find("^dk%-content%-6\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it

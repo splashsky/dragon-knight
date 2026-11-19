@@ -152,18 +152,62 @@ CREATE TABLE items (
 	data         TEXT    NOT NULL DEFAULT ''
 );
 
+-- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a
+-- monster whose file is gone is retired: no longer met, fights in progress go on). The
+-- original monsters keep ids 1-151. maxmp: MP at the start of every encounter; uses_mp:
+-- spells cost it MP (0: free); attack_weight: the weight of its basic attack among its
+-- actions; roams: met in random encounters of its level band. The loadout (equipment,
+-- items, spells) is in the monster_* tables; `when` conditions stay in the file
+-- (has_when says the entry has one).
 CREATE TABLE monsters (
-	id       INTEGER PRIMARY KEY AUTOINCREMENT,
-	name     TEXT    NOT NULL DEFAULT '',
-	maxhp    INTEGER NOT NULL DEFAULT 0,
-	maxdam   INTEGER NOT NULL DEFAULT 0,
-	armor    INTEGER NOT NULL DEFAULT 0,
-	level    INTEGER NOT NULL DEFAULT 0,
-	maxexp   INTEGER NOT NULL DEFAULT 0,
-	maxgold  INTEGER NOT NULL DEFAULT 0,
-	immune   INTEGER NOT NULL DEFAULT 0
+	id             INTEGER PRIMARY KEY,
+	key            TEXT    NOT NULL UNIQUE,
+	name           TEXT    NOT NULL DEFAULT '',
+	description    TEXT    NOT NULL DEFAULT '',
+	maxhp          INTEGER NOT NULL DEFAULT 1,
+	maxdam         INTEGER NOT NULL DEFAULT 0,
+	armor          INTEGER NOT NULL DEFAULT 0,
+	level          INTEGER NOT NULL DEFAULT 1,
+	maxexp         INTEGER NOT NULL DEFAULT 0,
+	maxgold        INTEGER NOT NULL DEFAULT 0,
+	immune         INTEGER NOT NULL DEFAULT 0,
+	maxmp          INTEGER NOT NULL DEFAULT 0,
+	uses_mp        INTEGER NOT NULL DEFAULT 1,
+	attack_weight  INTEGER NOT NULL DEFAULT 1,
+	roams          INTEGER NOT NULL DEFAULT 1,
+	retired        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX monsters_level ON monsters (level);
+
+-- A monster's equipment (slot: weapon, armor, shield, accessory1-3; like a character's).
+CREATE TABLE monster_equipment (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	slot        TEXT    NOT NULL,
+	item_id     INTEGER NOT NULL REFERENCES items (id),
+	PRIMARY KEY (monster_id, slot)
+) WITHOUT ROWID;
+
+-- The consumables a monster may use (position: the file's order), by weight; stock: uses
+-- per encounter (NULL: no limit).
+CREATE TABLE monster_items (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	position    INTEGER NOT NULL,
+	item_id     INTEGER NOT NULL REFERENCES items (id),
+	weight      INTEGER NOT NULL DEFAULT 1,
+	stock       INTEGER,
+	has_when    INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (monster_id, position)
+) WITHOUT ROWID;
+
+-- The spells a monster may cast (position: the file's order), by weight.
+CREATE TABLE monster_spells (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	position    INTEGER NOT NULL,
+	spell_id    INTEGER NOT NULL REFERENCES spells (id),
+	weight      INTEGER NOT NULL DEFAULT 1,
+	has_when    INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (monster_id, position)
+) WITHOUT ROWID;
 
 -- thread_id: the post's discussion thread in the News board (app/lib/news.lua).
 CREATE TABLE news (
@@ -339,7 +383,8 @@ CREATE TABLE fights (
 -- ally, enemy; kind: player, monster (entity_id: monsters.id), summon (summons.id). wave:
 -- an enemy's wave (0 otherwise). hp, maxhp: NULL for the player (users.currenthp and the
 -- effective stats hold them). turns_left: rounds a summon stays (NULL: no limit). data:
--- per-combatant values (a monster's immunity), "name=value" lines.
+-- per-combatant values (a monster's immunity, the stock of its items), "name=value" lines.
+-- mp, maxmp: a monster's MP (NULL otherwise; NULL for a monster: full).
 CREATE TABLE fight_combatants (
 	user_id     INTEGER NOT NULL REFERENCES fights (user_id) ON DELETE CASCADE,
 	id          INTEGER NOT NULL,
@@ -351,6 +396,8 @@ CREATE TABLE fight_combatants (
 	maxhp       INTEGER,
 	turns_left  INTEGER,
 	data        TEXT    NOT NULL DEFAULT '',
+	mp          INTEGER,
+	maxmp       INTEGER,
 	PRIMARY KEY (user_id, id)
 ) WITHOUT ROWID;
 

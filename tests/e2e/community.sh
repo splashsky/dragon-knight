@@ -21,7 +21,7 @@ expect_body '>Heal<br><span class="small">Restores hit points, in a fight or out
 expect_body '>Nightmare<br><span class="small">Puts the monster to sleep. Some monsters are immune.</span></td><td style="width: 25%">60</td><td style="width: 25%">13<'
 expect_body '<th>Name</th><th>Cost</th><th>Power</th>'; expect_body 'a power in 15 chance'
 t_get /help/monsters; expect_status 200; expect_body 'Help: Monsters'
-expect_body '>Blue Slime</td><td style="width: 10%">4</td>'; expect_body 'Hurt &amp; Sleep'
+expect_body '>Blue Slime</td><td style="width: 9%">4</td>'; expect_body 'Hurt &amp; Sleep'
 t_get /help/levels;   expect_status 200; expect_body 'Mage Levels'; expect_body 'Warrior Levels'; expect_body 'Paladin Levels'
 # experience and TP from lib/leveling.lua, HP = table gain + milestone bonus
 expect_body '<tr><td>10</td><td>1,970</td><td>10</td><td>3</td><td>2</td><td>4</td><td>3</td><td><span class="light">None</span></td></tr>'

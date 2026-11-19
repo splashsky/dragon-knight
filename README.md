@@ -202,7 +202,7 @@ ASan/UBSan), `CONFIG=path`, `DIST=dir` (where `make dist` writes), and for `make
 - The C code builds warning-free with `-Wall -Wextra`. Lua code uses no globals (in Lua
 	5.5 `global` is a reserved word). The project indents with tabs.
 
-## Adding a class, a spell or an item
+## Adding a class, a spell, an item or a monster
 
 Character classes are data files, `app/content/classes/<key>.lua` (Mage, Warrior and
 Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (the file
@@ -274,6 +274,38 @@ called with `s:summon("wolf", { turns = 5 })`. Copy `poison.lua` or `wolf.lua` t
 `hyper_beam.lua` and `solar_beam.lua` show actions over two turns (recharge, charge). See
 `docs/APP.md`, "Fight engine".
 
+### Adding a monster
+
+Monsters are data files too, `app/content/monsters/<key>.lua` (the original 151 keep
+their ids and only attack). Copy one and set its name, level (where it is met and what it
+drops), maximum HP, damage and armor, rewards, immunity and MP (`maxmp`). A monster can
+also carry equipment (`equipment = { weapon = "broadsword" }`: the items' attack, defense
+and modifiers count like a character's), use consumables (`items`, with a stock per
+encounter) and cast spells (`spells`; `uses_mp = false` makes them free). Each turn it
+picks by weight among its attack (`attack_weight`) and what it may use now; a `when`
+function (inline or free-standing) can make an entry depend on the fight:
+
+```lua
+-- app/content/monsters/goblin_shaman.lua (excerpt)
+local function low_hp(m) return m.hp < m.maxhp // 3 end
+
+return {
+	name = "Goblin Shaman", level = 5, maxhp = 40, maxdam = 8, armor = 4, maxexp = 12, maxgold = 15,
+	maxmp = 17, attack_weight = 3,
+	roams = false,                    -- not met at random (default true)
+	equipment = { weapon = "dagger" },
+	spells = {
+		{ spell = "hurt", weight = 2 },
+		{ spell = "heal", weight = 3, when = function(m) return m.hp < m.maxhp // 2 end },
+	},
+	items = { { item = "potion", weight = 4, stock = 2, when = low_hp } },
+}
+```
+
+`./dk check` validates it (unknown keys, an item in the wrong slot, ...); the next page
+load picks it up, and a roaming monster is met at random in its level band. See
+`docs/APP.md`, "Monsters".
+
 ## Project layout
 
 ```
@@ -283,7 +315,7 @@ app/            Lua application
   routes/         route registration per area
   lib/            router, session, csrf, auth, view, game helpers, PHP-compatible helpers, mail
   town/ fight/ community/ admin/   feature modules
-  content/        content files: classes/, spells/, items/, statuses/, summons/ (one Lua file each: data, plus code for spells, consumables, statuses and summons), synced into the DB
+  content/        content files: classes/, spells/, items/, statuses/, summons/, monsters/ (one Lua file each: data, plus code for spells, consumables, statuses and summons, conditions for monsters), synced into the DB
   install.lua, cli/, sql/          `dk install`, `dk user`, `dk migrate`, `dk content`, schema and seed data
 templates/      HTML templates (layout/, auth/, home/, town/, fight/, community/, admin/, errors/)
 public/         static files served at /static/ (css/, js/, images/)
@@ -352,6 +384,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	side (and that monsters may attack instead of you); the fight page shows them, and a
 	turn you can't act in offers only "Continue". Some effects (a Regen Potion) also last
 	outside fights, a few moves at a time. Fights without them play exactly as before.
+- Monsters are content files (`app/content/monsters/`): administrators override their
+	stats per server (`/admin/monsters`), and monsters have magic points and can carry
+	equipment, use items and cast spells, chosen by weight (the original monsters only
+	attack, exactly as before; three new ones, not met at random, show the rest).
 - An inventory: besides what is equipped, a bag of 12 slots (a stack counts once; quest
 	items don't count; size in the settings) with an Inventory page to equip, take off, use
 	and discard items. Buying a weapon, armor or shield offers to keep the old one in the bag

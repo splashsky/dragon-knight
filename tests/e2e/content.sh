@@ -60,7 +60,7 @@ ct_eq "SELECT id || '|' || key || '|' || name || '|' || start_hp || '|' || exp_b
 	"4|knight|Knight|30|10|0" "class row"
 ct_eq "SELECT count(*) || '|' || sum(hp) FROM class_levels WHERE class_id = 4" "99|198" "class levels"
 ct_eq "SELECT group_concat(spell_id) FROM class_spells WHERE class_id = 4 AND level = 3" "1,6" "class spells"
-grep -qF 'content synced (statuses: 7, 0 new, 0 retired, 0 restored; summons: 1, 0 new, 0 retired, 0 restored; spells: 24, 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored; items: 70, 0 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
+grep -qF 'content synced (statuses: 7, 0 new, 0 retired, 0 restored; summons: 1, 0 new, 0 retired, 0 restored; spells: 24, 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored; items: 70, 0 new, 0 retired, 0 restored; monsters: 154, 0 new, 0 retired, 0 restored)' "$T/server.log" && t_ok || t_fail "sync not logged"
 t_get /help;          expect_body '<b>Knight</b>'; expect_body '<li>Test class.</li>'; expect_body 'There are four character classes'
 t_get /help/levels;   expect_body 'Knight Levels'
 "$BIN" content status --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content status"
@@ -174,7 +174,7 @@ rm "$CT_DIR/Bad-Name.lua"
 t_jar admin
 ct_wait_gone /admin 'Content files have errors' && t_ok || t_fail "content error not cleared"
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check after the fix: $(cat "$T/content.log")"
-grep -qF 'content: ok (7 statuses, 1 summons, 24 spells, 4 classes, 70 items)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
+grep -qF 'content: ok (7 statuses, 1 summons, 24 spells, 4 classes, 70 items, 154 monsters)' "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
 
 t_section "content: a new spell, learned through a class file"
 cat > "$CT_SPELLS/zap.lua" <<'EOF'

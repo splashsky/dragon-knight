@@ -51,18 +51,20 @@ app/                  Lua application (hot-reloaded)
                       news, paging, migrations (schema versions), leveling, classes,
                       spells, items, inventory, stats (derived stats, gear modifiers),
                       action (the API scripted spells, items, statuses and summons run
-                      against), statuses, summons, world (world statuses on map moves),
+                      against), statuses, summons, monsters (rows, loadouts, stats with
+                      equipment), world (world statuses on map moves),
                       content/ (content loader, sandbox, schemas, scripted kinds, sync)
-  content/            content files: classes/, spells/, items/, statuses/, summons/ <key>.lua
-                      (synced into the DB)
+  content/            content files: classes/, spells/, items/, statuses/, summons/,
+                      monsters/ <key>.lua (synced into the DB)
   town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested);
                       state.lua: the fight model and its tables; round.lua: the round
                       pipeline; engine.lua: handles, events, statuses, summons; ai.lua:
-                      weighted choices; act.lua: the actions of a turn (attack, spell, item)
+                      weighted choices; act.lua: the actions of a turn (attack, spell, item);
+                      monster.lua: a monster's spells and items (AI candidates, using them)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, classes, spells, items, statuses and
-                      summons, generic CRUD editor)
+  admin/              admin control panel (settings, news, classes, spells, items, statuses,
+                      summons and monsters, generic CRUD editor for towns and users)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
   cli/content.lua     `dk content sync|status`; cli/check.lua: content part of `dk check`
@@ -77,7 +79,7 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v7.sql, seed_v3 .. seed_v7.sql:
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v8.sql, seed_v3 .. seed_v8.sql:
                       frozen old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
@@ -246,7 +248,7 @@ queued cookies), so HEAD never changes state.
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,monsters,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/{statuses,summons}[/:id]` (new), `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/monsters[/:id]` (content overrides since schema version 9), `/admin/{statuses,summons}[/:id]` (new), `/admin/news` |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -325,6 +327,15 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	`user_statuses(user_id → users ON DELETE CASCADE, status_id, position, turns_left,
 	data)`. `control.max_allies` (1) caps the summons per fight. Data columns hold
 	"name=value" lines of plain values (never code).
+- Monsters (schema version 9, `docs/APP.md` "Monsters"): content files
+	`app/content/monsters/<key>.lua` synced into `monsters(id, key UNIQUE, name,
+	description, maxhp, maxdam, armor, level, maxexp, maxgold, immune, maxmp, uses_mp,
+	attack_weight, roams, retired)` (the original monsters keep ids 1-151) and the loadout
+	tables `monster_equipment(monster_id, slot, item_id)`, `monster_items(monster_id,
+	position, item_id, weight, stock, has_when)` and `monster_spells(monster_id, position,
+	spell_id, weight, has_when)` (`when` conditions stay in the files).
+	`fight_combatants.mp`/`maxmp` hold a monster's MP; its item stock is in the combatant's
+	data (`stock_<position>`).
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -340,10 +351,11 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	expires INTEGER, remember INTEGER)`. Cookie `dk_session=<random 32-byte hex>`,
 	`HttpOnly; SameSite=Lax; Path=/`, `Max-Age` 1 year when "remember me", else a
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
-- Seed data in `app/sql/seed.sql` plus the class, spell and item content files match the
-	original install.php "complete setup" exactly (all rows of drops, items, levels,
+- Seed data in `app/sql/seed.sql` plus the class, spell, item and monster content files
+	match the original install.php "complete setup" exactly (all rows of drops, items, levels,
 	monsters, spells, towns, control), minus the difficulty settings and the levels values
-	that became formulas, plus the new consumables (Herb, Potion, Ether) in the shops.
+	that became formulas, plus the new consumables (Herb, Potion, Ether) in the shops and the
+	later example content (statuses, summons, spells, items, monsters that don't roam).
 - Email (registration verification, lost password) is written to
 	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 
@@ -414,8 +426,8 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 (`content-and-inventory.md`), ✅ D scripted spells and items (`spell-scripting.md`,
 	 schema version 7).
 6. **2.2 fights** (`docs/plans/turn-effects.md`): ✅ E1 the fight engine (round pipeline,
-	 statuses, multi-stage actions, summons, weighted AI, encounters; schema version 8).
-	 Next: E2 monsters as content with MP, equipment, items, spells and weighted loadouts
+	 statuses, multi-stage actions, summons, weighted AI, encounters; schema version 8),
+	 ✅ E2 monsters as content with MP, equipment, items, spells and weighted loadouts
 	 (schema version 9).
 
 ## Definition of done

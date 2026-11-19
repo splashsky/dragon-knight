@@ -10,13 +10,15 @@
 -- f = { user_id, round, wave, data = {}, st (the game.player row copy: the player's
 -- numbers), in_fight, combatants = { c, ... } (by id), next_id }
 -- c = { id, side ("player" | "ally" | "enemy"), kind ("player" | "monster" | "summon"),
--- entity_id, wave, hp, maxhp (nil for the player: st has them), turns_left (summons),
--- data = {}, row (the monsters / summons row), statuses = { inst, ... } (in the order
--- applied) }
+-- entity_id, wave, hp, maxhp (nil for the player: st has them), mp, maxmp (monsters),
+-- turns_left (summons), data = {} (a monster's immune and the stock of its items,
+-- stock_<position>), row (the summons row; a monster's with its equipment counted:
+-- lib/monsters.lua monsters.effective), statuses = { inst, ... } (in the order applied) }
 -- inst = { status_id, key, row (statuses row), turns_left (nil: no limit), data (the params
 -- it was applied with), applied_round, source (a combatant id), position }
 -- Persisted values are names and plain data only (lib/action.lua action.params), never
 -- code: a charged spell's release step is saved by name.
+local monsters = require("lib.monsters")
 local statuses = require("lib.statuses")
 local summons = require("lib.summons")
 
@@ -146,11 +148,22 @@ function state.won(f)
 	return any
 end
 
--- An enemy from a monsters row (its HP is rolled when the encounter starts).
+-- The data key of the stock left of a monster's item entry (position in its file).
+function state.stock_key(position)
+	return "stock_" .. position
+end
+
+-- An enemy from a monsters row (its HP is rolled when the encounter starts; its MP and the
+-- stock of its items are full).
 function state.add_monster(f, monster, wave)
+	local row = monsters.effective(monster)
+	local data = { immune = monster.immune }
+	for _, e in ipairs(monsters.loadout(row).items) do
+		if e.stock then data[state.stock_key(e.position)] = e.stock end
+	end
 	return state.add(f, {
-		side = "enemy", kind = "monster", entity_id = monster.id, wave = wave or 1, hp = 0, maxhp = monster.maxhp,
-		data = { immune = monster.immune }, row = monster,
+		side = "enemy", kind = "monster", entity_id = monster.id, wave = wave or 1, hp = 0, maxhp = row.maxhp,
+		mp = row.maxmp, maxmp = row.maxmp, data = data, row = row,
 	})
 end
 
@@ -200,9 +213,14 @@ function state.load(user, st)
 	local by_id = {}
 	for _, r in ipairs(dk.db:query("SELECT * FROM fight_combatants WHERE user_id = ? ORDER BY id", user.id)) do
 		local c = { id = r.id, side = r.side, kind = r.kind, entity_id = r.entity_id, wave = r.wave, hp = r.hp,
-			maxhp = r.maxhp, turns_left = r.turns_left, data = state.decode(r.data), statuses = {} }
+			maxhp = r.maxhp, mp = r.mp, maxmp = r.maxmp, turns_left = r.turns_left, data = state.decode(r.data),
+			statuses = {} }
 		if r.kind == "monster" then
-			c.row = dk.db:first("SELECT * FROM monsters WHERE id = ?", r.entity_id)
+			local m = monsters.get(r.entity_id)
+			c.row = m and monsters.effective(m)
+			-- a fight from before monsters had MP (schema version 8): full
+			if m and c.maxmp == nil then c.maxmp = c.row.maxmp end
+			if m and c.mp == nil then c.mp = c.maxmp end
 		elseif r.kind == "summon" then
 			c.row = summons.get(r.entity_id)
 		end
@@ -228,9 +246,10 @@ function state.save(f)
 	dk.db:exec("DELETE FROM fight_combatants WHERE user_id = ?", uid)
 	for _, c in ipairs(f.combatants) do
 		local player = c.side == "player"
-		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, turns_left, data) " ..
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind, c.entity_id, c.wave or 0,
-			not player and c.hp or nil, not player and c.maxhp or nil, c.turns_left, state.encode(c.data))
+		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, turns_left, data, " ..
+			"mp, maxmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind, c.entity_id, c.wave or 0,
+			not player and c.hp or nil, not player and c.maxhp or nil, c.turns_left, state.encode(c.data),
+			c.kind == "monster" and c.mp or nil, c.kind == "monster" and c.maxmp or nil)
 		for i, s in ipairs(c.statuses) do
 			dk.db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, turns_left, data, " ..
 				"applied_round, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, s.status_id, i, s.turns_left,

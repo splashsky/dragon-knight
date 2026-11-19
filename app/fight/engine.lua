@@ -68,9 +68,11 @@ function engine.handle(f, c)
 		t.hp, t.maxhp, t.mp, t.maxmp, t.tp, t.maxtp = st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp
 		t.attack, t.defense, t.strength, t.dexterity = st.attackpower, st.defensepower, st.strength, st.dexterity
 	elseif c.kind == "monster" then
+		-- c.row has the effective numbers (its equipment counted: lib/monsters.lua)
 		local m = c.row
-		t.name, t.level, t.hp, t.maxhp = m.name, m.level, c.hp, c.maxhp
+		t.name, t.level, t.hp, t.maxhp, t.mp, t.maxmp = m.name, m.level, c.hp, c.maxhp, c.mp, c.maxmp
 		t.attack, t.defense, t.immune = m.maxdam, m.armor, c.data.immune or 0
+		t.strength, t.dexterity = m.strength, m.dexterity
 	else
 		local r = c.row
 		t.name, t.hp, t.maxhp = r.name, c.hp, c.maxhp
@@ -390,12 +392,15 @@ end
 ---------------------------------------------------------------------------------------
 -- Events
 
+-- (monsters have HP and MP, summons only HP: other stats are ignored)
 local function add_stat(f, c, stat, n)
 	if c.side == "player" then
 		local col = "current" .. stat
 		f.st[col] = f.st[col] + n
 	elseif stat == "hp" then
 		c.hp = c.hp + n
+	elseif stat == "mp" and c.kind == "monster" then
+		c.mp = (c.mp or 0) + n
 	end
 	if stat == "hp" then f.hp_changed = true end
 end

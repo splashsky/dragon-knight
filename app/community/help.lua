@@ -6,6 +6,7 @@ local classes = require("lib.classes")
 local game = require("lib.game")
 local items = require("lib.items")
 local leveling = require("lib.leveling")
+local monsters = require("lib.monsters")
 local php = require("lib.php")
 local spells = require("lib.spells")
 local statuses = require("lib.statuses")
@@ -77,14 +78,32 @@ function help.spells(req)
 	})
 end
 
+-- Every monster that isn't retired, with its stats and MP (with equipment counted: what
+-- the fight uses), and for those that have them their spells, items and equipment.
 function help.monsters(req)
-	local monsters = {}
-	for _, m in ipairs(dk.db:query("SELECT * FROM monsters ORDER BY id")) do
+	local list = {}
+	for _, row in ipairs(monsters.active()) do
+		local m = monsters.effective(row)
 		local immune
 		if m.immune == 1 then immune = "Hurt" elseif m.immune ~= 0 then immune = "Hurt & Sleep" end
-		monsters[#monsters + 1] = { monster = m, immune = immune }
+		local lo = monsters.loadout(m)
+		local loadout = {}
+		local function add(label, names)
+			if #names > 0 then loadout[#loadout + 1] = { label = label, text = table.concat(names, ", ") } end
+		end
+		local names = {}
+		for _, e in ipairs(lo.spells) do names[#names + 1] = e.spell.name end
+		add("Spells", names)
+		names = {}
+		for _, e in ipairs(lo.items) do names[#names + 1] = e.item.name .. (e.stock and (" (" .. e.stock .. ")") or "") end
+		add("Items", names)
+		names = {}
+		for _, e in ipairs(lo.equipment) do names[#names + 1] = e.item.name end
+		add("Equipment", names)
+		list[#list + 1] = { monster = m, immune = immune, loadout = loadout, special = m.roams == 0,
+			free = m.uses_mp == 0 and #lo.spells > 0 }
 	end
-	return page(req, "Monsters", "community/help/monsters", { monsters = monsters })
+	return page(req, "Monsters", "community/help/monsters", { monsters = list })
 end
 
 -- Columns per class: HP (gain + milestone bonus), MP, TP (formula), Strength, Dexterity.

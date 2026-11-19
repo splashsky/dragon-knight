@@ -124,6 +124,22 @@ function stats.clamped(user, s)
 	}
 end
 
+-- A monster's effective numbers with the summed modifiers of its equipment (item_mods), by
+-- the players' rules (derive): its maxhp, maxmp are the base maxima, strength and
+-- dexterity 0, its maxdam the base attack and its armor the base defense. So maxdam =
+-- maxdam + strength + attack, armor = armor + dexterity + defense, maxhp/maxmp + theirs;
+-- without equipment the numbers are the row's (maxhp at least 1). (The experience and gold
+-- bonuses of gear don't apply to monsters.) Returns { maxhp, maxmp, maxdam, armor,
+-- strength, dexterity }.
+function stats.monster(m, mods)
+	local d = stats.derive({
+		base_maxhp = m.maxhp, base_maxmp = m.maxmp or 0, base_maxtp = 0, strength = 0, dexterity = 0,
+		base_attack = m.maxdam, base_defense = m.armor, base_exp_bonus = 0, base_gold_bonus = 0,
+	}, mods)
+	return { maxhp = math.max(1, d.maxhp), maxmp = d.maxmp, maxdam = d.attack, armor = d.defense, strength = d.strength,
+		dexterity = d.dexterity }
+end
+
 ---------------------------------------------------------------------------------------
 -- Modifiers (gear's stat bonuses while equipped).
 

@@ -14,8 +14,8 @@ usage: dk install [--partial] [--force]
 									[--class ID|KEY]
 
 	--partial     create tables but load no game data except the control row, the
-								forum boards, the first news post, the classes, spells and items
-								(legacy "Partial Setup")
+								forum boards, the first news post and the content (classes, spells,
+								items, statuses, summons, monsters) (legacy "Partial Setup")
 	--force       drop existing Dragon Knight tables first (DESTROYS ALL DATA)
 	--admin       administrator account; prompted for when omitted
 	--charname    administrator character name (default: the username)
@@ -24,9 +24,10 @@ usage: dk install [--partial] [--force]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
 -- user_spells/user_items/town_items/class_levels/class_spells before users/spells/items/
--- towns/classes, the fight tables and user_statuses before users/statuses; "levels" (before schema version 4) and "drops" (before 6) are old tables
+-- towns/classes, the monster loadouts before monsters/items/spells, the fight tables and
+-- user_statuses before users/statuses; "levels" (before schema version 4) and "drops" (before 6) are old tables
 local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items",
-								 "town_items", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
+								 "town_items", "monster_equipment", "monster_items", "monster_spells", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
 								 "spells", "towns", "fight_statuses", "fight_combatants", "fights", "user_statuses", "users",
 								 "classes", "statuses", "summons", "content_overrides", "content_adopt", "meta" }
 
@@ -97,7 +98,7 @@ end
 
 -- seed.sql has one INSERT per line; partial setup keeps only control + news (legacy
 -- populated those two even for "Partial Setup"), the forum boards and the class, spell,
--- item and status ids (structural: content keeps the original ids).
+-- item, status and monster ids (structural: content keeps the original ids).
 local function seed_sql(full, sql)
 	if full then return sql end
 	local keep = {}
@@ -105,7 +106,7 @@ local function seed_sql(full, sql)
 		if line:find("^INSERT INTO control ") or line:find("^INSERT INTO news ") or
 				line:find("^INSERT INTO forums ") or line:find("^INSERT INTO classes ") or
 				line:find("^INSERT INTO spells ") or line:find("^INSERT INTO items ") or
-				line:find("^INSERT INTO statuses ") then
+				line:find("^INSERT INTO statuses ") or line:find("^INSERT INTO monsters ") then
 			keep[#keep + 1] = line
 		end
 	end

@@ -543,21 +543,28 @@ local GENERIC = {
 	item = "Something went wrong with the %s. Please go back and try again.",
 }
 
--- Runs a spell or item: its can_cast / can_use, then its cast / use, then (spells) the MP
--- cost. o: as action.new, without module to take the behaviour from the content file
--- (load.module). Returns { ok = true, lines, events } (the caller applies the events, in
--- order), or { reason, refused }: reason "cannot" (no behaviour: the file is gone or
--- invalid; the caller says it can't be used), "refused" (refused: the message), "error"
--- (content code failed: logged; a generic message). Nothing is applied either way.
-function action.perform(o)
-	local k = assert(action.KINDS[o.kind], "unknown action kind")
+local function behaviour(o, k)
 	local module = o.module
 	if module == nil then
 		local err
 		module, err = load.module(k.content, o.entity.key)
 		if not module then dk.log("warn", ("%s %s can't be used: %s"):format(o.kind, tostring(o.entity.key), tostring(err))) end
 	end
-	if type(module) ~= "table" or type(module[k.run]) ~= "function" then return { reason = "cannot" } end
+	if type(module) ~= "table" or type(module[k.run]) ~= "function" then return nil end
+	return module
+end
+
+-- Runs a spell or item: its can_cast / can_use, then its cast / use, then (spells) the MP
+-- cost (none with o.free: a monster that doesn't use MP). o: as action.new, without module
+-- to take the behaviour from the content file (load.module). Returns { ok = true, lines,
+-- events } (the caller applies the events, in order), or { reason, refused }: reason
+-- "cannot" (no behaviour: the file is gone or invalid; the caller says it can't be used),
+-- "refused" (refused: the message), "error" (content code failed: logged; a generic
+-- message). Nothing is applied either way.
+function action.perform(o)
+	local k = assert(action.KINDS[o.kind], "unknown action kind")
+	local module = behaviour(o, k)
+	if not module then return { reason = "cannot" } end
 	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
 		in_fight = o.in_fight, rand = o.rand, summon_room = o.summon_room })
 	local i = INNER[s]
@@ -580,9 +587,33 @@ function action.perform(o)
 	local ok, r = sandbox.call(module[k.run], s)
 	if not ok then return finish({ reason = "error", err = r }) end
 	if is_refusal(r) then return finish({ reason = "refused", refused = r.text }) end
-	if o.kind == "spell" and (o.entity.mp or 0) > 0 then s.caster:spend("mp", o.entity.mp) end
+	if o.kind == "spell" and not o.free and (o.entity.mp or 0) > 0 then s.caster:spend("mp", o.entity.mp) end
 	finish({})
 	return { ok = true, lines = lines_of(s), events = i.events }
+end
+
+local function no_dice()
+	error("can_cast and can_use can't roll dice here (a monster weighing its options)", 2)
+end
+
+-- Whether a spell or item would be refused, without running it (a monster weighing its
+-- options, fight/monster.lua): only its can_cast / can_use runs, with no dice (a roll is
+-- an error) and, as always there, no changes. o: as action.perform. Returns { ok = true }
+-- or { reason, refused / err } like perform (errors are not logged: the caller decides).
+function action.check(o)
+	local k = assert(action.KINDS[o.kind], "unknown action kind")
+	local module = behaviour(o, k)
+	if not module then return { reason = "cannot" } end
+	if module[k.check] == nil then return { ok = true } end
+	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
+		in_fight = o.in_fight, rand = no_dice, summon_room = o.summon_room })
+	local i = INNER[s]
+	i.running, i.checking = true, true
+	local ok, r = sandbox.call(module[k.check], s)
+	i.running, i.checking = false, false
+	if not ok then return { reason = "error", err = r } end
+	if is_refusal(r) then return { reason = "refused", refused = r.text } end
+	return { ok = true }
 end
 
 -- Runs one function of a content file (a status hook, a summon's act, a spell's stage)

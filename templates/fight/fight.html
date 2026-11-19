@@ -7,6 +7,9 @@
 {%- if monsterhp then %}
 <p class="fight-monsterhp">Monster's HP: {{ monsterhp }}</p>
 {%- end %}
+{%- if monstermp then %}
+<p class="fight-monstermp">Monster's MP: {{ monstermp }}</p>
+{%- end %}
 {%- for _, e in ipairs(enemies) do %}
 {%- if #enemies > 1 or #e.statuses > 0 then %}
 <p class="fight-combatant fight-enemy"><b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>

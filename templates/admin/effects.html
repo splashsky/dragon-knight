@@ -1,10 +1,22 @@
-{#- Statuses or summons list (admin/effects.lua). ctx: k (the kind's page settings), name,
-		base, rows { e (row, decoded), cells, used, overrides }, status (content_sync.status()). -#}
+{#- Statuses, summons or monsters list (admin/effects.lua). ctx: k (the kind's page
+		settings), name, base, rows { e (row, decoded), cells, used, overrides }, status
+		(content_sync.status()), note (monsters: legacy's level vs. map size note). -#}
 <h1 class="admin-heading">{{ k.title }}</h1>
+{%- if note then %}
+{%- if note.mismatch then %}
+<p><span class="highlight">Note:</span> Your highest monster level does not match with your entered map size. Highest monster level should be {{ note.want }}, yours is {{ note.have }}. Please fix this before opening the game to the public.</p>
+{%- else %}
+<p>Monster level and map size match. No further actions are required for map compatibility.</p>
+{%- end %}
+{%- end %}
+{%- if k.intro then %}
+<p>{{{ k.intro }}}</p>
+{%- else %}
 <p>{{ k.title }} are content files, <code>app/content/{{ name }}/&lt;key&gt;.lua</code>; the game
 picks up a new or edited file on the next page load. Click one to override its name,
 description, numbers and messages on this server; what it does is the file's code
 ({{ k.code }}).</p>
+{%- end %}
 <table class="admin-list admin-effects">
 <tr><th>ID</th><th>Name</th><th>Key</th>{% for _, c in ipairs(k.columns) do %}<th>{{ c }}</th>{% end %}<th>In use</th><th>Overrides</th></tr>
 {%- for _, r in ipairs(rows) do %}
@@ -15,7 +27,11 @@ description, numbers and messages on this server; what it does is the file's cod
 </table>
 {{{ include("admin/content_status") }}}
 <h2 class="admin-subheading">Adding one</h2>
+{%- if k.adding then %}
+<p>{{{ k.adding }}}</p>
+{%- else %}
 <p>Copy one of the files in <code>app/content/{{ name }}/</code> to a new name (the file name is
 its key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it;
 spells and items use it by key (see <code>docs/APP.md</code>, "Fight engine"). Deleting a file
 retires it. Run <code>dk check</code> to validate the files.</p>
+{%- end %}

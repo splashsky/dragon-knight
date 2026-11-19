@@ -14,6 +14,7 @@ local combat = require("fight.combat")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
+local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
 local spells = require("lib.spells")
@@ -26,11 +27,11 @@ local function error_page(req, html)
 	return view.message(req, "Error", html)
 end
 
+-- The original random pick among the roaming monsters of the level band (retired ones and
+-- those that don't roam are never met at random).
 local function pick_monster(user)
 	local minlevel, maxlevel = combat.monster_levels(user.latitude, user.longitude)
-	local rows = dk.db:query("SELECT * FROM monsters WHERE level >= ? AND level <= ? ORDER BY id",
-													 minlevel, maxlevel)
-	return combat.pick(rows, rand)
+	return combat.pick(monsters.roaming(minlevel, maxlevel), rand)
 end
 
 local function save_player(user, st)
@@ -77,7 +78,9 @@ local function view_of(f)
 	local p = state.player(f)
 	local enemies, allies = {}, {}
 	for _, c in ipairs(state.side(f, "enemy", true)) do
-		enemies[#enemies + 1] = { name = c.row.name, hp = c.hp, statuses = status_list(c) }
+		-- MP only for monsters with spells (what it means to the player)
+		local casts = #monsters.loadout(c.row).spells > 0
+		enemies[#enemies + 1] = { name = c.row.name, hp = c.hp, mp = casts and c.mp or nil, statuses = status_list(c) }
 	end
 	for _, c in ipairs(state.allies(f)) do
 		allies[#allies + 1] = { name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
@@ -195,7 +198,7 @@ local function fight(req)
 	for _, e in ipairs(shown.enemies) do
 		if e.hp > 0 then first = e break end
 	end
-	page.monstername, page.monsterhp = first.name, first.hp
+	page.monstername, page.monsterhp, page.monstermp = first.name, first.hp, first.mp
 	if not page.dead then
 		page.locked = round.locked(f)
 		page.spells = spells.known(user, "fight")

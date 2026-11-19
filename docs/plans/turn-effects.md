@@ -1,9 +1,9 @@
 # Plan: Phase E — multi-turn effects: statuses, multi-stage spells, summons (2.2)
 
-Status: **E1 done** (the fight engine, schema version 8; see "Phase E1 as implemented" at
-the end, with notes for E2). E2 (monsters as content with loadouts, schema version 9) is
-next. The developer documentation is docs/APP.md, "Fight engine"; changelog lines are in
-the top 2.2.0 entry.
+Status: **done**: E1 (the fight engine, schema version 8) and E2 (monsters as content with
+MP, equipment, items, spells and weighted loadouts, schema version 9); see "Phase E1 as
+implemented" and "Phase E2 as implemented" at the end. The developer documentation is
+docs/APP.md, "Fight engine" and "Monsters"; changelog lines are in the top 2.2.0 entry.
 
 Version: Phase E is **2.2**. It starts by setting `view.GAME_VERSION = "2.2.0-dev"` (and
 `DK_VERSION` in src/main.c) and adding a new top changelog entry `version = "2.2.0",
@@ -344,3 +344,77 @@ schedules); tests use a test class.
 	encounter of any size; only the route's monster pick is one monster.
 - Not done: showing world-status lines after a move, a target picker, multi-monster
 	encounter content, AI tuning.
+
+## Phase E2 as implemented
+
+- **Content kind `monsters`** (`app/lib/content/kinds/monsters.lua`, synced after items, the
+	last kind): the 151 originals were generated once from the seed (ids 1-151, keys from
+	the names; no duplicates), with the same stats and `maxmp` = the Mage's total MP at
+	their level (start + gains of `classes/mage.lua`, at least 5) as a literal. Fields:
+	`name`, `description`, `level`, `maxhp`, `maxdam`, `armor`, `maxexp`, `maxgold`,
+	`immune`, `maxmp`, `uses_mp` (default true), `attack_weight` (default 1, 0: only as the
+	fallback), **`roams`** (default true: picked by random encounters; new, so the examples
+	can stay out of the level bands), `equipment` (slot -> item key), `items` (`{ item,
+	weight, stock, when }`), `spells` (`{ spell, weight, when }`). Flat form:
+	"equipment.weapon", "items.1.item"/".weight"/".stock"/".when" (1: has a condition),
+	"spells.1.spell"/... `dk check`: keys must be files, weights >= 1, stock >= 1 or absent,
+	`when` a function, slots valid, equipment of the slot's category, items consumables
+	usable in fights, spells usable in fights (a new optional kind hook,
+	`validate_refs(flat, all, err)`, run by `load.all`). `load.FORMAT` is "dk-content-6".
+- **Tables**: `monsters(id, key, name, description, maxhp, maxdam, armor, level, maxexp,
+	maxgold, immune, maxmp, uses_mp, attack_weight, roams, retired)` plus child tables
+	`monster_equipment(monster_id, slot, item_id)`, `monster_items(monster_id, position,
+	item_id, weight, stock, has_when)`, `monster_spells(monster_id, position, spell_id,
+	weight, has_when)` (written by the kind's `write_children`); `when` functions stay in the
+	file and are found by list and position (`monsters.condition`).
+	`fight_combatants.mp`/`maxmp` hold a monster's MP (NULL: full on load).
+- **Runtime**: `lib/monsters.lua` (rows, `roaming(min, max)` for the route's pick, loadouts
+	read in three queries per request, `effective(row)`); `fight/monster.lua` (the AI
+	provider `monster.candidates`, the `when` context, using spells and items);
+	`stats.monster` (equipment by the players' rules: maxdam is the base attack, armor the
+	base defense, maxhp/maxmp the base maxima, strength and dexterity 0; so a monster
+	without equipment keeps its numbers). `c.row` of a monster combatant is the effective
+	row (with `base`), so the HP roll, who swings first, running away, its attack and the
+	player's attack use the equipment; `engine.handle` gives monsters `mp`/`maxmp`,
+	`strength`/`dexterity`; `engine.apply` changes a monster's MP (TP still ignored).
+	`action.perform` takes `free` (no MP cost: `uses_mp = false`); `action.check` runs only
+	`can_cast`/`can_use` with dice that error, for eligibility without rolls.
+- **AI**: candidates in order: the attack (`attack_weight`), each spell (usable in fights,
+	affordable with `uses_mp`, `when` passes, `can_cast` doesn't refuse on the default
+	target), each item (stock left, usable, `when`, `can_use`); `ai.pick` by weight (no roll
+	for one), then the target (self for `target = "self"`, else an opponent by weight). A
+	use refused after all (another target than the checked one) becomes an attack. With no
+	eligible candidate of weight > 0 the attack is the fallback (no roll). Stock is
+	`stock_<position>` in the combatant's data, set at `state.add_monster` (lazily for
+	fights without it), so a new encounter starts full. A monster can't summon (no room).
+- **Examples** (`roams = false`, ids after 151 in key order: 152 `bandit_captain`, 153
+	`bog_witch`, 154 `goblin_shaman` on a fresh install): the Goblin Shaman (Hurt; Heal
+	below half HP, inline `when`; two Potions below a third, free-standing `when`; a
+	Dagger), the Bog Witch (`uses_mp = false`: Sleep unless you sleep, Poison unless you
+	are poisoned, Pain) and the Bandit Captain (Broadsword, Chain Mail, Small Shield, Life
+	Stone; Craze once, a Herb when hurt). Tests put them in fights directly.
+- **Admin**: `/admin/monsters` is the shared content admin (`admin/effects.lua`, which now
+	also serves monsters): stats, MP, `uses_mp`, `attack_weight`, `roams` overridable, the
+	loadout read-only ("edit app/content/monsters/<key>.lua"); the list keeps the level vs
+	map size note (roaming monsters). The old CRUD monster editor is gone.
+- **Help**: `/help/monsters` lists non-retired monsters with their effective stats and a
+	Max MP column; monsters with a loadout get a line with their spells, items (stock) and
+	equipment; non-roaming ones say "not met at random". The fight page shows "Monster's
+	MP" for monsters with spells.
+- **Migration 9**: rebuilds `monsters` (plain rowid ids, `key` UNIQUE), keys the originals
+	by id from the frozen list of original names (partial installs get the 151 ids), puts
+	their stats into `content_adopt` (the sync turns edits into overrides), keeps other rows
+	under `monster_<id>` (retired by the sync, reported; their fights go on; maxmp from a
+	frozen Mage MP table), creates the loadout tables, adds `fight_combatants.mp`/`maxmp`.
+	`tests/fixtures/schema_v8.sql` + `seed_v8.sql` are the frozen version 8;
+	`tests/e2e/migrate.sh` checks v0 -> 9 and v8 -> 9 against a fresh install (layout,
+	monsters and loadouts), the overrides, a retired hand-made monster's fight and an
+	original monster's fight going on (asleep, MP full).
+- **Equivalence**: `tests/lua/test_round.lua` plays its 1,000 seeded fights against the
+	151 original monsters (its query now names them, `id <= 151`, as the examples act
+	differently by design) through the pipeline with the loadout provider in place: the
+	same rolls, lines and state as the frozen 2.1 fight. `tests/lua/test_monsters.lua`
+	asserts no extra roll for attack-only monsters.
+- Not done: monsters dropping their equipment or items, encounter content placing the
+	non-roaming monsters, enemy wordings for every original spell (Hurt says "on you" even
+	when a monster casts it at a summon), AI tuning.

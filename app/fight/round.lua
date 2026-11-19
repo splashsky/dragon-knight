@@ -11,7 +11,7 @@
 --      blocked (target chosen by fight/ai.lua);
 --   4. each enemy of the current wave, in order: turn-start ticks (sleep is a status: the
 --      wake-up roll), then, unless blocked, an action and a target chosen by weight
---      (fight/ai.lua; today a monster's attack, the original formula);
+--      (fight/ai.lua: its attack, the original formula, or a spell or item of its loadout);
 --   5. turn ends for everyone (the player, the allies, the enemies): turn_end ticks, then
 --      the statuses count down (and expire); allies count their rounds down.
 --

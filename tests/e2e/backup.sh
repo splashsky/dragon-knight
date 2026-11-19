@@ -42,7 +42,7 @@ t_get /login; expect_status 200
 t_section "backup: explicit output, never overwritten"
 "$BIN" backup --config "$CONFIG" "$T/bk/sub/copy.db" >"$T/backup.out" 2>&1 && t_ok || t_fail "dk backup OUTPUT: $(cat "$T/backup.out")"
 [ "$(cat "$T/backup.out")" = "$T/bk/sub/copy.db" ] && t_ok || t_fail "printed path: $(cat "$T/backup.out")"
-[ "$(t_sql_db "$T/bk/sub/copy.db" "SELECT count(*) FROM monsters")" = 151 ] && t_ok || t_fail "explicit copy content"
+[ "$(t_sql_db "$T/bk/sub/copy.db" "SELECT count(*) FROM monsters")" = 154 ] && t_ok || t_fail "explicit copy content"
 BK_SUM=$(cksum < "$T/bk/sub/copy.db")
 "$BIN" backup --config "$CONFIG" "$T/bk/sub/copy.db" >"$T/backup.out" 2>&1 && t_fail "overwrote an existing file" || t_ok
 grep -qF 'already exists; not overwriting it' "$T/backup.out" && t_ok || t_fail "overwrite message: $(cat "$T/backup.out")"

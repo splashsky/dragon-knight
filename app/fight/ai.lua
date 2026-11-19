@@ -5,11 +5,13 @@
 -- facing only the player consumes no random numbers here (the original game's rolls).
 --
 -- Candidates come from providers, functions(f, c) returning a list of
--- { kind, weight, target = "opponent" | "self", perform = function(f, c, target) }.
--- Today a monster has its attack and an ally its file's act; monsters with spells and
--- items (Phase E2) add providers (ai.provide) without changing the round.
+-- { kind, weight, target = "opponent" | "self", perform = function(f, c, target) }: a
+-- monster's attack (weight attack_weight) and the spells and items of its loadout that it
+-- may use this turn (fight/monster.lua), an ally's file's act. More providers can join
+-- (ai.provide) without changing the round.
 local act = require("fight.act")
 local engine = require("fight.engine")
+local monster = require("fight.monster")
 local state = require("fight.state")
 
 local ai = {}
@@ -52,10 +54,12 @@ function ai.targets(f, c)
 	return out
 end
 
--- The basic actions: a monster's attack (the original formula), an ally's act.
+-- The basic actions: a monster's attack (the original formula; weight 0: only when nothing
+-- else is eligible), an ally's act.
 local function basic(_, c)
 	if c.kind == "monster" then
-		return { { kind = "attack", weight = c.row.attack_weight or 1, target = "opponent", perform = act.enemy_attack } }
+		return { { kind = "attack", weight = c.row.attack_weight or 1, target = "opponent", perform = act.enemy_attack,
+			fallback = true } }
 	elseif c.kind == "summon" then
 		return { { kind = "act", weight = 1, target = "opponent", perform = function(f, me, target)
 			engine.summon_hook(f, me, "act", target)
@@ -64,9 +68,9 @@ local function basic(_, c)
 	return {}
 end
 
-ai.PROVIDERS = { basic }
+ai.PROVIDERS = { basic, monster.candidates }
 
--- Adds a provider of action candidates (Phase E2: a monster's spells and items).
+-- Adds a provider of action candidates.
 function ai.provide(fn)
 	ai.PROVIDERS[#ai.PROVIDERS + 1] = fn
 end
@@ -81,9 +85,16 @@ function ai.actions(f, c)
 end
 
 -- What c does this turn: the action, then its target (a combatant; nil when there is
--- nobody to aim at).
+-- nobody to aim at). With no eligible action of weight > 0, a fallback (a monster's attack
+-- of weight 0) without a roll.
 function ai.choose(f, c)
-	local cand = ai.pick(ai.actions(f, c), f.rand)
+	local list = ai.actions(f, c)
+	local cand = ai.pick(list, f.rand)
+	if not cand then
+		for _, x in ipairs(list) do
+			if x.fallback then cand = x break end
+		end
+	end
 	if not cand then return nil end
 	if cand.target == "self" then return cand, c end
 	local t = ai.pick(ai.targets(f, c), f.rand)

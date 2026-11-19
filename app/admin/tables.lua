@@ -1,6 +1,6 @@
 -- admin/tables.lua :: field specs for the simple "list + edit one row" tables
--- (legacy admin.php towns, monsters, users; items and drops, spells and classes are
--- content, see admin/items.lua, admin/spells.lua and admin/classes.lua). See
+-- (legacy admin.php towns, users; items and drops, spells, classes and monsters are
+-- content, see admin/items.lua, admin/spells.lua, admin/classes.lua and admin/effects.lua). See
 -- admin/editor.lua for the spec format. Column lists here are the UPDATE whitelists.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
@@ -95,30 +95,6 @@ tables.towns = function()
 				get = function(row) return table.concat(items.town_keys(row.id), ", ") end,
 				help = 'Keys of the items this town\'s shop sells, comma-separated (see <a href="/admin/items">Items</a>; ' ..
 							 'example: <span class="highlight">stick, branch, herb</span>).' },
-		},
-	}
-end
-
-tables.monsters = function()
-	return {
-		table = "monsters", path = "/admin/monsters", column = "name",
-		heading = "Edit Monsters", saved = "Monster updated.",
-		list_intro = "Click an monster's name to edit it.", none = "No monsters found.",
-		fields = {
-			ID,
-			text("name", "Name"),
-			num("maxhp", "Max Hit Points", 5, 10, {
-				required = "Max HP is required.", numeric = "Max HP must be a number." }),
-			num("maxdam", "Max Damage", 5, 10, { help = "Compares to player's attackpower." }),
-			num("armor", "Armor", 5, 10, { help = "Compares to player's defensepower." }),
-			num("level", "Monster Level", 5, 10, { help = "Determines spawn location and item drops." }),
-			num("maxexp", "Max Experience", 5, 10, {
-				required = "Max Exp is required.", numeric = "Max Exp must be a number.",
-				help = "Max experience gained from defeating monster." }),
-			num("maxgold", "Max Gold", 5, 10, { help = "Max gold gained from defeating monster." }),
-			{ name = "immune", label = "Immunity", kind = "select", int = true,
-				options = { { 0, "None" }, { 1, "Hurt Spells" }, { 2, "Hurt & Sleep Spells" } },
-				help = "Some monsters may not be hurt by certain spells." },
 		},
 	}
 end

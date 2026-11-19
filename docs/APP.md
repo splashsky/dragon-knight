@@ -17,12 +17,13 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
-| Content (statuses, summons, classes, spells, items) | `app/content/{statuses,summons,classes,spells,items}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
+| Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
+| Content (statuses, summons, classes, spells, items, monsters) | `app/content/{statuses,summons,classes,spells,items,monsters}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons,monsters}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
 | Scripted spells and items (what they do) | `app/lib/action.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/{act,engine}.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,...,seed_v7}.sql`), `tests/lua/test_db.lua` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,...,seed_v8}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -248,11 +249,11 @@ experience already covers the next level gets it (or several) on the next victor
 
 ## Content
 
-Classes, spells, items, statuses and summons are **content**: Lua files in git, one per
-entity, hot-reloaded like the code and synced into the database, where players' rows
+Classes, spells, items, statuses, summons and monsters are **content**: Lua files in git,
+one per entity, hot-reloaded like the code and synced into the database, where players' rows
 reference them by id. Spells, consumables, statuses and summons also carry code: what they
 do (see [Scripting spells and items](#scripting-spells-and-items) and
-[Fight engine](#fight-engine)).
+[Fight engine](#fight-engine)); monsters may carry conditions (see [Monsters](#monsters)).
 
 ```lua
 -- app/content/classes/knight.lua: the file name is the key ("knight")
@@ -289,10 +290,11 @@ High hit points]],                       -- one line per point on the help page
 	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
 	deleted: players keep their class), un-retire keys whose file is back, then apply the
 	admin overrides. Kinds sync in `schema.KINDS` order (statuses, summons, spells,
-	classes, items: kinds others reference first; spells before classes, whose
-	`class_spells` rows need the spell ids). The original classes keep ids 1-3, the
-	original spells 1-19, the items 1-68 and the statuses of the original mechanics
-	(`sleep`, `uber_damage`, `uber_defense`) 1-3 (seeded in `seed.sql`).
+	classes, items, monsters: kinds others reference first; spells before classes, whose
+	`class_spells` rows need the spell ids, items and spells before monsters). The original
+	classes keep ids 1-3, the original spells 1-19, the items 1-68, the statuses of the
+	original mechanics (`sleep`, `uber_damage`, `uber_defense`) 1-3 and the original
+	monsters 1-151 (seeded in `seed.sql`).
 - **When**: every request (`main.lua`) compares `meta.content_seen` with
 	`<boot id>:<code-cache generation>` (`dk.vmstats()`): one query while nothing changed.
 	After a restart or any app file change, the files are loaded and fingerprinted (sha256
@@ -306,19 +308,20 @@ High hit points]],                       -- one line per point on the help page
 	`dk install` fail (and change nothing) instead.
 - **Overrides**: `content_overrides(kind, key, field, value)` hold per-server values that
 	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
-	`/admin/spells/#id`, `/admin/items/#id`, shared code in `admin/content.lua` and
-	`templates/admin/content_form.html`) write them for the kind's `admin_fields` (classes:
-	name, description, sort, playable, starting stats; spells: name, description, MP,
-	power, numbers and message strings; items: see [Items](#items); a value equal to the
-	file's deletes the override) and offer "reset to file". Field names are those of the
+	`/admin/spells/#id`, `/admin/items/#id`, `/admin/{statuses,summons,monsters}/#id`,
+	shared code in `admin/content.lua` and `templates/admin/content_form.html`) write them
+	for the kind's `admin_fields` (classes: name, description, sort, playable, starting
+	stats; spells: name, description, MP, power, numbers and message strings; items: see
+	[Items](#items); monsters: see [Monsters](#monsters); a value equal to the file's
+	deletes the override) and offer "reset to file". Field names are those of the
 	flat form: `name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `power`,
 	`data.min`, `messages.hit`, `messages.enemy.hit`, `modifiers.2.stat`.
 - **Migrations into content**: a migration that turns old rows into content writes the
 	old values into `content_adopt(kind, key, field, value)`; the next sync turns those
 	that differ from the file (and are valid) into overrides (that is how schema version 4
 	kept edited class names and levels data, version 5 edited spell names, MP and amounts,
-	version 6 edited items and drops, and version 7 turned edited effect amounts into
-	`power`).
+	version 6 edited items and drops, version 7 turned edited effect amounts into
+	`power`, and version 9 kept edited monster stats).
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
@@ -327,7 +330,8 @@ load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` m
 `validate_extra`/`write_children`), its table (`id`, `key` UNIQUE, the field columns,
 `retired`) and an entry in `schema.KINDS` (in sync order: kinds others reference first).
 A field of type `keys` with `refs = "<kind>"` lists keys of another kind (checked by
-`load.all`); `write_children` maps them to ids. A kind with code uses
+`load.all`); `write_children` maps them to ids; an optional `validate_refs(flat, all,
+err)` checks more against the other kinds' files (a monster's weapon must be a weapon). A kind with code uses
 `lib/content/scripted.lua` (function fields, messages, data; `load.module(kind, key)`
 gives the runtime the loaded file). Bump `load.FORMAT` when the flat form changes meaning.
 
@@ -520,8 +524,9 @@ actions), and the file's `stages = { release = fn }` (named steps; see
 `s:say("hit", ...)` uses `messages.enemy.hit` if there is one (same arguments); otherwise
 the line becomes a generic "The Dragon casts Hurt." (items: "The Dragon uses the Potion.")
 followed by what changed since the previous line ("You take 13 damage.", "The Dragon
-recovers 10 Hit Points.", "You are now Poisoned.", ...). No monster casts yet (Phase E2);
-`tests/lua/test_action.lua` covers both forms with monster casters.
+recovers 10 Hit Points.", "You are now Poisoned.", ...). Monsters cast spells and use items
+from their loadouts (see [Monsters](#monsters)); `tests/lua/test_action.lua` and
+`tests/lua/test_monsters.lua` cover both forms with monster casters.
 
 **Errors** in content code (a typo, a bad format, `error(...)`, more than
 `sandbox.BUDGET` instructions) are caught: logged as a warning with the traceback, the
@@ -565,7 +570,7 @@ the player's choice (known spell, MP, item in the bag) and saves.
 | | |
 |---|---|
 | `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id }`. `round` is the original `currentfight` counter (1: the encounter just began, no monster picked; +1 per fight page, at most 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`) |
-| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the monsters / summons row |
+| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's `immune` and item stock (`stock_<position>`) |
 | status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
 
 `state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (victory, escape, death)
@@ -741,11 +746,13 @@ player; the original formula then uses the ally's defense and dexterity. An ally
 single candidate is taken **without a roll**). `ai.choose(f, c)` picks an action among
 `ai.actions(f, c)`, then a target among `ai.targets(f, c)` (every living opponent weighs
 1: with one summon a monster attacks the player or the summon 50/50; alone with the
-player there is no roll). Actions come from providers (`ai.PROVIDERS`, `ai.provide(fn)`):
-functions `(f, c)` returning candidates `{ kind, weight, target = "opponent" | "self",
-perform = function(f, c, target) }`. Today they are a monster's attack (weight
-`row.attack_weight or 1`, `act.enemy_attack`) and an ally's `act`; Phase E2 adds
-providers for a monster's spells and items.
+player there is no roll; an action with `target = "self"` aims at the monster itself).
+Actions come from providers (`ai.PROVIDERS`, `ai.provide(fn)`): functions `(f, c)`
+returning candidates `{ kind, weight, target = "opponent" | "self", perform = function(f,
+c, target) }`: a monster's attack (weight `attack_weight`, `act.enemy_attack`; with weight
+0 it is the fallback when nothing else is eligible, without a roll), the spells and items
+of its loadout it may use this turn (`fight/monster.lua`, see [Monsters](#monsters)) and
+an ally's `act`.
 
 ### Adding a status or a summon
 
@@ -756,6 +763,112 @@ item (`s.target:afflict("<key>", ...)`, `s:summon("<key>", ...)`; declare it wit
 admin pages `/admin/statuses` and `/admin/summons` override names, descriptions, numbers
 and messages per server. Unit tests can run statuses and summons without files:
 `load.preload(kind, key, module)` primes the loaded module (see `tests/lua/test_round.lua`).
+
+## Monsters
+
+Monsters are content (see [Content](#content)): `app/content/monsters/<key>.lua`, synced
+into `monsters` (`lib/content/kinds/monsters.lua`) and the loadout tables
+`monster_equipment`, `monster_items` and `monster_spells`. The original 151 keep ids 1-151
+(keys from the names: `blue_slime` ... `lucifuge`) and only attack, exactly as before.
+`goblin_shaman.lua`, `bog_witch.lua` and `bandit_captain.lua` are examples of the rest.
+
+```lua
+-- app/content/monsters/goblin_shaman.lua
+local function low_hp(m)                    -- a free-standing condition
+	return m.hp < m.maxhp // 3
+end
+
+return {
+	name = "Goblin Shaman",
+	description = "Hurls Hurt spells, heals itself when wounded and carries two potions.",
+	level = 5,                                -- where it is met and what it drops
+	maxhp = 40, maxdam = 8, armor = 4,        -- the original columns
+	maxexp = 12, maxgold = 15,
+	immune = 0,                               -- 1: hurt spells, 2: hurt and sleep spells
+	maxmp = 17,                               -- MP at the start of every encounter (default 0)
+	uses_mp = true,                           -- spells cost it MP (default); false: free
+	attack_weight = 3,                        -- its attack's weight (default 1; 0: fallback only)
+	roams = false,                            -- met in random encounters (default true)
+	equipment = { weapon = "dagger" },        -- slot = item key (weapon, armor, shield, accessory1-3)
+	spells = {                                -- { spell, weight (default 1), when (optional) }
+		{ spell = "hurt", weight = 2 },
+		{ spell = "heal", weight = 3, when = function(m) return m.hp < m.maxhp // 2 end },
+	},
+	items = {                                 -- { item, weight, stock (per encounter; nil: no limit), when }
+		{ item = "potion", weight = 4, stock = 2, when = low_hp },
+	},
+}
+```
+
+- **Validation** (`dk check`): the stats as above (`maxhp` >= 1, `immune` 0-2, weights >=
+	1, `attack_weight` >= 0, `stock` >= 1 or absent); item and spell keys must be files;
+	equipment must fit its slot (a weapon in `weapon`, an accessory in `accessory1`-`3`);
+	items must be consumables and spells usable in fights; `when` must be a function.
+- **MP**: every original monster has `maxmp` = the Mage's total MP at its level (start +
+	gains in `classes/mage.lua`, at least 5), written into its file. A monster's MP is full
+	at the start of each encounter (`fight_combatants.mp`/`maxmp`; a fight from before
+	version 9 loads it full) and its spells cost `mp` like the player's (none affordable:
+	not eligible). With `uses_mp = false` spells are free (MP is still shown and readable
+	by conditions). Spells can restore a monster's MP (`:heal("mp", n)`); TP don't apply.
+- **Equipment**: the items' attack, defense and modifiers count by the players' rules
+	(`stats.monster`, the same `stats.derive`): the monster's base is `maxhp`, `maxmp`,
+	strength and dexterity 0, `maxdam` as base attack and `armor` as base defense, so its
+	effective `maxdam` = maxdam + strength + attack, `armor` = armor + dexterity + defense,
+	`maxhp`/`maxmp` + their modifiers (experience and gold bonuses don't apply). The fight
+	uses the effective numbers everywhere (`monsters.effective`: the encounter's HP roll,
+	who swings first, running away, its attack, the player's attack on its armor, its
+	handle's `attack`/`defense`/`strength`/`dexterity`). Without equipment they are the
+	row's: the original monsters are unchanged. Monsters don't drop their equipment.
+- **Choosing an action** (each turn it isn't blocked; `fight/monster.lua` as an AI
+	provider): the candidates are its attack (`attack_weight`), every spell it can use now
+	(usable in fights and not retired; enough MP with `uses_mp`; `when` passes; `can_cast`
+	doesn't refuse) and every item it can use now (stock left; usable in fights; `when`
+	passes; `can_use` doesn't refuse), in that order; one is picked by weight
+	(`ai.pick`), then its target: the monster itself for a spell or item with `target =
+	"self"`, otherwise an opponent by weight (the player, or a summon). With a single
+	eligible candidate no roll is made, so attack-only monsters roll exactly the original
+	dice (`tests/lua/test_round.lua`). Weighing the options rolls nothing: `can_cast` /
+	`can_use` run through `action.check` (no dice: a roll there is an error and makes the
+	entry ineligible), on the default target (the player); if the real use is refused after
+	all (another target), the monster attacks instead.
+- **`when` conditions** (inline or free-standing functions) get the monster as its AI sees
+	it: `m.hp`, `m.maxhp`, `m.mp`, `m.maxmp`, `m.level`, `m.name`, `m.attack`, ... (its
+	read-only handle), `m:has_status(key)`, `m:status(key)`, `m:statuses(kind)`, plus
+	`m.round` (the fight's round), `m.target` (the default opponent's handle: the player;
+	`m.target:has_status("sleep")`) and `m.stock` (items: uses left). They only decide: no
+	dice, no changes (an error, logged, makes the entry ineligible this turn). They stay in
+	the file (`has_when` in the loadout tables marks them; the runtime takes them from the
+	loaded file by position).
+- **Stock** is per encounter: `stock_<position>` in the combatant's data counts down on
+	each use (an entry without stock has no limit); the next encounter starts full.
+- **Using** a spell or item is `action.perform` with the monster as caster (its MP cost
+	skipped with `uses_mp = false`), applied by `engine.apply`; lines are the files'
+	`messages.enemy` wordings, or the generic "The Goblin Shaman casts Heal." / "uses the
+	Potion." plus what changed. A monster can't summon (no room on its side).
+- **Random encounters** pick among the roaming, non-retired monsters of the level band
+	(`monsters.roaming`: the original rows and order). Monsters with `roams = false` (the
+	examples) are only met where content or a test puts them (`state.add_monster(f, row,
+	wave)` + `round.start(f)`); an admin can let one roam.
+- **Admin** (`/admin/monsters`, the shared content admin `admin/effects.lua`): name,
+	description, level, the stats, `maxmp`, `uses_mp`, `attack_weight` and `roams` are
+	overridable; the loadout is shown read-only (edit the file). The list keeps the
+	original's check that the highest roaming level is the map size / 5.
+- **Help** (`/help/monsters`): every non-retired monster with its effective stats and MP,
+	and the spells, items (with stock) and equipment of those that have them.
+- **Retired** monsters (file deleted) are no longer met; fights against them go on.
+
+`lib/monsters.lua`: `monsters.get(id)`, `monsters.by_key(key)`, `monsters.active()`,
+`monsters.all()`, `monsters.roaming(min, max)`, `monsters.loadout(row)` (`{ equipment,
+items, spells }` with item and spell rows, read once per request; a row may carry its own
+`loadout` table: tests), `monsters.condition(row, list, entry)` (the `when` function),
+`monsters.effective(row)` (a copy with the equipment counted, base values in `base`),
+`monsters.reload()`.
+
+Adding a monster: copy `app/content/monsters/goblin_shaman.lua` (or an original's file for
+one that only attacks) to `<key>.lua`, edit it, run `./dk check`. With `roams = true` (the
+default) it is met at random in its level band on the next page load (mind the admin
+monsters page's level/map size note); it shows on `/help/monsters`. Deleting the file
+retires it.
 
 ## Items
 
@@ -906,7 +1019,8 @@ computes them (the equipment is read once per request); every page, the fight an
 spell and item actions use them (`game.player(user)` for the latter, so
 `fight/combat.lua` keeps the original formulas and names). Never store effective stats:
 change base stats or equipment. `stats.solve(expected, mods)` is the inverse (base columns
-that give expected effective stats), used by the migration.
+that give expected effective stats), used by the migration. `stats.monster(row, mods)`
+applies the same rules to a monster and its equipment (see [Monsters](#monsters)).
 
 Modifiers are gear's passive stat bonuses, plain data (not code: they are summed,
 displayed and overridden): `{ kind = "stat", stat = "strength", amount = 50 }` (amount may
@@ -1007,8 +1121,8 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v7.sql` (version 7) with the
-	 game data of that time (`seed_v3.sql` to `seed_v7.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v8.sql` (version 8) with the
+	 game data of that time (`seed_v3.sql` to `seed_v8.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.

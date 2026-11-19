@@ -77,7 +77,9 @@ for key in pairs(olds.ORIGINAL.spells) do ORIGINAL_KEYS[#ORIGINAL_KEYS + 1] = ke
 table.sort(ORIGINAL_KEYS)
 
 function T.fights_play_as_in_2_1()
-	local monsters = dk.db:query("SELECT * FROM monsters ORDER BY id")
+	-- the original monsters (ids 1-151, attack only, no equipment); the example monsters with
+	-- loadouts that came later (2.2) act differently by design (test_monsters.lua)
+	local monsters = dk.db:query("SELECT * FROM monsters WHERE id <= 151 ORDER BY id")
 	local spell_rows = {}
 	for _, key in ipairs(ORIGINAL_KEYS) do spell_rows[#spell_rows + 1] = assert(spells.by_key(key)) end
 	local item_rows = { items.by_key("herb"), items.by_key("potion"), items.by_key("ether") }

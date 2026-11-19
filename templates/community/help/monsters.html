@@ -1,15 +1,20 @@
-{#- Monsters spoilers (legacy help_monsters.php). -#}
+{#- Monsters spoilers (legacy help_monsters.php; MP and the loadouts are new in 2.2). ctx:
+		monsters { monster (effective row), immune, loadout { label, text }, special (doesn't
+		roam), free (its spells cost no MP) }. -#}
 {{{ include("community/help/header") }}}
 
 <table class="help-table help-w75">
 <thead>
-<tr><th colspan="8" class="help-caption">Monsters</th></tr>
-<tr><th>Name</th><th>Max HP</th><th>Max Damage</th><th>Armor</th><th>Level</th><th>Max Exp.</th><th>Max Gold</th><th>Immunity</th></tr>
+<tr><th colspan="9" class="help-caption">Monsters</th></tr>
+<tr><th>Name</th><th>Max HP</th><th>Max Damage</th><th>Armor</th><th>Level</th><th>Max Exp.</th><th>Max Gold</th><th>Max MP</th><th>Immunity</th></tr>
 </thead>
 <tbody>
 {%- for _, r in ipairs(monsters) do %}
 {%- local m = r.monster %}
-<tr><td style="width: 30%">{{ m.name }}</td><td style="width: 10%">{{ m.maxhp }}</td><td style="width: 10%">{{ m.maxdam }}</td><td style="width: 10%">{{ m.armor }}</td><td style="width: 10%">{{ m.level }}</td><td style="width: 10%">{{ m.maxexp }}</td><td style="width: 10%">{{ m.maxgold }}</td><td style="width: 20%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+<tr><td style="width: 26%">{{ m.name }}{% if r.special then %} <span class="light">(not met at random)</span>{% end %}</td><td style="width: 9%">{{ m.maxhp }}</td><td style="width: 9%">{{ m.maxdam }}</td><td style="width: 9%">{{ m.armor }}</td><td style="width: 9%">{{ m.level }}</td><td style="width: 9%">{{ m.maxexp }}</td><td style="width: 9%">{{ m.maxgold }}</td><td style="width: 8%">{{ m.maxmp }}</td><td style="width: 12%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- if #r.loadout > 0 then %}
+<tr class="help-loadout"><td colspan="9" class="small">{% for i, x in ipairs(r.loadout) do %}{% if i > 1 then %}; {% end %}{{ x.label }}: {{ x.text }}{% end %}{% if r.free then %} <span class="light">(its spells cost no MP)</span>{% end %}</td></tr>
+{%- end %}
 {%- end %}
 </tbody>
 </table>

@@ -17,8 +17,7 @@ else
 
 t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
 			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
-			 CREATE TABLE adm_snap_town_items AS SELECT * FROM town_items WHERE town_id = 2;
-			 CREATE TABLE adm_snap_monsters AS SELECT * FROM monsters WHERE id = 1;"
+			 CREATE TABLE adm_snap_town_items AS SELECT * FROM town_items WHERE town_id = 2;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
 
@@ -105,14 +104,43 @@ admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHER
 t_get /admin/towns/2;      expect_body 'name="items" size="60" maxlength="2000" value="stick, club, herb"'
 
 t_section "admin: monsters"
-t_get /admin/monsters/1;   expect_body 'Immunity:'
-t_form_submit /admin/monsters/1 maxhp= maxexp=lots
-expect_body 'Max HP is required.'; expect_body 'Max HP must be a number.'; expect_body 'Max Exp must be a number.'
-t_form_submit /admin/monsters/1 name=Slimer maxhp=1.6 maxdam=9 armor=2 level=1 maxexp=3 maxgold=4 immune=2
+# monster files app/content/monsters/*.lua; admins override the stats, MP, uses_mp, the
+# attack's weight and roams; the loadout is the file's (read-only here)
+t_get /admin/monsters;     expect_status 200; expect_body '<a href="/admin/monsters/1">Blue Slime</a>'
+expect_body '<td>blue_slime</td><td>1</td><td>4</td><td>3</td><td>1</td><td>5</td><td>1</td>'
+expect_body 'monsters: 154 files, 154 in the database (0 retired), 0 overrides.'
+ADM_SHAMAN=$(t_sql "SELECT id FROM monsters WHERE key = 'goblin_shaman'")
+expect_body "<td>goblin_shaman</td><td>5</td><td>40</td><td>8</td><td>4</td><td>17</td><td>0</td>"
+t_get /admin/monsters/1;   expect_body 'Edit Monster: Blue Slime'; expect_body 'app/content/monsters/blue_slime.lua'
+expect_body 'Immunity:'; expect_body 'name="maxmp" size="6" value="5"'; expect_body 'name="attack_weight" size="6" value="1"'
+expect_body 'Loadout:</td><td>none: it only attacks'
+t_form_submit /admin/monsters/1 maxhp= maxexp=lots attack_weight=-1
+expect_body 'Max Hit Points must be an integer from 1 to 1000000.'; expect_body 'Max Experience must be an integer from 0 to 1000000.'
+expect_body 'Attack weight must be an integer from 0 to 1000000.'
+admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid monster form not saved"
+t_get /admin/monsters/1
+t_form_submit /admin/monsters/1 name=Slimer maxhp=2 maxdam=9 immune=2 maxmp=12 uses_mp=0 attack_weight=3 roams=0
 expect_redirect '/admin/monsters/1\?saved=1'
-admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune FROM monsters WHERE id = 1" \
-	"Slimer|2|9|2" "monster saved"
-t_get /admin/monsters/1;   expect_body '<option value="2" selected>Hurt &amp; Sleep Spells</option>'
+admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune || '|' || maxmp || '|' || uses_mp || '|' || attack_weight || '|' || roams FROM monsters WHERE id = 1" \
+	"Slimer|2|9|2|12|0|3|0" "monster overrides applied"
+admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'monsters' ORDER BY field)" \
+	"attack_weight=3;immune=2;maxdam=9;maxhp=2;maxmp=12;name=Slimer;roams=0;uses_mp=0" "only the changed fields are overridden"
+t_get '/admin/monsters/1?saved=1'; expect_body 'Monster updated.'; expect_body 'File value: Blue Slime'
+expect_body '<option value="0" selected>No</option>'
+t_get /help/monsters;      expect_body 'Slimer <span class="light">(not met at random)</span>'
+t_get /admin/monsters/1
+t_post /admin/monsters/1/reset "csrf=$(t_csrf)&field=*"
+expect_redirect '/admin/monsters/1\?saved=1'
+admin_eq "SELECT name || '|' || maxhp || '|' || maxmp || '|' || roams FROM monsters WHERE id = 1" "Blue Slime|4|5|1" "monster reset to file"
+admin_eq "SELECT count(*) FROM content_overrides" "0" "no monster overrides left"
+# the loadout: read-only, from the file
+t_get "/admin/monsters/$ADM_SHAMAN"; expect_body 'Edit Monster: Goblin Shaman'
+expect_body 'Equipment:</td><td>weapon: Dagger (dagger)'; expect_body 'Spell:</td><td>Hurt (hurt): weight 2'
+expect_body 'Spell:</td><td>Heal (heal): weight 3, when its condition holds'
+expect_body 'Item:</td><td>Potion (potion): weight 4, stock 2 per encounter, when its condition holds'
+expect_body 'edit <code>app/content/monsters/goblin_shaman.lua</code>'
+expect_no_body 'name="spells'; expect_no_body 'name="items'; expect_no_body 'name="equipment'
+t_get /admin/monsters/999; expect_status 404
 
 t_section "admin: spells"
 # spell files app/content/spells/*.lua; admins override name, description, MP, power,
@@ -273,7 +301,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired; monsters: 154, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"
@@ -365,6 +393,5 @@ t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; 
 			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
 			 DELETE FROM town_items WHERE town_id = 2; INSERT INTO town_items SELECT * FROM adm_snap_town_items;
 			 DROP TABLE adm_snap_town_items;
-			 DELETE FROM monsters WHERE id = 1; INSERT INTO monsters SELECT * FROM adm_snap_monsters; DROP TABLE adm_snap_monsters;
 			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

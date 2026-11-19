@@ -1,10 +1,12 @@
 # tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
-# (tests/fixtures/schema_v0.sql) and from versions 1 to 7 (tests/fixtures/schema_vN.sql,
-# with the game data of that time, tests/fixtures/seed_v3.sql to seed_v7.sql), the 503
+# (tests/fixtures/schema_v0.sql) and from versions 1 to 8 (tests/fixtures/schema_vN.sql,
+# with the game data of that time, tests/fixtures/seed_v3.sql to seed_v8.sql), the 503
 # page for an outdated database, and no-op runs. Version 5 -> 6 checks that every
 # character's effective stats are the same before and after; version 6 -> 7 that edited
 # effect amounts become power overrides and a fight goes on; version 7 -> 8 that fights in
-# progress move to the fight tables (sleep and buffs as statuses) and go on.
+# progress move to the fight tables (sleep and buffs as statuses) and go on; version 8 -> 9
+# that monsters become content (edits as overrides, hand-made ones retired) and fights in
+# progress keep their monster.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
@@ -76,6 +78,17 @@ MIG_SPELLS_OF="SELECT id, key, name, description, mp, usable_in, retired, power,
 MIG_SPELLS="$MIG_SPELLS_OF ORDER BY id"
 # The items and what towns sell (the same on a fresh install and a migrated database without edits).
 MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id"
+# The monsters and their loadouts as data (the same on a fresh install and a migrated
+# database without edits).
+MIG_MONSTERS="SELECT * FROM monsters ORDER BY id; SELECT * FROM monster_equipment ORDER BY monster_id, slot;
+	SELECT * FROM monster_items ORDER BY monster_id, position; SELECT * FROM monster_spells ORDER BY monster_id, position"
+# The same by key (ids of the monsters added after the original 151 depend on the
+# database), but for red_slime and monster_152 (the version 8 database's edits).
+MIG_MONSTERS_BY_KEY="SELECT key, name, description, maxhp, maxdam, armor, level, maxexp, maxgold, immune, maxmp, uses_mp,
+	attack_weight, roams, retired FROM monsters WHERE key NOT IN ('red_slime', 'monster_152') ORDER BY key;
+	SELECT m.key, e.slot, e.item_id FROM monster_equipment e JOIN monsters m ON m.id = e.monster_id ORDER BY 1, 2;
+	SELECT m.key, i.position, i.item_id, i.weight, i.stock, i.has_when FROM monster_items i JOIN monsters m ON m.id = i.monster_id ORDER BY 1, 2;
+	SELECT m.key, x.position, x.spell_id, x.weight, x.has_when FROM monster_spells x JOIN monsters m ON m.id = x.monster_id ORDER BY 1, 2"
 # The classes as data (the same on a fresh install and a migrated database without edits).
 MIG_CLASSES="SELECT * FROM classes ORDER BY id; SELECT * FROM class_levels ORDER BY class_id, level;
 	SELECT * FROM class_spells ORDER BY class_id, level, spell_id"
@@ -105,7 +118,7 @@ CUR_VERSION=$(t_sql "PRAGMA user_version")
 [ "$CUR_VERSION" -ge 3 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
 "$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
 grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
-grep -qF "Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
+grep -qF "Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired; monsters: 154, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
 [ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
 
 t_section "migrate: version checks on every request"
@@ -183,7 +196,7 @@ grep -qF 'Migrating to version 6: items and drops are content files' "$T/migrate
 grep -qF 'Migrating to version 7: spells and consumables are scripted content' "$T/migrate.log" && t_ok || t_fail "step 7 not reported"
 grep -qF 'Migrating to version 8: the fight engine' "$T/migrate.log" && t_ok || t_fail "step 8 not reported"
 grep -qF 'Converted the stats of 3 characters to base stats (verified); 0 keep extra attack/defense power.' "$T/migrate.log" && t_ok || t_fail "stats conversion not reported"
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
+grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
@@ -200,6 +213,8 @@ mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a 
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name IN ('items', 'drops')" "0" "items ids are plain rowids now"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name = 'spells'" "0" "spells ids are plain rowids now"
+mig_eq "$MIG_MONSTERS" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS")" "monsters and loadouts equal a fresh install's"
+mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name = 'monsters'" "0" "monster ids are plain rowids now"
 mig_eq "SELECT count(*) FROM content_overrides; SELECT count(*) FROM content_adopt" "0
 0" "stock data: no overrides"
 mig_eq "SELECT value FROM meta WHERE key = 'content_fingerprint'" \
@@ -280,7 +295,7 @@ MIG_DB=$V1_DB
 mig_eq "PRAGMA user_version" "1" "fixture is version 1"
 V1_DATA="SELECT id, username, charname, charclass, gold, authlevel FROM users ORDER BY id;
 	SELECT id, gamename, gamesize, gameopen, forumtype, verifyemail FROM control;
-	SELECT count(*) FROM monsters; SELECT count(*) FROM forums"
+	SELECT count(*) FROM monsters WHERE id <= 151; SELECT count(*) FROM forums"
 before=$(mig_sql "$V1_DB" "$V1_DATA")
 "$BIN" migrate --config "$MIG/v1.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v1) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && t_ok || t_fail "step 2 not reported (v1)"
@@ -323,7 +338,7 @@ MIG_DB=$V2_DB
 mig_eq "PRAGMA user_version" "2" "fixture is version 2"
 V2_DATA="SELECT id, gamename, gamesize, gameopen, gameurl, adminemail,
 	forumtype, forumaddress, compression, verifyemail, shownews, showbabble, showonline FROM control;
-	SELECT count(*) FROM monsters"
+	SELECT count(*) FROM monsters WHERE id <= 151"
 before=$(mig_sql "$V2_DB" "$V2_DATA"; mig_users "$V2_DB")
 "$BIN" migrate --config "$MIG/v2.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v2) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 3: experience, TP and HP milestones per level are formulas (edited exp/tp values are discarded)' \
@@ -373,7 +388,7 @@ V3_USERS=$(mig_users "$V3_DB")
 "$BIN" migrate --config "$MIG/v3.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v3) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported (v3)"
 grep -qE 'Migrating to version [123]:' "$T/migrate.log" && t_fail "steps 1-3 ran on a version 3 database" || t_ok
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides; items: 70, 2 new, 0 retired).' "$T/migrate.log" \
+grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" \
 	&& t_ok || t_fail "sync report (v3): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v3 stamped"
 [ "$(mig_layout "$V3_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -456,7 +471,7 @@ grep -qF 'Migrating to version 5: spells are content files with effects; the spe
 grep -qE 'Migrating to version [1234]:' "$T/migrate.log" && t_fail "steps 1-4 ran on a version 4 database" || t_ok
 grep -qF "warning: spell 7 (Pain) had its type changed to 4; it keeps the effect of app/content/spells/pain.lua" \
 	"$T/migrate.log" && t_ok || t_fail "type change not reported: $(cat "$T/migrate.log")"
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 1 retired, 4 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides; items: 70, 2 new, 0 retired).' \
+grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 1 retired, 4 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).' \
 	"$T/migrate.log" && t_ok || t_fail "sync report (v4): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v4 stamped"
 [ "$(mig_layout "$V4_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -576,7 +591,7 @@ for line in 'Migrating to version 6: items and drops are content files; inventor
 	'note: character Oddone (user 3) keeps 8 attack and 0 defense power that strength, dexterity and gear don'"'"'t give' \
 	'warning: item 19 (Leather Armor) has the special "gold,100", which is not a stat' \
 	'warning: item 30 (Small Shield) had its type changed to 1; it keeps the category of app/content/items/small_shield.lua' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 2 retired, 11 earlier admin edits kept as overrides).' \
+	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 2 retired, 11 earlier admin edits kept as overrides; monsters: 154, 3 new, 0 retired).' \
 	'warning: character Typo (user 6): the items'"'"' new values changed attack, defense; base stats adjusted to keep them'; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v5) output lacks: $line
 $(cat "$T/migrate.log")"
@@ -700,7 +715,7 @@ grep -qE 'Migrating to version [123456]:' "$T/migrate.log" && t_fail "steps 1-6 
 for line in 'Migrating to version 7: spells and consumables are scripted content' \
 	'warning: spell zap: the edit of effects.1.min (5) can'"'"'t be kept: spells and items are scripted now, with one power' \
 	'warning: spell zap: the edit of effects.2.pct (25) can'"'"'t be kept' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired, 1 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired).' \
+	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired, 1 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).' \
 	'Moved 1 fight in progress to the new fight tables.'; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v6) output lacks: $line
 $(cat "$T/migrate.log")"
@@ -788,7 +803,7 @@ V7_USERS=$(mig_users "$V7_DB")
 grep -qE 'Migrating to version [1-7]:' "$T/migrate.log" && t_fail "steps 1-7 ran on a version 7 database" || t_ok
 for line in 'Migrating to version 8: the fight engine: fights in progress move to their own tables' \
 	'Moved 4 fights in progress to the new fight tables.' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired).'; do
+	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).'; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v7) output lacks: $line
 $(cat "$T/migrate.log")"
 done
@@ -854,6 +869,87 @@ t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>'
 mig_eq "SELECT $T_ROUND || '|' || ($T_MONSTER BETWEEN 1 AND 151) FROM users WHERE id = 4" "3|1" "a new monster for a deleted one"
 mig_unserve "$MIG/v7server.log"
 "$BIN" migrate --config "$MIG/v7.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v7)"
+
+t_section "migrate: version 8 database"
+# version 8 schema + its game data: an admin edit of an original monster, a monster added
+# by hand (no content file), a fight in progress against an original monster (asleep) and
+# one against the added monster; only step 9 runs. Monsters become content: the edit is an
+# override, the added monster is retired (its fight goes on), monster MP starts full.
+V8_DB="$MIG/v8.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V8_DB\"#" "$CONFIG" > "$MIG/v8.lua"
+mig_script "$V8_DB" "$ROOT/tests/fixtures/schema_v8.sql"
+mig_script "$V8_DB" "$ROOT/tests/fixtures/seed_v8.sql"
+cat > "$MIG/v8_data.sql" <<'SQL'
+UPDATE monsters SET name = 'Big Slime', maxhp = 7 WHERE id = 2;
+INSERT INTO monsters (id, name, maxhp, maxdam, armor, level, maxexp, maxgold, immune) VALUES (152, 'Homebrew', 30, 5, 2, 3, 9, 9, 0);
+INSERT INTO users (id, username, email, charname, verify, authlevel, charclass, level, currentaction,
+	currenthp, base_maxhp, currentmp, base_maxmp, strength, dexterity) VALUES
+	(1, 'fighter', 'f@example.com', 'Fighter', '1', 1, 1, 10, 'Fighting', 200, 200, 30, 30, 1, 0),
+	(2, 'brewer', 'b@example.com', 'Brewer', '1', 0, 1, 3, 'Fighting', 100, 100, 0, 0, 1, 0),
+	(3, 'idler', 'i@example.com', 'Idler', '1', 0, 1, 1, 'Exploring', 15, 15, 0, 0, 5, 5);
+INSERT INTO fights (user_id, round, wave, data) VALUES (1, 4, 1, ''), (2, 3, 1, '');
+INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data) VALUES
+	(1, 1, 'player', 'player', NULL, 0, NULL, NULL, ''), (1, 2, 'enemy', 'monster', 5, 1, 9, 10, 'immune=i:1'),
+	(2, 1, 'player', 'player', NULL, 0, NULL, NULL, ''), (2, 2, 'enemy', 'monster', 152, 1, 20, 30, 'immune=i:0');
+INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, data, applied_round) VALUES (1, 2, 1, 1, 'chance=i:13', 4);
+PRAGMA user_version = 8;
+SQL
+mig_script "$V8_DB" "$MIG/v8_data.sql"
+MIG_DB=$V8_DB
+mig_eq "PRAGMA user_version" "8" "fixture is version 8"
+V8_USERS=$(mig_users "$V8_DB")
+"$BIN" migrate --config "$MIG/v8.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v8) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version [1-8]:' "$T/migrate.log" && t_fail "steps 1-8 ran on a version 8 database" || t_ok
+for line in 'Migrating to version 9: monsters are content files with MP, equipment, items and spells' \
+	'warning: monster 152 Homebrew (monster_152) has no content file and is retired (fights against it go on; it is no longer met). Write app/content/monsters/monster_152.lua to bring it back.' \
+	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 1 retired, 2 earlier admin edits kept as overrides).'; do
+	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v8) output lacks: $line
+$(cat "$T/migrate.log")"
+done
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v8 stamped"
+[ "$(mig_layout "$V8_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v8 schema differs from a fresh install:"
+	diff <(mig_layout "$V8_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v8)"
+[ "$(mig_users "$V8_DB")" = "$V8_USERS" ] && t_ok || t_fail "users changed (v8)"
+mig_eq "SELECT kind || '|' || key || '|' || field || '|' || value FROM content_overrides ORDER BY key, field" \
+	"monsters|red_slime|maxhp|7
+monsters|red_slime|name|Big Slime" "the edit kept as overrides"
+mig_eq "SELECT id || '|' || key || '|' || name || '|' || maxhp || '|' || level || '|' || maxmp || '|' || retired FROM monsters WHERE id IN (2, 152) ORDER BY id" \
+	"2|red_slime|Big Slime|7|1|5|0
+152|monster_152|Homebrew|30|3|9|1" "an edited and a hand-made monster"
+mig_eq "SELECT group_concat(key || '=' || id, ',') FROM (SELECT key, id FROM monsters WHERE id > 152 ORDER BY id)" \
+	"bandit_captain=153,bog_witch=154,goblin_shaman=155" "the example monsters after the existing ids"
+mig_eq "SELECT * FROM monsters WHERE id <= 151 AND id <> 2 ORDER BY id" \
+	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM monsters WHERE id <= 151 AND id <> 2 ORDER BY id")" "the original monsters equal a fresh install's"
+mig_eq "$MIG_MONSTERS_BY_KEY" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS_BY_KEY")" \
+	"the other monsters and the loadouts equal a fresh install's (by key)"
+mig_eq "SELECT user_id || '|' || id || '|' || coalesce(entity_id, '-') || '|' || coalesce(hp, '-') || '|' || coalesce(mp, '-') || '|' || coalesce(maxmp, '-') FROM fight_combatants ORDER BY user_id, id" \
+	"1|1|-|-|-|-
+1|2|5|9|-|-
+2|1|-|-|-|-
+2|2|152|20|-|-" "fights keep their monster (MP: full when loaded)"
+# the game on it: both fights go on (an original monster asleep, the retired hand-made one)
+mig_serve "$MIG/v8.lua" "$MIG/v8server.log"
+for u in fighter brewer; do
+	"$BIN" user --config "$MIG/v8.lua" passwd "$u" v8pass1 >/dev/null && t_ok || t_fail "dk user passwd (v8 $u)"
+done
+t_jar migv8
+t_login fighter v8pass1; expect_redirect /
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>Shadow</b>'; expect_body "Monster's HP: 9"
+expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'; expect_no_body "Monster's MP"
+mig_eq "SELECT round || '|' || (SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2) FROM fights WHERE user_id = 1" \
+	"5|5|5" "the counter goes on; the Shadow's MP is full"
+t_jar migv8b
+t_login brewer v8pass1
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>Homebrew</b>'; expect_body "Monster's HP: 20"
+V8_CS=$(t_csrf)
+t_post /fight "csrf=$V8_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
+mig_eq "SELECT entity_id FROM fight_combatants WHERE user_id = 2 AND id = 2" "152" "the retired monster's fight goes on"
+t_get /help/monsters; expect_body '>Big Slime</td>'; expect_no_body 'Homebrew'
+mig_unserve "$MIG/v8server.log"
+"$BIN" migrate --config "$MIG/v8.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v8)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

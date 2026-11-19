@@ -1,13 +1,6 @@
-{#- Table list (legacy items()/drops()/...). ctx: heading, intro, none, path, rows {id, name},
-		monster_note, and for users: prev/next offsets, total, first, last. -#}
+{#- Table list (legacy towns()/users()). ctx: heading, intro, none, path, rows {id, name},
+		and for users: prev/next offsets, total, first, last. -#}
 <h1 class="admin-heading">{{ heading }}</h1>
-{%- if monster_note then %}
-{%- if monster_note.mismatch then %}
-<p><span class="highlight">Note:</span> Your highest monster level does not match with your entered map size. Highest monster level should be {{ monster_note.want }}, yours is {{ monster_note.have }}. Please fix this before opening the game to the public.</p>
-{%- else %}
-<p>Monster level and map size match. No further actions are required for map compatibility.</p>
-{%- end %}
-{%- end %}
 <p>{{ intro }}</p>
 <table class="admin-list">
 {%- for _, row in ipairs(rows) do %}

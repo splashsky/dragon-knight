@@ -23,6 +23,11 @@ changelog.RELEASES = {
 			"Errors in a status's or summon's code are logged and remove it; the fight goes on.",
 			"Admin pages for statuses and summons; the user editor shows the fight in progress and the statuses.",
 			"The help page on spells lists the statuses and allies.",
+			"Monsters are now content files too; admins can override their stats per server on a new Monsters page (it replaces the monsters editor), and dk migrate keeps edited stats as overrides.",
+			"Monsters have magic points (the Mage's at their level) and can carry equipment, use items and cast spells, each chosen by weight and an optional condition; items run out per encounter.",
+			"Added three monsters that show it off, not met at random: the Goblin Shaman, the Bog Witch and the Bandit Captain.",
+			"The help page on monsters shows their magic points and the spells, items and equipment of those that have them; the fight page shows the MP of a monster that casts spells.",
+			"Fights against the original monsters play exactly as before.",
 		},
 	},
 	{

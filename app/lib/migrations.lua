@@ -927,6 +927,129 @@ ALTER TABLE users DROP COLUMN currentuberdefense;
 ]])
 end
 
+-- 9: monsters become content (app/content/monsters/<key>.lua, synced into monsters) with
+-- MP, equipment, items and spells (the loadout tables monster_equipment, monster_items,
+-- monster_spells). The table is rebuilt with key, description, maxmp, uses_mp,
+-- attack_weight, roams and retired; the original monsters keep ids 1-151 and get their keys
+-- (from the original names), so fights in progress keep their monster. Admin edits of the
+-- original monsters' stats go to content_adopt (kept as overrides by the sync at the end of
+-- `dk migrate` where they differ from the files and are valid). Other monster rows (added
+-- by hand) keep their ids and stats under the key monster_<id> and are retired by the sync:
+-- fights against them go on, but they are no longer met (a content file with that key
+-- brings one back, same id; reported). Their maxmp is the Mage's MP at their level (at
+-- least 5), like the files' (V9_MAXMP). A monster's MP in a fight is fight_combatants.mp / maxmp (NULL
+-- in the fights moved here: full).
+local V9_MONSTERS = {
+	"blue_slime", "red_slime", "critter", "creature", "shadow", "drake", "shade", "drakelor", "silver_slime",
+	"scamp", "raven", "scorpion", "illusion", "nightshade", "drakemal", "shadow_raven", "ghost", "frost_raven",
+	"rogue_scorpion", "ghoul", "magician", "rogue", "drakefin", "shimmer", "fire_raven", "dybbuk", "knave",
+	"goblin", "skeleton", "dark_slime", "silver_scorpion", "mirage", "sorceror", "imp", "nymph", "scoundrel",
+	"megaskeleton", "grey_wolf", "phantom", "specter", "dark_scorpion", "warlock", "orc", "sylph", "wraith",
+	"hellion", "bandit", "ultraskeleton", "dark_wolf", "troll", "werewolf", "hellcat", "spirit", "nisse", "dawk",
+	"figment", "hellhound", "wizard", "uruk", "siren", "megawraith", "dawkin", "grey_bear", "haunt", "hellbeast",
+	"fear", "beast", "ogre", "dark_bear", "fire", "polgergeist", "fright", "lycan", "terra_elemental",
+	"necromancer", "ultrawraith", "dawkor", "werebear", "brute", "large_beast", "horror", "flame", "lycanthor",
+	"wyrm", "aero_elemental", "dawkare", "large_brute", "frost_wyrm", "knight", "lycanthra", "terror", "blaze",
+	"aqua_elemental", "fire_wyrm", "lesser_wyvern", "doomer", "armor_knight", "wyvern", "nightmare",
+	"fira_elemental", "megadoomer", "greater_wyvern", "advocate", "strong_knight", "liche", "ultradoomer",
+	"fanatic", "green_dragon", "fiend", "greatest_wyvern", "lesser_devil", "liche_master", "zealot", "serafiend",
+	"pale_knight", "blue_dragon", "obsessive", "devil", "liche_prince", "cherufiend", "red_dragon",
+	"greater_devil", "renegade", "archfiend", "liche_lord", "greatest_devil", "dark_knight", "giant",
+	"shadow_dragon", "liche_king", "incubus", "traitor", "demon", "dark_dragon", "insurgent", "leviathan",
+	"grey_daemon", "succubus", "demon_prince", "black_dragon", "nihilist", "behemoth", "demagogue", "demon_lord",
+	"red_daemon", "colossus", "demon_king", "dark_daemon", "titan", "black_daemon", "lucifuge",
+}
+local V9_ADOPT = { "name", "maxhp", "maxdam", "armor", "level", "maxexp", "maxgold", "immune" }
+-- maxmp per level 1-100: the Mage's MP at that level (app/content/classes/mage.lua as of
+-- version 9: start + gains), at least 5; what the monster files were written with
+local V9_MAXMP = {
+	5, 5, 9, 12, 17, 22, 26, 30, 33, 36, 38, 40, 43, 47, 52, 55, 57, 59, 64, 70, 74, 79, 82, 87, 91,
+	94, 96, 98, 101, 105, 110, 114, 118, 122, 125, 128, 132, 137, 141, 144, 147, 151, 156, 159, 167,
+	172, 176, 180, 183, 186, 188, 190, 192, 196, 200, 204, 209, 214, 217, 221, 226, 230, 235, 240,
+	244, 248, 251, 254, 258, 262, 267, 269, 273, 278, 281, 284, 288, 292, 296, 301, 304, 308, 310,
+	314, 318, 323, 327, 332, 334, 336, 339, 342, 346, 350, 353, 356, 360, 365, 370, 370,
+}
+
+local function v9_monsters_content()
+	local db = dk.db
+	local old = db:query("SELECT * FROM monsters ORDER BY id")
+	db:exec_script([[
+CREATE TABLE monsters_new (
+	id             INTEGER PRIMARY KEY,
+	key            TEXT    NOT NULL UNIQUE,
+	name           TEXT    NOT NULL DEFAULT '',
+	description    TEXT    NOT NULL DEFAULT '',
+	maxhp          INTEGER NOT NULL DEFAULT 1,
+	maxdam         INTEGER NOT NULL DEFAULT 0,
+	armor          INTEGER NOT NULL DEFAULT 0,
+	level          INTEGER NOT NULL DEFAULT 1,
+	maxexp         INTEGER NOT NULL DEFAULT 0,
+	maxgold        INTEGER NOT NULL DEFAULT 0,
+	immune         INTEGER NOT NULL DEFAULT 0,
+	maxmp          INTEGER NOT NULL DEFAULT 0,
+	uses_mp        INTEGER NOT NULL DEFAULT 1,
+	attack_weight  INTEGER NOT NULL DEFAULT 1,
+	roams          INTEGER NOT NULL DEFAULT 1,
+	retired        INTEGER NOT NULL DEFAULT 0
+);
+]])
+	local seen, others = {}, {}
+	for _, m in ipairs(old) do
+		local key = V9_MONSTERS[m.id] or ("monster_" .. m.id)
+		db:exec("INSERT INTO monsters_new (id, key, name, maxhp, maxdam, armor, level, maxexp, maxgold, immune, maxmp) " ..
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", m.id, key, m.name, m.maxhp, m.maxdam, m.armor, m.level, m.maxexp,
+			m.maxgold, m.immune, V9_MAXMP[math.min(math.max(m.level, 1), #V9_MAXMP)])
+		seen[m.id] = true
+		if V9_MONSTERS[m.id] then
+			for _, field in ipairs(V9_ADOPT) do
+				db:exec("INSERT INTO content_adopt (kind, key, field, value) VALUES ('monsters', ?, ?, ?)", key, field,
+					tostring(m[field]))
+			end
+		else
+			others[#others + 1] = ("%d %s (%s)"):format(m.id, tostring(m.name), key)
+		end
+	end
+	-- partial installs had no monsters: the original ids get their keys (the sync fills in the rest)
+	for id, key in ipairs(V9_MONSTERS) do
+		if not seen[id] then db:exec("INSERT INTO monsters_new (id, key) VALUES (?, ?)", id, key) end
+	end
+	db:exec_script([[
+DROP TABLE monsters;
+ALTER TABLE monsters_new RENAME TO monsters;
+DELETE FROM sqlite_sequence WHERE name = 'monsters';
+CREATE INDEX monsters_level ON monsters (level);
+CREATE TABLE monster_equipment (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	slot        TEXT    NOT NULL,
+	item_id     INTEGER NOT NULL REFERENCES items (id),
+	PRIMARY KEY (monster_id, slot)
+) WITHOUT ROWID;
+CREATE TABLE monster_items (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	position    INTEGER NOT NULL,
+	item_id     INTEGER NOT NULL REFERENCES items (id),
+	weight      INTEGER NOT NULL DEFAULT 1,
+	stock       INTEGER,
+	has_when    INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (monster_id, position)
+) WITHOUT ROWID;
+CREATE TABLE monster_spells (
+	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
+	position    INTEGER NOT NULL,
+	spell_id    INTEGER NOT NULL REFERENCES spells (id),
+	weight      INTEGER NOT NULL DEFAULT 1,
+	has_when    INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (monster_id, position)
+) WITHOUT ROWID;
+ALTER TABLE fight_combatants ADD COLUMN mp INTEGER;
+ALTER TABLE fight_combatants ADD COLUMN maxmp INTEGER;
+]])
+	for _, o in ipairs(others) do
+		print(("warning: monster %s has no content file and is retired (fights against it go on; it is no longer " ..
+			"met). Write app/content/monsters/%s.lua to bring it back."):format(o, o:match("%(([%w_]+)%)$")))
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -942,6 +1065,8 @@ migrations.STEPS = {
 		"edited amounts are kept as power overrides)", up = v7_scripted },
 	{ name = "the fight engine: fights in progress move to their own tables (sleep and the damage/defense " ..
 		"buffs become statuses); statuses and summons are content files", up = v8_fight_engine },
+	{ name = "monsters are content files with MP, equipment, items and spells (admin edits are kept as " ..
+		"overrides; fights in progress keep their monster)", up = v9_monsters_content },
 }
 
 migrations.VERSION = #migrations.STEPS
