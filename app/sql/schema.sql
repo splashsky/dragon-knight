@@ -74,27 +74,24 @@ CREATE TABLE items (
 	special    TEXT    NOT NULL DEFAULT ''
 );
 
--- Column names start with a digit: quote them in SQL ("1_exp").
+-- Per-level gains per class "<class>_<stat>"; row 1 holds the starting values, row 100
+-- (the last level) gains nothing. Experience, TP and the HP bonus at milestone levels
+-- are formulas (app/lib/leveling.lua); hp is the gain without that bonus.
+-- Column names start with a digit: quote them in SQL ("1_hp").
 CREATE TABLE levels (
 	id             INTEGER PRIMARY KEY AUTOINCREMENT,
-	"1_exp"        INTEGER NOT NULL DEFAULT 0,
 	"1_hp"         INTEGER NOT NULL DEFAULT 0,
 	"1_mp"         INTEGER NOT NULL DEFAULT 0,
-	"1_tp"         INTEGER NOT NULL DEFAULT 0,
 	"1_strength"   INTEGER NOT NULL DEFAULT 0,
 	"1_dexterity"  INTEGER NOT NULL DEFAULT 0,
 	"1_spells"     INTEGER NOT NULL DEFAULT 0,
-	"2_exp"        INTEGER NOT NULL DEFAULT 0,
 	"2_hp"         INTEGER NOT NULL DEFAULT 0,
 	"2_mp"         INTEGER NOT NULL DEFAULT 0,
-	"2_tp"         INTEGER NOT NULL DEFAULT 0,
 	"2_strength"   INTEGER NOT NULL DEFAULT 0,
 	"2_dexterity"  INTEGER NOT NULL DEFAULT 0,
 	"2_spells"     INTEGER NOT NULL DEFAULT 0,
-	"3_exp"        INTEGER NOT NULL DEFAULT 0,
 	"3_hp"         INTEGER NOT NULL DEFAULT 0,
 	"3_mp"         INTEGER NOT NULL DEFAULT 0,
-	"3_tp"         INTEGER NOT NULL DEFAULT 0,
 	"3_strength"   INTEGER NOT NULL DEFAULT 0,
 	"3_dexterity"  INTEGER NOT NULL DEFAULT 0,
 	"3_spells"     INTEGER NOT NULL DEFAULT 0

@@ -18,8 +18,11 @@ expect_body '+Damage (%)'; expect_body '+Defense (%)'; expect_body 'X in 15 chan
 t_get /help/monsters; expect_status 200; expect_body 'Help: Monsters'
 expect_body '>Blue Slime</td><td style="width: 10%">4</td>'; expect_body 'Hurt &amp; Sleep'
 t_get /help/levels;   expect_status 200; expect_body 'Mage Levels'; expect_body 'Warrior Levels'; expect_body 'Paladin Levels'
+# experience and TP from lib/leveling.lua, HP = table gain + milestone bonus
+expect_body '<tr><td>10</td><td>1,970</td><td>10</td><td>3</td><td>2</td><td>4</td><td>3</td><td><span class="light">None</span></td></tr>'
+expect_body '<tr><td>99</td><td>9,599,441</td><td>50</td><td>4</td><td>5</td><td>6</td><td>6</td><td><span class="light">None</span></td></tr>'
 expect_body '<tr><td>2</td><td>15</td><td>2</td><td>5</td><td>1</td><td>0</td><td>1</td><td>Heal</td></tr>'
-expect_body '<tr><td>99</td><td>7,964,068</td>'; expect_no_body '<tr><td>100</td>'
+expect_body '<tr><td>99</td><td>7,929,112</td>'; expect_no_body '<tr><td>100</td>'
 expect_body 'Experience points listed are total values'
 t_get /static/css/community.css; expect_status 200; expect_body 'table.forum'
 
@@ -151,11 +154,12 @@ t_jar default
 t_section "changelog"
 t_get /changelog;          expect_status 200
 expect_body '<h1>Dragon Knight Changelog</h1>'
-expect_body 'id="v2-0-0"'
+expect_body 'id="v2-1-0"'; expect_body '<a href="#v2-1-0">2.1.0</a> <span class="light">(unreleased)</span>'
+expect_body 'id="v2-0-0"'; expect_body 'TP gains and HP milestones now follow formulas'
 expect_body '<a href="#v1-1-11">1.1.11</a> <span class="light">(3.26.2006)</span>'
 expect_body 'Thanks to r0xes &amp; Adam. :)'
 expect_body 'Fixed problem where goldbonus was added to experience instead of gold.'
 expect_body 'id="vrc1-aero"'
 expect_body 'Initial public release.'
-t_get /login;              expect_body '<a href="/changelog">Version 2.0.0</a>'
+t_get /login;              expect_body '<a href="/changelog">Version 2.1.0-dev</a>'
 t_get /help;               expect_body 'href="/changelog">Changelog</a>'

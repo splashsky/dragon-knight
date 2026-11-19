@@ -5,15 +5,16 @@
 -- one), and is called with exactly the legacy arguments so the distributions match.
 -- `st` is a mutable copy of the users row (the legacy in-memory $userrow); messages are
 -- returned as lists of plain-text lines (escaped by the templates).
+local leveling = require("lib.leveling")
 local php = require("lib.php")
 
 local combat = {}
 
 local sqrt = math.sqrt
 
-combat.MAX_EXPERIENCE = 16777215   -- MEDIUMINT UNSIGNED ceiling legacy checked against
+combat.MAX_EXPERIENCE = leveling.MAX_EXPERIENCE   -- MEDIUMINT UNSIGNED ceiling legacy checked against
 combat.MAX_GOLD = 16777215
-combat.MAX_LEVEL = 100
+combat.MAX_LEVEL = leveling.MAX_LEVEL
 combat.MAX_FIGHT = 255             -- users.currentfight was TINYINT UNSIGNED (MySQL clamps)
 
 -- Monster level band from the distance to the origin (one mlevel per five spaces).
@@ -211,12 +212,13 @@ function combat.rewards(user, monster, rand)
 end
 
 -- Level ups for `newexp` experience: one level at a time while the experience covers the
--- next levels row (`level_row(n)`, may return nil), up to MAX_LEVEL. Returns nil (no level
--- gained) or the summed gains (hp, mp, tp, strength, dexterity), `levels` (how many),
--- `learned` (spells learned) and the new stats. `key(stat)` maps a stat to the levels
--- column for the user's class (game.level_key).
+-- next level (leveling.exp_for), up to MAX_LEVEL. `gains(level)` returns the levels table's
+-- gains for the user's class (game.level_gains; nil stops the loop); TP and the HP
+-- milestone bonus are added from lib/leveling.lua. Returns nil (no level gained) or the
+-- summed gains (hp, mp, tp, strength, dexterity), `levels` (how many), `learned` (spells
+-- learned) and the new stats.
 -- fixed: legacy granted at most one level per victory.
-function combat.level_up(user, newexp, key, level_row)
+function combat.level_up(user, newexp, gains)
 	local g = {
 		level = user.level, levels = 0, learned = 0,
 		hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0,
@@ -225,18 +227,20 @@ function combat.level_up(user, newexp, key, level_row)
 	-- fixed: legacy left every column unset (and MySQL stored 0) for level >= 100 or a
 	-- missing levels row, wiping the character; those victories now just don't level.
 	while g.level < combat.MAX_LEVEL do
-		local row = level_row(g.level + 1)
-		if not row or newexp < row[key("exp")] then break end
-		g.level = row.id
+		local level = g.level + 1
+		local need = leveling.exp_for(user.charclass, level)
+		if not need or newexp < need then break end
+		local row = gains(level)
+		if not row then break end
+		g.level = level
 		g.levels = g.levels + 1
-		g.hp = g.hp + row[key("hp")]
-		g.mp = g.mp + row[key("mp")]
-		g.tp = g.tp + row[key("tp")]
-		g.strength = g.strength + row[key("strength")]
-		g.dexterity = g.dexterity + row[key("dexterity")]
-		local spell = row[key("spells")]
-		if spell ~= 0 then
-			spells = spells .. "," .. spell
+		g.hp = g.hp + row.hp + leveling.hp_bonus(level)
+		g.mp = g.mp + row.mp
+		g.tp = g.tp + leveling.tp_gain(level)
+		g.strength = g.strength + row.strength
+		g.dexterity = g.dexterity + row.dexterity
+		if row.spells ~= 0 then
+			spells = spells .. "," .. row.spells
 			g.learned = g.learned + 1
 		end
 	end

@@ -3,6 +3,7 @@
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
 local game = require("lib.game")
+local leveling = require("lib.leveling")
 local php = require("lib.php")
 local view = require("lib.view")
 
@@ -77,8 +78,7 @@ function help.monsters(req)
 	return page(req, "Monsters", "community/help/monsters", { monsters = monsters })
 end
 
-local LEVEL_STATS = { "hp", "mp", "tp", "strength", "dexterity" }
-
+-- Columns per class: HP (table gain + milestone bonus), MP, TP (formula), Strength, Dexterity.
 function help.levels(req)
 	local spell_names = {}
 	for _, s in ipairs(dk.db:query("SELECT id, name FROM spells")) do spell_names[s.id] = s.name end
@@ -88,14 +88,17 @@ function help.levels(req)
 		local rows = {}
 		for _, lv in ipairs(levels) do
 			-- legacy hides level 100 (the level cap: exp 16777215, no stat gains)
-			if lv.id ~= 100 then
-				local stats = {}
-				for i, stat in ipairs(LEVEL_STATS) do stats[i] = lv[game.level_key(class, stat)] end
-				local spell = lv[game.level_key(class, "spells")]
+			if lv.id ~= leveling.MAX_LEVEL then
+				local function gain(stat) return lv[game.level_key(class, stat)] end
+				local spell = gain("spells")
+				local exp = leveling.exp_for(class, lv.id)
 				rows[#rows + 1] = {
 					level = lv.id,
-					exp = php.number_format(lv[game.level_key(class, "exp")]),
-					stats = stats,
+					exp = exp and php.number_format(exp),
+					stats = {
+						gain("hp") + leveling.hp_bonus(lv.id), gain("mp"), leveling.tp_gain(lv.id),
+						gain("strength"), gain("dexterity"),
+					},
 					has_spell = spell ~= 0,
 					spell = spell_names[spell],
 				}

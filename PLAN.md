@@ -253,6 +253,11 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	are `ON DELETE SET NULL`; foreign keys are enforced.
 - No difficulty levels: `control.diff1name`…`diff3mod` and `users.difficulty` are dropped
 	(schema version 2); everyone plays at the original Easy difficulty (no scaling).
+- `levels` holds per-class gains only (`"<class>_hp"`, `_mp`, `_strength`, `_dexterity`,
+	`_spells`; row 1 = starting values, row 100 = the cap). Experience per level, TP gains
+	and the milestone HP bonus (added to `_hp`, which is 0 at levels 10, 20, …, 90 and 99)
+	are formulas in `app/lib/leveling.lua`, fitted to the original table (schema version 3
+	dropped the `_exp`/`_tp` columns).
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -270,7 +275,7 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	session cookie (server-side expiry 1 day, sliding). Store only `sha256(token)`.
 - Seed data in `app/sql/seed.sql` matches the original install.php "complete setup"
 	exactly (all rows of drops, items, levels, monsters, spells, towns, control), minus
-	the difficulty settings.
+	the difficulty settings and the levels values that became formulas.
 - Email (registration verification, lost password) is written to
 	`<outbox_dir>/<unix>-<rand>.eml` and logged; `control.verifyemail` defaults to 0.
 
@@ -314,7 +319,7 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 - Lua 5.5: `global` is a **reserved word**; for-loop control variables are **read-only**.
 	Use `local` everywhere; modules return tables; no globals from app code.
 - Never build SQL with string concatenation of user data. Always `?` params.
-	(Identifiers like the level column `1_exp` may be chosen from a whitelist.)
+	(Identifiers like the level column `1_hp` may be chosen from a whitelist.)
 - Templates escape by default; use `{{{ }}}` only for HTML built by trusted code.
 - Indent with tabs.
 

@@ -222,4 +222,20 @@ expect_body 'You gain 3 dexterity.'; expect_body 'You have learned a new spell.'
 f_is level 3; f_is maxhp 19; f_is maxmp 7; f_is maxtp 13; f_is strength 10; f_is dexterity 8
 f_is attackpower 10; f_is defensepower 8; f_is spells 0,1; f_is experience 54
 
+t_section "fight: milestone level (formula experience, TP and HP bonus)"
+# Warrior level 10 needs 2368 (lib/leveling.lua; the original table said 2369): 2367 + 1.
+# Gains: HP 0 + milestone 10, MP 2, TP floor(10/30) + 2, strength 6, dexterity 3.
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1,
+	currentmonsterhp = 0, experience = 2366, level = 9, maxhp = 50, maxmp = 20, maxtp = 20,
+	strength = 30, dexterity = 30, attackpower = 30, defensepower = 30, spells = '0,1',
+	expbonus = 0, goldbonus = 0"
+t_get /victory; expect_body 'You gain 1 experience.'; expect_no_body 'gained a level'
+f_is level 9; f_is experience 2367
+f_sql "UPDATE users SET currentaction = 'Fighting', currentfight = 2, currentmonster = 1, currentmonsterhp = 0"
+t_get /victory; expect_body 'You have gained a level!'
+expect_body 'You gain 10 hit points.'; expect_body 'You gain 2 magic points.'
+expect_body 'You gain 2 travel points.'; expect_body 'You gain 6 strength.'
+expect_body 'You gain 3 dexterity.'; expect_no_body 'learned a new spell'
+f_is level 10; f_is maxhp 60; f_is maxmp 22; f_is maxtp 22; f_is strength 36; f_is dexterity 33
+
 fi

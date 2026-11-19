@@ -226,8 +226,10 @@ tu "expbonus=-5, goldbonus=10, level=1, experience=1234, charclass=1"
 t_get /character;                 expect_status 200
 expect_body '<b>Townie</b>'; expect_body 'Class: Mage'; expect_no_body 'Difficulty'
 expect_body 'Experience: 1,234 <span class="light">(-5%)</span>'; expect_body '<span class="light">(+10%)</span>'
-expect_body "Next Level: $(t_sql 'SELECT "1_exp" FROM levels WHERE id = 2')<"
+expect_body "Next Level: 15<"
 expect_body 'Heal<br>'; expect_body 'Hurt<br>'; expect_no_body 'Revive<br>'; expect_no_body 'action="/move"'
+tu "level=10"                     # lib/leveling.lua: Mage level 11 at 2,991 (the original table: 2,997)
+t_get /character;                 expect_body "Next Level: 2,991<"
 tu "level=99"
 t_get /character;                 expect_body "Next Level: 16,777,215<"
 tu "level=100"

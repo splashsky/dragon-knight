@@ -166,8 +166,8 @@ local function victory(req)
 
 	local r = combat.rewards(user, monster, rand)
 	local ctx = { monster = monster, r = r }
-	local key = function(stat) return game.level_key(user.charclass, stat) end
-	local up = combat.level_up(user, r.newexp, key, game.level_row)
+	local gains = function(level) return game.level_gains(user.charclass, level) end
+	local up = combat.level_up(user, r.newexp, gains)
 	local title
 	local s = {
 		level = user.level, maxhp = user.maxhp, maxmp = user.maxmp, maxtp = user.maxtp,

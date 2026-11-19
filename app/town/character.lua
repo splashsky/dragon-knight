@@ -2,6 +2,7 @@
 -- (anyone's sheet, from Who's Online) and showmap().
 local common = require("town.common")
 local game = require("lib.game")
+local leveling = require("lib.leveling")
 local php = require("lib.php")
 local view = require("lib.view")
 
@@ -17,9 +18,8 @@ local function sheet(user)
 	local class = math.tointeger(user.charclass)
 	local nextlevel
 	-- fixed: legacy showed "Next Level: None" already at level 99.
-	if user.level < 100 and class and class >= 1 and class <= 3 then
-		local row = game.level_row(user.level + 1)
-		nextlevel = php.number_format(row and row[game.level_key(class, "exp")] or 0)
+	if user.level < leveling.MAX_LEVEL and class and leveling.EXP[class] then
+		nextlevel = php.number_format(leveling.exp_for(class, user.level + 1) or 0)
 	end
 	local spells = {}
 	for _, s in ipairs(game.user_spells(user)) do spells[#spells + 1] = s.name end

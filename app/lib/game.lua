@@ -68,9 +68,11 @@ function game.user_towns(user)
 	return out
 end
 
--- levels table columns are "<class>_<stat>"; whitelist them before putting one in SQL.
-local LEVEL_STATS = { exp = true, hp = true, mp = true, tp = true, strength = true,
-											dexterity = true, spells = true }
+-- levels table columns are "<class>_<stat>" (the per-level gains that are data; experience
+-- and TP come from lib/leveling.lua). Whitelist them before putting one in SQL.
+game.LEVEL_STATS = { "hp", "mp", "strength", "dexterity", "spells" }
+local LEVEL_STATS = {}
+for _, stat in ipairs(game.LEVEL_STATS) do LEVEL_STATS[stat] = true end
 
 function game.level_key(charclass, stat)
 	local c = math.tointeger(tonumber(charclass))
@@ -78,13 +80,14 @@ function game.level_key(charclass, stat)
 	return c .. "_" .. stat
 end
 
--- Quoted SQL identifier, e.g. "1_exp" (safe: whitelisted).
-function game.level_column(charclass, stat)
-	return '"' .. game.level_key(charclass, stat) .. '"'
-end
-
-function game.level_row(level)
-	return dk.db:first("SELECT * FROM levels WHERE id = ?", level)
+-- The levels table's gains for `charclass` at `level` ({ hp, mp, strength, dexterity,
+-- spells }; hp without the milestone bonus), or nil when there is no such row.
+function game.level_gains(charclass, level)
+	local row = dk.db:first("SELECT * FROM levels WHERE id = ?", level)
+	if not row then return nil end
+	local g = {}
+	for _, stat in ipairs(game.LEVEL_STATS) do g[stat] = row[game.level_key(charclass, stat)] end
+	return g
 end
 
 -- 5 -> "5N", -5 -> "5S"; longitude: "E"/"W" (legacy display()).

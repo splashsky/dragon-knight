@@ -14,7 +14,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
-| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_fight.lua` |
+| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/combat.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
@@ -182,14 +182,40 @@ starting with `__` are reserved.
 | `game.class_name(n)` | from control (nil if out of range) |
 | `game.user_spells(user [, type])` | spell rows in `users.spells`, ordered by id (type 1 heal, 2 hurt, 3 sleep, 4 uber damage, 5 uber defense) |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
-| `game.level_row(level)` | levels row; read stats as `row[game.level_key(class, "exp")]` |
-| `game.level_column(class, stat)` | whitelisted quoted SQL identifier, e.g. `"2_hp"` |
+| `game.level_gains(class, level)` | the levels table's gains `{hp, mp, strength, dexterity, spells}` for a class (hp without the milestone bonus), or nil |
+| `game.level_key(class, stat)` | whitelisted levels column name, e.g. `"2_hp"` (stats in `game.LEVEL_STATS`) |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, height, color}` |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
 | `game.forum_link()` | `/forum`, the external address, or nil |
 | `game.online_users()` | users seen in the last 10 minutes (`id, charname`) |
 | `game.nav(user)` | the table the side columns render |
+
+## Leveling (`lib/leveling.lua`)
+
+The experience needed per level, the TP gained per level and the HP bonus at milestone
+levels are formulas, fitted to the original 1.1.11 levels table. The other per-level gains
+(base HP, MP, strength, dexterity, spells; row 1 = starting values) stay data in the
+`levels` table, edited at `/admin/levels`, which shows the computed values read-only.
+
+- **Experience**, per class (1 Mage, 2 Warrior, 3 Paladin): `step(n)`, the experience from
+	level n to n + 1, starts at `base` (15 / 18 / 20); every later step is the previous one
+	times a stage factor, rounded down: ×2 for 2 steps, ×1.5 for 8, ×1.25 for 5 (Paladin 6),
+	×1.125 for 28 / 27 / 25, then flat. `exp_for(class, level)` is the sum of the steps below
+	the level (0 at level 1); level 100 is the cap, 16777215 (rewards stop just below it).
+	Within 0.44% of the original table at every level.
+- **TP** gained on reaching a level: `floor(level / 30) + 2`, except +1 at level 2 (level 1
+	shows the table's starting 5, level 100 gains nothing). Exactly the original.
+- **HP**: the levels table's gain plus `hp_bonus(level)`: +10 at levels 10/20/30, +15 at
+	40/50/60, +20 at 70/80/90, +50 at 99 (the table holds 0 there). Exactly the original.
+
+The parameters are plain data at the top of the module (`leveling.EXP`, `leveling.TP`,
+`leveling.HP_MILESTONES`); edit them and the next request uses them (hot reload): victory
+level-ups (`combat.level_up`), "Next Level" on the character sheets, `/help/levels` and
+the admin editor. `tests/lua/test_leveling.lua` pins them against a frozen copy of the
+original table (`tests/lua/levels_original.lua`), so update its expectations with them.
+Moving thresholds needs no data fixup: a player whose experience already covers the next
+level gets it (or several) on the next victory.
 
 ## Forum and news
 
@@ -240,7 +266,7 @@ in a comment.
 
 - `dk.db:query(sql, ...)` returns rows, `:first` one row or nil, `:value` a scalar,
 	`:exec` returns `changes, last_id`. Always use `?` parameters and **never concatenate
-	user input**. Column identifiers come from whitelists only (`game.level_column`, or a
+	user input**. Column identifiers come from whitelists only (`game.level_key`, or a
 	table of allowed `slotN` names).
 - Always call `dk.db` at call time. Don't cache it in a module-level local: it's attached
 	per request and wrapped to count queries.
@@ -282,10 +308,10 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) and `schema_v1.sql` (version 1), migrates
-	 them, checks the data and compares the column, foreign key and index layout with a
-	 fresh install. Never edit the fixtures; add a `schema_vN.sql` copy of the old schema
-	 when a test needs to start from version N.
+	 `tests/fixtures/schema_v0.sql` (version 0), `schema_v1.sql` (version 1) and
+	 `schema_v2.sql` (version 2), migrates them, checks the data and compares the column,
+	 foreign key and index layout with a fresh install. Never edit the fixtures; add a
+	 `schema_vN.sql` copy of the old schema when a test needs to start from version N.
 
 ## Sessions, CSRF, accounts
 
@@ -373,4 +399,5 @@ The version shown in the footer is `view.GAME_VERSION` (`app/lib/view.lua`); it 
 `/changelog`. For a release, bump it and add an entry at the top of
 `changelog.RELEASES` in `app/community/changelog.lua`, in the original changelog's style
 (`m.d.yyyy` dates, one short past-tense line per change). Entries up to 1.1.11 are the
-original `changelog.txt` and stay verbatim.
+original `changelog.txt` and stay verbatim. Between releases, the version is the next one
+with `-dev` (e.g. `2.1.0-dev`) and its entry has `date = "unreleased"` until the release.

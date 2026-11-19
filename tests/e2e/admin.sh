@@ -7,6 +7,9 @@ admin_eq() {  # admin_eq "SQL" expected label
 	got=$(t_sql "$1")
 	if [ "$got" = "$2" ]; then t_ok; else t_fail "$3: expected '$2', got '$got'"; fi
 }
+adm_body() {  # adm_body text   (like expect_body, with the body's lines joined)
+	if tr -d '\n' < "$BODY" | grep -qF -- "$1"; then t_ok; else t_fail "body lacks: $1"; fi
+}
 
 if ! t_has_sql; then
 	echo "admin.sh: skipped (needs sqlite3 or python3)"
@@ -154,13 +157,20 @@ t_get /admin/levels;       expect_body '<option value="2">2</option>'; expect_bo
 expect_no_body '<option value="1">1</option>'; expect_no_body '<option value="100">100</option>'
 t_get '/admin/levels?level=5'; expect_redirect /admin/levels/5
 t_get /admin/levels/5;     expect_body 'Mage Experience:'; expect_body 'Paladin Spells:'
-t_form_submit /admin/levels/5 one_hp= two_exp=lots
-expect_body 'Class 1 HP is required.'; expect_body 'Class 1 HP must be a number.'
-expect_body 'Class 2 Experience must be a number.'
+# experience, TP and the HP bonus come from lib/leveling.lua, read-only
+expect_body 'app/lib/leveling.lua'; expect_no_body 'name="one_exp"'; expect_no_body 'name="three_tp"'
+adm_body 'Warrior Experience:</td><td>234</td>'; adm_body 'Paladin TP:</td><td>2</td>'
+expect_body 'name="one_hp" size="5" maxlength="5" value="2"'
+t_get /admin/levels/10;    adm_body 'Mage HP Bonus:</td><td>10</td>'; adm_body 'Mage TP:</td><td>2</td>'
+expect_body 'name="two_hp" size="5" maxlength="5" value="0"'
 t_get /admin/levels/5
-t_form_submit /admin/levels/5 one_exp=111 two_hp=22 three_spells=7 '1_mp=99' "id=6"
+t_form_submit /admin/levels/5 one_hp= two_mp=lots
+expect_body 'Class 1 HP is required.'; expect_body 'Class 1 HP must be a number.'
+expect_body 'Class 2 MP must be a number.'; adm_body 'Mage Experience:</td><td>195</td>'
+t_get /admin/levels/5
+t_form_submit /admin/levels/5 one_exp=111 one_tp=9 two_hp=22 three_spells=7 '1_mp=99' "id=6"
 expect_redirect '/admin/levels/5\?saved=1'
-admin_eq "SELECT \"1_exp\" || '|' || \"2_hp\" || '|' || \"3_spells\" FROM levels WHERE id = 5" "111|22|7" "level saved"
+admin_eq "SELECT \"2_hp\" || '|' || \"3_spells\" FROM levels WHERE id = 5" "22|7" "level saved"
 admin_eq "SELECT \"1_mp\" FROM levels WHERE id = 5" "$(t_sql 'SELECT "1_mp" FROM adm_snap_levels')" "level column not mass-assigned"
 t_get /admin/levels/5?saved=1; expect_body 'Level updated.'
 t_get /admin/levels/1000;  expect_status 404; expect_body 'No level to edit.'

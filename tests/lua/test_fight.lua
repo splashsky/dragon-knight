@@ -1,6 +1,7 @@
 -- Unit tests for app/fight/combat.lua: scripted dice, outcomes computed by hand from
--- the original fight.php. The fake rand applies PHP's argument casting (truncate, swap) and
--- records the (min, max) it was called with, so tests also pin the exact legacy rolls.
+-- the original fight.php (level-up thresholds and TP/HP bonuses: lib/leveling.lua). The
+-- fake rand applies PHP's argument casting (truncate, swap) and records the (min, max) it
+-- was called with, so tests also pin the exact legacy rolls.
 local combat = require("fight.combat")
 local php = require("lib.php")
 local T = {}
@@ -255,50 +256,56 @@ function T.victory_rewards()
 end
 
 function T.level_up()
-	-- seed levels rows 2-4, class 1: exp 15/45/105, hp 2/3/3, mp 5/4/3, tp 1/2/2,
-	-- str 0/1/1, dex 1/2/2, spells 1/0/6
+	-- seed gains for levels 2-4, class 1 (Mage: exp 15/45/105 from lib/leveling.lua, tp
+	-- 1/2/2): hp 2/3/3, mp 5/4/3, str 0/1/1, dex 1/2/2, spells 1/0/6
 	local rows = {
-		[2] = { id = 2, ["1_exp"] = 15, ["1_hp"] = 2, ["1_mp"] = 5, ["1_tp"] = 1,
-						["1_strength"] = 0, ["1_dexterity"] = 1, ["1_spells"] = 1 },
-		[3] = { id = 3, ["1_exp"] = 45, ["1_hp"] = 3, ["1_mp"] = 4, ["1_tp"] = 2,
-						["1_strength"] = 1, ["1_dexterity"] = 2, ["1_spells"] = 0 },
-		[4] = { id = 4, ["1_exp"] = 105, ["1_hp"] = 3, ["1_mp"] = 3, ["1_tp"] = 2,
-						["1_strength"] = 1, ["1_dexterity"] = 2, ["1_spells"] = 6 },
+		[2] = { hp = 2, mp = 5, strength = 0, dexterity = 1, spells = 1 },
+		[3] = { hp = 3, mp = 4, strength = 1, dexterity = 2, spells = 0 },
+		[4] = { hp = 3, mp = 3, strength = 1, dexterity = 2, spells = 6 },
 	}
 	local row = function(n) return rows[n] end
-	local key = function(stat) return "1_" .. stat end
 	local u = player()
-	eq(combat.level_up(u, 14, key, row), nil)
-	local g = combat.level_up(u, 15, key, row)
-	eq(g.level, 2); eq(g.levels, 1); eq(g.hp, 2); eq(g.mp, 5); eq(g.learned, 1)
+	eq(combat.level_up(u, 14, row), nil)
+	local g = combat.level_up(u, 15, row)
+	eq(g.level, 2); eq(g.levels, 1); eq(g.hp, 2); eq(g.mp, 5); eq(g.tp, 1); eq(g.learned, 1)
 	eq(g.maxhp, 17); eq(g.maxmp, 5); eq(g.maxtp, 11)
 	eq(g.newstrength, 5); eq(g.newdexterity, 6); eq(g.attackpower, 5); eq(g.defensepower, 6)
 	eq(g.spells, "0,1")
 	-- several levels at once: 2 and 3 (44 < 45 stops at 2; 104 < 105 stops at 3)
-	eq(combat.level_up(u, 44, key, row).level, 2)
-	g = combat.level_up(u, 104, key, row)
+	eq(combat.level_up(u, 44, row).level, 2)
+	g = combat.level_up(u, 104, row)
 	eq(g.level, 3); eq(g.levels, 2); eq(g.hp, 5); eq(g.mp, 9); eq(g.tp, 3)
 	eq(g.strength, 1); eq(g.dexterity, 3); eq(g.learned, 1); eq(g.spells, "0,1")
 	eq(g.maxhp, 20); eq(g.maxmp, 9); eq(g.maxtp, 13); eq(g.newstrength, 6); eq(g.newdexterity, 8)
 	eq(g.attackpower, 6); eq(g.defensepower, 8)
 	-- all the way, stopping where the rows run out
-	g = combat.level_up(u, 10 ^ 6, key, row)
+	g = combat.level_up(u, 10 ^ 6, row)
 	eq(g.level, 4); eq(g.levels, 3); eq(g.learned, 2); eq(g.spells, "0,1,6")
 	-- from level 3 only row 4 counts
-	g = combat.level_up(player({ level = 3, spells = "0,1" }), 10 ^ 6, key, row)
+	g = combat.level_up(player({ level = 3, spells = "0,1" }), 10 ^ 6, row)
 	eq(g.level, 4); eq(g.levels, 1); eq(g.hp, 3); eq(g.spells, "0,1,6")
 	-- no spell learned: spells stays nil
-	rows[2]["1_spells"] = 0
-	g = combat.level_up(u, 15, key, row)
+	rows[2].spells = 0
+	g = combat.level_up(u, 15, row)
 	eq(g.spells, nil); eq(g.learned, 0)
-	-- stops at the max level (100), even with a row 101
-	local any = { id = 0, ["1_exp"] = 0, ["1_hp"] = 1, ["1_mp"] = 0, ["1_tp"] = 0,
-								["1_strength"] = 0, ["1_dexterity"] = 0, ["1_spells"] = 0 }
-	local every = function(n) local r = {}; for k, v in pairs(any) do r[k] = v end; r.id = n; return r end
-	g = combat.level_up(player({ level = 97 }), 10 ^ 7, key, every)
-	eq(g.level, 100); eq(g.levels, 3); eq(g.hp, 3)
-	eq(combat.level_up(player({ level = 100 }), 10 ^ 7, key, every), nil)
-	eq(combat.level_up(u, 15, key, function() return nil end), nil)
+	-- thresholds follow each class's curve: Warrior level 2 at 18, Paladin at 20
+	eq(combat.level_up(player({ charclass = 2 }), 17, row), nil)
+	eq(combat.level_up(player({ charclass = 2 }), 18, row).level, 2)
+	eq(combat.level_up(player({ charclass = 3 }), 19, row), nil)
+	eq(combat.level_up(player({ charclass = 3 }), 20, row).level, 2)
+	-- milestone levels add the HP bonus; TP follows the formula
+	local any = { hp = 1, mp = 0, strength = 0, dexterity = 0, spells = 0 }
+	local every = function() return any end
+	g = combat.level_up(player({ level = 9 }), 4000, every)   -- Mage level 10 at 1970, 11 at 2991, 12 at 4522
+	eq(g.level, 11); eq(g.levels, 2); eq(g.hp, 1 + 10 + 1); eq(g.tp, 2 + 2)
+	-- level 99 (+50 HP, +5 TP), then 100 needs the 16777215 cap
+	g = combat.level_up(player({ level = 98 }), 16777214, every)
+	eq(g.level, 99); eq(g.levels, 1); eq(g.hp, 51); eq(g.tp, 5)
+	-- stops at the max level (100)
+	g = combat.level_up(player({ level = 97 }), 10 ^ 8, every)
+	eq(g.level, 100); eq(g.levels, 3); eq(g.hp, 1 + 51 + 1); eq(g.tp, 5 + 5 + 0)
+	eq(combat.level_up(player({ level = 100 }), 10 ^ 8, every), nil)
+	eq(combat.level_up(u, 15, function() return nil end), nil)
 end
 
 function T.drop_roll_and_pick()

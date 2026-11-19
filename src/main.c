@@ -13,7 +13,7 @@
 #include "lua.h"
 #include "sqlite3.h"
 
-#define DK_VERSION "2.0.0-dev"
+#define DK_VERSION "2.1.0-dev"
 
 static void usage(FILE *f)
 {

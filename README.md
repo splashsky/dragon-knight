@@ -248,6 +248,9 @@ in-game `/changelog` page (also linked from the version number in the footer).
 - The admin "page compression" setting is gone (the server doesn't gzip).
 - There are no difficulty levels: everyone plays at the original Easy difficulty (no
 	multiplier on monster HP, damage, experience or gold).
+- The experience needed per level, the TP gained per level and the HP bonus every tenth
+	level (and at 99) are formulas fitted to the original level table (`app/lib/leveling.lua`;
+	experience within 0.44% of it, TP and HP exactly), no longer columns of the levels table.
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

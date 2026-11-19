@@ -8,6 +8,13 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "2.1.0", date = "unreleased",
+		changes = {
+			"Removed difficulty levels; everyone plays at the original Easy difficulty.",
+			"Experience needed per level, TP gains and HP milestones now follow formulas fitted to the original level table.",
+		},
+	},
+	{
 		version = "2.0.0", date = "11.19.2026",
 		changes = {
 			"Complete engine rewrite: a single program with its own HTTP server in C, the game in Lua and the database in SQLite. No PHP, MySQL or web server needed.",
@@ -25,7 +32,6 @@ changelog.RELEASES = {
 			"Emails (verification, lost password) are written to an outbox folder instead of being sent. Email verification is off by default.",
 			"The forum shows a message when the built-in forum is turned off, and its paging works.",
 			"Admin: removed the page compression option, added paging to the user list, added setting a user's password, fixed swapped labels in the user editor.",
-			"Removed difficulty levels; everyone plays at the original Easy difficulty.",
 			"Fixed the Bris item list so it sells the Buckler and Small Shield.",
 			"The sell-back value of the item you replace now counts toward the shop price.",
 			"Heal spells can't be cast at full HP, in town or in fights, and never lower your HP.",

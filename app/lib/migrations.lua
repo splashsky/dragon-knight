@@ -89,9 +89,29 @@ ALTER TABLE users DROP COLUMN difficulty;
 ]])
 end
 
+-- 3: experience and TP per level and the HP bonus at milestone levels became formulas
+-- (lib/leveling.lua): drop the levels table's exp and tp columns (values an admin edited
+-- are discarded) and take the milestone bonus off the HP gain at those levels (0 for the
+-- original data; an edited value keeps its difference). Players keep their experience;
+-- one whose experience already covers the (slightly moved) next level gets it on the
+-- next victory.
+local function v3_leveling_formulas()
+	local db = dk.db
+	local bonus = "CASE WHEN id IN (10, 20, 30) THEN 10 WHEN id IN (40, 50, 60) THEN 15 " ..
+								"WHEN id IN (70, 80, 90) THEN 20 ELSE 50 END"
+	for class = 1, 3 do
+		db:exec(string.format('ALTER TABLE levels DROP COLUMN "%d_exp"', class))
+		db:exec(string.format('ALTER TABLE levels DROP COLUMN "%d_tp"', class))
+		db:exec(string.format('UPDATE levels SET "%d_hp" = max("%d_hp" - (%s), 0) ' ..
+													'WHERE id IN (10, 20, 30, 40, 50, 60, 70, 80, 90, 99)', class, class, bonus))
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
+	{ name = "experience, TP and HP milestones per level are formulas (edited exp/tp values are discarded)",
+		up = v3_leveling_formulas },
 }
 
 migrations.VERSION = #migrations.STEPS
