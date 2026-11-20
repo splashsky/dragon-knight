@@ -148,6 +148,23 @@ local function live_response(req, res)
 	return res
 end
 
+---------------------------------------------------------------------------------------
+-- Modal requests (docs/APP.md "Modals"): public/js/modal.js sends X-DK-Modal: 1 and shows
+-- what comes back in a dialog over the page: a page's title and content alone
+-- (view.layout). A redirect becomes X-DK-Go: <location> on an empty answer (fetch would
+-- follow it into the dialog): the dialog closes and the page goes there.
+
+local function modal_of(req)
+	return req.headers["x-dk-modal"] == "1" and not req.live and (req.method == "GET" or req.method == "POST")
+end
+
+local function modal_response(res)
+	local loc = redirect_of(res)
+	if not loc then return res end
+	return { status = 200, headers = { { "Content-Type", "text/plain; charset=utf-8" },
+		{ "Cache-Control", "private, no-cache" }, { "X-DK-Go", loc } }, body = "" }
+end
+
 -- After a player's POST, their other pages (other tabs, other devices) are told to fetch
 -- themselves again (live.js, the live client): `stale` on user:<id> with the sending tab's
 -- id (X-DK-Tab), which that tab ignores. Routes whose change reaches the pages by other
@@ -162,11 +179,13 @@ end
 return function(req)
 	req.out_headers = {}
 	req.live = live_of(req)
+	req.modal = modal_of(req)
 	dbcount.install()
 	local ok, res = xpcall(function()
 		local res = normalize(dispatch(req))
 		publish_stale(req, res)
 		if req.live then res = live_response(req, res) end
+		if req.modal then res = modal_response(res) end
 		return res
 	end, debug.traceback)
 	if ok and req.method == "HEAD" then
@@ -186,8 +205,10 @@ return function(req)
 		if req.live then res = wire_response(500, { { "doc", "", res.body } }) end
 	end
 	for _, hd in ipairs(req.out_headers) do table.insert(res.headers, hd) end
-	-- pages and live answers differ by X-DK-Live
+	-- pages, live answers and a modal's differ by X-DK-Live and X-DK-Modal
 	local ct = header(res, "content-type") or ""
-	if ct:find("^text/html") or ct:find("^application/x%-dk%-live") then table.insert(res.headers, { "Vary", "X-DK-Live" }) end
+	if ct:find("^text/html") or ct:find("^application/x%-dk%-live") or header(res, "x-dk-go") then
+		table.insert(res.headers, { "Vary", "X-DK-Live, X-DK-Modal" })
+	end
 	return res
 end

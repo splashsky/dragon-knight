@@ -3,7 +3,8 @@
 		icon, label, tip }. Items are icon buttons like the fight menu's (dk.css .spell-btn),
 		each with a tooltip made for the shop (tip/shop.html: the price, the player's gold, the
 		stats against what is worn, the effects); one the gold doesn't cover is greyed out but
-		still opens the purchase page, which says why. Any item can be bought again (2.4: no
+		still opens the purchase page, which says why. The purchase page opens in a dialog
+		(data-modal: public/js/modal.js; without it, the page itself). Any item can be bought again (2.4: no
 		"Already purchased"). Selling: a button per bag entry the shop buys (a stack's size on
 		a badge, a quantity field), its tooltip saying what the shop pays. -#}
 <div class="town-message">
@@ -12,7 +13,7 @@ Buying weapons will increase your Attack Power. Buying armor and shields will in
 <div class="shop-group" role="group" aria-labelledby="shop-{{ g.key }}-label"><span class="shop-group-label" id="shop-{{ g.key }}-label">{{ g.label }}</span>
 <div class="spell-grid">
 {%- for _, e in ipairs(g.items) do %}
-<span class="spell-tip{% if e.short then %} shop-short{% end %}" data-tip><a class="spell-btn" href="/shop/buy/{{ e.item.id }}" title="{{ e.label }}" aria-label="{{ e.label }}"><img src="{{ e.icon }}" width="44" height="44" alt=""></a>{{{ include("tip/shop", e.tip) }}}</span>
+<span class="spell-tip{% if e.short then %} shop-short{% end %}" data-tip><a class="spell-btn" href="/shop/buy/{{ e.item.id }}" data-modal title="{{ e.label }}" aria-label="{{ e.label }}"><img src="{{ e.icon }}" width="44" height="44" alt=""></a>{{{ include("tip/shop", e.tip) }}}</span>
 {%- end %}
 </div>
 </div>

@@ -79,15 +79,15 @@ t_section "wand: bought in Midworld"
 t_items_clear wizard
 wd_sql "UPDATE users SET gold = 200, base_maxhp = 17, currenthp = 17"
 t_get /shop; TC=$(t_csrf)
-expect_body "<a class=\"spell-btn\" href=\"/shop/buy/$WD_WAND_ITEM\" title=\"Wand (75 gold)\" aria-label=\"Wand (75 gold)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"></a><template class=\"tip\">"
-expect_body '<b class="shop-tip-gold">75 gold</b></div><div class="shop-tip-note">You have 200 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table><ul class="shop-tip-effects"><li>Casts Magic Bolt</li><li>Charges 5</li></ul>'
+expect_body "<a class=\"spell-btn\" href=\"/shop/buy/$WD_WAND_ITEM\" data-modal title=\"Wand (75 gold)\" aria-label=\"Wand (75 gold)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"></a><template class=\"tip\">"
+expect_body '<b class="shop-tip-gold">75 gold</b></div><div class="shop-tip-note">You have 200 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table><ul class="shop-tip-effects"><li>Casts Magic Bolt</li><li>5 Charges</li></ul>'
 t_get "/shop/buy/$WD_WAND_ITEM"; expect_text 'You are buying the Wand, is that ok?'
-expect_body '<img class="shop-buy-icon" src="/static/images/items/wand.png" width="44" height="44" alt="">'
+expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/wand.png" width="36" height="36" alt="">'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
 wd_is "gold || '|' || $T_ITEMS || '|' || $WD_CHARGES" "125|wand@weapon|weapon=5"
 expect_stats "17 10 11 5 6 7 6" "a level 2 Mage: the wand adds 2 attack power"
 t_get /inventory
-expect_text 'Wand (Attack Power +2, Casts Magic Bolt, Charges 5/5)'
+expect_text 'Wand (Attack Power +2, Casts Magic Bolt, 5/5 Charges)'
 expect_body '<img class="item-icon" src="/static/images/items/wand.png" width="22" height="22" alt=""> <b class="tip-term"'
 # not sold elsewhere
 t_sql "UPDATE users SET latitude = 30, longitude = 30 $WQ"
@@ -171,9 +171,42 @@ t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=10"; expect_body 'Thank you for pur
 wd_is "$T_ITEMS" "herbx10,herbx10"
 t_items_clear wizard
 
+t_section "wand: single use (not rechargeable)"
+# an admin turns the Wand's recharging off (an override; reset below): its lines say
+# "Single use", the inn doesn't recharge it, and its last charge uses it up (gone from its
+# slot, the round says so)
+t_jar wandadmin; t_reset_jar; t_login "$ADMIN_USER" "$ADMIN_PASS"
+t_get /admin/items/71; expect_body '<select name="rechargeable">'
+t_form_submit /admin/items/71 rechargeable=0
+wd_is "(SELECT rechargeable FROM items WHERE key = 'wand')" "0"
+t_get /admin/items/1; expect_no_body 'name="rechargeable"'   # only for items that cast
+t_jar wand
+t_items_clear wizard; t_give wizard wand 1 weapon
+WAND=$(wd_wand); t_sql "UPDATE user_items SET charges = 2 WHERE id = $WAND"
+wd_sql "UPDATE users SET gold = 100, currentaction = 'In Town', latitude = 0, longitude = 0"
+t_get /inventory; expect_text 'Wand (Attack Power +2, Casts Magic Bolt, 2/5 Charges, Single use)'
+t_get /shop; expect_body '<ul class="shop-tip-effects"><li>Casts Magic Bolt</li><li>5 Charges</li><li>Single use</li></ul>'
+t_get /inn; expect_no_body 'recharge'
+t_post /inn "csrf=$TC&submit=Yes"; expect_no_body 'fully charged again'
+wd_is "$WD_CHARGES" "weapon=2"
+t_fight wizard 2 50
+wd_sql "UPDATE users SET currentmp = 0, currenthp = 100, base_maxhp = 100"
+t_get /fight; CS=$(t_csrf); expect_body '<div class="tip-meta">Casts Magic Bolt · 2/5 Charges · No MP · Single use</div>'
+t_round "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '; expect_no_body 'is used up'
+wd_is "$WD_CHARGES" "weapon=1"
+t_round "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '; expect_body 'Your Wand is used up.'
+wd_is "coalesce($WD_CHARGES, '-') || '|' || coalesce($T_ITEMS, '')" "-|"
+t_get /fight; expect_no_body 'name="use_gear"'
+t_fight_clear wizard
+wd_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"
+t_jar wandadmin; t_get /admin/items/71
+t_post /admin/items/71/reset "csrf=$(t_csrf)&field=*"
+wd_is "(SELECT rechargeable FROM items WHERE key = 'wand')" "1"
+t_jar wand
+
 t_section "wand: help"
 t_get /help/items
 expect_body '<td style="width: 30%">Wand<div class="help-lore">'
-expect_body '<td style="width: 20%">75 Gold</td><td style="width: 20%">2 Attack Power</td><td style="width: 25%">Casts Magic Bolt, Charges 5</td>'
+expect_body '<td style="width: 20%">75 Gold</td><td style="width: 20%">2 Attack Power</td><td style="width: 25%">Casts Magic Bolt, 5 Charges</td>'
 
 fi

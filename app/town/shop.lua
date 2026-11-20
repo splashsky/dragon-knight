@@ -34,7 +34,6 @@ local function check(req, id)
 	local o = { item = item }
 	local bag = inventory.bag(user.id)
 	local size = inventory.size()
-	o.icon = items.icon(item)
 	if item.slot and item.slot ~= "accessory" then
 		-- a copy of what you are wearing is fine too (2.4: no more "Already purchased")
 		local old = inventory.equipped(user.id)[item.slot]
@@ -101,10 +100,12 @@ function shop.list(req)
 	return view.page(req, "Buy Items", "town/shop", { groups = groups, sell = sell })
 end
 
--- GET /shop/buy/#id
+-- GET /shop/buy/#id (the shop's dialog: its links have data-modal)
 function shop.confirm(req, params)
 	local o, err = check(req, params.id)
 	if not o then return err end
+	o.card = tips.shop(o.item, { gold = req.user.gold, old = o.old, sellback = o.sellback })
+	o.card.inline = true
 	return view.page(req, "Buy Items", "town/shop_buy", o)
 end
 

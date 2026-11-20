@@ -180,7 +180,8 @@ local function choice(user, st, f, form)
 		local spell = items.spell(gear.item)
 		if not spell then return nil, nil, nil, act.CANNOT.item end
 		if gear.charges < 1 then
-			return nil, nil, nil, "The " .. gear.item.name .. " has no charges left. Rest at an inn to recharge it."
+			return nil, nil, nil, "The " .. gear.item.name .. " has no charges left." ..
+				(items.rechargeable(gear.item) and " Rest at an inn to recharge it." or "")
 		end
 		return { kind = "gear", item = gear.item, spell = spell }, nil, gear
 	elseif form.item ~= nil then
@@ -289,7 +290,10 @@ local function fight(req)
 	local r = round.play(f, a)
 	if r.refused then return note(req, f, "note", r.refused) end
 	if entry then inventory.take(entry, 1) end
-	if gear then inventory.spend_charge(gear) end
+	if gear and inventory.spend_charge(gear) then
+		r.player = r.player or {}
+		r.player[#r.player + 1] = "Your " .. gear.item.name .. " is used up."
+	end
 	f = r.f
 	local evs = f.trace and round_events(r) or json.array()
 	if r.escaped then

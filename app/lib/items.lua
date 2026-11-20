@@ -139,16 +139,24 @@ function items.spell(item)
 	return cast_spells[key] or nil
 end
 
--- A casting item's lines: { "Casts Magic Bolt", "Charges 3/5" } (with `charges`, one
--- item's charges left; without, the full count: "Charges 5").
+-- A casting item's lines: { "Casts Magic Bolt", "3/5 Charges" } (with `charges`, one
+-- item's charges left; without, the full count: "5 Charges", "1 Charge"), then "Single
+-- use" for one that isn't rechargeable (used up with its last charge).
 function items.charge_lines(item, charges)
 	if not items.casts(item) then return {} end
 	local spell = items.spell(item)
 	local max = item.charges
-	return {
+	local out = {
 		"Casts " .. (spell and spell.name or item.casts),
-		"Charges " .. (charges and (math.min(charges, max) .. "/" .. max) or max),
+		(charges and (math.min(charges, max) .. "/" .. max) or max) .. (max == 1 and " Charge" or " Charges"),
 	}
+	if not items.rechargeable(item) then out[#out + 1] = "Single use" end
+	return out
+end
+
+-- Whether resting at an inn refills its charges (else it is used up with its last one).
+function items.rechargeable(item)
+	return item.rechargeable ~= 0 and item.rechargeable ~= false
 end
 
 -- "Max HP +10", "Gold Bonus +10%", "Strength -5".

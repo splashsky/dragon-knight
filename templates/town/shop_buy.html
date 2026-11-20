@@ -1,35 +1,38 @@
-{#- Purchase confirmation (legacy towns.php buy2()). ctx: the offer of town/shop.lua's
-		check(): item, slot (gear that is equipped when bought), old (the entry in that slot),
-		sellback, can_keep, keep_full, can_sell; max (bag items: how many); icon (the item's
-		picture, or nil). The items' names in the text carry their tooltips. -#}
+{#- Purchase confirmation (legacy towns.php buy2()), a page of its own or the shop's dialog
+		(public/js/modal.js: the shop's links open it there; "No" just closes the dialog). ctx:
+		the offer of town/shop.lua's check(): item, slot (gear that is equipped when bought),
+		old (the entry in that slot), sellback, can_keep, keep_full, can_sell; max (bag items:
+		how many); card (tips.shop: the shop's tooltip, shown as a card: the price, the gold,
+		the stats against what is worn). The items' names in the text carry their tooltips. -#}
 <div class="town-message shop-buy">
-{%- if icon then %}
-<img class="shop-buy-icon" src="{{ icon }}" width="44" height="44" alt="">
-{%- end %}
-<form action="/shop/buy/{{ item.id }}" method="post">
+{{{ include("tip/shop", card) }}}
+<form class="shop-buy-form" action="/shop/buy/{{ item.id }}" method="post">
 {{{ csrf_field() }}}
 {%- if slot and old then %}
-You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item, old) }}}</span>?<br><br>
+<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item, old) }}}</span>?</p>
+{%- if keep_full then %}
+<p class="light">Your bag is full, so you can't keep your {{ old.item.name }}.</p>
+{%- elseif not can_keep then %}
+<p class="light">You don't have enough gold to buy it and keep your {{ old.item.name }}.</p>
+{%- end %}
+<div class="shop-buy-actions">
 {%- if can_keep then %}
-<input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)"><br>
-{%- elseif keep_full then %}
-<span class="light">Your bag is full, so you can't keep your {{ old.item.name }}.</span><br>
-{%- else %}
-<span class="light">You don't have enough gold to buy it and keep your {{ old.item.name }}.</span><br>
+<input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)">
 {%- end %}
 {%- if can_sell then %}
-<input type="submit" name="sell" value="Buy and sell my {{ old.item.name }} for {{ sellback }} gold"><br>
+<input type="submit" name="sell" value="Buy and sell my {{ old.item.name }} for {{ sellback }} gold">
 {%- end %}
-<br><input type="submit" name="cancel" value="No">
+<input type="submit" name="cancel" value="No" data-modal-close>
+</div>
 {%- elseif slot then %}
-You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span>, is that ok?<br><br>
-<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
+<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span>, is that ok?</p>
+<div class="shop-buy-actions"><input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No" data-modal-close></div>
 {%- else %}
-You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.<br><br>
+<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.</p>
 {%- if max > 1 then %}
-How many? <input type="text" name="qty" size="3" value="1" aria-label="Quantity"> (1 to {{ max }})<br><br>
+<p><label>How many? <input type="text" name="qty" size="3" value="1" inputmode="numeric" aria-label="Quantity"></label> (1 to {{ max }})</p>
 {%- end %}
-<input type="submit" name="submit" value="Buy"> <input type="submit" name="cancel" value="No">
+<div class="shop-buy-actions"><input type="submit" name="submit" value="Buy"> <input type="submit" name="cancel" value="No" data-modal-close></div>
 {%- end %}
 </form>
 </div>

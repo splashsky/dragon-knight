@@ -145,7 +145,8 @@ CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 -- never). The original items keep ids 1-33 and the original drops are 34-65. Schema
 -- version 14: casts (a spell key: gear that casts it in fights; '' = none) and charges
 -- (when full; user_items.charges holds each one's), icon (a PNG in public/images/items/,
--- '' = the default icon).
+-- '' = the default icon). Schema version 16: rechargeable (0: single use, gone with its
+-- last charge; 1: an inn refills it).
 CREATE TABLE items (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -170,7 +171,8 @@ CREATE TABLE items (
 	lore         TEXT    NOT NULL DEFAULT '',
 	casts        TEXT    NOT NULL DEFAULT '',
 	charges      INTEGER NOT NULL DEFAULT 0,
-	icon         TEXT    NOT NULL DEFAULT ''
+	icon         TEXT    NOT NULL DEFAULT '',
+	rechargeable INTEGER NOT NULL DEFAULT 1
 );
 
 -- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a

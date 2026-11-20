@@ -54,12 +54,12 @@ t_get /shop;                      expect_status 200
 # price, the gold, what it adds; nothing worn here, so nothing to compare)
 SHOP_GROUPS=$(grep -o 'class="shop-group-label" id="shop-[a-z]*-label">[A-Za-z]*' "$BODY" | sed 's/.*>//' | tr '\n' ' ')
 [ "$SHOP_GROUPS" = "Weapons Armor Shields Items " ] && t_ok || t_fail "shop groups: $SHOP_GROUPS"
-expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""></a><template class="tip">'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" data-modal title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""></a><template class="tip">'
 expect_body '<b class="shop-tip-gold">10 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table>'
-expect_body 'href="/shop/buy/17" title="Skivvies (25 gold)"'
+expect_body 'href="/shop/buy/17" data-modal title="Skivvies (25 gold)"'
 expect_body '<tr><th scope="row">Defense Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr><tr><th scope="row">Gold Bonus</th><td class="shop-tip-value">+10%</td><td class="shop-tip-delta"></td></tr></table>'
 expect_no_body 'Dagger'
-expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'; expect_no_body 'Potion'
+expect_body 'href="/shop/buy/66" data-modal title="Herb (15 gold)"'; expect_no_body 'Potion'
 expect_no_body 'shop-short'                       # 1000 gold covers everything here
 expect_no_body 'I will buy these from your bag'
 t_get /shop/buy/4;                expect_body 'Cheat attempt detected.'
@@ -67,6 +67,30 @@ t_post /shop/buy/4 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 t_post /shop/buy/999 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 t_post /shop/buy/67 "csrf=$TC&submit=Buy"; expect_body 'Cheat attempt detected.'      # Potions: not in Midworld
 expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "cheat buy"
+
+t_section "town: the purchase in the shop's dialog (X-DK-Modal)"
+# the shop's links open the purchase page in a dialog (data-modal: public/js/modal.js):
+# with X-DK-Modal: 1 the page's title and content alone (no layout); a redirect comes
+# back as X-DK-Go (the dialog closes, the page goes there); the result and errors are the
+# dialog's content, the result with a button back to the shop. Without the header: pages.
+t_get /shop/buy/1 -H 'X-DK-Modal: 1'; expect_status 200
+expect_header '^x-dk-modal: 1'; expect_header '^vary: X-DK-Live, X-DK-Modal'
+expect_body '<h2 class="dk-modal-title" id="dk-modal-title">Buy Items</h2>'
+expect_body '<div class="dk-modal-content"><div class="town-message shop-buy">'
+expect_text 'You are buying the Stick, is that ok?'
+expect_body '<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No" data-modal-close>'
+expect_no_body '<html'; expect_no_body 'compass'; expect_no_body 'Babble'
+t_post /shop/buy/1 "csrf=$TC&cancel=No" -H 'X-DK-Modal: 1'
+expect_status 200; expect_header '^x-dk-go: /'$'\r''?$'; [ -s "$BODY" ] && t_fail "X-DK-Go has a body" || t_ok
+t_post /shop/buy/4 "csrf=$TC&submit=Yes" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body 'Cheat attempt detected.'
+t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'
+expect_body 'Thank you for purchasing this item.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the shop</button></div>'
+expect_no_body 'direction buttons'
+expect_db "gold,$T_ITEMS" "970|herbx2" "bought in the dialog"
+t_get /shop/buy/1; expect_body '<html'; expect_body 'compass'
+grep -qi '^x-dk-modal' "$HEADERS" && t_fail "a page says X-DK-Modal" || t_ok
+t_get /shop; expect_body 'href="/shop/buy/1" data-modal title="Stick (10 gold)"'
+t_items_clear townie; tu "gold=1000"
 
 t_section "town: shop weapon, keep or sell the old one"
 t_get /shop/buy/1;                expect_text 'You are buying the Stick, is that ok?'; expect_body 'action="/shop/buy/1"'
@@ -79,7 +103,7 @@ expect_stats "15 0 10 5 5 7 5" "stick"
 t_get /;                          expect_body 'Weapon: Stick'
 # a copy of the weapon you wear can be bought too (2.4: no more "Already purchased"): the
 # old one is kept in the bag or sold, as with any other
-t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" title="Stick (10 gold)"'
+t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" data-modal title="Stick (10 gold)"'
 t_get /shop/buy/1;                expect_text 'You are buying the Stick for 10 gold. What should I do with your Stick?'
 t_post /shop/buy/1 "csrf=$TC&keep=x"; expect_body 'Thank you for purchasing this item.'
 expect_db "gold,$T_ITEMS" "980|stick,stick@weapon" "a second stick, the first kept"

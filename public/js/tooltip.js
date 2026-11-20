@@ -6,7 +6,8 @@
 // other side with room, clamped into the viewport. Hover (after a short delay, at once
 // when moving between triggers), keyboard focus, or a long press on touch screens show it;
 // leaving, blur, Escape, or the trigger scrolling away or leaving the page hide it. Events
-// are delegated to the document, so content swapped in later needs nothing.
+// are delegated to the document, so content swapped in later needs nothing. A trigger in
+// an open <dialog> gets the box inside it (drawn over the page like the dialog).
 (function () {
 	"use strict";
 
@@ -92,6 +93,9 @@
 			arrowEl.className = "dk-tip-arrow";
 			document.body.appendChild(box);
 		}
+		// in a modal dialog (modal.js) the box goes into it: the dialog is drawn over the page
+		var host = el.closest("dialog[open]") || document.body;
+		if (box.parentNode !== host) host.appendChild(box);
 		body.textContent = "";
 		for (var c = el.firstElementChild; c; c = c.nextElementSibling) {
 			if (c.tagName === "TEMPLATE" && c.classList.contains("tip")) {

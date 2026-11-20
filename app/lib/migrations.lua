@@ -1167,6 +1167,12 @@ local function v15_after_sync()
 	end
 end
 
+-- 16: items that cast a spell may be single use (items.rechargeable; every item so far is
+-- rechargeable).
+local function v16_rechargeable()
+	dk.db:exec("ALTER TABLE items ADD COLUMN rechargeable INTEGER NOT NULL DEFAULT 1")
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1195,6 +1201,7 @@ migrations.STEPS = {
 	{ name = "GETs don't change the game: an encounter begins on the move, a victory is paid in the " ..
 		"winning round, a finished fight is kept for its page (pending encounters are cancelled, won fights " ..
 		"are paid)", up = v15_pure_gets, after_sync = v15_after_sync },
+	{ name = "items that cast a spell may be single use (not rechargeable)", up = v16_rechargeable },
 }
 
 migrations.VERSION = #migrations.STEPS

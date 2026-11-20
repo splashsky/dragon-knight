@@ -1,5 +1,6 @@
 -- town/inn.lua :: legacy towns.php inn(): pay the innprice, refill HP/MP/TP, and (2.4) the
--- charges of the equipped items that cast a spell (bag items keep theirs).
+-- charges of the equipped items that cast a spell (bag items keep theirs; single-use ones
+-- aren't rechargeable).
 local common = require("town.common")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
@@ -25,11 +26,11 @@ function inn.handle(req)
 	elseif req.method == "POST" and req.form.cancel ~= nil then
 		return view.redirect("/")
 	end
-	-- what a night recharges: the equipped items that cast and aren't full
+	-- what a night recharges: the equipped items that cast and are rechargeable
 	local charged = {}
 	for _, slot in ipairs(inventory.SLOTS) do
 		local e = inventory.equipped(user.id)[slot]
-		if e and items.casts(e.item) then
+		if e and items.casts(e.item) and items.rechargeable(e.item) then
 			charged[#charged + 1] = { name = e.item.name, charges = math.min(e.charges, e.item.charges), max = e.item.charges }
 		end
 	end

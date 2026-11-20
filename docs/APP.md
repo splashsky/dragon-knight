@@ -200,7 +200,8 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
 live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
-`tooltip.js`, see [Tooltips](#tooltips), `live.js`, `fight.js`): the head is the same
+`tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
+`live.js`, `fight.js`): the head is the same
 everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
 `<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
@@ -345,6 +346,51 @@ stream starting and stopping), links, back/forward with their scroll, typed text
 folded chat kept, the chat, a move, a POST's own page, the progress bar, a newer link
 winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
 routes only) is a page that takes its time.
+
+## Modals
+
+A page can open in a dialog over the one on screen (`public/js/modal.js`), the shop's
+purchase first: give the link `data-modal`.
+
+```html
+<a href="/shop/buy/3" data-modal>Club</a>
+```
+
+- **The request**: `modal.js` fetches the link's address with `X-DK-Modal: 1` (and the
+	live client's `X-DK-Tab`). `main.lua` marks the request (`req.modal`) and
+	`view.layout` answers with the page's title and content alone, no layout
+	(`templates/layout/modal.html`: `h2.dk-modal-title` and `.dk-modal-content`; region
+	markers stripped), marked `X-DK-Modal: 1`. The same routes run, so the handler needs
+	nothing: whatever page it answers (the purchase form, a message, a 403) is the dialog's.
+	A redirect comes back as an empty `200` with `X-DK-Go: <location>` (fetch would
+	follow it into the dialog): the dialog closes and the page goes there (`DK.visit`).
+	Templates can tell with `req.modal` (`town/message.html` offers "Back to the shop"
+	instead of the ways on). HTML answers vary by `X-DK-Live, X-DK-Modal`.
+- **The dialog**: one `<dialog class="dk-modal">` made by the script (`data-client`: the
+	live client's morph leaves it alone) and opened with `showModal()`: the page behind is
+	inert and dimmed, Escape closes it, focus stays inside. Its first field or button gets
+	the focus (`autofocus` picks another); closing gives the focus back to the link. If the
+	page takes longer than 250 ms the dialog opens with "Loading…" meanwhile.
+- **Inside it**: forms submit into the dialog (`fetch`, the submitter's name and value
+	included); after a POST the page behind brings itself up to date (`DK.refresh()`;
+	without the live client, a reload when the dialog closes), so the gold and lists are
+	current under the answer. A link closes the dialog and goes on like any link (a
+	`data-modal` one opens in it instead). An element with `data-modal-close` closes it
+	without a request: on a submit button (`<input type="submit" name="cancel" value="No"
+	data-modal-close>`) the page without JavaScript still submits it. The close button
+	(×) and a click on the backdrop close it too. Tooltips inside it work as anywhere
+	(`tooltip.js` puts its box into the open dialog), and the compass's arrow keys rest.
+- **Without it** (no JavaScript, no `<dialog>`): the link is an ordinary link and the page
+	shows as a page, exactly as before. A GET that fails or answers something else (a 503
+	page) loads the address as a page; a POST answered with a whole page shows it, and one
+	lost on the way reloads the page as it is now.
+- `window.dkModal`: `open(url)`, `close()`, `isOpen()`.
+- Styles: `.dk-modal`, `.dk-modal-box`, `.dk-modal-title`, `.dk-modal-x`,
+	`.dk-modal-actions` (`dk.css`; the themes give the box their tooltips' paper).
+- Tests: `tests/e2e/town.sh` ("the purchase in the shop's dialog": the answer, the headers,
+	`X-DK-Go`, a purchase); `tests/browser/client.js` ("the shop's dialog": it opens over
+	the page, the focus, No, a purchase and the page behind catching up, Escape, a tooltip in
+	it, the arrow keys).
 
 ## Realtime (event streams)
 
@@ -608,7 +654,9 @@ starting with `__` are reserved.
 	greyed, `.shop-short`, when the gold, with what the worn piece sells back for, doesn't
 	cover it — still a link: the purchase page says why) and its Sell buttons (a stack's
 	size, `.item-badge-qty`, and how many to sell). The shop's prices are in its tooltips,
-	`tip/shop.html` (below).
+	`tip/shop.html` (below). The wares' links open the purchase page
+	(`town/shop_buy.html`: the item's card, the same `tip/shop.html` with `inline`, then the
+	question and its buttons) in a dialog, `data-modal` (see [Modals](#modals)).
 - Images: `/static/images/<file>`. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
@@ -720,8 +768,8 @@ live.js chat, a resync) needs no set-up, and nothing runs while nothing is hover
 	`.tip-body` (the description, paragraphs) and `.tip-lore` (italic, muted, set apart by a
 	dotted rule). `.tip-term` underlines a word that has a tooltip (dotted, `cursor: help`).
 - **Game things**: `{{{ tip("spell", row) }}}` (also `"item"`, `"monster"`, `"class"`;
-	`tip("item", row, entry)` with a `user_items` entry says that item's charges, "Charges
-	3/5") renders the template from a row: `lib/tips.lua` picks what to say (title, meta, lines,
+	`tip("item", row, entry)` with a `user_items` entry says that item's charges, "3/5
+	Charges") renders the template from a row: `lib/tips.lua` picks what to say (title, meta, lines,
 	description, lore), `templates/tip/tip.html` renders it, escaping everything; empty
 	parts (no lore, no description) are left out. For anything else,
 	`{{{ include("tip/tip", { title = ..., meta = { ... }, lines = { ... }, body = text, lore = text }) }}}`.
@@ -769,8 +817,8 @@ equipped slots and every bag entry, quest items saying "Quest item"; on `/shop` 
 for sale and the Sell buttons (`tips.shop(item, { gold, old, sellback, short })`,
 `tips.sell(entry, price)`, rendered by their own template, `tip/shop.html`, made to be read
 at a glance: the price set large with the player's gold or what is missing, the stats as
-a table of figures with the change against the item worn in that slot, green or red, and
-the stats a swap loses, the effects (a consumable's, the spell gear casts, its charges),
+a table of figures with the change against the item worn in that slot, green or red, a
+gray "+0" when it doesn't change, and the stats a swap loses, the effects (a consumable's, the spell gear casts, its charges),
 the trade-in, then the description; no lore); the purchase page's item and
 the one it replaces; the discard confirmation), the monster's name on the fight page (name,
 level, description, lore) and the class names on the registration page (starting HP/MP, the
@@ -1251,7 +1299,8 @@ many on a badge, `.item-badge`; disabled when its `can_use` refuses now, checked
 (`item=Use Item&useritem=<id>`) still works (`useritem` wins), and a missing or `0` id is
 "You must select an item first". `use_gear=<id>` must be an entry of the player's that is
 equipped and casts a spell ("You do not have this item equipped.") with a charge left ("The
-Wand has no charges left. Rest at an inn to recharge it."; nothing happens, the turn isn't
+Wand has no charges left. Rest at an inn to recharge it.", without the inn for a single-use
+item; nothing happens, the turn isn't
 spent); the round then casts the spell through the spell's code with the player as caster
 and no MP cost (`act.run` with `{ kind = "gear", item, spell }`, an `item` step in the
 trace), and the route spends one charge (`inventory.spend_charge`), also when the player
@@ -1746,8 +1795,11 @@ return {
 	`user_items` row has its own `charges`: full when obtained (shop, drop, `t_give`; any
 	`inventory.add` / `inventory.equip_new`), one spent per cast, 0 refuses. Resting at an inn
 	refills the equipped ones (`inventory.recharge`; the inn page lists them, "Your Wand is
-	fully charged again."); bag items keep theirs. Lines: "Casts Magic Bolt", "Charges 3/5"
-	(`items.charge_lines`, on `/inventory`, in tooltips and on `/help/items`).
+	fully charged again."); bag items keep theirs. `rechargeable = false` makes one single
+	use: the inn passes it by, and the cast that spends its last charge uses it up (the entry
+	is deleted, stats clamped; the round adds "Your Wand is used up."). Lines: "Casts Magic
+	Bolt", "3/5 Charges" ("1 Charge"), then "Single use" for one that isn't rechargeable
+	(`items.charge_lines`, on `/inventory`, in tooltips, in the shop and on `/help/items`).
 
 ```lua
 -- app/content/items/wand.lua
@@ -1761,11 +1813,12 @@ return {
 }
 ```
 - Validation (`dk check`): gear has `max_stack` 1; only gear has attack, defense,
-	modifiers and `casts`; `casts` needs `charges` >= 1 and `charges` needs `casts`; the spell
+	modifiers and `casts`; `casts` needs `charges` >= 1 and `charges` (and `rechargeable =
+	false`) needs `casts`; the spell
 	must exist and be castable in fights; only consumables have `use`/`can_use`, `power`, `messages`, `data`,
 	`usable_in` and `target`, and a consumable needs `use`; quest items can't be sellable;
 	`sellable = true` needs a price.
-- Admins override name, description, price, attack, defense, icon, charges, drop level, sellable,
+- Admins override name, description, price, attack, defense, icon, charges, rechargeable, drop level, sellable,
 	droppable, the modifiers' stats and amounts (an override can add a modifier: both its
 	`modifiers.N.stat` and `.amount`) and a consumable's power, numbers and message strings
 	at `/admin/items`.
@@ -1803,7 +1856,7 @@ and `messages` and `data` into tables.
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
 | `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
 | `items.icon(item)`, `items.icon_url(item)` | its picture's URL, or nil / the default icon |
-| `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "Charges 3/5" }` |
+| `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])`, `items.rechargeable(item)` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "3/5 Charges" [, "Single use"] }`; an inn refills it |
 
 Adding an item: copy a file in `app/content/items/` to `<key>.lua`, edit it, run
 `./dk check`. The next page load syncs it: give it a `drop_level` for monsters to drop it,
@@ -1835,7 +1888,7 @@ an item that casts, see [Items](#items)), equipped in a slot
 | `inventory.entries(uid)`, `inventory.bag(uid)`, `inventory.equipped(uid)` (slot -> entry, cached per request), `inventory.entry(uid, id)`, `inventory.find(uid, item_id)` | entries `{ id, user_id, qty, equipped, item }` |
 | `inventory.size()`, `inventory.used(bag)`, `inventory.free(bag, size)`, `inventory.room(item, bag, size)` | the cap |
 | `inventory.add(uid, item, qty)`, `inventory.take(entry [, qty])` | into / out of the bag |
-| `inventory.full_charges(item)`, `inventory.spend_charge(entry)`, `inventory.recharge(uid)` | an item's charges when obtained; one charge used; the inn: refill the equipped items (returns them) |
+| `inventory.full_charges(item)`, `inventory.spend_charge(entry)`, `inventory.recharge(uid)` | an item's charges when obtained; one charge used (true: a single-use item's last, the item is gone); the inn: refill the equipped rechargeable items (returns them) |
 | `inventory.equip(uid, entry, slot)`, `inventory.equip_new(uid, item, slot)`, `inventory.unequip(uid, slot)`, `inventory.free_accessory_slot(uid)` | equipment (they clamp) |
 | `inventory.stats(user)`, `inventory.names(uid)` | effective stats, equipped names per slot |
 

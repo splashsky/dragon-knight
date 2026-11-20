@@ -45,13 +45,15 @@ function tips.item(it, extra)
 end
 
 -- The fight menu's button of an equipped item that casts (entry: its user_items entry):
--- the item; the spell, its charges left and that it costs no MP; the item's description,
--- then the spell's; the item's lore.
+-- the item; the spell, its charges left ("3/5 Charges"), that it costs no MP and, for one
+-- that isn't rechargeable, "Single use"; the item's description, then the spell's; the
+-- item's lore.
 function tips.gear(entry)
 	local it = entry.item
 	local spell = items.spell(it)
 	local meta = { "Casts " .. (spell and spell.name or it.casts),
-		"Charges " .. math.min(entry.charges, it.charges) .. "/" .. it.charges, "No MP" }
+		math.min(entry.charges, it.charges) .. "/" .. it.charges .. (it.charges == 1 and " Charge" or " Charges"), "No MP" }
+	if not items.rechargeable(it) then meta[#meta + 1] = "Single use" end
 	local lines = spell and (spell.description or "") ~= "" and { spell.name .. ": " .. spell.description } or {}
 	return { title = it.name, icon = items.icon(it), meta = meta, lines = lines, body = it.description, lore = it.lore }
 end
@@ -82,14 +84,15 @@ end
 
 -- The rows of templates/tip/shop.html's stats table: { label, value, delta, better }; with
 -- `old` (the item worn in that slot), every stat either has, the change if one replaces
--- the other ("—": the new one hasn't it).
+-- the other ("—": the new one hasn't it; "+0" with `better` nil: no change).
 local function stat_rows(it, old)
 	local rows, seen = {}, {}
 	local function row(stat, n, o)
 		local r = { label = items.STAT_LABELS[stat] or stat, value = n and signed(stat, n) or "—" }
 		if old then
 			local d = (n or 0) - (o or 0)
-			if d ~= 0 then r.delta, r.better = signed(stat, d), d > 0 end
+			r.delta = signed(stat, d)
+			if d ~= 0 then r.better = d > 0 end
 		end
 		rows[#rows + 1] = r
 	end

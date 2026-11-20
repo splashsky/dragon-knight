@@ -165,6 +165,47 @@ async function run(wsUrl, port) {
 	check("the chat stays folded", await js("document.querySelector('details[data-chat]').open === false"));
 	await js("document.querySelector('details[data-chat]').open = true");
 
+	section = "the shop's dialog";
+	// an item's link opens its purchase in a dialog over the shop (modal.js): the page stays
+	// (the arrow keys don't walk meanwhile), "No" closes it and the focus goes back, a
+	// purchase is answered in it while the page behind catches up, Escape closes it, and a
+	// tooltip in it shows over it
+	await js("DK.visit('/shop')");
+	check("the shop", await until("location.pathname === '/shop' && !DK.busy()"), await js("location.pathname"));
+	function gold() { return js("+[...document.querySelectorAll('[data-r=charpanel] dt')].find(e => e.textContent === 'Gold').nextElementSibling.textContent.replace(/,/g, '')"); }
+	function press(k, code) {
+		return send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code: k, windowsVirtualKeyCode: code })
+			.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
+	}
+	var gold0 = await gold(), loc0 = await js("document.querySelector('[data-r=loc]').textContent");
+	await js("window.__item = document.querySelector('a[href=\"/shop/buy/66\"]'); window.__item.focus(); window.__item.click()");
+	check("a dialog opens", await until("!!document.querySelector('dialog.dk-modal[open] [name=qty]')"));
+	check("over the shop", await js("location.pathname === '/shop' && window.__dk === 1"));
+	check("its title", await js("document.querySelector('dialog .dk-modal-title').textContent === 'Buy Items'"));
+	check("the item's card", await js("/Price 15 gold/.test(document.querySelector('dialog .shop-tip-price').textContent)"));
+	check("the focus in it", await js("document.activeElement === document.querySelector('dialog [name=qty]')"), await js("document.activeElement.outerHTML.slice(0, 80)"));
+	await js("document.querySelector('dialog [name=submit]').focus()");
+	await press("ArrowUp", 38);
+	await sleep(400);
+	check("the arrow keys don't walk", await js("document.querySelector('[data-r=loc]').textContent") === loc0 && await js("!DK.busy()"));
+	await js("dkTip.show(document.querySelector('dialog .tip-term'))");
+	check("a tooltip in it shows over it", await js("document.getElementById('dk-tooltip').parentElement === document.querySelector('dialog') && !document.getElementById('dk-tooltip').hidden"));
+	await js("dkTip.hide()");
+	await js("document.querySelector('dialog [name=cancel]').click()");
+	check("No closes it", await until("!document.querySelector('dialog[open]')"));
+	check("nothing bought", await gold() === gold0, [gold0, await gold()]);
+	check("the focus back on the item", await js("document.activeElement === window.__item"));
+	await js("window.__item.click()");
+	await until("!!document.querySelector('dialog[open] [name=qty]')");
+	await js("document.querySelector('dialog [name=qty]').value = '2'; document.querySelector('dialog [name=submit]').click()");
+	check("the answer in the dialog", await until("/Thank you for purchasing this item/.test(document.querySelector('dialog').textContent)"));
+	check("its button back to the shop has the focus", await js("document.activeElement.textContent === 'Back to the shop'"));
+	check("the page behind caught up", await until("!DK.busy() && !!document.querySelector('form.shop-sell-item')"));
+	check("30 gold spent", await gold() === gold0 - 30, [gold0, await gold()]);
+	await press("Escape", 27);
+	check("Escape closes it", await until("!document.querySelector('dialog[open]')"));
+	check("no reload", await js("window.__dk === 1 && location.pathname === '/shop'"));
+
 	section = "forms";
 	await js("document.querySelector('a[href=\"/\"]').click()");
 	await until("location.pathname === '/'");

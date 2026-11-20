@@ -199,7 +199,7 @@ function T.item_fields_and_overrides()
 	eq(table.concat(names, ","), "name,description,lore,price,sellable,power,icon,messages.full,messages.full_town,messages.used")
 	names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.wand)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,sellable,charges,icon")
+	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,sellable,charges,rechargeable,icon")
 end
 
 function T.display()

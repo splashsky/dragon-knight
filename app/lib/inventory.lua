@@ -14,7 +14,8 @@
 --
 -- Items that cast a spell (lib/items.lua items.casts) have charges per row
 -- (user_items.charges): full (items.charges) when obtained, one spent per cast, refilled
--- for the equipped ones at an inn (inventory.recharge).
+-- for the equipped ones at an inn (inventory.recharge); a single-use one (not
+-- rechargeable) is gone with its last charge.
 local items = require("lib.items")
 local stats = require("lib.stats")
 
@@ -230,19 +231,26 @@ function inventory.full_charges(item)
 	return items.casts(item) and item.charges or 0
 end
 
--- Spends one charge of `entry` (an item that casts; the caller checked it has one).
+-- Spends one charge of `entry` (an item that casts; the caller checked it has one). A
+-- single-use item (not rechargeable) is used up with its last charge: true then.
 function inventory.spend_charge(entry)
+	if entry.charges <= 1 and not items.rechargeable(entry.item) then
+		dk.db:exec("DELETE FROM user_items WHERE id = ?", entry.id)
+		inventory.changed(entry.user_id)
+		return true
+	end
 	dk.db:exec("UPDATE user_items SET charges = charges - 1 WHERE id = ? AND charges > 0", entry.id)
 	cache[entry.user_id] = nil
+	return false
 end
 
--- Refills the charges of the user's equipped items that cast (the inn); bag items keep
--- theirs. Returns the entries that were recharged, in slot order.
+-- Refills the charges of the user's equipped items that cast and are rechargeable (the
+-- inn); bag items keep theirs. Returns the entries that were recharged, in slot order.
 function inventory.recharge(user_id)
 	local out = {}
 	for _, slot in ipairs(inventory.SLOTS) do
 		local e = inventory.equipped(user_id)[slot]
-		if e and items.casts(e.item) and e.charges < e.item.charges then
+		if e and items.casts(e.item) and items.rechargeable(e.item) and e.charges < e.item.charges then
 			dk.db:exec("UPDATE user_items SET charges = ? WHERE id = ?", e.item.charges, e.id)
 			out[#out + 1] = e
 		end

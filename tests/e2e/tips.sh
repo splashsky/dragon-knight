@@ -97,7 +97,7 @@ TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="use_gear"\|nam
 [ "$TP_ORDER" = 'name="fight" name="use_gear" name="run" name="spell" name="item" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
 # the wand's button: its picture, the charges as a badge, a tooltip with the spell
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="use_gear" value="'
-expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · Charges 5/5 · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'
+expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · 5/5 Charges · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'
 expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Wand</div>'
 t_get /static/images/skills/attack.png; expect_status 200; expect_header '^content-type: image/png'
 t_get /static/images/skills/run.png;    expect_status 200; expect_header '^content-type: image/png'
@@ -120,7 +120,7 @@ expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
 t_items_clear tipper; t_give tipper wand 1 weapon
 t_sql "UPDATE user_items SET charges = 2 WHERE user_id = (SELECT id FROM users WHERE username = 'tipper')"
 t_get /inventory
-expect_body '<li title="Weapon: Wand" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/wand.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Wand</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li><li>Casts Magic Bolt</li><li>Charges 2/5</li></ul>'
+expect_body '<li title="Weapon: Wand" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/wand.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Wand</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li><li>Casts Magic Bolt</li><li>2/5 Charges</li></ul>'
 t_items_clear tipper
 
 t_section "tips: items on the Inventory page, in the shop and when discarding"
@@ -154,16 +154,16 @@ expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'a
 # (the change, the trade-in), the effects, the description (escaped); the item worn is
 # for sale too (2.4); the Sell buttons say what the shop pays
 t_get /shop; expect_status 200
-expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""></a><template class="tip"><div class="shop-tip">'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" data-modal title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""></a><template class="tip"><div class="shop-tip">'
 expect_body '<div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt=""><div><div class="tip-title">Branch</div><div class="tip-meta">Weapon · worn when bought</div></div></div>'
 expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Price</span> <b class="shop-tip-gold">30 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><td></td><td></td><td class="shop-tip-vs">vs Stick</td></tr><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+4</td><td class="shop-tip-delta shop-tip-up">+2</td></tr></table>'
 expect_body '<div class="shop-tip-replaces">Replaces your Stick, which sells back for 5 gold</div>'
 expect_body '<div class="shop-tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div></div></template></span>'
 tp_no_xss; expect_no_body 'alert(4)'      # the lore stays out of the shop
 # the Stick worn: the same figures, no change
-expect_body '<th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td>'
+expect_body '<th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta shop-tip-same">+0</td>'
 # a consumable: where it works, its effect
-expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'
+expect_body 'href="/shop/buy/66" data-modal title="Herb (15 gold)"'
 expect_body '<div class="tip-title">Herb</div><div class="tip-meta">Consumable · In fights and in town</div></div></div>'
 expect_body '<b class="shop-tip-gold">15 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><ul class="shop-tip-effects"><li>Restores 30 hit points, in a fight or out of it.</li></ul></div></template>'
 expect_no_body 'Already purchased'; expect_no_body 'item-badge-price'
@@ -177,9 +177,9 @@ expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold
 t_get /shop/buy/2; expect_status 200
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span> for 30 gold. What should I do with your <span class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</span>?'
 expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'; tp_no_xss
-expect_body '<img class="shop-buy-icon" src="/static/images/items/branch.png" width="44" height="44" alt="">'
+expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt="">'
 t_get /shop/buy/66
-expect_body '<img class="shop-buy-icon" src="/static/images/items/herb.png" width="44" height="44" alt="">'
+expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/herb.png" width="36" height="36" alt="">'
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"
 expect_text 'You are buying the Herb for 15 gold each. It goes into your bag.'
 # the discard confirmation

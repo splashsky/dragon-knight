@@ -12,7 +12,8 @@
 # the lore columns; version 13 -> 14 (schema_v13.sql, seed_v13.sql) that Mages get +5 MP and
 # Magic Bolt, Midworld sells the Wand, and the rest equals a fresh install; version 14 -> 15
 # (schema_v14.sql, seed_v14.sql) that a fight in progress goes on, an encounter waiting for
-# GET /fight is cancelled and a won fight waiting for GET /victory is paid. Since version
+# GET /fight is cancelled and a won fight waiting for GET /victory is paid (and version 16's
+# items.rechargeable). Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -1222,8 +1223,8 @@ mig_unserve "$MIG/v13server.log"
 t_section "migrate: version 14 database"
 # version 14 schema + its game data, characters in every state GET /fight and GET /victory
 # used to move on: a fight in progress, an encounter waiting for GET /fight to pick its
-# monster, a won fight waiting for GET /victory to pay, and one exploring; only step 15
-# runs. The fight in progress goes on (its counter kept), the pending encounter is
+# monster, a won fight waiting for GET /victory to pay, and one exploring; only steps 15
+# and 16 (items.rechargeable) run. The fight in progress goes on (its counter kept), the pending encounter is
 # cancelled, the victory is paid and kept for its page; nobody else changes.
 V14_DB="$MIG/v14.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V14_DB\"#" "$CONFIG" > "$MIG/v14.lua"
@@ -1250,6 +1251,8 @@ V14_USERS=$(mig_users "$V14_DB")
 "$BIN" migrate --config "$MIG/v14.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v14) failed: $(cat "$T/migrate.log")"
 grep -qE 'Migrating to version ([1-9]|1[0-4]):' "$T/migrate.log" && t_fail "steps 1-14 ran on a version 14 database" || t_ok
 grep -qF "Migrating to version 15: GETs don't change the game" "$T/migrate.log" && t_ok || t_fail "step 15 not reported: $(cat "$T/migrate.log")"
+grep -qF "Migrating to version 16: items that cast a spell may be single use" "$T/migrate.log" && t_ok || t_fail "step 16 not reported"
+mig_eq "SELECT group_concat(DISTINCT rechargeable) FROM items" "1" "every item rechargeable (16)"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
 [ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v14 schema differs from a fresh install:"

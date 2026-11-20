@@ -198,8 +198,10 @@ end
 --       events ({ kind, json } list: played by the live client before the page's regions
 --       apply, docs/APP.md "Live client").
 -- A live request (req.live, main.lua) gets the rendered page with its region markers in
--- res.live, for main.lua to answer with the regions the client lacks; any other request
--- gets the page (markers gone, region hashes on <html data-h>).
+-- res.live, for main.lua to answer with the regions the client lacks; a modal's request
+-- (req.modal: public/js/modal.js) only the page's title and content (layout/modal.html,
+-- marked X-DK-Modal: 1); any other request gets the page (markers gone, region hashes on
+-- <html data-h>).
 function view.layout(req, title, content, opts)
 	opts = opts or {}
 	local user = req.user
@@ -209,6 +211,12 @@ function view.layout(req, title, content, opts)
 		-- re-read the user row: the handler may have just changed it (legacy display() did too)
 		user = game.user(user.id) or user
 		req.user = user
+	end
+	if req.modal then
+		local headers = { { "X-DK-Modal", "1" } }
+		for _, hd in ipairs(opts.headers or {}) do headers[#headers + 1] = hd end
+		local body = view.render("layout/modal", { title = title, content = content }, req)
+		return html_response(wire.strip(body), opts.status, headers)
 	end
 	local layout = opts.layout or "main"
 	local ctx = {

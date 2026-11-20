@@ -10,7 +10,8 @@
 -- optional can_use) stays in the file (lib/content/scripted.lua). Quest items can't be
 -- sold or discarded and don't count against the bag size. Gear may cast a spell (casts: a
 -- spell key usable in fights) with charges instead of MP (charges: when full; each
--- user_items row has its own). icon: a PNG in public/images/items/ (default: the spells'
+-- user_items row has its own; rechargeable = false: single use, gone with its last charge
+-- instead of refilled at an inn). icon: a PNG in public/images/items/ (default: the spells'
 -- default icon).
 local scripted = require("lib.content.scripted")
 local schema = require("lib.content.schema")
@@ -52,6 +53,8 @@ items.fields = {
 		help = "The spell it casts in a fight while equipped (with charges instead of MP)." },
 	{ name = "charges", type = "int", default = 0, min = 0, max = 1000, admin = true, label = "Charges",
 		help = "Charges when full: one per cast; resting at an inn refills those of equipped items." },
+	{ name = "rechargeable", type = "bool", default = true, admin = true, label = "Rechargeable",
+		help = "Resting at an inn refills its charges. Off: single use, the item is used up with its last charge." },
 	{ name = "icon", type = "icon", dir = "images/items", fallback = "images/skills/default.png", default = "",
 		admin = true, label = "Icon",
 		help = "A PNG in public/images/items/, without \".png\" (herb: herb.png); empty: the default icon." },
@@ -143,6 +146,9 @@ function items.validate_extra(data, flat, err)
 	end
 	if casts ~= "" and charges < 1 then err("casts needs charges (1 or more)") end
 	if casts == "" and charges ~= 0 then err("charges are for items that cast a spell (casts = \"<spell key>\")") end
+	if casts == "" and flat.rechargeable == 0 then
+		err("rechargeable is for items that cast a spell (casts = \"<spell key>\")")
+	end
 	if flat.category == "quest" and flat.sellable == 1 then err("quest items can't be sellable") end
 	if flat.sellable == 1 and flat.price == 0 then err("sellable = true needs a price") end
 end
@@ -195,7 +201,7 @@ function items.admin_fields(flat)
 		if f.name == "attack" or f.name == "defense" then show = gear end
 		if f.name == "drop_level" or f.name == "droppable" then show = flat.drop_level ~= nil end
 		if f.name == "power" then show = consumable end
-		if f.name == "charges" then show = (flat.casts or "") ~= "" end
+		if f.name == "charges" or f.name == "rechargeable" then show = (flat.casts or "") ~= "" end
 		if show then out[#out + 1] = f end
 	end
 	for _, i in ipairs(modifier_indices(flat)) do
