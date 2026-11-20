@@ -8,6 +8,11 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.0.0", date = "unreleased",
+		changes = {
+		},
+	},
+	{
 		version = "2.4.0", date = "11.20.2026",
 		changes = {
 			"Added tooltips: pointing at a spell's button in the fight menu or the Fast Spells box (or focusing it with the keyboard, or pressing and holding it on a touch screen) shows its name, MP cost, where it can be cast, what it does and its lore, also when you don't have the MP for it.",

@@ -1,0 +1,271 @@
+# Plan: 3.0 — the live HTML client
+
+Status: approved design for version **3.0** (starts after 2.4.0 with `view.GAME_VERSION =
+"3.0.0-dev"`, `DK_VERSION "3.0.0-dev"` and a new top changelog entry `version = "3.0.0",
+date = "unreleased"`). Implemented in six steps: **L0** pure GETs, **L1** regions and the
+wire protocol (server), **L2** the client, **L3** fights on the client, **L4** live sync,
+**L5** measure, document, release.
+
+Decisions taken with the owner: updates are **region hashes + DOM morph** (only changed
+regions travel, only changed nodes are touched); a slow request may show a **thin progress
+bar after ~250 ms** (nothing else new is visible); **every layout is live** (game, admin,
+accounts, help); **all GETs become pure** (the fight's state changes move into the POSTs
+that cause them).
+
+## Goals
+
+- **Looks identical.** Every page renders the same with and without JavaScript, and the
+	same as 2.4. The only new visible thing is the progress bar on slow requests.
+- **Server-authoritative.** The client keeps no game state and builds no game markup.
+	Every byte of HTML comes from the templates; the client only decides where it goes.
+	What the client shows after any request is what a full page load of the same URL would
+	show.
+- **Seamless.** After the first page load there are no more full page loads: links and
+	forms go through `fetch`, and focus, typed text, scroll positions, open panels, the
+	event stream and the chat survive navigation. Back/forward work and restore scroll.
+- **Cheap and precise.** Only the regions whose HTML changed travel; the client morphs
+	them, touching only the nodes that differ; a POST and the page it redirects to are
+	one round trip (the server follows its own redirects).
+- **No build, no dependencies.** Plain scripts in `public/js/` (the existing style: IIFEs,
+	no modules, no framework); the C engine needs no changes.
+- **Progressive enhancement.** Without JavaScript, before it has arrived, or when anything
+	in it fails, the game is plain links and forms exactly as today. Every enhanced action
+	has a defined fallback (below).
+
+## L0: pure GETs
+
+A **GET (or HEAD) changes no game state.** Bookkeeping stays allowed: the session touch
+and expiry slide, presence (join, sweep), the content sync, the CSRF cookie seed. This is
+what lets the client refetch any page at any time (back/forward, resync, another tab
+acting) and show exactly what the server would.
+
+Today two GETs play the game: `GET /fight` (picks the monster when an encounter has just
+begun, plays its first strike, counts the fight's round) and `GET /victory` (pays the
+rewards, rolls the drop, ends the fight). Changes (schema version **15**):
+
+- `fights.outcome TEXT NOT NULL DEFAULT ''` ('' in progress, `victory`, `death`) and
+	`fights.log TEXT NOT NULL DEFAULT ''` (the last round's lines, one `<part>\t<line>` per
+	line, `part` one of `yourturn`, `allyturn`, `monsterturn`, `roundend`). A finished fight
+	is **kept** (model, statuses, log, rewards in `fights.data`) so its page can be shown
+	again, until the next encounter begins (`state.begin`) or the player moves or travels.
+	`state.load` returns the fight with its `outcome`; the round pipeline only ever sees
+	fights in progress.
+- `POST /move`: when the 1-in-5 roll hits, the encounter begins there: the monster is
+	picked, the first strike (ambush) is played and saved, then `302 /fight`. Same dice,
+	same order, one request earlier.
+- `POST /fight` (Post/Redirect/Get): plays the round, saves its lines, then `302 /fight`.
+	Victory: the rewards are paid in this POST (experience, gold, levels, spells, the drop
+	roll; same functions, same order), the fight is kept with outcome `victory`, `302
+	/victory`. Death: outcome `death` (`currentaction` and the player's numbers as today),
+	`302 /fight`. Escape: cleared, `302 /`. A stale form (another round): nothing played,
+	`302 /fight?stale=1`.
+- `GET /fight`: the fight in progress with its last round's lines, the form carrying
+	`fights.round` as is (no increment); after a death, the fight as it ended with the
+	"You have died" block; a won fight redirects to `/victory`; no fight: the old "Cheat
+	attempt" page. `?stale=1` adds the stale note.
+- `GET /victory`: the kept rewards (nothing paid); no won fight: `302 /`.
+- The round counter counts played rounds: the encounter's first strike is round 1, the
+	first form carries 2, as the numbers came out before.
+- `POST /drop` and the other POSTs that render a page directly stay as they are (a POST
+	may answer with a page); their address is the POST's (see L2, "POST results").
+- Migration: pending encounters (a fights row without enemies, from `state.begin` before
+	15) are cancelled (the player is back to Exploring at the same spot); won but unpaid
+	fights are paid in the step's `after_sync` with the same payout function, and kept as
+	`victory`.
+- HEAD keeps its rollback (now a safety net, not a requirement).
+
+**Tests**: `tests/e2e/pure.sh`: every GET route of the route table, for a player in town,
+exploring, fighting, after a victory with and without a drop, after a death, and an
+administrator: the game tables (everything but `sessions`, `meta`, the presence columns)
+are byte-identical before and after. The fight scripts (`fight.sh`, `fight_api.sh`,
+`playthrough.sh`, `wand.sh`, `effects.sh`, `monsters.sh`) follow the new flow; the seeded
+form-vs-API comparisons keep their meaning. `migrate.sh`: v14 → v15 with a pending
+encounter and a won unpaid fight.
+
+## L1: regions and the wire protocol (server)
+
+**Regions.** A layout or template marks the parts of a page that change on their own:
+
+```
+{{{ region("left") }}}<aside class="dk-left" data-r="left">...</aside>{{{ endregion() }}}
+```
+
+`region(name)`/`endregion()` (helpers in `lib/view.lua`) emit invisible markers
+(`<\1name>` and `</\1>`: a `<` never comes out of escaped text, so they can't be forged
+by user data) around the element whose `data-r` names the region. Regions nest. Names
+are unique in a page. Two are special: `root` is `<body>` (its attributes and
+everything in it) and `head` is the contents of `<head>` except `<title>`.
+
+The main layout's regions (the others follow the same idea): `root`, `banner` (the
+banner slot), `left` (with `loc`, `towns`, `functions`: the left column's boxes), `main`
+(the middle column), `right` (with `charpanel`, `invpanel`, `spellpanel`, and `side`: the
+online count and the chat, with `chat-posts` and `chat-form`), `foot` (the footer's
+timing line), `themes` (the theme picker, which carries the page in `back`). Adding
+`data-r` attributes changes nothing visible.
+
+**Hashes.** After rendering, `lib/wire.lua` splits the page at the markers in one pass
+and hashes each region's **skeleton**: its HTML with every child region replaced by a
+placeholder (`<\1name>`), so a region's hash changes only when its own markup does. Hash:
+the first 12 hex digits of SHA-256 (`dk.crypto.sha256`). A full page strips the markers
+(one `gsub`) and carries every hash on `<html data-h="root=… left=…">`, so the client
+knows from the first load what it has.
+
+**A live request** is any GET or POST with `X-DK-Live: 1`; it may send `X-DK-Have: name=hash
+...` (the regions it has). The **same route, guards and handler** run; then:
+
+- `view.layout` renders the layout with markers and, instead of the page, answers with
+	the regions whose hash differs from the client's (walking from `root`: a region the
+	client has with the same hash is skipped and its children are compared; a region sent
+	whole includes its children). `head` is never sent: when it differs (a theme change, a
+	new stylesheet or script after a deploy) the answer is `go` and the client loads the
+	page normally.
+- A **redirect to a same-site path with a GET route is followed on the server**
+	(`main.lua`, up to 5 hops, a fresh dispatch with the cookies the earlier hops set, so
+	login and logout work): a POST and the page it lands on are one round trip, and the
+	answer's `url` is where it landed. A redirect elsewhere becomes `go`.
+- An HTML page that isn't a layout's (the 500 and 503 pages) becomes `doc`. Anything
+	else (JSON, text, the event stream) passes through unchanged.
+- Responses get `Vary: X-DK-Live` (pages are already `private, no-cache`).
+
+**The wire format** (`application/x-dk-live`): a line `DK1`, then frames:
+
+```
+<op> [<arg> ...] <length>\n<length bytes of payload>\n
+```
+
+Lengths are in bytes, payloads are raw (no escaping: HTML goes as HTML), unknown ops are
+skipped (forward compatible). Ops, in this order:
+
+| Op | Payload |
+|---|---|
+| `title <n>` | the document title |
+| `url <n>` | the page's address (path and query) |
+| `events <kind> <n>` | JSON for a player of that kind (L3: `fight`, the round's events), played before the regions apply |
+| `region <name> <n>` | the region's element as HTML (outerHTML; `root`: the `<body>`), children included |
+| `hashes <n>` | `name=hash` for every region of the page now, space-separated |
+| `go <n>` | load this URL normally instead |
+| `doc <n>` | a whole HTML document to show instead |
+
+The HTTP status is the page's (a 404 page is a 404 with a wire body).
+
+**Tests**: `tests/lua/test_wire.lua` (split, skeleton hashes, nesting, unbalanced markers
+fail loudly in dev and fall back to `root` otherwise, encode/decode round trip);
+`tests/e2e/live_wire.sh` (a `t_live` helper with a small byte-exact frame reader):
+for every page of `pure.sh`, the live answer without `X-DK-Have` rebuilds exactly the
+full page's body; with the page's own hashes, nothing but `title`/`url`/`hashes` (and the
+always-changing `foot`) comes back; a move sends `loc` but not `towns`; redirects followed
+(POST /move → the fight, login, logout); `go` for a changed `head` and external redirects;
+`doc` for a 500; CSRF failures; HEAD.
+
+## L2: the client
+
+`public/js/client.js` (new, loaded on every page before the others): the protocol, the
+morph, navigation, forms, history, the progress bar. It exposes `window.DK` for the other
+scripts: `DK.visit(url)`, `DK.refresh()`, `DK.on("events:<kind>", fn)` (a player
+returning a promise), `DK.on("applied", fn)`.
+
+**What it takes over.** Clicks on same-origin `<a href>` (left button, no modifier keys,
+no `target`, `download`, `data-popup` or `data-native`, not a hash on the same page, not
+`/static/` or `/live`) and submits of same-origin forms (urlencoded, no `target` or
+`data-native`; the pressed button is included via `new FormData(form, submitter)`, or
+appended by hand where unsupported). Everything else is native.
+
+**Requests.** One visit in flight at a time: a new GET aborts a running GET
+(`AbortController`); anything started while a POST runs waits for it; a second submit of
+the same form while it runs is ignored. Headers: `X-DK-Live: 1`, `X-DK-Have`, the CSRF
+token in `X-CSRF-Token`. After 250 ms without an answer the progress bar shows (`<html
+class="dk-busy">`, `aria-busy` on `main`).
+
+**Applying an answer.** `events` players run first (forms disabled meanwhile); then each
+`region` is morphed into `[data-r=name]` (`root` into `<body>`), the hash map is replaced
+by `hashes`, the title set, and the URL pushed (a new address) or replaced (the same).
+After a POST the submitted form, if still there, is `reset()`, so its controls show what
+the server rendered (cleared after success, kept values after a validation error).
+
+**The morph** (~150 lines): attributes synced; children matched by key (`data-r`, `id`,
+`data-id`, `data-k`), else by position and tag; text nodes updated in place; `<template>`
+contents replaced when they differ; an element of another tag replaced. It never removes
+elements marked `data-client` (the tooltip box, toasts, the progress bar, the screen-reader
+announcer), never touches a control's live value except through the form `reset()` above
+(so typed chat text survives), and leaves client-owned attributes alone (`open` on
+`details[data-keep-open]`, tooltip.js's `data-tip-title`).
+
+**History.** `history.scrollRestoration = "manual"`; each entry's state holds its scroll
+position. A new address scrolls to the top (or to the `#hash`); the same address keeps
+the scroll (a fight round). Back/forward: a live GET of that address (pure since L0), then
+the saved scroll. **POST results** (a page a POST rendered without redirecting, like "You
+travelled to Midworld") get their POST address like a native submit; when such a view is
+refreshed (L4) its `main` is kept and only the other regions update.
+
+**Focus and screen readers.** Focus stays where it was when that element survives the
+morph; otherwise (a new address) it goes to the middle column, and the new title is
+announced in a polite live region.
+
+**Fallbacks.**
+- No JavaScript, or old browsers (no `fetch`, `AbortController`, `TextDecoder` or
+	`history.pushState`): nothing is intercepted.
+- JavaScript still loading: links and forms work natively until it runs (scripts are
+	`defer`); nothing on the page depends on it.
+- A GET that fails (network error, a non-wire answer, a script error while applying) or
+	takes longer than 10 s: a normal navigation to the same URL.
+- A POST whose request fails before an answer: the client can't know whether it was
+	applied, so it loads the current URL normally (safe: GETs are pure) and the page shows
+	the truth. A POST answered with something other than the wire format: that document is
+	shown (`doc` handling).
+- `go`: a normal navigation. `doc`: the document replaces the page
+	(`document.open/write/close`), as a native navigation would show it.
+
+**Tests**: `tests/js/test_client.js` (node, pure functions: the frame reader, the have-map,
+which links and forms qualify); a browser check `tests/browser/` driven over the DevTools
+protocol with headless Chrome/Edge when one is installed (skipped like node otherwise):
+navigation without reloads (a `window` marker survives), regions applied, back/forward and
+scroll, the chat's typed text kept across a move, a slow request's bar, a killed
+connection falling back.
+
+## L3: fights on the client
+
+- `fight.js` becomes a player: `DK.on("events:fight", play)` plays the round's events on
+	the page that is showing (lines, bars, statuses, allies, skip, reduced motion: as in
+	2.3), then the regions apply. The fight routes attach the round's events to their
+	redirect (`res.events`), and `main.lua` carries them into the answer of the page it
+	lands on.
+- The bars of monsters and allies are rendered by the template (they were added by
+	fight.js): the same look, with or without JavaScript, and nothing for the morph to
+	remove.
+- The JSON fight API (`Accept: application/json`, `{ events, fragments, redirect }`) and
+	`view.fragments`/`view.fragment_page` go away: the wire format replaces them.
+	`fight_api.sh` keeps its seeded form-vs-live comparisons over the wire; `dkbench` sends
+	live requests where it sent JSON (`make bench` compares form and live fights).
+
+## L4: live sync
+
+- **Resync** (the stream's `resync`, a reconnect, a page back from the bfcache, a tab
+	visible again after more than a minute) is `DK.refresh()`: a live GET of the current
+	address with the hashes; only what changed comes back. `GET /live/state` goes away.
+- **Other tabs and devices.** After every successful POST of a logged-in player (but
+	chat posts and banner dismissals) `main.lua` publishes `stale` on `user:<id>` with the
+	sending tab's id (`X-DK-Tab`, random per tab). Every other page of the player refreshes
+	(debounced 250 ms; a hidden tab when it becomes visible). Tabs of one browser share the
+	stream as before; the sender ignores its own.
+- **Markup prototypes.** live.js stops building markup: the chat post, the online name,
+	the banner and the toast come from `<template data-proto="…">` elements rendered with
+	the page (so an administrator's chat posts carry the delete button with their token);
+	live.js clones them and fills `data-slot` elements with `textContent` only.
+- The stream stays open across navigation (no reconnect per page). live.js starts it when
+	`<body data-live>` appears (after a live login) and stops it when it goes.
+
+## L5: measure, document, release
+
+- `make bench BENCH_SCENARIO=mixed` and `realtime-mixed` with live requests: bytes per
+	action and p99 against the 2.4 numbers (target: no p99 regression; a move or a fight
+	round well under 3 KiB on the wire); the cost of splitting and hashing a page
+	(`docs/PERF.md`).
+- `docs/APP.md`: "Live client" (regions, the protocol, adding a region, the fallbacks),
+	"Pure GETs", the fight sections; `PLAN.md` (URL map: no stateful GETs; phases);
+	`README.md`.
+- Changelog, version `3.0.0`.
+
+## Out of scope for 3.0
+
+Prefetching on hover, optimistic updates, server-side diffing below the region level,
+HTTP/2, offline play.

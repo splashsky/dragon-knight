@@ -507,6 +507,9 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 7. **2.3 realtime** (`docs/plans/realtime.md`): ✅ R0 measure, then tune the server
 	 (`docs/PERF.md`); ✅ R1 SSE hub; ✅ R2 chat, presence, notices, broadcast banner
 	 (schema version 10); R3 smooth fights, R4 load and soak tests.
+8. **3.0 live HTML client** (`docs/plans/live-client.md`): L0 pure GETs (schema version
+	 15), L1 regions and the wire protocol, L2 the client, L3 fights on the client, L4 live
+	 sync, L5 measure, document, release.
 
 ## Definition of done
 
