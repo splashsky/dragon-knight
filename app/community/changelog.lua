@@ -13,6 +13,8 @@ changelog.RELEASES = {
 			"Loading a page no longer changes the game: reloading the fight page shows the last round again instead of counting a turn, and the victory page can be reloaded or revisited without losing it (schema version 15, run dk migrate).",
 			"An encounter now begins the moment you step into it, the monster's first strike included, and the rewards are paid by the blow that wins the fight.",
 			"After a death the fight page still shows how the fight ended, until you set out again.",
+			"The game no longer loads whole pages as you play: links and buttons bring only the parts of the page that changed, so the page stays put, the chat keeps what you were typing, and the live chat stays connected; Back and Forward work as before. Without JavaScript everything works as it always did.",
+			"A thin bar at the top of the page shows when the server takes more than a moment to answer.",
 		},
 	},
 	{

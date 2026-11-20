@@ -34,3 +34,6 @@ a:hover, button.link:hover { color: #d0161e; }
 .tip-meta { color: #5f6773; }
 .tip-lore { color: #4a515c; }
 .tip-term:focus-visible, .invpanel-gear li:focus-visible { outline-color: #d0161e; }
+
+/* the live client's progress bar: the links' red */
+.dk-progress { background-color: #d0161e; }

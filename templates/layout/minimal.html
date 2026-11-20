@@ -4,7 +4,7 @@
 <title>{{ title }}</title>
 {{{ region("head") }}}{{{ include("layout/head") }}}{{{ endregion() }}}
 </head>
-{{{ region("root") }}}<body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
+{{{ region("root") }}}<body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
 {{{ region("banner") }}}<div class="dk-banner-slot" data-r="banner" data-banner-slot>{{{ include("layout/banner") }}}</div>{{{ endregion() }}}
 {{{ region("main") }}}<div class="dk-content" data-r="main">
 {{{ content }}}

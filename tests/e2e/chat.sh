@@ -24,7 +24,7 @@ t_sql "UPDATE control SET showbabble = 0"
 t_get /inn;   expect_no_body 'data-chat-form'
 t_get /;      expect_no_body 'data-chat-form'
 t_sql "UPDATE control SET showbabble = 1"
-t_get /help;  expect_no_body 'data-live'                     # minimal layout: no live updates
+t_get /help;  expect_body 'data-live data-csrf="'          # minimal layout too: the stream lives on
 t_jar chatanon; t_reset_jar
 t_get /login; expect_no_body 'data-live'
 if command -v node >/dev/null; then

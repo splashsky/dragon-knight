@@ -197,7 +197,25 @@ always-changing `foot`) comes back; a move sends `loc` but not `towns`; redirect
 (POST /move → the fight, login, logout); `go` for a changed `head` and external redirects;
 `doc` for a 500; CSRF failures; HEAD.
 
-## L2: the client
+## L2: the client — ✅ done
+
+**As implemented** (`docs/APP.md` "Live client", "The client", "Live pages"):
+`public/js/client.js` (~520 lines) as designed below, with these decisions made on the
+way: it is loaded first of the page scripts and listens on `window`, so the other scripts'
+`document` listeners act first (the chat's form stays live.js's); history entries carry a
+key and their scroll is kept in memory (popstate comes after the browser left the entry),
+and also written to `history.state` for reloads; `url` is sent only for a page a GET shows
+(a POST's own page, like "You have travelled to Midworld", keeps the address on screen and
+is marked, and a refresh keeps its middle column); `go` may be empty (load the address on
+screen). Parts of L4 came with it, as the client needed them: live.js runs on every page
+and starts and stops its stream with `<body data-live>` (now on the minimal layout too, so
+help and popups don't drop it), reports its own changes with `DK.touched`, resyncs and
+handles logout through `DK.refresh()`, and toasts stay out of popups. Tests:
+`tests/js/test_client.js`, and `tests/e2e/browser.sh` driving `tests/browser/client.js` in
+headless Chrome/Edge over the DevTools protocol (45 checks), `GET /__test/slow` for the
+progress bar.
+
+The design as approved:
 
 `public/js/client.js` (new, loaded on every page before the others): the protocol, the
 morph, navigation, forms, history, the progress bar. It exposes `window.DK` for the other

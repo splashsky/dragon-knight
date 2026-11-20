@@ -36,7 +36,7 @@ t_register themer themepw1 themer@example.com Themer; t_login themer themepw1
 t_get /;           expect_status 200; theme_is default
 expect_body '<body class="theme-default" data-live'; expect_body 'src="/static/images/themes/default/logo.png"'
 expect_body 'name="back" value="/"'
-t_get /character;  expect_status 200; theme_is default; expect_body '<body class="minimal theme-default">'
+t_get /character;  expect_status 200; theme_is default; expect_body '<body class="minimal theme-default" data-live data-csrf="'
 t_get /babble;     expect_status 200; theme_is default; expect_body 'name="back" value="/babble"'
 t_jar themeadmin; t_reset_jar
 t_login "$ADMIN_USER" "$ADMIN_PASS"
@@ -125,7 +125,7 @@ t_get /
 theme_post retro /;                      expect_redirect /
 t_get /;           expect_status 200; theme_is retro; expect_body '<body class="theme-retro" data-live'
 expect_body 'src="/static/images/logo.gif"'
-t_get /character;  theme_is retro; expect_body '<body class="minimal theme-retro">'
+t_get /character;  theme_is retro; expect_body '<body class="minimal theme-retro" data-live data-csrf="'
 t_logout
 t_get /login;      theme_is retro
 t_login themer themepw1; t_get /; theme_is retro

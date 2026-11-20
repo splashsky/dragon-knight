@@ -70,7 +70,8 @@ end
 
 local function live_of(req)
 	if req.headers["x-dk-live"] ~= "1" or (req.method ~= "GET" and req.method ~= "POST") then return nil end
-	return { have = wire.parse_have(req.headers["x-dk-have"]), url = req.target or req.path }
+	-- url: the view's address; a POST's own page has none (no GET shows it)
+	return { have = wire.parse_have(req.headers["x-dk-have"]), url = req.method == "GET" and req.target or nil }
 end
 
 local function header(res, name)
@@ -130,12 +131,13 @@ local function live_response(req, res)
 		local have, regions = req.live.have, doc.regions
 		if regions.head and have.head and have.head ~= regions.head.hash then
 			-- other stylesheets or scripts (a theme, a deploy): a normal page load
-			return wire_response(200, { { "go", "", url } })
+			return wire_response(200, { { "go", "", url or "" } })
 		end
 		if not regions.root then
 			return wire_response(res.status, { { "doc", "", wire.page(res.live.html) } }, res.headers)
 		end
-		local frames = { { "title", "", res.live.title or "" }, { "url", "", url } }
+		local frames = { { "title", "", res.live.title or "" } }
+		if url then frames[#frames + 1] = { "url", "", url } end
 		for _, e in ipairs(events) do frames[#frames + 1] = { "events", e.kind, e.json } end
 		for _, node in ipairs(wire.changed(doc, have)) do frames[#frames + 1] = { "region", node.name, wire.html(node) } end
 		frames[#frames + 1] = { "hashes", "", wire.hashes(doc, have) }

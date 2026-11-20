@@ -4,16 +4,21 @@
 // when it closes, another tab takes over. Without BroadcastChannel or localStorage each
 // tab has its own stream. The events update the Babble Box, who's online, the broadcast
 // banner, show notices, and close the page's stream on logout. Event data is put in the
-// page with textContent only. Loaded on the pages of logged-in players (<body data-live>);
-// without it everything works with plain forms and page loads.
+// page with textContent only. Loaded on every page, it runs while the page is a logged-in
+// player's (<body data-live>): with the live client (client.js) the page stays while the
+// player logs in and out, so the stream starts and stops as data-live comes and goes. When
+// it changes a part of the page itself it tells the live client (DK.touched), whose next
+// answer then brings that part as the server has it. Without it everything works with
+// plain forms and page loads.
 (function () {
 	"use strict";
 	var body = document.body;
-	if (!body || !body.hasAttribute("data-live") || !window.EventSource || !window.fetch) return;
+	if (!body || !window.EventSource || !window.fetch) return;
 
-	var CSRF = body.getAttribute("data-csrf") || "";
-	var SESSION = body.getAttribute("data-live-session") || "";
-	var ADMIN = body.hasAttribute("data-live-admin");
+	function csrf() { return body.getAttribute("data-csrf") || ""; }
+	function sessionId() { return body.getAttribute("data-live-session") || ""; }
+	function isAdmin() { return body.hasAttribute("data-live-admin"); }
+	function touched(el) { if (window.DK && window.DK.touched) window.DK.touched(el); }
 	var HISTORY = 50;               // messages kept in a chat panel (lib/chat.lua HISTORY)
 	var EVENTS = ["babble", "delete", "join", "leave", "news", "reply", "banner", "clear", "logout", "resync"];
 	// the leader's claim is renewed every BEAT; a visible tab takes over a claim older than
@@ -33,9 +38,9 @@
 	}
 	function post(url, fields) {
 		var data = new URLSearchParams(fields);
-		data.set("csrf", CSRF);
+		data.set("csrf", csrf());
 		return fetch(url, { method: "POST", body: data, credentials: "same-origin",
-			headers: { "Accept": "application/json", "X-CSRF-Token": CSRF } });
+			headers: { "Accept": "application/json", "X-CSRF-Token": csrf() } });
 	}
 	function local(fn) { try { return fn(window.localStorage); } catch (e) { return null; } }
 
@@ -44,7 +49,7 @@
 	function deleteForm(id) {
 		var f = el("form", "inline chat-delete");
 		f.method = "post"; f.action = "/babble/" + id + "/delete";
-		f.appendChild(hidden("csrf", CSRF)); f.appendChild(hidden("back", here()));
+		f.appendChild(hidden("csrf", csrf())); f.appendChild(hidden("back", here()));
 		var b = el("button", "link"); b.type = "submit"; b.title = "Delete"; b.setAttribute("aria-label", "Delete");
 		b.textContent = "\u00d7";
 		f.appendChild(b);
@@ -60,17 +65,18 @@
 			if (m.time) li.title = new Date(m.time * 1000).toLocaleString();
 			var b = el("b"); b.textContent = String(m.author);
 			li.appendChild(txt("[")); li.appendChild(b); li.appendChild(txt("] " + String(m.text)));
-			if (ADMIN) { li.appendChild(txt(" ")); li.appendChild(deleteForm(id)); }
+			if (isAdmin()) { li.appendChild(txt(" ")); li.appendChild(deleteForm(id)); }
 			var next = null;
 			Array.prototype.forEach.call(list.children, function (c) {
 				if (!next && Number(c.getAttribute("data-id")) > id) next = c;
 			});
 			list.insertBefore(li, next);
 			while (list.children.length > HISTORY) list.removeChild(list.firstElementChild);
+			touched(list);
 		});
 	}
 	function removePost(id) {
-		$$('[data-chat-posts] [data-id="' + Number(id) + '"]').forEach(function (li) { li.remove(); });
+		$$('[data-chat-posts] [data-id="' + Number(id) + '"]').forEach(function (li) { touched(li); li.remove(); });
 	}
 	function chatStatus(form, msg) {
 		var s = form.querySelector("[data-chat-status]");
@@ -92,19 +98,21 @@
 			});
 		}).catch(function () { chatStatus(form, "The message could not be sent."); });
 	}
+	// a folded Babble Box stays folded (also the panels the live client brings in)
 	function keepChatOpen() {
 		$$("details[data-chat]").forEach(function (d) {
 			if (local(function (s) { return s.getItem("dk-chat-closed"); }) === "1") d.removeAttribute("open");
-			d.addEventListener("toggle", function () {
-				local(function (s) { s.setItem("dk-chat-closed", d.open ? "0" : "1"); });
-			});
 		});
 	}
+	document.addEventListener("toggle", function (ev) {
+		var d = ev.target;
+		if (d.matches && d.matches("details[data-chat]")) local(function (s) { s.setItem("dk-chat-closed", d.open ? "0" : "1"); });
+	}, true);
 
 	// ---- who's online
 
 	function setCount(n) {
-		if (typeof n === "number") $$("[data-online-count]").forEach(function (e) { e.textContent = n; });
+		if (typeof n === "number") $$("[data-online-count]").forEach(function (e) { e.textContent = n; touched(e); });
 	}
 	function relist(list, links) {
 		links.sort(function (a, b) {
@@ -113,6 +121,7 @@
 		});
 		list.textContent = "";
 		links.forEach(function (a, i) { list.appendChild(txt(i ? ", " : " ")); list.appendChild(a); });
+		touched(list);
 	}
 	function onlineLinks(list) { return Array.prototype.slice.call(list.querySelectorAll("a[data-id]")); }
 	// The box lists at most data-online-limit names; "and N more" covers the rest (a name
@@ -124,6 +133,7 @@
 		var c = more.querySelector("[data-online-more-count]");
 		if (c) c.textContent = n;
 		more.hidden = n === 0;
+		touched(more);
 	}
 	function join(p) {
 		setCount(p.online);
@@ -150,9 +160,11 @@
 	// ---- notices (toasts)
 
 	function toast(before, title, url, after) {
+		if (window.opener) return;   // not in the small windows (the character sheet, the map)
 		var box = document.querySelector(".dk-toasts");
 		if (!box) {
 			box = el("div", "dk-toasts");
+			box.setAttribute("data-client", "");   // the live client's morph leaves it alone
 			box.setAttribute("role", "status"); box.setAttribute("aria-live", "polite");
 			body.appendChild(box);
 		}
@@ -174,7 +186,7 @@
 
 	function dismissed() { var m = document.cookie.match(/(?:^|;\s*)dk_banner=(\d+)/); return m ? Number(m[1]) : 0; }
 	function expire(div, ttl) {
-		if (ttl > 0) setTimeout(function () { div.remove(); }, ttl * 1000);
+		if (ttl > 0) setTimeout(function () { touched(div); div.remove(); }, ttl * 1000);
 	}
 	function showBanner(b) {
 		var id = Number(b.id);
@@ -184,14 +196,15 @@
 			var div = el("div", "dk-banner"); div.setAttribute("role", "status"); div.setAttribute("data-banner", id);
 			var span = el("span", "dk-banner-text"); span.textContent = String(b.text);
 			var f = el("form", "inline dk-banner-dismiss"); f.method = "post"; f.action = "/banner/dismiss";
-			f.appendChild(hidden("csrf", CSRF)); f.appendChild(hidden("id", id)); f.appendChild(hidden("back", here()));
+			f.appendChild(hidden("csrf", csrf())); f.appendChild(hidden("id", id)); f.appendChild(hidden("back", here()));
 			var x = el("button", "link"); x.type = "submit"; x.title = "Dismiss"; x.setAttribute("aria-label", "Dismiss");
 			x.textContent = "\u00d7";
 			f.appendChild(x); div.appendChild(span); div.appendChild(f); slot.appendChild(div);
+			touched(slot);
 			expire(div, Number(b.ttl));
 		});
 	}
-	function clearBanner() { $$(".dk-banner").forEach(function (d) { d.remove(); }); }
+	function clearBanner() { $$(".dk-banner").forEach(function (d) { touched(d); d.remove(); }); }
 	function dismissBanner(id) {
 		document.cookie = "dk_banner=" + Number(id) + "; path=/; max-age=2592000; samesite=lax";
 		clearBanner();
@@ -200,6 +213,8 @@
 	// ---- resync: the live parts again, as the server renders them
 
 	function refresh() {
+		// the live client: the whole page as the server has it now, only what changed
+		if (window.DK && window.DK.refresh) { window.DK.refresh(); return; }
 		fetch("/live/state?back=" + encodeURIComponent(here()), { credentials: "same-origin",
 			headers: { "Accept": "application/json" } }).then(function (res) {
 			if (res.redirected) { location.reload(); return; }
@@ -217,8 +232,13 @@
 			});
 		}).catch(function () {});
 	}
+	var timed = window.WeakSet ? new WeakSet() : null;
 	function initBanners() {
-		$$(".dk-banner[data-banner-ttl]").forEach(function (d) { expire(d, Number(d.getAttribute("data-banner-ttl"))); });
+		$$(".dk-banner[data-banner-ttl]").forEach(function (d) {
+			if (timed && timed.has(d)) return;
+			if (timed) timed.add(d);
+			expire(d, Number(d.getAttribute("data-banner-ttl")));
+		});
 	}
 
 	// ---- events (every tab)
@@ -234,7 +254,11 @@
 		banner: showBanner,
 		clear: clearBanner,
 		logout: function (d) {
-			if (d.all || d.session === SESSION) { stop(); location.reload(); }
+			if (!(d.all || d.session === sessionId())) return;
+			// this page's session ended: with the live client the page asks for itself again
+			// (the login page comes; a logout this tab sent brings it anyway), else it reloads
+			end();
+			if (window.DK) window.DK.refresh(); else location.reload();
 		},
 		resync: refresh,
 	};
@@ -303,7 +327,8 @@
 	function stop() {
 		stopped = true;
 		closeStream();
-		if (leader && bc) local(function (s) { var c = readLeader(); if (c && c.id === me) s.removeItem(KEY); });
+		// the claim goes, also one not confirmed yet
+		if (bc) local(function (s) { var c = readLeader(); if (c && c.id === me) s.removeItem(KEY); });
 		leader = false;
 	}
 	function readLeader() {
@@ -333,10 +358,14 @@
 		}
 	}
 
-	// ---- start
+	// ---- start and stop with <body data-live>
+
+	var running = false, beat = 0;
+	function live() { return body.hasAttribute("data-live"); }
 
 	document.addEventListener("submit", function (ev) {
 		var f = ev.target;
+		if (!running) return;
 		if (f.matches("[data-chat-form]")) { ev.preventDefault(); sendChat(f); }
 		else if (f.matches("form.chat-delete")) {
 			ev.preventDefault();
@@ -348,24 +377,44 @@
 			dismissBanner(f.elements.id.value);
 		}
 	});
-	keepChatOpen();
-	initBanners();
-
-	if (!bc) { leader = true; open(false); return; }
-	bc.onmessage = function (ev) {
-		var m = ev.data || {};
-		if (m.type === "event" && !leader) handle(m.name, m.data, m.id);
-		else if (m.type === "gone" && !leader) setTimeout(function () { tick(true); }, Math.random() * 200);
-	};
-	window.addEventListener("pagehide", function () {
-		if (!leader) return;
-		leader = false;
-		closeStream();
-		local(function (s) { var c = readLeader(); if (c && c.id === me) s.removeItem(KEY); });
-		bc.postMessage({ type: "gone" });
-	});
+	if (bc) {
+		bc.onmessage = function (ev) {
+			var m = ev.data || {};
+			if (!running) return;
+			if (m.type === "event" && !leader) handle(m.name, m.data, m.id);
+			else if (m.type === "gone" && !leader) setTimeout(function () { tick(true); }, Math.random() * 200);
+		};
+		window.addEventListener("pagehide", function () {
+			if (!leader) return;
+			leader = false;
+			closeStream();
+			local(function (s) { var c = readLeader(); if (c && c.id === me) s.removeItem(KEY); });
+			bc.postMessage({ type: "gone" });
+		});
+	}
 	// back from the browser's page cache: what the page shows may be old
-	window.addEventListener("pageshow", function (ev) { if (ev.persisted) { refresh(); tick(false); } });
-	tick(false);
-	setInterval(function () { tick(false); }, BEAT);
+	window.addEventListener("pageshow", function (ev) { if (ev.persisted && running) { refresh(); tick(false); } });
+
+	function begin() {
+		if (running || !live()) return;
+		running = true;
+		stopped = false;
+		keepChatOpen();
+		initBanners();
+		if (!bc) { leader = true; open(false); return; }
+		tick(false);
+		beat = setInterval(function () { tick(false); }, BEAT);
+	}
+	function end() {
+		if (!running) return;
+		running = false;
+		clearInterval(beat);
+		stop();
+	}
+	// the live client brought a page: logged in or out, panels to fold, banners to time
+	if (window.DK) window.DK.on("applied", function () {
+		if (!live()) { end(); return; }
+		if (running) { keepChatOpen(); initBanners(); } else begin();
+	});
+	begin();
 })();

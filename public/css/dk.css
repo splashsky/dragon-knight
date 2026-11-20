@@ -422,3 +422,39 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 @media (prefers-reduced-motion: reduce) {
 	.dk-tip { transition: none; }
 }
+
+/* ---- the live client (client.js; docs/APP.md "Live client"): a thin bar at the top while a
+	request takes longer than a moment (<html class="dk-busy">), and the announcer of new
+	pages for screen readers; both are made by the script, so nothing shows without it ---- */
+.dk-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 1001;
+	width: 100%;
+	height: 2px;
+	background-color: #663300;
+	transform: scaleX(0);
+	transform-origin: left;
+	opacity: 0;
+	pointer-events: none;
+}
+.dk-busy .dk-progress {
+	opacity: 1;
+	animation: dk-progress 8s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+}
+@keyframes dk-progress {
+	from { transform: scaleX(0.05); }
+	to { transform: scaleX(0.92); }
+}
+.dk-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+	.dk-busy .dk-progress { animation: none; transform: scaleX(0.5); }
+}

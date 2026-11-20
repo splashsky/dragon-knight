@@ -262,11 +262,11 @@ and payloads raw (HTML goes as HTML, nothing is escaped); clients skip ops they 
 | Op | Payload |
 |---|---|
 | `title <n>` | the document title |
-| `url <n>` | the page's address: where the redirects landed, else the request's (a POST that answers with a page keeps its own, as a browser shows it) |
+| `url <n>` | the page's address (a GET's, or where a POST's redirects landed); absent for a page a POST answered with itself, which no GET shows (the client keeps its address) |
 | `events <kind> <n>` | data for a player of that kind (JSON), played before the regions apply; from `opts.events = { { kind, json }, ... }` of `view.layout`/`view.page`, or `res.events` on a redirect |
 | `region <name> <n>` | the region's element (outerHTML, children included; `root`: the `<body>`) |
 | `hashes <n>` | the regions whose hash the client lacks or has differently (`name=hash`, space-separated), and `name=-` for those the page no longer has |
-| `go <n>` | load this URL normally instead |
+| `go <n>` | load this URL normally instead (empty: load the current address again) |
 | `doc <n>` | a whole HTML document to show instead |
 
 The HTTP status is the page's (a 404 page comes as a 404 with its regions).
@@ -276,6 +276,65 @@ The HTTP status is the page's (a 404 page comes as a 404 with its regions).
 box in a column). Markers must balance: a page that doesn't is an error with `dev = true`
 (and loses its hashes otherwise). Partials rendered on their own for JSON (`/live/state`,
 `view.fragments`) must not leave markers in their output (`wire.strip`).
+
+### The client (`public/js/client.js`)
+
+Loaded on every page (first of the page scripts), it runs where the page has `<html
+data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMParser` and
+`history.pushState`; elsewhere nothing changes.
+
+- **What it takes over.** Clicks on same-origin links (left button, no modifier keys, no
+	`target`, `download` or `data-popup`, not another `#hash` of the same page, not
+	`/static/` or `/live`) and submits of same-origin urlencoded forms (the pressed button
+	included). `data-native` on a link, a form or an ancestor keeps it native. Its click and
+	submit listeners are on `window`: the other scripts' (on `document`) come first, and a
+	form one of them handles itself (`preventDefault`: the chat) is left alone.
+- **Requests.** `X-DK-Live: 1` and `X-DK-Have` (its hash map: `<html data-h>`, then every
+	answer's `hashes`). One at a time: a new GET aborts a running GET; anything started
+	while a POST runs waits for its answer (a second submit of the same form is dropped).
+	After 250 ms without an answer `<html class="dk-busy">` shows the progress bar
+	(`.dk-progress`, a 2 px bar in the theme's link colour) and `data-r="main"` is
+	`aria-busy`.
+- **Applying an answer.** `events` players first (`DK.on("events:<kind>", fn)`, each
+	returning a promise), then each `region` is morphed into `[data-r=name]` (`root` into
+	`<body>`), the hashes merged, the title set; after a POST the submitted form is
+	`reset()`, so it shows what the server rendered (empty after success, the values the
+	server put back after a refusal). Then the history entry: a new address is pushed (and
+	scrolled to the top or its `#hash`, and announced to screen readers), the same address
+	replaced (the scroll stays: a fight round). A page a POST answered with itself (no
+	`url`) keeps the address on screen and is marked as such (`DK.view().post`). Focus lost
+	with its element goes to the middle column.
+- **The morph** changes only what differs: attributes, text, children matched by key
+	(`data-r`, `id`, `data-k`, `data-id`) or by position and tag; `<template>` contents
+	compared as HTML. It never removes elements marked `data-client` (the tooltip box, the
+	toasts, the progress bar, the announcer: give anything a script adds to the page that
+	attribute), never touches the live value of a control (typed text survives; only the
+	form `reset()` above), and leaves `open` on `<details>` and tooltip.js's
+	`data-tip-title` to the page's scripts.
+- **History.** `history.scrollRestoration = "manual"`; each entry has a key, and its scroll
+	is kept while the page lives (and in `history.state` for a reload). Back and forward
+	are live GETs of the entry's address (safe: [pure GETs](#routes)), then its scroll.
+- **Fallbacks.** A GET that fails, takes over 10 s, or answers with something else than the
+	wire format is loaded natively. A POST that fails before its answer may or may not have
+	happened: the address on screen is loaded natively, showing the game as it is. A POST
+	answered with a non-wire document shows it as the browser would (`document.write`).
+	`go` loads natively, `doc` shows the document. An answer with a region the page lacks
+	(the page isn't what the server's hashes say) loads the address natively.
+- **For other scripts**, `window.DK`: `visit(url)`; `refresh()` (the address on screen
+	again, keeping the scroll: only what changed comes; a POST's own page keeps its middle
+	column, which no GET shows, and updates the rest); `on("applied", fn)` (after an answer
+	is on screen; `{ url, post }`); `on("events:<kind>", fn)`; `touched(el)` (the script
+	changed the region `el` is in, e.g. a chat message added from an event: the next answer
+	brings that region as the server has it); `view()`; `busy()`.
+
+`tests/js/test_client.js` tests the pure parts (the frame reader, the hash map, which
+addresses qualify); `tests/e2e/browser.sh` drives `tests/browser/client.js` in headless
+Chrome, Edge or Chromium over the DevTools protocol (node's `WebSocket`, no dependencies;
+skipped without node or a browser): logging in and out without a page load (and the event
+stream starting and stopping), links, back/forward with their scroll, typed text and a
+folded chat kept, the chat, a move, a POST's own page, the progress bar, a newer link
+winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
+routes only) is a page that takes its time.
 
 ## Realtime (event streams)
 
@@ -378,10 +437,14 @@ The `admin` channel exists for administrators' streams; nothing uses it yet.
 
 ### Live pages
 
-`public/js/live.js` runs on the pages of logged-in players (main and admin layouts:
-`<body data-live data-csrf=... data-live-session=... [data-live-admin]>`, from
-`layout/live_attrs.html`). Everything it does is also there without it: forms post and
-pages reload.
+`public/js/live.js` is loaded on every page and runs while the page is a logged-in
+player's (every layout: `<body data-live data-csrf=... data-live-session=...
+[data-live-admin]>`, from `layout/live_attrs.html`). With the [live client](#live-client)
+the page stays while the player logs in and out, so the stream starts when `data-live`
+appears and stops when it goes (on `DK.on("applied")`), and it stays open across
+navigation. What it changes in the page itself (a chat message, a name joining) it reports
+with `DK.touched`. Everything it does is also there without it: forms post and pages
+reload. No toasts in popup windows (`window.opener`).
 
 - **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
 	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
@@ -397,14 +460,16 @@ pages reload.
 	(but 429) stops it for good, anything else is retried with a backoff (1 s doubling to
 	60 s, with jitter); a stream opened after that resyncs. On `bye` (server shutdown) it
 	reconnects after 2–5 s the same way.
-- **Resync.** On `resync` (and after a reconnect or a takeover) every tab fetches
-	`GET /live/state?back=<page>`: `{ chat, online = { count, html }, banner }`, the live
-	parts rendered by the same templates as the page, and swaps them in.
+- **Resync.** On `resync` (and after a reconnect or a takeover) every tab asks the live
+	client for its page again (`DK.refresh()`: only what changed comes). Without the live
+	client it fetches `GET /live/state?back=<page>`: `{ chat, online = { count, html },
+	banner }`, the live parts rendered by the same templates as the page, and swaps them in.
 - **Event data goes in with `textContent` only.** Links in notices are used only when they
 	are same-site paths (`/...`, not `//`).
 - **Logout.** `logout` with `all`, or with the page's own `data-live-session`
 	(`session.live_id`, a hash of the session row: not the token), closes the stream and
-	reloads (to `/login`); the pages of the player's other sessions ignore it.
+	asks for the page again (`DK.refresh()`, or a reload without the live client): the login
+	page comes. The pages of the player's other sessions ignore it.
 - Not covered: events published between a page's render and its stream opening are lost
 	(the stream starts at the server's current position); the page shows the state of its
 	render. Navigating keeps that window to a few milliseconds.

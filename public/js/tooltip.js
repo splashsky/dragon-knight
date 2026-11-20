@@ -85,6 +85,7 @@
 		if (!box) {
 			box = document.createElement("div");
 			box.id = ID; box.className = "dk-tip"; box.hidden = true;
+			box.setAttribute("data-client", "");   // the live client's morph leaves it alone
 			box.setAttribute("role", "tooltip");
 			box.appendChild(body = document.createElement("div"));
 			box.appendChild(arrowEl = document.createElement("div"));

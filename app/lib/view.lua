@@ -171,11 +171,12 @@ function view.online(all)
 	return { online = presence.list(limit), online_count = presence.count(), online_limit = limit }
 end
 
--- The live parts of the layout (docs/APP.md "Live pages"): `live` (the page loads live.js:
--- the user is logged in) and `side` (the online count and the chat in the right column).
+-- The live parts of the layout (docs/APP.md "Live pages"): `live` (live.js runs: the user
+-- is logged in; also on the minimal layout's pages, so the stream lives on while the live
+-- client shows them) and `side` (the online count and the chat in the right column).
 local function live_ctx(req, ctx, layout, nav, opts)
 	local user = req.user
-	if not user or layout == "minimal" then return end
+	if not user then return end
 	ctx.live = {
 		csrf = csrf.token(req),
 		session = req.session and session.live_id(req.session) or "",
