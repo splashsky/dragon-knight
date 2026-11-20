@@ -179,18 +179,26 @@ add a live feature are in `docs/APP.md`, "Realtime".
 Who's online counts a player while they have a live page open or made a request within
 `online_seconds` (app-level key, default 600); departures are checked every
 `presence_sweep_seconds` (default 60) by the first request after that. The app-level key
-`test_routes = true` adds `POST /__test/publish` (publish an event as any logged-in user)
-and the `X-Test-Seed` request header (seeds the dice) for the end-to-end tests and the
-realtime benchmark; never set it on a real server.
+`test_routes = true` adds `POST /__test/publish` (publish an event as any logged-in user),
+the routes of `app/routes/test.lua` and the `X-Test-Seed` request header (seeds the dice)
+for the end-to-end tests and the realtime benchmark; never set it on a real server.
 
-**Smooth fights**: on the fight pages `public/js/fight.js` sends the fight's forms with
-`fetch` (`Accept: application/json`); the same routes answer with the round as a list of
-events (each line of the fight page with the HP, MP, statuses and allies it changed) and
-the page's parts rendered by the same templates, and the script plays the round line by
-line (click or any key to skip; no delays with reduced motion) before swapping them in.
-Every fight form carries its round number, so a double click or an old tab plays nothing.
-Without JavaScript the fight pages are the same forms and page loads. The JSON shape is in
-`docs/APP.md`, "Fight API".
+**The live client** (3.0): `public/js/client.js` sends links and forms with `fetch` and a
+header asking for a live answer; the same routes run, and the server answers in its own
+wire format with only the parts of the page (regions, marked in the templates) whose HTML
+changed, which the client morphs into the page: no page loads, focus, typed text, scroll
+and the event stream stay, Back and Forward work. A POST and the page it redirects to are
+one round trip (the server follows its own redirects). GETs never change the game, so any
+page can be fetched again at any time, and whenever something goes wrong the client loads
+the page normally. Without JavaScript everything is plain links and forms. Details:
+`docs/APP.md`, "Live client".
+
+**Smooth fights**: a fight round sent by the live client comes back with the round as a
+list of events (each line of the fight page with the HP, MP, statuses and allies it
+changed), which `public/js/fight.js` plays line by line (click or any key to skip; no
+delays with reduced motion) before the page's regions apply. Every fight form carries its
+round number, so a double click or an old tab plays nothing. Details: `docs/APP.md`, "Fight
+events".
 
 ## Deployment
 
@@ -258,7 +266,7 @@ does the same check, backup and migration.
 | `make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]` | build and serve in the foreground; first use creates the config and installs the game (admin / admin), an old database is backed up and migrated (see [Quick start](#quick-start)) |
 | `make test` | lint, C unit tests, Lua unit tests and end-to-end tests |
 | `make lint` | check tab indentation |
-| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, `realtime` — 1,000 event streams and the fan-out latency of published events —, `realtime-mixed` — the target scale: 1,000 idle players with streams, 50 active ones playing (form and JSON fights), chat, reconnects —, `soak` — the same for an hour (`BENCH_SECONDS`), sampled every 30 s, with a pass/fail summary and a CSV —, or `all`; `BENCH_BUILD=dbg\|tsan` serves with the ASan/UBSan or ThreadSanitizer build; see `docs/PERF.md`) |
+| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, `realtime` — 1,000 event streams and the fan-out latency of published events —, `realtime-mixed` — the target scale: 1,000 idle players with streams, 50 active ones playing (form and live fights), chat, reconnects —, `soak` — the same for an hour (`BENCH_SECONDS`), sampled every 30 s, with a pass/fail summary and a CSV —, or `all`; `BENCH_BUILD=dbg\|tsan` serves with the ASan/UBSan or ThreadSanitizer build; see `docs/PERF.md`) |
 | `make release` | optimized build in `build/release/dk` (`-O2`, no sanitizers) |
 | `make dist` | release tarball `dist/dk-VERSION-OS-ARCH.tar.gz` |
 | `make backup [CONFIG=config.lua]` | `./dk backup` |

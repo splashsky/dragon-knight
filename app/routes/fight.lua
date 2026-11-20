@@ -16,11 +16,10 @@
 -- GETs change nothing (docs/APP.md "Pure GETs"): GET /fight shows the fight with its last
 -- round's lines, as the POST that played it did; GET /victory shows the rewards paid.
 --
--- The JSON fight API (docs/APP.md "Fight API"; public/js/fight.js): the same routes, asked
--- with Accept: application/json, run the same code and answer { events, fragments, round,
--- redirect, url, title, stale } instead of the page (a redirect is a field, not a 302:
--- fetch would follow it and lose the round's events), or { error } instead of an error
--- page. Every fight form carries the round it was shown at: a POST /fight with another
+-- Smooth fights (docs/APP.md "Fight events"; public/js/fight.js): a live request (the live
+-- client) gets the round's events with its answer, as an `events fight` frame (on the page
+-- or on the redirect the server follows), which fight.js plays before the page's regions
+-- apply. Every fight form carries the round it was shown at: a POST /fight with another
 -- round (a second click, an older tab) plays nothing and shows the fight as it is now.
 local act = require("fight.act")
 local auth = require("lib.auth")
@@ -40,29 +39,28 @@ local view = require("lib.view")
 
 local rand = php.rand
 
--- An error: the page (html: trusted HTML, by default the text escaped), or { error = text }.
+-- An error page (html: trusted HTML, by default the text escaped).
 local function error_page(req, text, html)
-	if view.wants_json(req) then return view.json({ error = text }) end
 	return view.message(req, "Error", html or dk.html(text))
 end
 
--- A page of the fight, or its fragments (view.fragment_page) with the fields of t.
-local function show(req, title, template, ctx, t)
-	if view.wants_json(req) then
-		t = t or {}
-		t.events = t.events or json.array()
-		return view.fragment_page(req, title, template, ctx, t)
-	end
-	return view.page(req, title, template, ctx)
+-- The answer's events for the live client: { { kind = "fight", json } } (nil: none).
+local function fight_events(req, evs)
+	if not req.live or not evs or #evs == 0 then return nil end
+	return { { kind = "fight", json = json.encode(evs) } }
 end
 
--- A redirect, or { redirect = url } with the fields of t.
+-- A page of the fight; t.events: the round's (fight/events.lua), for a live request.
+local function show(req, title, template, ctx, t)
+	return view.page(req, title, template, ctx, { events = fight_events(req, t and t.events) })
+end
+
+-- A redirect; t.events: the round's, carried to the page it lands on (main.lua follows
+-- a live request's redirects on the server).
 local function go(req, url, t)
-	if not view.wants_json(req) then return view.redirect(url) end
-	t = t or {}
-	t.redirect = url
-	t.events = t.events or json.array()
-	return view.json(t)
+	local res = view.redirect(url)
+	res.events = fight_events(req, t and t.events)
+	return res
 end
 
 -- The fight menu's item buttons: consumables in the bag usable in fights, one per item with
@@ -203,7 +201,7 @@ end
 
 -- The fight page of fight f (in progress, or as it ended in a death): its combatants, the
 -- lines of its last round (lines: encounter.lines), and the commands with the round they
--- carry. opts: stale (the note), events (the JSON API's).
+-- carry. opts: stale (the note), events (the round's, for the live client).
 local function fight_page(req, f, lines, opts)
 	local user = req.user
 	local page = { yourturn = lines.yourturn, allyturn = lines.allyturn, monsterturn = lines.monsterturn,
@@ -227,8 +225,7 @@ local function fight_page(req, f, lines, opts)
 		page.gear = gear_buttons(user)
 		page.round = f.round
 	end
-	return show(req, "Fighting", "fight/fight", page, { events = opts.events or json.array(), round = page.round,
-		stale = opts.stale or nil })
+	return show(req, "Fighting", "fight/fight", page, { events = opts.events })
 end
 
 local NO_MONSTER = "There are no monsters in this area. Please contact the game administrator."
@@ -275,7 +272,7 @@ local function fight(req)
 	if err then return error_page(req, err) end
 	if not a then return fight_page(req, f, encounter.lines(f.log), {}) end
 
-	if view.wants_json(req) then f.trace = {} end
+	if req.live then f.trace = {} end
 	local r = round.play(f, a)
 	-- refusal texts may come from content files and admin overrides: escaped
 	if r.refused then return error_page(req, r.refused) end

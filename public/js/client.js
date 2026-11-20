@@ -289,6 +289,7 @@
 			var type = res.headers.get("Content-Type") || "";
 			if (type.indexOf("application/x-dk-live") === 0) {
 				return res.arrayBuffer().then(function (buf) {
+					busy(false);   // the answer is here (a fight round may still play)
 					return apply(decode(new Uint8Array(buf), text), url, o);
 				});
 			}

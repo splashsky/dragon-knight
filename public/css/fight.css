@@ -31,7 +31,7 @@
 .fight-status-gone { text-decoration: line-through; animation: fight-out 0.8s ease-in forwards; }
 .fight-gone { opacity: 0.4; transition: opacity 0.4s; }
 .fight-skip { margin: 0 0 1em; }
-[data-main][aria-busy="true"] form[data-fight] { opacity: 0.75; }
+form[data-fight] [data-fight-locked] { opacity: 0.75; }
 
 @keyframes fight-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fight-out { from { opacity: 1; } to { opacity: 0.2; } }

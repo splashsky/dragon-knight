@@ -280,7 +280,24 @@ navigation without reloads (a `window` marker survives), regions applied, back/f
 scroll, the chat's typed text kept across a move, a slow request's bar, a killed
 connection falling back.
 
-## L3: fights on the client
+## L3: fights on the client — ✅ done
+
+**As implemented** (`docs/APP.md` "Fight events"): the fight routes record the round's
+trace for live requests and attach its events (`opts.events` on the page, `res.events` on a
+redirect, carried by `main.lua` into the page the redirects land on); `fight.js` is a
+player (`DK.on("events:fight")`), with the 2.3 animations, the forms locked while it plays,
+an 800 ms pause before a victory or escape moves on, and the focus back on the button used.
+One change from the design: **the monsters' and allies' bars stay fight.js's** rather than
+the template's, so the no-JS page is exactly 2.4's; they carry `data-client`, so the
+morph keeps them, and they are updated from `data-value`/`data-max` after every answer. The
+JSON fight API and `view.fragments`/`view.fragment_page` are gone; an error (a refusal) is
+the error page for everyone. `fight_api.sh` reads live answers (`fa.py` builds the old `d`
+from the frames, so its seeded form-vs-client comparisons stand), `tips.sh` reads a live
+answer's regions, `browser.sh` plays a round in the browser, and `dkbench`'s JSON fighters
+send live requests (without `X-DK-Have`: the whole page each time, the most a live answer
+costs).
+
+The design as approved:
 
 - `fight.js` becomes a player: `DK.on("events:fight", play)` plays the round's events on
 	the page that is showing (lines, bars, statuses, allies, skip, reduced motion: as in

@@ -60,13 +60,15 @@ expect_body '<span class="spell-mp" aria-hidden="true">10</span></button><templa
 expect_body '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left">'
 expect_body '<form class="spell-tip spell-tip-short" method="post" action="/spell/2" data-tip data-tip-side="left">'
 [ "$(grep -o '<div class="tip-title">Heal</div>' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "Heal's tooltip in the menu and in Fast Spells"
-# the JSON fight API's fragments are the same templates (fight.js swaps them in as they are)
-t_get /fight -H 'Accept: application/json'; expect_status 200
+# a live answer's regions are the same templates (the live client morphs them in as they are)
 if command -v python3 >/dev/null; then
-	python3 - "$BODY" "$TP_HEAL_LORE" <<'PY' && t_ok || t_fail "fight fragments without the tooltips"
-import json, sys
-d = json.load(open(sys.argv[1]))
-main, right = d["fragments"]["main"], d["fragments"]["nav_right"]
+	t_live_forget; t_live GET /fight; expect_status 200
+	w_payload region root > "$T/tips_root.html"
+	python3 - "$T/tips_root.html" "$TP_HEAL_LORE" <<'PY' && t_ok || t_fail "live regions without the tooltips"
+import re, sys
+body = open(sys.argv[1], encoding="utf-8").read()
+main = re.search(r'<main class="dk-middle" data-r="main"[^>]*>(.*?)</main>', body, re.S).group(1)
+right = re.search(r'<aside class="dk-right" data-r="right"[^>]*>(.*?)</aside>', body, re.S).group(1)
 assert '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1"' in main
 assert '<div class="tip-lore"><p>' + sys.argv[2] + '</p></div></template></span>' in main
 assert '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div>' in main

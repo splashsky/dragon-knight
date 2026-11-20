@@ -1,37 +1,33 @@
-// fight.js :: smooth fights (docs/APP.md "Fight API"). Loaded on the fight pages (fight,
-// victory, item drop, death). Forms marked data-fight and links in the middle column to
-// those pages go through fetch with Accept: application/json; the server runs the same
-// handlers and answers { events, fragments, redirect, url, title } or { error }. The
-// events are played one by one (a line every STEP ms, with the HP/MP bars and numbers,
-// the statuses and the allies they change), then the page's parts are swapped for the
-// fragments, rendered by the same templates as the pages, so what stays on screen is the
-// page the server would have shown. A redirect to another fight page is fetched the same
-// way and history.replaceState keeps the address right (a reload shows that page). A
-// click, any key or "Skip" finishes the round at once; with prefers-reduced-motion there
-// are no delays. Buttons are disabled while a round plays. On a network or JSON error the
-// form is posted (or the link followed) as without JavaScript. Text from the server goes
-// in with textContent only; fragments are the server's own HTML.
+// fight.js :: smooth fights (docs/APP.md "Fight events"). A fight round sent by the live
+// client (client.js) comes back with the round's events (an `events fight` frame), which
+// this script plays on the page being shown before the page's regions apply: a line every
+// STEP ms, with the HP/MP bars and numbers, the statuses and the allies they change. Then
+// the regions bring the page as the server renders it, so what stays on screen is what a
+// page load shows. A click in the middle column, any key or "Skip" finishes the round at
+// once; with prefers-reduced-motion there are no delays. The fight forms are disabled while
+// a round plays, and the button that sent it gets the focus back after. The monsters' and
+// allies' bars ([data-stat][data-max]) are drawn here (data-client: the live client's morph
+// leaves them, and they are updated after each answer). Without the live client the fight
+// forms are plain forms. Text from the server goes in with textContent only.
 (function () {
 	"use strict";
-	var body = document.body;
-	if (!body || !window.fetch || !window.URLSearchParams || !window.FormData || !window.Promise || !window.URL) return;
+	var root = document.documentElement;
+	if (!document.body || !window.Promise) return;
 
 	var STEP = 400;
-	var PAGES = { "/fight": true, "/victory": true, "/drop": true, "/dead": true };
 	var PARTS = { player: "fight-yourturn", allies: "fight-allyturn", enemies: "fight-monsterturn", ending: "fight-roundend" };
 	var motion = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-	var busy = false;       // a request or a round is under way
+	var playing = false;    // a round is being played
 	var skipping = false;   // the round plays to its end at once
 	var wake = null;        // ends the current wait
 	var refocus = false;    // the keyboard was in the middle column: focus the new form
-	var lastButton = null;  // the submit button last clicked (browsers without ev.submitter)
 	var pressed = null;     // name and value of the button that sent the round (refocused after)
 
 	// ---- helpers
 
-	function $(sel, root) { return (root || document).querySelector(sel); }
-	function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+	function $(sel, r) { return (r || document).querySelector(sel); }
+	function $$(sel, r) { return Array.prototype.slice.call((r || document).querySelectorAll(sel)); }
 	function el(tag, cls, text) {
 		var e = document.createElement(tag);
 		if (cls) e.className = cls;
@@ -40,42 +36,13 @@
 	}
 	function txt(s) { return document.createTextNode(s); }
 	function remove(node) { if (node && node.parentNode) node.parentNode.removeChild(node); }
-	function middle() { return $("[data-main]"); }
-	function closest(node, sel) { return node && node.closest ? node.closest(sel) : null; }
-
-	// a same-site fight page's path and query, or null
-	function fightPage(url) {
-		try {
-			var u = new URL(url, location.href);
-			return u.origin === location.origin && PAGES[u.pathname] ? u.pathname + u.search : null;
-		} catch (e) { return null; }
-	}
-
-	function csrf(form) {
-		var input = form && form.querySelector('input[name="csrf"]');
-		return (input && input.value) || body.getAttribute("data-csrf") || "";
-	}
-
-	function request(url, data, form) {
-		var opts = { credentials: "same-origin", headers: { "Accept": "application/json" } };
-		if (data) {
-			opts.method = "POST";
-			opts.body = data;
-			opts.headers["X-CSRF-Token"] = csrf(form);
-		}
-		return fetch(url, opts).then(function (res) {
-			var type = res.headers.get("Content-Type") || "";
-			if (!res.ok || type.indexOf("application/json") !== 0) throw new Error("fight.js: " + res.status + " " + type);
-			return res.json();
-		});
+	function middle() { return $('[data-r="main"]') || $("[data-main]"); }
+	function closest(node, sel) {
+		var e = node && (node.nodeType === 1 ? node : node.parentElement);
+		return e && e.closest ? e.closest(sel) : null;
 	}
 
 	function lock(on) {
-		busy = on;
-		var m = middle();
-		if (m) {
-			if (on) m.setAttribute("aria-busy", "true"); else m.removeAttribute("aria-busy");
-		}
 		$$("form[data-fight] input, form[data-fight] select, form[data-fight] button").forEach(function (c) {
 			if (on && !c.disabled) {
 				c.disabled = true;
@@ -121,6 +88,7 @@
 			// the same bar as the Character panel's (dk.css .meter-track/.meter-fill/.bar-*)
 			b = el("span", "meter-track fight-meter");
 			b.setAttribute("aria-hidden", "true");
+			b.setAttribute("data-client", "");   // the live client's morph leaves it
 			b.appendChild(el("span", "meter-fill"));
 			node.appendChild(b);
 		}
@@ -293,59 +261,28 @@
 		return next();
 	}
 
-	function note(text) {
-		var m = middle();
-		if (!m) return;
-		$$(".fight-note", m).forEach(remove);
-		var p = el("p", "fight-note error", text);
-		p.setAttribute("role", "alert");
-		var form = $("form[data-fight]", m);
-		if (form) form.parentNode.insertBefore(p, form); else m.insertBefore(p, m.firstChild);
-	}
-
-	function swap(j) {
-		var f = j.fragments, m = middle();
-		if (f.main != null && m) {
-			m.innerHTML = f.main;
-			enhance(m);
-		}
-		var left = $("[data-nav-left]"), right = $("[data-nav-right]");
-		if (f.nav_left != null && left) left.innerHTML = f.nav_left;
-		if (f.nav_right != null && right) right.innerHTML = f.nav_right;
-		if (j.title) document.title = j.title;
-		var url = j.url && fightPage(j.url);
-		if (url && window.history && history.replaceState) history.replaceState(null, "", url);
-	}
-
-	function follow(url) {
-		var page = fightPage(url);
-		if (!page) {
-			location.assign(url);
-			return new Promise(function () {});   // the page goes; stay busy
-		}
-		return request(page).then(handle, function () {
-			location.assign(page);
-			return new Promise(function () {});
-		});
-	}
-
-	function handle(j) {
-		if (j.error) {
-			note(j.error);
-			return Promise.resolve();
-		}
-		var events = j.events || [];
+	// The round's events (JSON), played on the page on screen; the regions apply after.
+	function playRound(data) {
+		var events;
+		try { events = JSON.parse(data); } catch (e) { return Promise.resolve(); }
+		if (!Array.isArray(events) || !events.length) return Promise.resolve();
+		playing = true;
+		lock(true);
 		return play(events).then(function () {
-			if (j.fragments) swap(j);
-			if (!j.redirect) return;
-			// a moment to read the last blow before the next page
+			// a moment to read the last blow before the page moves on (victory, escape)
+			var last = events[events.length - 1];
 			var said = events.some(function (e) { return e.text; });
-			return wait(said ? 2 * STEP : 0).then(function () { return follow(j.redirect); });
+			return wait(said && last && (last.type === "victory" || last.type === "escape") ? 2 * STEP : 0);
+		}).then(function () { playing = false; lock(false); }, function (err) {
+			playing = false;
+			lock(false);
+			throw err;
 		});
 	}
 
-	function finish() {
-		lock(false);
+	// after an answer: the bars of the page now, and the focus back on the button used
+	function applied() {
+		enhance(document);
 		var m = middle();
 		if (refocus && m) {
 			// the same button again (a spell's, say) if the new form has it enabled, else the first
@@ -359,79 +296,33 @@
 		pressed = null;
 	}
 
-	// sends a request and plays its answer; fallback: the same without JavaScript
-	function start(sent, fallback) {
-		var m = middle();
-		refocus = !!(m && document.activeElement && m.contains(document.activeElement));
-		lock(true);
-		var answered = false;
-		sent.then(function (j) {
-			answered = true;
-			return handle(j);
-		}).then(finish, function (err) {
-			if (window.console) console.warn(err);
-			lock(false);
-			if (answered) location.reload(); else fallback();
-		});
-	}
-
-	function submitNative(form, button) {
-		lock(false);
-		if (button && button.name) {
-			var h = el("input");
-			h.type = "hidden";
-			h.name = button.name;
-			h.value = button.value;
-			form.appendChild(h);
-		}
-		HTMLFormElement.prototype.submit.call(form);
-	}
-
 	// ---- wiring
 
 	document.addEventListener("submit", function (ev) {
-		var form = ev.target;
-		if (ev.defaultPrevented || !form.hasAttribute || !form.hasAttribute("data-fight")) return;
-		ev.preventDefault();
-		if (busy) return;
-		var button = ev.submitter || (lastButton && lastButton.form === form ? lastButton : null);
-		// FormData(form) leaves out the submit buttons: the one pressed (Fight, a spell's icon
-		// button with name="spell" value="<id>", ...) is added, as a native submit sends it
-		var data = new URLSearchParams(new FormData(form));
-		if (button && button.name) data.append(button.name, button.value);
+		var form = ev.target, m = middle();
+		if (!form.hasAttribute || !form.hasAttribute("data-fight")) return;
+		var button = ev.submitter;
 		pressed = button && button.name ? { name: button.name, value: button.value } : null;
-		start(request(form.getAttribute("action") || location.pathname, data, form), function () {
-			submitNative(form, button);
-		});
+		refocus = !!(m && document.activeElement && m.contains(document.activeElement));
 	});
 
 	document.addEventListener("click", function (ev) {
 		var m = middle();
-		var inside = m && m.contains(ev.target);
-		if (busy) {
-			if (inside) {
-				skip();
-				if (closest(ev.target, "a[href]")) ev.preventDefault();   // links wait for the round
-			}
-			return;
-		}
-		var button = closest(ev.target, "form[data-fight] [type=submit]");
-		if (button) lastButton = button;
-		var a = closest(ev.target, "a[href]");
-		if (!a || !inside || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-		if (a.target && a.target !== "_self") return;
-		var page = fightPage(a.href);
-		if (!page) return;
-		ev.preventDefault();
-		start(request(page), function () { location.assign(page); });
+		if (!playing || !m || !m.contains(ev.target)) return;
+		skip();
+		if (closest(ev.target, "a[href]")) ev.preventDefault();   // links wait for the round
 	});
 
 	document.addEventListener("keydown", function (ev) {
-		if (!busy || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+		if (!playing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
 		if (closest(ev.target, "input, textarea, select, [contenteditable]")) return;   // typing (the chat)
 		skip();
 	});
 
-	body.classList.add("fight-js");
+	if (window.DK) {
+		window.DK.on("events:fight", playRound);
+		window.DK.on("applied", applied);
+	}
+	root.classList.add("fight-js");
 	enhance(document);
 })();

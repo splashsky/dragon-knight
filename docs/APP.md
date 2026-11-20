@@ -19,7 +19,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
-| Smooth fights (the JSON fight API) | `app/fight/events.lua`, `app/routes/fight.lua`, `app/lib/view.lua` (`view.fragments`) | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua` |
+| Smooth fights (fight events) | `app/fight/events.lua`, `app/routes/fight.lua` | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua`, `tests/e2e/browser.sh` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
 | Content (statuses, summons, classes, spells, items, monsters) | `app/content/{statuses,summons,classes,spells,items,monsters}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons,monsters}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
@@ -166,12 +166,10 @@ Form and query values are raw strings. Validate them, and convert them with
 | `view.unavailable(req, text)` | standalone 503 page (no DB access; used for the schema check) |
 | `view.redirect(url [, status])` | 302 (legacy `header("Location: …")`) |
 | `view.text(body [, status])` | text/plain |
-| `view.json(t [, status, headers])` | `application/json` (`lib/json.lua`), `Cache-Control: no-store`; `view.wants_json(req)`: the request sent `Accept: application/json` (live.js's fetch) |
+| `view.json(t [, status, headers])` | `application/json` (`lib/json.lua`), `Cache-Control: no-store`; `view.wants_json(req)`: the request sent `Accept: application/json` (live.js's fetch: the chat) |
 | `view.back_path(req)` / `view.back_to(req [, fallback])` | this page's path and query (for a form's `back` field) / where to redirect after a form with `back`: that path if it is same-site with a GET route, else `fallback` (`/`) |
 | `view.chat(req, large)` / `view.online()` | ctx for `layout/chat.html` / `layout/online.html`, or nil when the Babble Box / Who's Online is turned off |
-| `view.render(name, ctx, req)` | a rendered template string (for building fragments) |
-| `view.fragments(req, template, ctx)` | the parts of the page `view.page` would draw, as HTML: `{ main, nav_left, nav_right }` (the middle column, and the side columns' boxes from the user row as it is now); same templates, so a page and its fragments can't drift |
-| `view.fragment_page(req, title, template, ctx [, t])` | JSON for a page fetched by a script: `t` plus `title`, `url` (`req.path` unless `t.url`) and `fragments` (fight.js, see [Fight API](#fight-api-smooth-fights)) |
+| `view.render(name, ctx, req)` | a rendered template string (a partial for JSON; mind region markers: `wire.strip`) |
 | `view.layout(req, title, html, opts)` | wraps already-rendered HTML |
 
 `opts`:
@@ -274,8 +272,8 @@ The HTTP status is the page's (a 404 page comes as a 404 with its regions).
 **Adding a region.** Wrap the element in `region()`/`endregion()` and give it the same
 `data-r`. Worth it for a part that changes often while the rest of its parent doesn't (a
 box in a column). Markers must balance: a page that doesn't is an error with `dev = true`
-(and loses its hashes otherwise). Partials rendered on their own for JSON (`/live/state`,
-`view.fragments`) must not leave markers in their output (`wire.strip`).
+(and loses its hashes otherwise). Partials rendered on their own for JSON (`/live/state`)
+must not leave markers in their output (`wire.strip`).
 
 ### The client (`public/js/client.js`)
 
@@ -654,7 +652,7 @@ browser; to use SemiBold or Black, add the file and its `@font-face`.
 tooltip for any element with `data-tip`. One shared box (`<div id="dk-tooltip"
 role="tooltip" class="dk-tip">`, made on first use) serves every trigger; the only DOM work
 per show is cloning the content. Events are delegated to `document` (`pointerover`/`out`,
-`focusin`/`out`, `keydown`, `pointerdown`), so content swapped in later (fight.js fragments,
+`focusin`/`out`, `keydown`, `pointerdown`), so content swapped in later (the live client's regions,
 live.js chat, a resync) needs no set-up, and nothing runs while nothing is hovered.
 
 **Markup.**
@@ -696,7 +694,7 @@ live.js chat, a resync) needs no set-up, and nothing runs while nothing is hover
 click or a tap) shows it at once; on touch screens a long press (400 ms, without moving)
 shows it and swallows the click that follows, while a normal tap still clicks. It hides on
 leaving, on blur, on Escape, on a click or tap (one opened by focus stays until blur), when the trigger scrolls out of view
-(the viewport or a scrolling ancestor) and when it leaves the DOM (a fight fragment
+(the viewport or a scrolling ancestor) and when it leaves the DOM (a region
 swapped in). While shown, the focused element (or the trigger) has
 `aria-describedby="dk-tooltip"`. A short fade, none with `prefers-reduced-motion`.
 `window.dkTip.show(el)` / `.hide()` open and close one from other scripts (and test pages).
@@ -1425,33 +1423,18 @@ admin pages `/admin/statuses` and `/admin/summons` override names, descriptions,
 and messages per server. Unit tests can run statuses and summons without files:
 `load.preload(kind, key, module)` primes the loaded module (see `tests/lua/test_round.lua`).
 
-### Fight API (smooth fights)
+### Fight events (smooth fights)
 
-With JavaScript the fight pages play a round in place: `public/js/fight.js` (loaded on every page;
-it acts on the fight pages' forms) sends the fight forms with `fetch` and plays the
-answer's events one by one. The server side is the same routes (`routes/fight.lua`) asked
-with `Accept: application/json` (`view.wants_json`): the same handlers, the same round
-code, the same templates.
-
-**Answers.** Instead of a page, `GET`/`POST /fight`, `GET /victory`, `GET`/`POST /drop` and
-`GET /dead` answer:
-
-```lua
-{
-	events = { ... },             -- the round (below); [] for a page without a round
-	fragments = {                 -- view.fragments: the page's parts, by the page's templates
-		main = "<section class=\"box fight\">...",   -- the middle column (fight, victory, drop, death)
-		nav_left = "...", nav_right = "...",        -- the side columns' boxes (HP, gold, bag, ...)
-	},
-	round = 7,                    -- the fight's round now (what the next form must carry); absent when over
-	url = "/fight", title = "Fighting",   -- the page's address and title
-	stale = true,                 -- only when the form was stale (below)
-}
--- or, where the page would redirect (a 302 would be followed by fetch, losing the events):
-{ events = { ... }, redirect = "/victory" }   -- also "/" (escaped, nothing pending), "/fight"
--- or, instead of an error page (refusals, invalid choices; nothing changed):
-{ error = "Your Hit Points are already full. Please go back and try again." }
-```
+With the [live client](#live-client) a fight round plays in place: the fight forms are sent
+like any other form, and the answer to a live request carries the round's **events** (an
+`events fight` frame: the JSON list below), which `public/js/fight.js` plays on the page
+being shown before the page's regions apply. The server side is the fight routes
+(`routes/fight.lua`): when `req.live`, the round records its trace and `show` passes the
+events to `view.page` (`opts.events`), `go` puts them on its redirect (`res.events`), which
+`main.lua` carries into the answer of the page it lands on (`/victory`, `/`). Everything
+else is the page: the same handlers, the same round code, the same templates, so what stays
+on screen is what a page load shows. (2.3's JSON fight API, `Accept: application/json` with
+`fragments`, is gone: the live client replaced it.)
 
 **Events** (`fight/events.lua`, from the round's trace): one per line of the page, in the
 page's order, with what changed with it; a change in a step that hasn't said anything is
@@ -1486,42 +1469,27 @@ Changes go with their step's latest line (a spell's line, then its damage and MP
 name="round">`, `fights.round`, which only a played round counts up). A `POST /fight` with
 another round (a second click, an older tab, a resubmitted page) plays nothing: the answer
 is the fight as `GET /fight` shows it (with its last round's lines) and the note "That
-command came from an older page, so nothing happened." (`stale = true` in JSON); a fight
-that is over (not fighting any more) redirects to `/`. A form
+command came from an older page, so nothing happened."; a fight that is over (not fighting
+any more) redirects to `/`. A form
 without the field (from before 2.3) plays as before. The counter has no cap (the original's
 stopped at 255), so long fights are protected too.
 
-**fight.js.** Forms marked `data-fight` (the fight commands, the drop's Take/Leave) and links
-in the middle column to the four fight pages (the victory page's drop link) go through
-fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the form's
-`csrf` field or `<body data-csrf>`; `FormData` leaves submit buttons out, so the pressed
-one's `name=value` is appended, as a native submit sends it: `fight=Fight` for Attack's icon
-button, `run=Run` for Run's, `spell=<id>` for a spell's icon button, `item=<items id>` and
-`use_gear=<user_items id>` for the Items and Gear buttons). Meanwhile the forms' controls are disabled and
-`data-main` is `aria-busy`. Then it:
-
-1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
-	(in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms after the
-	previous one; its changes update the player's numbers and bars in the right column
-	(`[data-meter=hp|mp|tp]` values, `[data-bar=hp|mp|tp]` bar widths), the numbers and bars of the monsters and
-	allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`; fight.js adds the
-	bars), the status chips of a combatant's line (made if the page had none), allies
-	joining and leaving. A click in the middle column, any key (not while typing) or the
-	"Skip" button plays the rest at once; with `prefers-reduced-motion` there are no delays
-	and no animations (`fight.css`).
-2. swaps the fragments in (`data-main`, `data-nav-left`, `data-nav-right`), sets the title
-	and `history.replaceState`s the answer's `url`, so a reload shows the same page (and
-	the screen ends up exactly as the server rendered it);
-3. follows a `redirect` after a short pause: another fight page is fetched the same way,
-	anything else (`/`) is a normal navigation;
-4. shows an `error` as a note above the form (the form stays; nothing was played).
-
-When the keyboard was in the middle column, the button that sent the round gets the focus
-back in the new form (the same spell's button, unless it is now disabled; else Attack).
-
-Any network error, non-JSON answer (a 403 for CSRF, a redirect to `/login`) or failure
-before the answer posts the form (or follows the link) as without JavaScript; a stale
-round then shows the fight as it is. A failure after the answer reloads the page.
+**fight.js** (`DK.on("events:fight")`): while the round plays the fight forms' controls are
+disabled (`data-fight-locked`); it clears the round lines (`[data-fight-log]`) and adds each
+line (in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms after the
+previous one; its changes update the player's numbers and bars in the right column
+(`[data-meter=hp|mp|tp]` values, `[data-bar=hp|mp|tp]` widths), the numbers and bars of the
+monsters and allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`), the
+status chips of a combatant's line (made if the page had none), allies joining and leaving.
+A click in the middle column, any key (not while typing) or the "Skip" button plays the rest
+at once; with `prefers-reduced-motion` there are no delays and no animations (`fight.css`).
+A round that ends in a victory or an escape pauses 800 ms before the next page comes. Then
+the regions apply; when the keyboard was in the middle column, the button that sent the
+round gets the focus back (the same spell's button, unless it is now disabled; else
+Attack). The monsters' and allies' bars are fight.js's (`span.fight-meter[data-client]`, so
+the morph keeps them; it updates them from `data-value`/`data-max` after every answer):
+without JavaScript there are none, as before. Without the live client the forms post as
+plain forms and nothing is played.
 
 **Adding an animated event type.** A new kind of line needs nothing: give the code that
 says it a step (`local prev = engine.doing(f, c, "my_kind")` ... `engine.done(f, prev)`
@@ -1994,7 +1962,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
-| `t_fetch path 'a=1' [curl args]` | POST like live.js and fight.js: `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
+| `t_fetch path 'a=1' [curl args]` | POST like live.js (the chat): `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
 | `t_live GET\|POST path ['a=1'] [curl args]`, `t_live_page`, `t_live_forget`, `w_ops`, `w_payload op [arg]`, `w_has op [arg]`, `w_lacks op [arg]` | a live request like the live client's (python3; `X-DK-Live`, `X-DK-Have` from the jar's hash map, which the answer's `hashes` frame updates); take the map from the last full page / start empty; the answer's frames (`op args length` lines), a frame's payload, assertions |
 | `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
 | `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |

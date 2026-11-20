@@ -24,8 +24,8 @@
  *           latency (the fan-out). Needs max_streams and max_streams_per_ip >= LISTENERS.
  *   realtime-mixed  the target scale: LISTENERS idle players (accounts live<n>) and CLIENTS
  *           active ones (PREFIX<n>) each hold an event stream; the active players run
- *           the mixed script at RATE (pages, fights: half of them through the JSON fight
- *           API like fight.js, half with forms, both sending the round), other players
+ *           the mixed script at RATE (pages, fights: half of them as live requests like
+ *           client.js, half with forms, both sending the round), other players
  *           post EVENTS_PER_SECOND chat messages (POST /babble like live.js, each player
  *           at most once per 3 s), and CHURN_PER_SECOND streams close and come back (half
  *           a blip: back after 1-3 s with Last-Event-ID; half a player leaving: back after
@@ -80,7 +80,7 @@ enum {
 	K_PAGE, K_FIGHT, K_FIGHT_JSON, K_FIGHT_OPEN, K_MOVE, K_VICTORY, K_OTHER, K_STATIC, K_CHAT, NKINDS
 };
 static const char *const kind_names[NKINDS] = {
-	"page GET /", "fight POST", "fight POST json", "fight GET", "move POST", "victory GET", "other",
+	"page GET /", "fight POST", "fight POST live", "fight GET", "move POST", "victory GET", "other",
 	"static", "chat POST",
 };
 
@@ -433,9 +433,8 @@ typedef struct client {
 	int     fstate, dir, static_i, step_fight;
 	char    follow[256];    /* redirect to follow next (immediately) */
 	unsigned rng;
-	int     json;           /* fights through the JSON fight API (like fight.js) */
-	int     json_req;       /* the request in flight asked for JSON */
-	int     follow_json;    /* follow[] is fetched with JSON too (a fight page) */
+	int     live;           /* fights as live requests (like client.js) */
+	int     live_req;       /* the request in flight is a live one */
 	int     round;          /* the fight round the last fight page showed (0: none) */
 	int64_t last_chat;      /* when this account last posted to the chat */
 } client;
@@ -480,20 +479,18 @@ static void schedule_next(client *c, int64_t now)
 		c->next_at = now;
 }
 
-/* json: like fetch in fight.js (Accept: application/json, the CSRF token in a header) */
+/* live: like client.js (X-DK-Live: 1; no X-DK-Have, so the answers carry the whole page:
+   the most a live answer costs) */
 static void build_request_ex(client *c, const char *method, const char *path, const char *body, int kind,
-							 int json)
+							 int live)
 {
 	c->out.len = 0;
 	c->out_off = 0;
 	buf_printf(&c->out, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n", method, path, O.host);
 	if (c->cookie[0])
 		buf_printf(&c->out, "Cookie: %s\r\n", c->cookie);
-	if (json) {
-		buf_printf(&c->out, "Accept: application/json\r\n");
-		if (body)
-			buf_printf(&c->out, "X-CSRF-Token: %s\r\n", c->csrf);
-	}
+	if (live)
+		buf_printf(&c->out, "X-DK-Live: 1\r\n");
 	if (body) {
 		buf_printf(&c->out, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: %zu\r\n\r\n%s",
 				   strlen(body), body);
@@ -502,7 +499,7 @@ static void build_request_ex(client *c, const char *method, const char *path, co
 	}
 	c->kind = kind;
 	c->is_post = body != NULL;
-	c->json_req = json;
+	c->live_req = live;
 }
 
 static void build_request(client *c, const char *method, const char *path, const char *body, int kind)
@@ -523,32 +520,22 @@ static int kind_of_path(const char *path)
 	return K_OTHER;
 }
 
-/* the pages fight.js fetches as JSON when the API redirects there */
-static int is_fight_page(const char *path)
-{
-	return !strcmp(path, "/fight") || !strcmp(path, "/victory") || !strcmp(path, "/drop")
-		   || !strcmp(path, "/dead");
-}
-
 static void next_fight_request(client *c)
 {
 	char body[200], rnd_field[24] = "";
 	if (c->round > 0 && is_live_mix())
 		snprintf(rnd_field, sizeof rnd_field, "&round=%d", c->round);
-	/* the JSON API takes the token from the header, a form from its field */
-	const char *csrf = c->json ? "" : c->csrf;
-	const char *amp = c->json ? "" : "&";
 	switch (c->fstate) {
 	case F_FIGHT:
 		build_request(c, "GET", "/fight", NULL, K_FIGHT_OPEN);
 		break;
 	case F_FIGHT_POST:
-		snprintf(body, sizeof body, "%s%s%sfight=Fight%s", c->json ? "" : "csrf=", csrf, amp, rnd_field);
-		build_request_ex(c, "POST", "/fight", body, c->json ? K_FIGHT_JSON : K_FIGHT, c->json);
+		snprintf(body, sizeof body, "csrf=%s&fight=Fight%s", c->csrf, rnd_field);
+		build_request_ex(c, "POST", "/fight", body, c->live ? K_FIGHT_JSON : K_FIGHT, c->live);
 		break;
 	case F_CONTINUE:
-		snprintf(body, sizeof body, "%s%s%scontinue=Continue%s", c->json ? "" : "csrf=", csrf, amp, rnd_field);
-		build_request_ex(c, "POST", "/fight", body, c->json ? K_FIGHT_JSON : K_FIGHT, c->json);
+		snprintf(body, sizeof body, "csrf=%s&continue=Continue%s", c->csrf, rnd_field);
+		build_request_ex(c, "POST", "/fight", body, c->live ? K_FIGHT_JSON : K_FIGHT, c->live);
 		break;
 	default:
 		c->dir = !c->dir;
@@ -560,9 +547,8 @@ static void next_fight_request(client *c)
 static void next_request(client *c)
 {
 	if (c->follow[0]) {
-		build_request_ex(c, "GET", c->follow, NULL, kind_of_path(c->follow), c->follow_json);
+		build_request(c, "GET", c->follow, NULL, kind_of_path(c->follow));
 		c->follow[0] = '\0';
-		c->follow_json = 0;
 		return;
 	}
 	int what = O.scenario;
@@ -582,25 +568,19 @@ static void next_request(client *c)
 	}
 }
 
-/* a fight form's button in HTML, or in HTML inside a JSON string */
+/* a fight form's button in a page or a live answer (its regions are HTML as is) */
 static int has_button(const char *body, const char *name)
 {
-	char a[48], b[48];
+	char a[48];
 	snprintf(a, sizeof a, "name=\"%s\"", name);
-	snprintf(b, sizeof b, "name=\\\"%s\\\"", name);
-	return body && (strstr(body, a) || strstr(body, b));
+	return body && strstr(body, a);
 }
 
-/* the round a fight page shows (its form's field, or the JSON answer's "round"), or 0 */
+/* the round a fight page shows (its form's field), or 0 */
 static int find_round(const char *body)
 {
-	if (!body)
-		return 0;
-	const char *p = strstr(body, "name=\"round\" value=\"");
-	if (p)
-		return atoi(p + 20);
-	p = strstr(body, "\"round\":");
-	return p ? atoi(p + 8) : 0;
+	const char *p = body ? strstr(body, "name=\"round\" value=\"") : NULL;
+	return p ? atoi(p + 20) : 0;
 }
 
 /* Response complete: update the client's script state. */
@@ -609,23 +589,10 @@ static void on_response(client *c, const hresp *r, const char *body)
 	int is_fight_flow = c->kind == K_FIGHT || c->kind == K_FIGHT_JSON || c->kind == K_FIGHT_OPEN
 						|| c->kind == K_MOVE || c->kind == K_VICTORY
 						|| (c->kind == K_PAGE && O.scenario == SC_FIGHTS);
-	const char *jr = c->json_req && r->status == 200 && body ? strstr(body, "\"redirect\":\"") : NULL;
-	if (c->json_req && body && strstr(body, "\"stale\":true"))
+	/* a live answer comes from the page the server's redirects landed on: the fight, the
+	   victory, the town; its buttons tell which */
+	if (c->live_req && body && strstr(body, "fight-stale"))
 		atomic_fetch_add(&g_stale, 1);
-	if (jr) {
-		/* the JSON API's redirect: fight pages are fetched as JSON again, others loaded */
-		char path[256];
-		size_t n = 0;
-		for (const char *p = jr + 12; *p && *p != '"' && n < sizeof path - 1; p++)
-			if (!(p[0] == '\\' && p[1] == '/'))
-				path[n++] = *p;
-		path[n] = '\0';
-		snprintf(c->follow, sizeof c->follow, "%s", path);
-		c->follow_json = is_fight_page(path);
-		c->fstate = strcmp(path, "/fight") == 0 ? F_FIGHT : F_MOVE;
-		c->round = 0;
-		return;
-	}
 	if (r->status == 302 || r->status == 303) {
 		const char *loc = r->location;
 		const char *path = strstr(loc, "://") ? strchr(strstr(loc, "://") + 3, '/') : loc;
@@ -1836,7 +1803,7 @@ static int run_live_mix(void)
 		ac[i].fd = -1;
 		ac[i].rng = 0x9e3779b9u * (unsigned)(i + 1);
 		ac[i].static_i = i;
-		ac[i].json = i % 2 == 0;
+		ac[i].live = i % 2 == 0;
 	}
 	setup_accounts(lc, nl, "live");
 	setup_accounts(ac, na, O.prefix);

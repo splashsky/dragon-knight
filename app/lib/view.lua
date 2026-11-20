@@ -243,33 +243,6 @@ function view.page(req, title, template, ctx, opts)
 	return view.layout(req, title, view.render(template, ctx, req), opts)
 end
 
--- The parts of the page view.page would draw, as HTML for a script to swap in (fight.js):
--- main (the middle column: templates/<template>.html with ctx), nav_left and nav_right
--- (the side columns' boxes, from the user row as it is now, like the layout). Same
--- templates as the page, so the two can't drift.
-function view.fragments(req, template, ctx)
-	local out = { main = wire.strip(view.render(template, ctx, req)) }
-	local user = req.user and game.user(req.user.id)
-	if user then
-		req.user = user
-		local nav = game.nav(user)
-		out.nav_left = wire.strip(view.render("layout/nav_left", nav, req))
-		out.nav_right = wire.strip(view.render("layout/nav_right", nav, req))
-	end
-	return out
-end
-
--- The JSON answer for a page fetched by a script: t (the route's fields) plus title, url
--- (the page's address, for history.replaceState: req.path unless t has one) and fragments
--- (view.fragments).
-function view.fragment_page(req, title, template, ctx, t)
-	t = t or {}
-	t.title = title
-	t.url = t.url or req.path
-	t.fragments = view.fragments(req, template, ctx)
-	return view.json(t)
-end
-
 -- A page whose content is a trusted HTML snippet (legacy display("text...")).
 -- Escape any user data you interpolate with dk.html().
 function view.message(req, title, html, opts)

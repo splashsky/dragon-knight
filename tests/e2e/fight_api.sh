@@ -1,9 +1,9 @@
-# tests/e2e/fight_api.sh :: the JSON fight API and smooth fights (2.3, docs/APP.md "Fight
-# API"): the same scenarios played as a form and with fetch from the same state and the
-# same dice (X-Test-Seed, test_routes) must leave the same database and say the same lines;
-# the events' shape (spells, items, statuses, summons, monster spells and items); stale
-# rounds (a second click, an older tab) in both paths; CSRF; the victory, death and drop
-# pages as fragments; the no-JS page (the round field).
+# tests/e2e/fight_api.sh :: smooth fights (docs/APP.md "Fight events"): the same scenarios
+# played as a form and as the live client sends it (a live request, whose answer carries the
+# round's events) from the same state and the same dice (X-Test-Seed, test_routes) must
+# leave the same database and say the same lines; the events' shape (spells, items,
+# statuses, summons, monster spells and items); stale rounds (a second click, an older tab)
+# in both paths; CSRF; the victory, death and drop pages; the no-JS page (the round field).
 # Sourced by tests/run.sh.
 if ! command -v python3 >/dev/null; then
 	t_section "fight api (skipped: needs python3)"
@@ -38,13 +38,20 @@ FA_STATE="SELECT currenthp || ',' || currentmp || ',' || currenttp || ',' || gol
 	coalesce($T_ITEMS, '') FROM users $FAQ"
 fa_state() { t_sql "$FA_STATE"; }
 
-# JSON and HTML helpers (python3): the fight lines of a page, the events' texts, a value
-# of the answer (an expression on d), and the shape of the answer and its events.
+# Live answers and HTML (python3): a live answer (the wire format, tests/wire.py's reader)
+# read as d = { events, fragments = { main, nav_left, nav_right } (the middle and side
+# columns of the page it brings), url, title, round (its form's), stale (its note),
+# redirect (where the server's redirects landed, when not where the request went), error
+# (an error page's text) }; the fight lines of a page, the events' texts, a value (an
+# expression on d), and the shape of the events.
 cat > "$T/fa.py" <<'PY'
 import html, json, re, sys
+sys.path.insert(0, sys.argv[-1])
+from wire import frames
 
-cmd, path = sys.argv[1], sys.argv[2]
-text = open(path, encoding="utf-8").read()
+cmd, path, req = sys.argv[1], sys.argv[2], sys.argv[-2]
+raw = open(path, "rb").read()
+text = raw.decode("utf-8")
 
 ACTORS = {"player", "ally", "enemy"}
 TYPES = {"attack", "spell", "item", "status", "summon", "blocked", "run", "ambush", "wave", "say",
@@ -54,29 +61,42 @@ EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", 
 CHANGE = {"who", "id", "name", "from", "to", "max"}
 STATUS = {"who", "id", "name", "key", "status", "turns", "change", "statuses"}
 SUMMON = {"change", "id", "name", "hp", "max", "turns"}
-TOP = {"events", "fragments", "round", "redirect", "url", "title", "stale", "error"}
-FRAGMENTS = {"main", "nav_left", "nav_right"}
+
+def inner(body, start, tag):
+	m = re.search(start + r'[^>]*>(.*?)</' + tag + '>', body, re.S)
+	return m.group(1) if m else None
+
+def answer():
+	d = {"events": []}
+	regions = {}
+	for op, args, payload in frames(path):
+		p = payload.decode("utf-8")
+		if op == "events" and args == ["fight"]: d["events"] = json.loads(p)
+		elif op == "title": d["title"] = p
+		elif op == "url": d["url"] = p
+		elif op == "region": regions[args[0]] = p
+		elif op == "go": d["redirect"] = p
+	body = regions.get("root", "")
+	main = inner(body, r'<main class="dk-middle" data-r="main"', "main")
+	if main is not None:
+		d["fragments"] = {"main": main, "nav_left": inner(body, r'<aside class="dk-left" data-r="left"', "aside") or "",
+			"nav_right": inner(body, r'<aside class="dk-right" data-r="right"', "aside") or ""}
+		m = re.search(r'name="round" value="(\d+)"', main)
+		if m: d["round"] = int(m.group(1))
+		if "fight-stale" in main: d["stale"] = True
+		if d.get("title") == "Error": d["error"] = html.unescape(re.sub(r"<[^>]*>", "", main)).strip()
+	if "url" in d and d["url"] != req: d["redirect"] = d["url"]
+	return d
 
 def is_int(v):
 	return isinstance(v, int) and not isinstance(v, bool)
 
 def check(d):
-	assert isinstance(d, dict), "not an object"
-	assert set(d) <= TOP, "top-level keys: %s" % sorted(set(d) - TOP)
 	if "error" in d:
-		assert isinstance(d["error"], str) and d["error"], "error"
+		assert d["events"] == [], "an error plays nothing"
 		return
-	assert isinstance(d.get("events"), list), "events"
-	for k in ("redirect", "url", "title"):
-		assert k not in d or isinstance(d[k], str), k
-	assert "round" not in d or is_int(d["round"]), "round"
-	assert "stale" not in d or d["stale"] is True, "stale"
-	if "fragments" in d:
-		assert set(d["fragments"]) <= FRAGMENTS and "main" in d["fragments"], "fragments"
-		assert all(isinstance(v, str) for v in d["fragments"].values()), "fragment strings"
-		assert "url" in d and "title" in d, "a page has its url and title"
-	else:
-		assert "redirect" in d, "fragments or a redirect"
+	assert "fragments" in d or "redirect" in d, "a page or a redirect"
+	assert "fragments" not in d or "title" in d, "a page has its title"
 	for e in d["events"]:
 		assert set(e) <= EVENT, "event keys: %s" % sorted(set(e) - EVENT)
 		assert e["type"] in TYPES, "type %r" % e["type"]
@@ -108,27 +128,30 @@ if cmd == "lines-html":
 		for line in p.split("<br>"):
 			print(html.unescape(line))
 elif cmd == "lines-json":
-	for e in json.loads(text)["events"]:
+	for e in answer()["events"]:
 		if "text" in e:
 			print(e["text"])
 elif cmd == "get":
-	d = json.loads(text)
+	d = answer()
 	v = eval(sys.argv[3], {"d": d, "any": any, "all": all, "len": len})
 	print(v if isinstance(v, str) else json.dumps(v))
 elif cmd == "check":
 	try:
-		check(json.loads(text))
+		check(answer())
 		print("ok")
 	except Exception as err:
 		print("bad: %s" % err)
 elif cmd == "html-has":
 	print("yes" if sys.argv[3] in html.unescape(text) else "no")
 PY
-fa_py() { python3 "$T/fa.py" "$1" "$BODY" "${@:2}"; }
+# a live request as the live client sends it (no regions known: the answer brings the
+# whole page); fa_py reads it
+fa_live() { FA_REQ=$2; t_live_forget; t_live "$@"; }
+fa_py() { python3 "$T/fa.py" "$1" "$BODY" "${@:2}" "${FA_REQ:-/fight}" "$ROOT/tests"; }
 fa_get() { fa_py get "$1"; }
-fa_check() {  # the answer (JSON) has the documented shape
+fa_check() {  # the answer has the documented shape
 	local r; r=$(fa_py check)
-	if [ "$r" = ok ]; then t_ok; else t_fail "JSON shape: $r"; fi
+	if [ "$r" = ok ]; then t_ok; else t_fail "answer shape: $r"; fi
 }
 fa_expect() {  # fa_expect 'python expression on d' [label]: true
 	local r; r=$(fa_get "$1")
@@ -137,25 +160,25 @@ fa_expect() {  # fa_expect 'python expression on d' [label]: true
 fa_location() { grep -i '^location:' "$HEADERS" | tr -d '\r' | cut -d' ' -f2; }
 
 # fa_both LABEL SEED SETUP 'fields': SETUP, then the round as a form (no JS), then SETUP
-# again and the same round with fetch, both with the dice seeded by SEED. Same database
-# afterwards, same lines (a redirect: the same target), and a well-formed answer. The
-# JSON answer stays in $BODY; FA_LINES has its lines.
+# again and the same round as a live request, both with the dice seeded by SEED. Same
+# database afterwards, same lines (a redirect: the same target), and a well-formed answer.
+# The live answer stays in $BODY; FA_LINES has its lines.
 fa_both() {
 	local label=$1 seed=$2 setup=$3 fields=$4 st1 st2 l1 l2 s1 loc1
 	$setup
 	t_post /fight "csrf=$FA_CS&$fields" -H "X-Test-Seed: $seed"
 	s1=$STATUS; st1=$(fa_state); l1=$(fa_py lines-html); loc1=$(fa_location)
 	$setup
-	t_fetch /fight "$fields" -H "X-Test-Seed: $seed"
+	fa_live POST /fight "csrf=$FA_CS&$fields" -H "X-Test-Seed: $seed"
 	expect_status 200; fa_check
 	st2=$(fa_state); l2=$(fa_py lines-json)
 	FA_LINES=$l2
-	if [ "$st1" = "$st2" ]; then t_ok; else t_fail "$label (seed $seed): the database differs: form $st1, fetch $st2"; fi
+	if [ "$st1" = "$st2" ]; then t_ok; else t_fail "$label (seed $seed): the database differs: form $st1, live $st2"; fi
 	if [ "$s1" = 302 ]; then
 		[ "$(fa_get 'd.get("redirect", "")')" = "$loc1" ] && t_ok || t_fail "$label (seed $seed): redirect $loc1 vs $(fa_get 'd.get("redirect")')"
 	else
 		[ "$s1" = 200 ] && t_ok || t_fail "$label (seed $seed): form status $s1"
-		if [ "$l1" = "$l2" ]; then t_ok; else t_fail "$label (seed $seed): the lines differ: form [$l1], fetch [$l2]"; fi
+		if [ "$l1" = "$l2" ]; then t_ok; else t_fail "$label (seed $seed): the lines differ: form [$l1], live [$l2]"; fi
 		[ -n "$(fa_get 'd.get("redirect", "")')" ] && t_fail "$label (seed $seed): a redirect" || t_ok
 	fi
 }
@@ -199,7 +222,7 @@ for seed in 1 2 3 4 5 6; do
 	[ "$(fa_get 'any(e["type"] == "attack" and e["actor"] == "player" and e["hp"][0]["who"] == "enemy" and e["hp"][0]["to"] < e["hp"][0]["from"] for e in d["events"] if "hp" in e)')" = true ] && FA_HIT=1
 done
 [ -n "$FA_HIT" ] && t_ok || t_fail "no attack's damage in the events"
-fa_expect 'd["round"] == 3 and d["url"] == "/fight" and d["title"] == "Fighting"'
+fa_expect 'd["round"] == 3 and "url" not in d and d["title"] == "Fighting"' "a POST's own page: no address"
 fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "Latitude:" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
 fa_expect '"name=\"round\" value=\"3\"" in d["fragments"]["main"] and "<html" not in d["fragments"]["main"]'
 fa_expect 'not any("data" in e or "step" in e for e in d["events"])' "no internal state"
@@ -211,12 +234,12 @@ fa_expect 'any(e["text"].startswith("You attack the monster for") and e["hp"][0]
 fa_is "$T_MONSTER_HP <= 0" 1
 
 t_section "fight api: the victory page as a fragment"
-t_get /victory -H 'Accept: application/json'; expect_status 200; fa_check
+fa_live GET /victory; expect_status 200; fa_check
 fa_expect '"Congratulations. You have defeated the Red Slime." in d["fragments"]["main"] and d["url"] == "/victory"'
 fa_expect 'd["title"] in ("Victory!", "Courage and Wit have served thee well!") and d["events"] == []'
 fa_is currentaction Exploring; fa_is "$T_ROUND" 0
 EXP=$(t_sql "SELECT experience FROM users $FAQ")
-t_get /victory -H 'Accept: application/json'; fa_check; fa_expect '"Congratulations." in d["fragments"]["main"]' "shown again"
+fa_live GET /victory; fa_check; fa_expect '"Congratulations." in d["fragments"]["main"]' "shown again"
 fa_is experience "$EXP"
 
 t_section "fight api: running away"
@@ -354,7 +377,7 @@ fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing chang
 	[ "$(fa_py html-has "$3")" = yes ] && t_ok || t_fail "page lacks: $3"
 	st1=$(fa_state); [ "$st1" = "$before" ] && t_ok || t_fail "a refusal changed: $before -> $st1"
 	$1
-	t_fetch /fight "$2"; expect_status 200; fa_check
+	fa_live POST /fight "csrf=$FA_CS&$2"; expect_status 200; fa_check
 	[ "$(fa_get 'd["error"]')" = "$3" ] && t_ok || t_fail "error: $(fa_get 'd.get("error")')"
 	[ "$(fa_state)" = "$before" ] && t_ok || t_fail "a refusal changed (fetch)"
 }
@@ -385,7 +408,7 @@ t_section "fight api: monster spells and items"
 fa_find() {
 	local seed found=
 	for seed in $(seq 1 40); do
-		$2; t_fetch /fight "$3" -H "X-Test-Seed: $seed"
+		$2; fa_live POST /fight "csrf=$FA_CS&$3" -H "X-Test-Seed: $seed"
 		if [ "$(fa_get "$4")" = true ]; then found=$seed; break; fi
 	done
 	if [ -z "$found" ]; then t_fail "$1: no seed of 40 gives it"; return; fi
@@ -409,16 +432,16 @@ fa_find "bandit: Craze" fa_bandit "fight=Fight&round=2" \
 	'any(e["actor"] == "enemy" and e["type"] == "spell" and s["who"] == "enemy" and s["key"] == "uber_damage" for e in d["events"] for s in e.get("status", []))'
 fa_expect '"Damage Up" in d["fragments"]["main"]'
 # an attack-only monster: its MP isn't on the page
-fa_slime; t_fetch /fight "fight=Fight&round=2"; fa_check
+fa_slime; fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=2"; fa_check
 fa_expect '"fight-monstermp" not in d["fragments"]["main"] and "fight-monsterhp" in d["fragments"]["main"]'
 
 t_section "fight api: death"
 fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 151 30000; }
 fa_both death 1 fa_doomed "fight=Fight&round=2"
 fa_expect 'd["events"][-1]["type"] == "death" and "<b>You have died.</b>" in d["fragments"]["main"] and "round" not in d'
-fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and d["url"] == "/fight"'
+fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and "url" not in d'
 fa_is currentaction "In Town"
-t_get /dead -H 'Accept: application/json'; expect_status 200; fa_check
+fa_live GET /dead; expect_status 200; fa_check
 fa_expect '"You have died." in d["fragments"]["main"] and d["title"] == "You Have Died" and d["url"] == "/dead"'
 
 t_section "fight api: stale rounds"
@@ -435,12 +458,12 @@ BEFORE=$(fa_state)
 t_post /fight "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'fight-stale'; expect_body 'name="round" value="3"'
 [ "$(fa_state)" = "$BEFORE" ] && t_ok || t_fail "a stale form changed the fight"
 # the same with fetch
-t_fetch /fight "fight=Fight&round=3"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 4'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=3"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 4'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_fetch /fight "fight=Fight&round=3"; expect_status 200; fa_check
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=3"; expect_status 200; fa_check
 fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 4 and "fight-stale" in d["fragments"]["main"]'
 fa_is "$T_MONSTER_HP" "$HP"
-t_fetch /fight "fight=Fight&round=x"; fa_check; fa_expect 'd["stale"] is True'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=x"; fa_check; fa_expect 'd["stale"] is True'
 # long fights: the counter goes past the original's cap of 255, stale rounds are still caught
 fa_player; t_fight fapi 2 5000 255
 t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 256
@@ -452,44 +475,44 @@ t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'You attack the m
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
 t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'
 fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 302
-t_fetch /fight "fight=Fight&round=302"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 303'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=302"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 303'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_fetch /fight "fight=Fight&round=302"; fa_check; fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 303'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=302"; fa_check; fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 303'
 fa_is "$T_MONSTER_HP" "$HP"
 # a won fight: on to the victory; a fight that is over: home
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fight_combatants SET hp = 0 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FAQ)"
-t_fetch /fight "fight=Fight&round=1"; fa_check; fa_expect 'd["redirect"] == "/victory" and d["stale"] is True'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=1"; fa_check; fa_expect 'd["redirect"] == "/victory"'
 t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_redirect /   # paid: the fight is over
 t_fight_clear fapi; fa_sql "UPDATE users SET currentaction = 'Exploring'"
 t_post /fight "csrf=$FA_CS&fight=Fight&round=9"; expect_redirect /
-t_fetch /fight "fight=Fight&round=9"; fa_check; fa_expect 'd["redirect"] == "/" and d["stale"] is True'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=9"; fa_check; fa_expect 'd["redirect"] == "/"'
 t_post /fight "csrf=$FA_CS&fight=Fight"; expect_body 'Cheat attempt detected.'   # no round: as before
-t_fetch /fight "fight=Fight"; fa_check; fa_expect 'd["error"].startswith("Cheat attempt detected.")'
+fa_live POST /fight "csrf=$FA_CS&fight=Fight"; fa_check; fa_expect 'd["error"].startswith("Cheat attempt detected.")'
 
 t_section "fight api: CSRF"
 fa_slime; BEFORE=$(fa_state)
-t_req POST /fight --data "fight=Fight&round=2" -H 'Accept: application/json'; expect_status 403
-t_req POST /fight --data "fight=Fight&round=2" -H 'Accept: application/json' -H "X-CSRF-Token: $(printf '0%.0s' $(seq 64))"
+t_req POST /fight --data "fight=Fight&round=2" -H 'X-DK-Live: 1'; expect_status 403
+t_req POST /fight --data "fight=Fight&round=2" -H 'X-DK-Live: 1' -H "X-CSRF-Token: $(printf '0%.0s' $(seq 64))"
 expect_status 403
 [ "$(fa_state)" = "$BEFORE" ] && t_ok || t_fail "a POST without the token changed the fight"
-t_req POST /drop --data "take=Take+it" -H 'Accept: application/json'; expect_status 403
+t_req POST /drop --data "take=Take+it" -H 'X-DK-Live: 1'; expect_status 403
 
 t_section "fight api: item drops"
 t_fight_clear fapi; fa_player; fa_sql "UPDATE users SET currentaction = 'Exploring', dropcode = $(it life_pebble)"
-t_get /drop -H 'Accept: application/json'; expect_status 200; fa_check
+fa_live GET /drop; expect_status 200; fa_check
 fa_expect '"<b>Life Pebble</b>" in d["fragments"]["main"] and "data-fight" in d["fragments"]["main"] and d["url"] == "/drop" and d["title"] == "Item Drop"'
-t_fetch /drop "take=Take+it"; expect_status 200; fa_check
+fa_live POST /drop "csrf=$FA_CS&take=Take+it"; expect_status 200; fa_check
 fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "<b>1</b>/12</span>" in d["fragments"]["nav_right"]'
 fa_is dropcode 0; fa_is "$T_ITEMS" life_pebble
-t_get /drop -H 'Accept: application/json'; fa_check; fa_expect 'd["redirect"] == "/"'
+fa_live GET /drop; fa_check; fa_expect 'd["redirect"] == "/"'
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"
-t_fetch /drop "leave=Leave+it"; fa_check; fa_expect 'd["redirect"] == "/"'; fa_is dropcode 0
+fa_live POST /drop "csrf=$FA_CS&leave=Leave+it"; fa_check; fa_expect 'd["redirect"] == "/"'; fa_is dropcode 0
 for k in stick branch club dagger hatchet axe brand poleaxe broadsword battle_axe claymore; do t_give fapi "$k"; done
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"
-t_fetch /drop "take=x&discard=999999"; fa_check
+fa_live POST /drop "csrf=$FA_CS&take=x&discard=999999"; fa_check
 fa_expect 'd["error"] == "Please go back and select an item from your bag to discard."'
-t_fetch /drop "take=x"; fa_check; fa_expect '"Your bag is full. Choose an item to discard first" in d["fragments"]["main"]'
+fa_live POST /drop "csrf=$FA_CS&take=x"; fa_check; fa_expect '"Your bag is full. Choose an item to discard first" in d["fragments"]["main"]'
 fa_is dropcode "$(it life_pebble)"
 t_items_clear fapi; fa_sql "UPDATE users SET dropcode = 0"
 

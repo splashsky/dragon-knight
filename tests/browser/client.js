@@ -149,6 +149,29 @@ async function run(wsUrl) {
 		}
 	}
 
+	section = "a fight";
+	await js("fetch('/__test/encounter', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': document.body.dataset.csrf } })" +
+		".then(function () { DK.visit('/fight'); })");
+	check("the fight page", await until("location.pathname === '/fight' && document.title === 'Fighting' && !DK.busy()"), await js("document.title"));
+	check("no reload", await js("window.__dk === 1"));
+	if (await js("!!document.querySelector('form[data-fight] button[name=fight]')")) {
+		check("the monster's bar (made by fight.js, kept by the morph)", await js("!!document.querySelector('[data-fighter] .fight-meter[data-client]')"));
+		var round = await js("Number(document.querySelector('form[data-fight] [name=round]').value)");
+		await js("document.querySelector('form[data-fight] button[name=fight]').focus(); document.querySelector('form[data-fight] button[name=fight]').click()");
+		check("the round plays: its first line", await until("!!document.querySelector('[data-fight-log] .fight-line')", 3000));
+		check("the forms are locked meanwhile", await js("!document.querySelector('form[data-fight]') || !!document.querySelector('[data-fight-locked]')"));
+		check("then the page as the server has it", await until("!DK.busy() && !document.querySelector('[data-fight-log] .fight-line') && !document.querySelector('[data-fight-locked]')", 8000));
+		var after = await js("location.pathname");
+		if (after === "/fight" && await js("!!document.querySelector('form[data-fight] [name=round]')")) {
+			check("the next round's form", await js("Number(document.querySelector('form[data-fight] [name=round]').value)") === round + 1);
+			check("the focus back on Attack", await js("document.activeElement && document.activeElement.name === 'fight'"), await js("document.activeElement && document.activeElement.outerHTML.slice(0, 80)"));
+			check("the bar still there", await js("!!document.querySelector('[data-fighter] .fight-meter[data-client]')"));
+		}
+		check("no reload", await js("window.__dk === 1"));
+	}
+	await js("DK.visit('/')");
+	await until("!DK.busy()");
+
 	section = "slow answers";
 	await js("var a = document.createElement('a'); a.href = '/__test/slow?ms=900'; a.textContent = 'slow';" +
 		"document.querySelector('[data-r=main]').appendChild(a); a.click()");
@@ -189,7 +212,8 @@ async function run(wsUrl) {
 	await js("document.querySelector('[name=username]').value = " + JSON.stringify(USER) +
 		"; document.querySelector('[name=password]').value = " + JSON.stringify(PASS) + ";" +
 		"document.querySelector('form[action=\"/login\"]').requestSubmit()");
-	check("logged in again", await until("location.pathname === '/' && !DK.busy() && document.body.hasAttribute('data-live')"));
+	check("logged in again", await until("/^\\/(fight)?$/.test(location.pathname) && !DK.busy() && document.body.hasAttribute('data-live')"),
+		await js("location.pathname"));
 
 	section = "bad answers";
 	// a region the page doesn't have: the client loads the page natively
