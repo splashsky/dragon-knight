@@ -402,16 +402,21 @@ CREATE TABLE sessions (
 CREATE INDEX sessions_user ON sessions (user_id);
 CREATE INDEX sessions_expires ON sessions (expires);
 
--- A fight in progress (app/fight/state.lua), one per player, loaded and saved once per
--- request. round: the fight's counter (1: the encounter just began, no monster picked
--- yet; +1 per fight page, like the original currentfight but without its cap of 255);
--- wave: the enemies' wave on the field; data: fight-level values ("name=value" lines,
--- typed).
+-- A fight (app/fight/state.lua), one per player, loaded and saved once per request.
+-- round: the fight's counter (+1 per round played, without the original's cap of 255; the
+-- encounter's first strike is round 1, so the first form carries 2); wave: the enemies'
+-- wave on the field; data: fight-level values ("name=value" lines, typed). outcome: '' in
+-- progress, 'victory' or 'death': a finished fight is kept for its page (GET /fight, GET
+-- /victory) until the next encounter or a move (app/fight/encounter.lua); log: the last
+-- round's lines ("<part>\t<line>" lines); result: a victory's rewards ("name=value" lines).
 CREATE TABLE fights (
 	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
 	round    INTEGER NOT NULL DEFAULT 1,
 	wave     INTEGER NOT NULL DEFAULT 1,
-	data     TEXT    NOT NULL DEFAULT ''
+	data     TEXT    NOT NULL DEFAULT '',
+	outcome  TEXT    NOT NULL DEFAULT '',
+	log      TEXT    NOT NULL DEFAULT '',
+	result   TEXT    NOT NULL DEFAULT ''
 );
 
 -- The combatants of a fight, numbered from 1 within it (1: the player). side: player,

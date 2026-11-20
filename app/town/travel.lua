@@ -2,6 +2,7 @@
 -- town must be on your map) and arriving by walking onto a town (explore.lua, free).
 local common = require("town.common")
 local php = require("lib.php")
+local state = require("fight.state")
 local view = require("lib.view")
 
 local travel = {}
@@ -20,6 +21,8 @@ function travel.go(req, id, usepoints)
 		return common.message(req, "Travel To", "travel_here")
 	end
 
+	-- moving on: the page of the last finished fight goes
+	state.forget(user.id)
 	local newtp = user.currenttp
 	if usepoints then newtp = newtp - town.travelpoints end
 	-- arriving by exploring puts the town on your map

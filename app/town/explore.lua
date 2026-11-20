@@ -1,5 +1,7 @@
--- town/explore.lua :: legacy explore.php move(): compass buttons, 1-in-5 chance of a fight.
--- Each move is a turn for the world statuses (lib/world.lua).
+-- town/explore.lua :: legacy explore.php move(): compass buttons, 1-in-5 chance of a fight
+-- (it begins here: fight/encounter.lua). Each move is a turn for the world statuses
+-- (lib/world.lua).
+local encounter = require("fight.encounter")
 local game = require("lib.game")
 local php = require("lib.php")
 local state = require("fight.state")
@@ -24,16 +26,18 @@ function explore.move(req)
 	if form.west ~= nil then lon = lon - 1; if lon < -size then lon = -size end end
 
 	world.move(user, php.rand)
+	-- moving on: the page of the last finished fight goes
+	state.forget(user.id)
 
 	local town = game.town_at(lat, lon)
 	if town then return travel.go(req, town.id, false) end
 
 	if php.rand(1, 5) == 1 then
-		-- /fight picks the monster when the fight's round is 1
-		state.begin(user.id)
+		-- the encounter begins here: the monster is picked, its first strike played
+		-- (fight/encounter.lua); with no monster to meet the move is an ordinary one
 		dk.db:exec("UPDATE users SET currentaction = 'Fighting', latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
 							 lat, lon, user.id)
-		return view.redirect("/fight")
+		if encounter.begin(user.id) then return view.redirect("/fight") end
 	end
 	dk.db:exec("UPDATE users SET currentaction = 'Exploring', latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
 						 lat, lon, user.id)

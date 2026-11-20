@@ -17,15 +17,17 @@ t_get /victory; expect_redirect /
 t_get /drop;    expect_redirect /
 t_get /dead;    expect_status 200; expect_body 'You have died.'
 
-# an encounter just began (monster not picked yet): no free victory
+# a fight in progress: no free victory
 t_fight_new fighter
-t_get /victory; expect_redirect /
-f_is "$T_ROUND" 1
+t_get /victory; expect_redirect /fight
+f_is "$T_ROUND" 2
 t_get /;        expect_redirect /fight
 
 t_section "fight: monster selection"
-t_fight_new fighter
+# the encounter begins where the player stands (POST /move, here t_fight_new): the monster
+# is picked by the level band, its first strike (when quicker) played
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
+t_fight_new fighter
 t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 expect_no_body 'action="/move"'                       # no compass while fighting
@@ -40,7 +42,7 @@ f_is "(SELECT c.maxhp FROM fight_combatants c WHERE c.user_id = users.id AND c.s
 f_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id)" 2
 t_post /fight "fight=Fight"; expect_status 403          # CSRF required
 f_is "$T_ROUND" 2
-t_get /fight; expect_body "Monster's HP: $hp"; f_is "$T_ROUND" 3   # refresh: same monster
+t_get /fight; expect_body "Monster's HP: $hp"; f_is "$T_ROUND" 2   # refresh: same monster, nothing counted
 
 t_section "fight: run away"
 CS=$(t_csrf)
@@ -71,9 +73,9 @@ t_fight_clear fighter
 f_sql "UPDATE users SET currentaction = 'Exploring', dexterity = $DEX"
 
 t_section "fight: victory + level up"
-t_fight_new fighter
 f_sql "UPDATE users SET latitude = 0, longitude = 0,
 	base_attack = 495, currenthp = 500, base_maxhp = 500, experience = 17, gold = 100"
+t_fight_new fighter
 t_get /fight; CS=$(t_csrf)
 for _ in $(seq 1 30); do
 	t_post /fight "csrf=$CS&fight=Fight"
@@ -92,7 +94,8 @@ expect_stats "502 4 11 7 6 502 6" "level-up stats"
 f_is currentaction Exploring; f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0
 [ "$(f_col experience)" -ge 18 ] && t_ok || t_fail "experience not awarded"
 [ "$(f_col gold)" -gt 100 ] && t_ok || t_fail "gold not awarded"
-t_get /victory; expect_redirect /                     # only once
+# paid in the winning round: the page shows it again, nothing more is paid
+t_get /victory; expect_status 200; expect_body 'You have gained a level!'; f_is level 2; f_is base_maxhp 502
 
 t_section "fight: victory without level up"
 t_fight_new fighter
@@ -208,6 +211,10 @@ expect_no_body 'name="fight"'
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0
 t_get /; expect_status 200; expect_body 'Town Options'
+# the fight as it ended stays on its page (GET /fight) until the player moves on
+t_get /fight; expect_status 200; expect_body '<b>You have died.</b>'; expect_body 'The monster attacks you for'
+expect_no_body 'name="fight"'; f_is gold 51
+t_get /victory; expect_redirect /
 
 t_section "fight: death on a spell turn keeps the MP spent, clears buffs"
 t_spells fighter 1,6,11,14
@@ -315,7 +322,7 @@ t_section "fight: victory drops come from the items with a drop level"
 for _ in $(seq 1 60); do
 	t_fight fighter 1 0
 	f_sql "UPDATE users SET dropcode = 0, level = 100, experience = 0"
-	t_get /victory
+	t_fight_win
 	[ "$(f_col dropcode)" != 0 ] && break
 done
 case $(f_col dropcode) in
@@ -329,14 +336,14 @@ t_section "fight: victory stores negative experience as 0 (MySQL UNSIGNED)"
 # Blue Slime: exp rand(0,1) -> at least 1; -500% bonus: 1 + ceil(-5) = -4; gold 1
 t_fight fighter 1 0
 f_sql "UPDATE users SET experience = 0, gold = 0, base_exp_bonus = -500, base_gold_bonus = 0, level = 2"
-t_get /victory; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
+t_fight_win; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
 f_is experience 0; f_is gold 1; f_is level 2
 
 t_section "fight: gold bonus is a percentage of the gold"
 # Blue Slime: exp 1 + ceil(5 * 1) = 6; gold 1 + ceil(1 * 1) = 2 (legacy: of the exp, 7)
 t_fight fighter 1 0
 f_sql "UPDATE users SET experience = 0, gold = 0, base_exp_bonus = 500, base_gold_bonus = 100"
-t_get /victory; expect_body 'You gain 6 experience.'; expect_body 'You gain 2 gold.'
+t_fight_win; expect_body 'You gain 6 experience.'; expect_body 'You gain 2 gold.'
 f_is experience 6; f_is gold 2
 
 t_section "fight: several levels at once"
@@ -346,7 +353,7 @@ f_sql "UPDATE users SET experience = 53, level = 1, base_maxhp = 15, base_maxmp 
 	strength = 5, dexterity = 5, base_attack = 0, base_defense = 0,
 	base_exp_bonus = 0, base_gold_bonus = 0"
 t_spells fighter ""
-t_get /victory; expect_body '<title>Courage and Wit have served thee well!</title>'
+t_fight_win; expect_body '<title>Courage and Wit have served thee well!</title>'
 expect_body 'You have gained 2 levels!'; expect_no_body 'gained a level'
 expect_body 'You gain 4 hit points.'; expect_body 'You gain 7 magic points.'
 expect_body 'You gain 3 travel points.'; expect_body 'You gain 5 strength.'
@@ -362,10 +369,10 @@ f_sql "UPDATE users SET experience = 2366, level = 9, base_maxhp = 50, base_maxm
 	strength = 30, dexterity = 30, base_attack = 0, base_defense = 0,
 	base_exp_bonus = 0, base_gold_bonus = 0"
 t_spells fighter 1
-t_get /victory; expect_body 'You gain 1 experience.'; expect_no_body 'gained a level'
+t_fight_win; expect_body 'You gain 1 experience.'; expect_no_body 'gained a level'
 f_is level 9; f_is experience 2367
 t_fight fighter 1 0
-t_get /victory; expect_body 'You have gained a level!'
+t_fight_win; expect_body 'You have gained a level!'
 expect_body 'You gain 10 hit points.'; expect_body 'You gain 2 magic points.'
 expect_body 'You gain 2 travel points.'; expect_body 'You gain 6 strength.'
 expect_body 'You gain 3 dexterity.'; expect_no_body 'learned a new spell'

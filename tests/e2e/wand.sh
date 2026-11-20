@@ -122,7 +122,7 @@ t_give wizard wand 1
 BAGWAND=$(wd_wand bag)
 t_get /fight; expect_no_body "name=\"use_gear\" value=\"$BAGWAND\""
 t_post /fight "csrf=$CS&use_gear=$BAGWAND"; expect_body 'You do not have this item equipped.'
-wd_is "$T_ROUND || '|' || $WD_CHARGES" "$((ROUND + 1))|weapon=0,bag=5"
+wd_is "$T_ROUND || '|' || $WD_CHARGES" "$ROUND|weapon=0,bag=5"
 t_fight_clear wizard
 wd_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"
 

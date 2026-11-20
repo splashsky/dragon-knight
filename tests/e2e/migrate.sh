@@ -10,7 +10,9 @@
 # account and recent players count as online; version 11 -> 12 that spells get their icons
 # (tests/fixtures/schema_v11.sql and seed_v11.sql) and the game shows them; version 12 -> 13
 # the lore columns; version 13 -> 14 (schema_v13.sql, seed_v13.sql) that Mages get +5 MP and
-# Magic Bolt, Midworld sells the Wand, and the rest equals a fresh install. Since version
+# Magic Bolt, Midworld sells the Wand, and the rest equals a fresh install; version 14 -> 15
+# (schema_v14.sql, seed_v14.sql) that a fight in progress goes on, an encounter waiting for
+# GET /fight is cancelled and a won fight waiting for GET /victory is paid. Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -461,7 +463,7 @@ t_get /register;   expect_body '<option value="1">Wizard</option>'; expect_body 
 t_login wiz v3pass1; expect_redirect /
 t_get /character;  expect_body 'Class: Wizard'
 mig_fight "$V3_DB" 1 1 0 3
-t_get /victory;    expect_status 200; expect_body 'You have gained a level!'
+t_fight_win;       expect_status 200; expect_body 'You have gained a level!'
 mig_eq "SELECT level || '|' || experience || '|' || base_maxhp || '|' || base_maxmp || '|' || base_maxtp || '|' || coalesce($T_KNOWN, '') FROM users WHERE id = 1" \
 	"2|15|24|10|11|25" "level-up with the migrated gains (5 MP from the start, +5)"
 mig_unserve "$MIG/v3server.log"
@@ -814,7 +816,9 @@ t_section "migrate: version 7 database"
 # version 7 schema + its game data, and characters in every state of a fight: mid-fight
 # with the monster asleep and both buffs, an encounter that just began, a victory not yet
 # collected, a fight whose monster was deleted, and one not fighting with leftover buff
-# values; only step 8 runs. The fights move to the fight tables and go on.
+# values; steps 8 and up run. The fights move to the fight tables and go on; step 15
+# (pure GETs) pays the victory and cancels the encounter that had just begun and the one
+# whose monster is gone (they were waiting for GET /fight to pick one).
 V7_DB="$MIG/v7.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V7_DB\"#" "$CONFIG" > "$MIG/v7.lua"
 mig_script "$V7_DB" "$ROOT/tests/fixtures/schema_v7.sql"
@@ -853,28 +857,27 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "v7 stamped"
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v7)"
 mig_eq "SELECT count(*) FROM pragma_table_info('users') WHERE name LIKE 'currentmonster%' OR name LIKE 'currentuber%' OR name = 'currentfight'" \
 	"0" "the fight columns are gone"
-[ "$(mig_users "$V7_DB")" = "$V7_USERS" ] && t_ok || t_fail "users otherwise changed (v7)"
+[ "$(mig_users "$V7_DB" | sed -n '1p;5p')" = "$(echo "$V7_USERS" | sed -n '1p;5p')" ] && t_ok || t_fail "users otherwise changed (v7)"
+mig_eq "SELECT group_concat(currentaction, ',') FROM (SELECT currentaction FROM users ORDER BY id)" \
+	"Fighting,Exploring,Exploring,Exploring,Exploring" "the victory paid, the encounters without a monster cancelled"
+mig_eq "SELECT (experience > 0) || '|' || (gold > 0) FROM users WHERE id = 3" "1|1" "the winner paid"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's (v7)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items equal a fresh install's (v7)"
 mig_eq "SELECT * FROM statuses ORDER BY id; SELECT * FROM summons ORDER BY id" \
 	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM statuses ORDER BY id; SELECT * FROM summons ORDER BY id")" "statuses and summons equal a fresh install's"
-mig_eq "SELECT user_id || '|' || round || '|' || wave FROM fights ORDER BY user_id" "1|4|1
-2|1|1
-3|3|1
-4|2|1" "fights (round = the old counter)"
+mig_eq "SELECT user_id || '|' || round || '|' || wave || '|' || outcome FROM fights ORDER BY user_id" "1|4|1|
+3|3|1|victory" "fights (round = the old counter; the won one kept for its page)"
 mig_eq "SELECT user_id || '|' || id || '|' || side || '|' || kind || '|' || coalesce(entity_id, '-') || '|' || coalesce(hp, '-') || '|' || coalesce(maxhp, '-') || '|' || data FROM fight_combatants ORDER BY user_id, id" \
 	"1|1|player|player|-|-|-|
 1|2|enemy|monster|5|9|10|immune=i:1
-2|1|player|player|-|-|-|
 3|1|player|player|-|-|-|
-3|2|enemy|monster|1|0|4|immune=i:0
-4|1|player|player|-|-|-|" "combatants (a deleted monster is left out)"
+3|2|enemy|monster|1|0|4|immune=i:0" "combatants (a deleted monster is left out)"
 mig_eq "SELECT $T_STATUSES || '|' || $T_SLEEP || '|' || $T_UBER_DAMAGE || '|' || $T_UBER_DEFENSE FROM users WHERE id = 1" \
 	"player:uber_damage,player:uber_defense,enemy:sleep|13|25|10" "sleep and buffs as statuses"
 mig_eq "SELECT count(*) FROM fight_statuses WHERE user_id <> 1; SELECT count(*) FROM user_statuses" "0
 0" "no other statuses (a walker's leftover buff value is not a fight)"
 # the game on it: the sleeper's fight goes on (same monster, HP, sleep, buffs); the
-# victory is paid; the encounter that just began and the orphaned fight pick a monster
+# victory shows; the cancelled encounters are gone
 mig_serve "$MIG/v7.lua" "$MIG/v7server.log"
 for u in sleeper winner starter orphan; do
 	"$BIN" user --config "$MIG/v7.lua" passwd "$u" v7pass1 >/dev/null && t_ok || t_fail "dk user passwd (v7 $u)"
@@ -885,7 +888,7 @@ t_get /;           expect_redirect /fight
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
 expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'
 expect_body '<b>You</b> <span class="fight-statuses">&mdash; Damage Up, Defense Up</span>'
-mig_eq "SELECT $T_ROUND FROM users WHERE id = 1" "5" "the counter goes on"
+mig_eq "SELECT $T_ROUND FROM users WHERE id = 1" "4" "the counter is kept"
 V7_CS=$(t_csrf)
 t_post /fight "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 mig_sql "$V7_DB" "UPDATE users SET currenthp = 100 WHERE id = 1"
@@ -897,14 +900,12 @@ t_jar migv7w
 t_login winner v7pass1
 t_get /victory;    expect_status 200; expect_body 'You have defeated the Blue Slime.'
 mig_eq "SELECT currentaction || '|' || $T_ROUND || '|' || (experience > 0) FROM users WHERE id = 3" "Exploring|0|1" "the victory paid out"
-t_jar migv7s
-t_login starter v7pass1
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
-mig_eq "SELECT $T_ROUND || '|' || ($T_MONSTER > 0) FROM users WHERE id = 2" "2|1" "the encounter began"
-t_jar migv7o
-t_login orphan v7pass1
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
-mig_eq "SELECT $T_ROUND || '|' || ($T_MONSTER BETWEEN 1 AND 151) FROM users WHERE id = 4" "3|1" "a new monster for a deleted one"
+for u in starter orphan; do
+	t_jar "migv7$u"
+	t_login "$u" v7pass1; expect_redirect /
+	t_get /;           expect_status 200; expect_body 'Exploring'
+	t_get /fight;      expect_body 'Cheat attempt detected.'
+done
 mig_unserve "$MIG/v7server.log"
 "$BIN" migrate --config "$MIG/v7.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v7)"
 
@@ -977,8 +978,9 @@ t_jar migv8
 t_login fighter v8pass1; expect_redirect /
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
 expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'; expect_no_body "Monster's MP"
-mig_eq "SELECT round || '|' || (SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2) FROM fights WHERE user_id = 1" \
-	"5|5|5" "the counter goes on; the Shadow's MP is full"
+mig_eq "SELECT round FROM fights WHERE user_id = 1" "4" "the counter is kept"
+t_post /fight "csrf=$(t_csrf)&fight=Fight"; expect_status 200
+mig_eq "SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2" "5|5" "the Shadow's MP is full"
 t_jar migv8b
 t_login brewer v8pass1
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Homebrew<template class="tip">'; expect_body "Monster's HP: 20"
@@ -1105,7 +1107,7 @@ MIG_DB=$V12_DB
 mig_eq "PRAGMA user_version" "12" "fixture is version 12"
 mig_eq "SELECT count(*) FROM pragma_table_info('spells') WHERE name = 'lore'" "0" "no lore column at version 12"
 V12_USERS=$(mig_users "$V12_DB")
-V12_FIGHT=$(mig_sql "$V12_DB" "SELECT * FROM fights; SELECT * FROM fight_combatants ORDER BY id")
+V12_FIGHT=$(mig_sql "$V12_DB" "SELECT user_id, round, wave, data FROM fights; SELECT * FROM fight_combatants ORDER BY id")
 "$BIN" migrate --config "$MIG/v12.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v12) failed: $(cat "$T/migrate.log")"
 grep -qE 'Migrating to version ([1-9]|1[012]):' "$T/migrate.log" && t_fail "steps 1-12 ran on a version 12 database" || t_ok
 grep -qF 'Migrating to version 13: classes, spells, items, monsters, statuses and summons have lore' "$T/migrate.log" && t_ok || t_fail "step 13 not reported: $(cat "$T/migrate.log")"
@@ -1119,7 +1121,7 @@ for tbl in classes items monsters spells statuses summons; do
 done
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v12)"
 [ "$(mig_users "$V12_DB")" = "$V12_USERS" ] && t_ok || t_fail "users changed (v12)"
-[ "$(mig_sql "$V12_DB" "SELECT * FROM fights; SELECT * FROM fight_combatants ORDER BY id")" = "$V12_FIGHT" ] && t_ok || t_fail "the fight changed (v12)"
+[ "$(mig_sql "$V12_DB" "SELECT user_id, round, wave, data FROM fights; SELECT * FROM fight_combatants ORDER BY id")" = "$V12_FIGHT" ] && t_ok || t_fail "the fight changed (v12)"
 mig_eq "$MIG_LORE_KEYS" "$MIG_LORE_EXPECTED" "lore (v12)"
 mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v12)"
 mig_eq "SELECT name FROM spells WHERE id = 1" "Mend" "the v12 override survives"
@@ -1216,6 +1218,69 @@ expect_body 'You have cast the Magic Bolt spell for '
 mig_eq "SELECT currentmp FROM users WHERE id = 1" "14" "1 MP spent"
 mig_unserve "$MIG/v13server.log"
 "$BIN" migrate --config "$MIG/v13.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v13)"
+
+t_section "migrate: version 14 database"
+# version 14 schema + its game data, characters in every state GET /fight and GET /victory
+# used to move on: a fight in progress, an encounter waiting for GET /fight to pick its
+# monster, a won fight waiting for GET /victory to pay, and one exploring; only step 15
+# runs. The fight in progress goes on (its counter kept), the pending encounter is
+# cancelled, the victory is paid and kept for its page; nobody else changes.
+V14_DB="$MIG/v14.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V14_DB\"#" "$CONFIG" > "$MIG/v14.lua"
+mig_script "$V14_DB" "$ROOT/tests/fixtures/schema_v14.sql"
+mig_script "$V14_DB" "$ROOT/tests/fixtures/seed_v14.sql"
+cat > "$MIG/v14_data.sql" <<SQL
+INSERT INTO users (id, username, email, charname, verify, charclass, level, experience, gold, currentaction, latitude,
+	longitude, currenthp, base_maxhp) VALUES
+	(1, 'midfight', 'm@example.com', 'Midfight', '1', 2, 3, 40, 10, 'Fighting', 5, 5, 30, 30),
+	(2, 'pending', 'p@example.com', 'Pending', '1', 2, 1, 0, 0, 'Fighting', 6, 6, 15, 15),
+	(3, 'winner', 'w@example.com', 'Winner', '1', 2, 1, 0, 0, 'Fighting', 7, 7, 15, 15),
+	(4, 'walker', 'k@example.com', 'Walker', '1', 2, 1, 0, 0, 'Exploring', 8, 8, 15, 15);
+INSERT INTO fights (user_id, round, wave, data) VALUES (1, 3, 1, ''), (2, 1, 1, ''), (3, 4, 1, '');
+INSERT INTO fight_combatants (user_id, id, side, kind) VALUES (1, 1, 'player', 'player'), (3, 1, 'player', 'player');
+INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data) VALUES
+	(1, 2, 'enemy', 'monster', 1, 1, 2, 4, 'immune=i:0'), (3, 2, 'enemy', 'monster', 1, 1, 0, 4, 'immune=i:0');
+PRAGMA user_version = 14;
+SQL
+mig_script "$V14_DB" "$MIG/v14_data.sql"
+MIG_DB=$V14_DB
+mig_eq "PRAGMA user_version" "14" "fixture is version 14"
+mig_eq "SELECT count(*) FROM pragma_table_info('fights') WHERE name = 'outcome'" "0" "no outcome column at version 14"
+V14_USERS=$(mig_users "$V14_DB")
+"$BIN" migrate --config "$MIG/v14.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v14) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version ([1-9]|1[0-4]):' "$T/migrate.log" && t_fail "steps 1-14 ran on a version 14 database" || t_ok
+grep -qF "Migrating to version 15: GETs don't change the game" "$T/migrate.log" && t_ok || t_fail "step 15 not reported: $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
+[ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v14 schema differs from a fresh install:"
+	diff <(mig_layout "$V14_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v14)"
+[ "$(mig_users "$V14_DB" | sed -n '1p;4p')" = "$(echo "$V14_USERS" | sed -n '1p;4p')" ] && t_ok || t_fail "users otherwise changed (v14)"
+mig_eq "SELECT id || '|' || currentaction || '|' || latitude || '|' || (experience > 0) || '|' || (gold > 0) FROM users WHERE id IN (2, 3) ORDER BY id" \
+	"2|Exploring|6|0|0
+3|Exploring|7|1|1" "the pending encounter cancelled where it was, the victory paid"
+mig_eq "SELECT user_id || '|' || round || '|' || outcome FROM fights ORDER BY user_id" "1|3|
+3|4|victory" "fights: one goes on, the won one is kept for its page"
+mig_eq "SELECT count(*) FROM fight_combatants WHERE user_id = 2" "0" "the pending encounter is gone"
+V14_PAID=$(mig_sql "$V14_DB" "SELECT experience || '|' || gold || '|' || level FROM users WHERE id = 3")
+mig_serve "$MIG/v14.lua" "$MIG/v14server.log"
+for u in midfight winner; do
+	"$BIN" user --config "$MIG/v14.lua" passwd "$u" v14pass1 >/dev/null && t_ok || t_fail "dk user passwd (v14 $u)"
+done
+t_jar migv14; t_reset_jar
+t_login midfight v14pass1; expect_redirect /
+t_get /fight; expect_status 200; expect_body "Monster's HP: 2"; expect_body 'name="round" value="3"'
+t_get /fight; mig_eq "SELECT round FROM fights WHERE user_id = 1" "3" "GET /fight counts nothing"
+t_post /fight "csrf=$(t_csrf)&round=3&fight=Fight"
+mig_eq "SELECT (round = 4 AND outcome = '') OR outcome = 'victory' FROM fights WHERE user_id = 1" "1" "a round is played"
+t_jar migv14w; t_reset_jar
+t_login winner v14pass1; expect_redirect /
+t_get /victory; expect_status 200; expect_body 'You have defeated the Blue Slime.'
+t_get /victory; expect_status 200; expect_body 'You have defeated the Blue Slime.'
+mig_eq "SELECT experience || '|' || gold || '|' || level FROM users WHERE id = 3" "$V14_PAID" "GET /victory pays nothing"
+mig_unserve "$MIG/v14server.log"
+"$BIN" migrate --config "$MIG/v14.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v14)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

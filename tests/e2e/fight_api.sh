@@ -174,7 +174,7 @@ fa_player
 t_fight fapi 2 50
 t_get /fight; expect_status 200
 expect_body '<script src="/static/js/fight.js" defer></script>'
-expect_body '<input type="hidden" name="round" value="3">'; fa_is "$T_ROUND" 3
+expect_body '<input type="hidden" name="round" value="2">'; fa_is "$T_ROUND" 2   # a GET counts nothing
 expect_body 'action="/fight" method="post" data-fight>'
 expect_body "Monster's HP: 50"; expect_no_body 'fight-stale'
 expect_body '<div class="dk-nav-right" data-nav-right>'; expect_body 'data-bar="hp"'
@@ -215,7 +215,9 @@ t_get /victory -H 'Accept: application/json'; expect_status 200; fa_check
 fa_expect '"Congratulations. You have defeated the Red Slime." in d["fragments"]["main"] and d["url"] == "/victory"'
 fa_expect 'd["title"] in ("Victory!", "Courage and Wit have served thee well!") and d["events"] == []'
 fa_is currentaction Exploring; fa_is "$T_ROUND" 0
-t_get /victory -H 'Accept: application/json'; fa_check; fa_expect 'd["redirect"] == "/"' "paid once"
+EXP=$(t_sql "SELECT experience FROM users $FAQ")
+t_get /victory -H 'Accept: application/json'; fa_check; fa_expect '"Congratulations." in d["fragments"]["main"]' "shown again"
+fa_is experience "$EXP"
 
 t_section "fight api: running away"
 fa_run() { fa_player; t_fight fapi 2 50; }
@@ -342,7 +344,7 @@ for cmd in "continue=Continue" "fight=Fight" "spell=Spell&userspell=$(sp heal)";
 	fa_expect 'any(e["type"] == "blocked" and e["actor"] == "player" and e["text"] == "You must recharge this turn." for e in d["events"])'
 done
 fa_both "continue, not locked" 7 fa_titan "continue=Continue&round=2"
-fa_expect 'd["events"] == [] and d["round"] == 3'
+fa_expect 'd["events"] == [] and d["round"] == 2'
 
 t_section "fight api: refusals"
 fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing changes, the same text both ways
@@ -423,40 +425,42 @@ t_section "fight api: stale rounds"
 fa_player; t_fight fapi 2 500
 t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_status 200
 expect_body 'That command came from an older page, so nothing happened.'
-expect_no_body 'class="fight-yourturn"'; expect_body 'name="round" value="3"'
-fa_is "$T_MONSTER_HP" 500; fa_is "$T_ROUND" 3
-# a second click: the first plays, the second is stale
-t_post /fight "csrf=$FA_CS&fight=Fight&round=3"; expect_body 'You attack the monster for'; expect_no_body 'fight-stale'
-HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ"); fa_is "$T_ROUND" 4
-t_post /fight "csrf=$FA_CS&fight=Fight&round=3"; expect_body 'fight-stale'; expect_no_body 'You attack the monster for'
-fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 5
+expect_no_body 'class="fight-yourturn"'; expect_body 'name="round" value="2"'
+fa_is "$T_MONSTER_HP" 500; fa_is "$T_ROUND" 2
+# a second click: the first plays, the second is stale (the page shows the fight as it is:
+# the last round's lines again, nothing played)
+t_post /fight "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'You attack the monster for'; expect_no_body 'fight-stale'
+HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ"); fa_is "$T_ROUND" 3
+BEFORE=$(fa_state)
+t_post /fight "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'fight-stale'; expect_body 'name="round" value="3"'
+[ "$(fa_state)" = "$BEFORE" ] && t_ok || t_fail "a stale form changed the fight"
 # the same with fetch
-t_fetch /fight "fight=Fight&round=5"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 6'
+t_fetch /fight "fight=Fight&round=3"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 4'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_fetch /fight "fight=Fight&round=5"; expect_status 200; fa_check
-fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 7 and "fight-stale" in d["fragments"]["main"]'
+t_fetch /fight "fight=Fight&round=3"; expect_status 200; fa_check
+fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 4 and "fight-stale" in d["fragments"]["main"]'
 fa_is "$T_MONSTER_HP" "$HP"
 t_fetch /fight "fight=Fight&round=x"; fa_check; fa_expect 'd["stale"] is True'
 # long fights: the counter goes past the original's cap of 255, stale rounds are still caught
 fa_player; t_fight fapi 2 5000 255
 t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 256
 expect_body 'name="round" value="256"'
-t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'fight-stale'; fa_is "$T_ROUND" 257
+t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'fight-stale'; fa_is "$T_ROUND" 256
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fights SET round = 301 WHERE user_id = (SELECT id FROM users $FAQ)"
 t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 302
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'; expect_no_body 'You attack the monster for'
-fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 303
-t_fetch /fight "fight=Fight&round=303"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 304'
+t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'
+fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 302
+t_fetch /fight "fight=Fight&round=302"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 303'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_fetch /fight "fight=Fight&round=303"; fa_check; fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 305'
+t_fetch /fight "fight=Fight&round=302"; fa_check; fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 303'
 fa_is "$T_MONSTER_HP" "$HP"
 # a won fight: on to the victory; a fight that is over: home
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fight_combatants SET hp = 0 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FAQ)"
 t_fetch /fight "fight=Fight&round=1"; fa_check; fa_expect 'd["redirect"] == "/victory" and d["stale"] is True'
-t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_redirect /victory
+t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_redirect /   # paid: the fight is over
 t_fight_clear fapi; fa_sql "UPDATE users SET currentaction = 'Exploring'"
 t_post /fight "csrf=$FA_CS&fight=Fight&round=9"; expect_redirect /
 t_fetch /fight "fight=Fight&round=9"; fa_check; fa_expect 'd["redirect"] == "/" and d["stale"] is True'

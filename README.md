@@ -474,8 +474,8 @@ PLAN.md         design notes: engine API, URL map, data model
 	Changing or resetting a password ends all of the user's sessions.
 - Every POST needs a CSRF token: the per-session token when logged in, an HMAC-signed
 	double-submit cookie (keyed by `secret`) on the login/registration forms.
-- Every action that changes the game is a POST. The GETs that change state (opening a
-	fight, collecting a victory) are one-shot by game state, and HEAD never writes.
+- Every action that changes the game is a POST: GETs only read (and touch the session),
+	and HEAD never writes.
 - The static file server rejects path traversal; request size and time limits are
 	configurable. Set `dev = false` in production to hide tracebacks.
 

@@ -62,9 +62,10 @@ t_post /fight "csrf=$CS&continue=Continue"
 expect_body 'The Solar Beam fires for'; expect_body 'name="fight"'
 dmg=$((hp - $(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")))
 [ "$dmg" -ge 75 ] && [ "$dmg" -le 90 ] && t_ok || t_fail "solar beam damage $dmg"
-# Continue when nothing locks the turn does nothing
-FIGHT=$(t_sql "SELECT $T_ROUND FROM users $EQ")
-t_post /fight "csrf=$CS&continue=Continue"; expect_no_body 'The monster attacks'; ef_is "$T_ROUND" $((FIGHT + 1))
+# Continue when nothing locks the turn does nothing (the page shows the last round again)
+FIGHT=$(t_sql "SELECT $T_ROUND || '|' || currenthp || '|' || $T_MONSTER_HP FROM users $EQ")
+t_post /fight "csrf=$CS&continue=Continue"; expect_body 'The Solar Beam fires for'
+ef_is "$T_ROUND || '|' || currenthp || '|' || $T_MONSTER_HP" "$FIGHT"
 
 t_section "effects: Call Wolf"
 # the monster sleeps through this part (a chance of 15 in 15 to stay asleep)
@@ -108,7 +109,9 @@ for _ in $(seq 1 20); do   # until the monster doesn't dodge
 done
 expect_redirect /victory
 t_get /victory; expect_body 'You have defeated the Titan.'
-ef_is "$T_ROUND" 0; ef_is "(SELECT count(*) FROM fight_statuses fs WHERE fs.user_id = users.id)" 0
+ef_is "$T_ROUND" 0; ef_is "$T_STATUSES" ""
+# (the finished fight is kept for its page, statuses and all, until the next encounter)
+ef_is "(SELECT outcome FROM fights f WHERE f.user_id = users.id)" victory
 ef_sql "UPDATE users SET base_attack = 0"
 
 t_section "effects: world statuses (Regen in town, the Regen Potion)"

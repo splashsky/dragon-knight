@@ -9,10 +9,12 @@
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
--- The fight is a model loaded and saved once per request (fight/state.lua); a request
--- plays at most one round of the pipeline (fight/round.lua), whose dice and formulas live
--- in fight/combat.lua. This module picks the monster, checks the player's choice, and
--- saves.
+-- The fight is a model loaded and saved once per request (fight/state.lua); a POST plays at
+-- most one round of the pipeline (fight/round.lua), whose dice and formulas live in
+-- fight/combat.lua. This module checks the player's choice, plays it and saves; how a fight
+-- begins (on a map move) and ends (paid in the winning round) is fight/encounter.lua.
+-- GETs change nothing (docs/APP.md "Pure GETs"): GET /fight shows the fight with its last
+-- round's lines, as the POST that played it did; GET /victory shows the rewards paid.
 --
 -- The JSON fight API (docs/APP.md "Fight API"; public/js/fight.js): the same routes, asked
 -- with Accept: application/json, run the same code and answer { events, fragments, round,
@@ -22,8 +24,7 @@
 -- round (a second click, an older tab) plays nothing and shows the fight as it is now.
 local act = require("fight.act")
 local auth = require("lib.auth")
-local classes = require("lib.classes")
-local combat = require("fight.combat")
+local encounter = require("fight.encounter")
 local events = require("fight.events")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
@@ -65,27 +66,6 @@ local function go(req, url, t)
 	t.redirect = url
 	t.events = t.events or json.array()
 	return view.json(t)
-end
-
--- The original random pick among the roaming monsters of the level band (retired ones and
--- those that don't roam are never met at random).
-local function pick_monster(user)
-	local minlevel, maxlevel = combat.monster_levels(user.latitude, user.longitude)
-	return combat.pick(monsters.roaming(minlevel, maxlevel), rand)
-end
-
-local function save_player(user, st)
-	dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
-						 st.currenthp, st.currentmp, st.currenttp, user.id)
-end
-
-local function save_death(user, st)
-	local d = combat.death(st)
-	-- fixed: legacy kept the uber buffs and didn't write currentmp, refunding the MP of a
-	-- spell cast on the fatal turn. The fight (and its statuses) ends.
-	state.clear(user.id)
-	dk.db:exec([[UPDATE users SET currenthp = ?, currentmp = ?, currentaction = 'In Town', latitude = 0,
-		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
 end
 
 -- The fight menu's item buttons: consumables in the bag usable in fights, one per item with
@@ -171,139 +151,66 @@ local function round_events(r)
 	return json.array(list)
 end
 
--- A new encounter against `monster` (the fight's counter is kept). Returns the model and
--- whether the player swings first.
-local function encounter(user, st, fight_round, monster)
-	local f = state.new({ user_id = user.id, round = fight_round, st = st })
-	state.add_monster(f, monster, 1)
-	f.rand = rand
-	return f, round.start(f)
-end
-
-local function fight(req)
-	local user = req.user
-	local form = req.method == "POST" and req.form or {}
-	-- the round the form was shown at (absent: a form from before 2.3, or a GET)
-	local sent = form.round ~= nil and php.intval(form.round) or nil
-	if user.currentaction ~= "Fighting" then
-		-- a form of a fight that is over: the game as it is now
-		if sent then return go(req, "/", { stale = true }) end
-		return error_page(req, "Cheat attempt detected. Get a life, loser.", "Cheat attempt detected.<br><br>Get a life, loser.")
-	end
-	local st = game.player(user)
-
-	-- A form shown at another round than the fight's (a second click, an older tab) plays
-	-- nothing: the fight page as a GET would show it, with a note.
-	local f = state.load(user, st)
-	local stale = sent ~= nil and (not f or sent ~= f.round)
-	if stale then form = {} end
-
-	-- First, check to see if we need to pick a monster (an encounter just began, or its
-	-- monster was deleted mid-fight: start over with a new one).
-	local swing_first = true
-	if not f or f.round <= 1 or #state.side(f, "enemy", true) == 0 then
-		local monster = pick_monster(user)
-		if not monster then
-			return error_page(req, "There are no monsters in this area. Please contact the game administrator.")
-		end
-		f, swing_first = encounter(user, st, f and f.round or 1, monster)
-	elseif state.won(f) then
-		-- fixed: legacy showed a defeated monster (0 HP) until /victory was visited.
-		return go(req, "/victory", { stale = stale or nil })
-	end
-	f.rand = rand
-	f.max_allies = game.control().max_allies or 1
-
-	-- The player's choice: a status that blocks the action (asleep, recharging, ...) leaves
-	-- only "Continue".
-	local locked = round.locked(f)
-	local a, entry, gear
-	if locked and (form.run or form.fight or form.spell or form.item or form.use_gear or form.continue) ~= nil then
-		a = { kind = "continue" }
+-- The player's choice in a POST's form (nil: none, e.g. a stale form): { kind, spell,
+-- item }, plus the bag entry (a consumable) or the equipped entry (gear) it uses; or nil,
+-- nil, nil, an error text (a refusal: nothing happens).
+local function choice(user, st, f, form)
+	-- a status that blocks the action (asleep, recharging, ...) leaves only "Continue"
+	if round.locked(f) and (form.run or form.fight or form.spell or form.item or form.use_gear or form.continue) ~= nil then
+		return { kind = "continue" }
 	elseif form.run ~= nil then
-		a = { kind = "run" }
+		return { kind = "run" }
 	elseif form.fight ~= nil then
-		a = { kind = "attack" }
+		return { kind = "attack" }
 	elseif form.spell ~= nil then
 		-- the icon button's value, or the old select's (spell=Spell&userspell=<id>)
 		local picked = form.userspell
 		if picked == nil then picked = form.spell end
-		if php.intval(picked) == 0 then
-			return error_page(req, "You must select a spell first. Please go back and try again.")
-		end
+		if php.intval(picked) == 0 then return nil, nil, nil, "You must select a spell first. Please go back and try again." end
 		-- Validated server-side: an integer id the user knows that exists in spells.
 		local spell_id = math.tointeger(tonumber(picked))
 		local spell = spell_id and spells.knows(user, spell_id) and spells.get(spell_id) or nil
-		if not spell then
-			return error_page(req, "You have not yet learned this spell. Please go back and try again.")
-		end
+		if not spell then return nil, nil, nil, "You have not yet learned this spell. Please go back and try again." end
 		if st.currentmp < spell.mp then
-			return error_page(req, "You do not have enough Magic Points to cast this spell. Please go back and try again.")
+			return nil, nil, nil, "You do not have enough Magic Points to cast this spell. Please go back and try again."
 		end
-		a = { kind = "spell", spell = spell }
+		return { kind = "spell", spell = spell }
 	elseif form.use_gear ~= nil then
 		-- an equipped item that casts a spell: a charge instead of MP, the turn like an item
 		local entry_id = math.tointeger(tonumber(form.use_gear))
-		gear = entry_id and inventory.entry(user.id, entry_id)
+		local gear = entry_id and inventory.entry(user.id, entry_id)
 		if not gear or not gear.equipped or not items.casts(gear.item) then
-			return error_page(req, "You do not have this item equipped. Please go back and try again.")
+			return nil, nil, nil, "You do not have this item equipped. Please go back and try again."
 		end
 		local spell = items.spell(gear.item)
-		if not spell then return error_page(req, act.CANNOT.item) end
+		if not spell then return nil, nil, nil, act.CANNOT.item end
 		if gear.charges < 1 then
-			return error_page(req, "The " .. gear.item.name .. " has no charges left. Rest at an inn to recharge it.")
+			return nil, nil, nil, "The " .. gear.item.name .. " has no charges left. Rest at an inn to recharge it."
 		end
-		a = { kind = "gear", item = gear.item, spell = spell }
+		return { kind = "gear", item = gear.item, spell = spell }, nil, gear
 	elseif form.item ~= nil then
 		-- a consumable from the bag: costs the turn like a spell (refusals cost nothing); the
 		-- icon button's value, or the old select's (item=Use Item&useritem=<id>)
 		local picked = form.useritem
 		if picked == nil then picked = form.item end
-		if php.intval(picked) == 0 then
-			return error_page(req, "You must select an item first. Please go back and try again.")
-		end
+		if php.intval(picked) == 0 then return nil, nil, nil, "You must select an item first. Please go back and try again." end
 		-- validated server-side: an integer item id with a stack in the user's bag
 		local item_id = math.tointeger(tonumber(picked))
-		entry = item_id and inventory.find(user.id, item_id)
-		if not entry then
-			return error_page(req, "You do not have this item. Please go back and try again.")
-		end
-		a = { kind = "item", item = entry.item }
-	elseif form.continue == nil and not swing_first then
-		-- the monster swung first
-		a = { kind = "ambush" }
+		local entry = item_id and inventory.find(user.id, item_id)
+		if not entry then return nil, nil, nil, "You do not have this item. Please go back and try again." end
+		return { kind = "item", item = entry.item }, entry
 	end
+	-- nothing chosen ("continue" on a turn no status blocks): nothing is played
+	return nil
+end
 
-	local page = { yourturn = {}, allyturn = {}, monsterturn = {}, roundend = {}, stale = stale }
-	local evs = json.array()
-	if a then
-		if view.wants_json(req) then f.trace = {} end
-		local r = round.play(f, a)
-		-- refusal texts may come from content files and admin overrides: escaped
-		if r.refused then return error_page(req, r.refused) end
-		if entry then inventory.take(entry, 1) end
-		if gear then inventory.spend_charge(gear) end
-		f = r.f
-		if f.trace then evs = round_events(r) end
-		page.yourturn, page.allyturn, page.monsterturn, page.roundend = r.player, r.allies, r.enemies, r.ending
-		if r.escaped then
-			-- fixed: legacy always let the player escape (a failed run's damage was never saved,
-			-- and a fatal blow left them 'Exploring' at 0,0) and kept the fight state.
-			state.clear(user.id)
-			save_player(user, f.st)
-			dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
-			return go(req, "/", { events = evs })
-		elseif r.victory then
-			-- the round's counter stays: /victory pays out and ends the fight
-			state.save(f)
-			save_player(user, f.st)
-			return go(req, "/victory", { events = evs })
-		elseif r.died then
-			save_death(user, f.st)
-			page.dead = true
-		end
-	end
-
+-- The fight page of fight f (in progress, or as it ended in a death): its combatants, the
+-- lines of its last round (lines: encounter.lines), and the commands with the round they
+-- carry. opts: stale (the note), events (the JSON API's).
+local function fight_page(req, f, lines, opts)
+	local user = req.user
+	local page = { yourturn = lines.yourturn, allyturn = lines.allyturn, monsterturn = lines.monsterturn,
+		roundend = lines.roundend, stale = opts.stale, dead = f.outcome == "death" }
 	local shown = view_of(f)
 	for k, v in pairs(shown) do page[k] = v end
 	local first = shown.enemies[1]
@@ -321,78 +228,94 @@ local function fight(req)
 		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)
 		page.items = usable_items(user, f)
 		page.gear = gear_buttons(user)
-		f.round = f.round + 1
 		page.round = f.round
-		state.save(f)
-		dk.db:exec("UPDATE users SET currentaction = 'Fighting', currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
-			f.st.currenthp, f.st.currentmp, f.st.currenttp, user.id)
 	end
-	return show(req, "Fighting", "fight/fight", page, { events = evs, round = page.round, stale = stale or nil })
+	return show(req, "Fighting", "fight/fight", page, { events = opts.events or json.array(), round = page.round,
+		stale = opts.stale or nil })
+end
+
+local NO_MONSTER = "There are no monsters in this area. Please contact the game administrator."
+
+local function fight(req)
+	local user = req.user
+	local post = req.method == "POST"
+	local form = post and req.form or {}
+	-- the round the form was shown at (absent: a form from before 2.3, or a GET)
+	local sent = form.round ~= nil and php.intval(form.round) or nil
+	local st = game.player(user)
+	local f = state.load(user, st)
+	if user.currentaction ~= "Fighting" then
+		-- the fight that just ended: a death shows as it ended, a victory has its own page
+		if f and f.outcome == "death" and #state.side(f, "enemy", true) > 0 and not post then
+			return fight_page(req, f, encounter.lines(f.log), {})
+		end
+		if f and f.outcome == "victory" and not post then return go(req, "/victory") end
+		-- a form of a fight that is over: the game as it is now
+		if sent then return go(req, "/", { stale = true }) end
+		return error_page(req, "Cheat attempt detected. Get a life, loser.", "Cheat attempt detected.<br><br>Get a life, loser.")
+	end
+	if f and f.outcome ~= "" then f = nil end
+
+	-- A fighting player without a fight to show (its enemies are gone, or a database from
+	-- before 3.0 slipped through): a POST begins a new encounter where they stand.
+	if not f or #state.side(f, "enemy", true) == 0 then
+		if not post then return error_page(req, NO_MONSTER) end
+		if not encounter.begin(user.id) then return error_page(req, NO_MONSTER) end
+		return go(req, "/fight")
+	end
+	-- A form shown at another round than the fight's (a second click, an older tab) plays
+	-- nothing: the fight page as it is, with a note.
+	local stale = sent ~= nil and sent ~= f.round
+	if post and state.won(f) then
+		-- a fight won without its payout (a database from before 3.0): paid now
+		encounter.win(user, f, nil)
+		return go(req, "/victory", { stale = stale or nil })
+	end
+	if stale or not post then return fight_page(req, f, encounter.lines(f.log), { stale = stale }) end
+	f.rand = rand
+	f.max_allies = game.control().max_allies or 1
+	local a, entry, gear, err = choice(user, st, f, form)
+	if err then return error_page(req, err) end
+	if not a then return fight_page(req, f, encounter.lines(f.log), {}) end
+
+	if view.wants_json(req) then f.trace = {} end
+	local r = round.play(f, a)
+	-- refusal texts may come from content files and admin overrides: escaped
+	if r.refused then return error_page(req, r.refused) end
+	if entry then inventory.take(entry, 1) end
+	if gear then inventory.spend_charge(gear) end
+	f = r.f
+	local evs = f.trace and round_events(r) or json.array()
+	if r.escaped then
+		-- fixed: legacy always let the player escape (a failed run's damage was never saved,
+		-- and a fatal blow left them 'Exploring' at 0,0) and kept the fight state.
+		state.clear(user.id)
+		encounter.save_player(user.id, f.st)
+		dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
+		return go(req, "/", { events = evs })
+	elseif r.victory then
+		encounter.save_player(user.id, f.st)
+		encounter.win(user, f, r)
+		return go(req, "/victory", { events = evs })
+	elseif r.died then
+		encounter.die(user, r)
+		return fight_page(req, f, encounter.lines(f.log), { events = evs })
+	end
+	f.round = f.round + 1
+	f.log = encounter.log_of(r)
+	state.save(f)
+	encounter.save_player(user.id, f.st)
+	return fight_page(req, f, encounter.lines(f.log), { events = evs })
 end
 
 local function victory(req)
-	local user = req.user
-	local player = game.player(user)
-	local f = state.load(user, player)
-	-- fixed: legacy paid out for a missing monster (e.g. /victory right after an encounter
-	-- began, before the monster was picked).
-	if not f or #state.side(f, "enemy", true) == 0 then return go(req, "/") end
-	if not state.won(f) then return go(req, "/fight") end
-
-	-- rewards per defeated enemy (summed), the drop roll once per encounter
-	local r = { exp = 0, gold = 0, warnexp = "", warngold = "" }
-	local names, top = {}, nil
-	for _, c in ipairs(f.combatants) do
-		if c.side == "enemy" then
-			local one = combat.rewards(player, c.row, rand)
-			player.experience, player.gold = one.newexp, one.newgold
-			r.exp, r.gold = r.exp + one.exp, r.gold + one.gold
-			r.newexp, r.newgold = one.newexp, one.newgold
-			if one.warnexp ~= "" then r.warnexp = one.warnexp end
-			if one.warngold ~= "" then r.warngold = one.warngold end
-			names[#names + 1] = c.row.name
-			if not top or c.row.level > top.level then top = c.row end
-		end
+	local f = state.load(req.user, game.player(req.user))
+	if f and f.outcome == "victory" then
+		local title, ctx = encounter.victory_page(f.result)
+		return show(req, title, "fight/victory", ctx)
 	end
-	local ctx = { monster = top, defeated = table.concat(names, ", the "), r = r }
-	-- a character of an unknown class gains experience but no levels
-	local cls = classes.get(user.charclass)
-	local up
-	if cls then
-		local levels = classes.levels(cls)
-		up = combat.level_up(user, cls, r.newexp, function(level) return levels[level] end)
-	end
-	local title
-	local g = { level = user.level, hp = 0, mp = 0, tp = 0, strength = 0, dexterity = 0 }
-	local dropcode = user.dropcode
-	if up then
-		g = up
-		for _, learned in ipairs(up.spells or {}) do spells.learn(user.id, learned.id, learned.level) end
-		ctx.levelup = up
-		title = "Courage and Wit have served thee well!"
-	else
-		if combat.drop_roll(rand) then
-			-- the original drops are items 34-65, in the same order: same odds, same picks
-			local drops = dk.db:query("SELECT id FROM items WHERE drop_level IS NOT NULL AND drop_level <= ? " ..
-																"AND droppable <> 0 AND retired = 0 ORDER BY id", top.level)
-			local drop = combat.pick(drops, rand)
-			-- fixed: legacy showed the drop text even with no eligible drop (dropcode stored as 0).
-			dropcode = drop and drop.id or 0
-			ctx.dropped = drop ~= nil
-		end
-		title = "Victory!"
-	end
-
-	-- level-ups grow the base stats (lib/stats.lua). experience/gold were MEDIUMINT
-	-- UNSIGNED: a bonus below -100% made them negative and MySQL stored 0. The fight (and
-	-- every status of it) ends.
-	state.clear(user.id)
-	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, base_maxhp = base_maxhp + ?,
-		base_maxmp = base_maxmp + ?, base_maxtp = base_maxtp + ?, strength = strength + ?,
-		dexterity = dexterity + ?, dropcode = ?, experience = ?, gold = ? WHERE id = ?]],
-		g.level, g.hp, g.mp, g.tp, g.strength, g.dexterity, dropcode, php.mysql_uint(r.newexp),
-		php.mysql_uint(r.newgold), user.id)
-	return show(req, title, "fight/victory", ctx)
+	if req.user.currentaction == "Fighting" then return go(req, "/fight") end
+	return go(req, "/")
 end
 
 -- The pending drop (users.dropcode: an items.id), or nil.

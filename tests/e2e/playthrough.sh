@@ -111,7 +111,8 @@ pt_explore
 pt_fight
 expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
 pt_is "level,base_maxmp,$T_KNOWN" "2|10|1,25" "level up (+5 MP, Heal)"
-t_get /victory;  expect_redirect /
+t_get /victory;  expect_body 'You have gained a level!'   # shown again, paid once
+pt_is level 2 "paid once"
 pt_walk_home
 
 t_section "playthrough: travel"

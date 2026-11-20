@@ -13,6 +13,7 @@ for _, name in ipairs({
 	"routes.admin",      -- admin panel
 	"routes.theme",      -- POST /theme (theme selector)
 	"routes.live",       -- GET /live (event stream)
+	"routes.test",       -- /__test/* (only with test_routes = true)
 }) do
 	require(name)(r)
 end

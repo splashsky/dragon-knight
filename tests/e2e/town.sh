@@ -271,7 +271,8 @@ t_post /move "csrf=$TC&north=North"
 expect_db "latitude,longitude,dropcode" "11|10|0" "move north"
 case $(tq currentaction) in
 	Exploring) expect_redirect / ;;
-	Fighting)  expect_redirect /fight; expect_db "$T_ROUND" 1 "fight started" ;;
+	Fighting)  expect_redirect /fight; expect_db "$T_ROUND,$T_MONSTER > 0" "2|1" "fight started (the monster picked)" ;;
+	"In Town") expect_redirect /fight ;;   # killed by the monster's first strike: its page
 	*) t_fail "move set currentaction to $(tq currentaction)" ;;
 esac
 fights=0 explores=0
@@ -280,14 +281,15 @@ for _ in $(seq 1 40); do
 	t_post /move "csrf=$TC&east=East"
 	case $(tq "currentaction||','||$T_ROUND||','||longitude") in
 		Exploring,0,11) explores=$((explores + 1)) ;;
-		Fighting,1,11)  fights=$((fights + 1)) ;;
+		Fighting,2,11|"In Town,0,0")  fights=$((fights + 1)) ;;   # (or killed by its first strike)
 		*) t_fail "unexpected move result $(tq "currentaction||','||$T_ROUND||','||longitude")" ;;
 	esac
 done
 [ "$fights" -gt 0 ] && [ "$explores" -gt "$fights" ] && t_ok || t_fail "fight odds: $fights fights / $explores explores"
 for dir in "north 250 5 250|5" "south -250 5 -250|5" "east 5 250 5|250" "west 5 -250 5|-250"; do
 	read -r d lat lon want <<< "$dir"
-	tu "currentaction='Exploring', latitude=$lat, longitude=$lon"
+	# (sturdy: an encounter's first strike at the edge of the map must not kill)
+	tu "currentaction='Exploring', latitude=$lat, longitude=$lon, currenthp=100000, base_maxhp=100000"
 	t_post /move "csrf=$TC&$d=x"
 	expect_db "latitude||'|'||longitude" "$want" "clamp $d"
 done

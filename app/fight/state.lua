@@ -8,7 +8,9 @@
 -- map moves.
 --
 -- f = { user_id, round, wave, data = {}, st (the game.player row copy: the player's
--- numbers), in_fight, combatants = { c, ... } (by id), next_id }
+-- numbers), in_fight, combatants = { c, ... } (by id), next_id, outcome ("" in progress,
+-- "victory", "death": a finished fight kept for its page, fight/encounter.lua), log (the
+-- last round's lines, encounter.log_of), result = {} (a victory's rewards) }
 -- c = { id, side ("player" | "ally" | "enemy"), kind ("player" | "monster" | "summon"),
 -- entity_id, wave, hp, maxhp (nil for the player: st has them), mp, maxmp (monsters),
 -- turns_left (summons), data = {} (a monster's immune and the stock of its items,
@@ -64,7 +66,7 @@ end
 function state.new(o)
 	local f = {
 		user_id = o.user_id, round = o.round or 1, wave = o.wave or 1, data = o.data or {}, st = o.st,
-		in_fight = o.in_fight ~= false, combatants = {}, next_id = 1,
+		in_fight = o.in_fight ~= false, combatants = {}, next_id = 1, outcome = "", log = "", result = {},
 	}
 	state.add(f, { side = "player", kind = "player" })
 	return f
@@ -207,7 +209,8 @@ function state.load(user, st)
 	local fr = dk.db:first("SELECT * FROM fights WHERE user_id = ?", user.id)
 	if not fr then return nil end
 	local f = { user_id = user.id, round = fr.round, wave = fr.wave, data = state.decode(fr.data), st = st,
-		in_fight = true, combatants = {}, next_id = 1 }
+		in_fight = true, combatants = {}, next_id = 1, outcome = fr.outcome, log = fr.log,
+		result = state.decode(fr.result) }
 	local by_id = {}
 	for _, r in ipairs(dk.db:query("SELECT * FROM fight_combatants WHERE user_id = ? ORDER BY id", user.id)) do
 		local c = { id = r.id, side = r.side, kind = r.kind, entity_id = r.entity_id, wave = r.wave, hp = r.hp,
@@ -239,8 +242,10 @@ end
 -- Writes the fight back (users' HP/MP/TP are the caller's: they belong to the users row).
 function state.save(f)
 	local uid = f.user_id
-	dk.db:exec("INSERT INTO fights (user_id, round, wave, data) VALUES (?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE " ..
-		"SET round = excluded.round, wave = excluded.wave, data = excluded.data", uid, f.round, f.wave, state.encode(f.data))
+	dk.db:exec("INSERT INTO fights (user_id, round, wave, data, outcome, log, result) VALUES (?, ?, ?, ?, ?, ?, ?) " ..
+		"ON CONFLICT (user_id) DO UPDATE SET round = excluded.round, wave = excluded.wave, data = excluded.data, " ..
+		"outcome = excluded.outcome, log = excluded.log, result = excluded.result", uid, f.round, f.wave,
+		state.encode(f.data), f.outcome or "", f.log or "", state.encode(f.result))
 	dk.db:exec("DELETE FROM fight_combatants WHERE user_id = ?", uid)
 	for _, c in ipairs(f.combatants) do
 		local player = c.side == "player"
@@ -256,15 +261,14 @@ function state.save(f)
 	end
 end
 
--- No fight any more (victory, escape, death): its combatants and statuses go too.
+-- No fight any more (an escape, a new encounter): its combatants and statuses go too.
 function state.clear(user_id)
 	dk.db:exec("DELETE FROM fights WHERE user_id = ?", user_id)
 end
 
--- An encounter begins (explore): a fresh fight, no enemies picked yet (round 1).
-function state.begin(user_id)
-	state.clear(user_id)
-	dk.db:exec("INSERT INTO fights (user_id, round, wave, data) VALUES (?, 1, 1, '')", user_id)
+-- The player moves on (a map move, travel): a finished fight kept for its page goes.
+function state.forget(user_id)
+	dk.db:exec("DELETE FROM fights WHERE user_id = ? AND outcome <> ''", user_id)
 end
 
 -- The player outside fights, with the world statuses (user_statuses).

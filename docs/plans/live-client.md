@@ -32,7 +32,29 @@ that cause them).
 	in it fails, the game is plain links and forms exactly as today. Every enhanced action
 	has a defined fallback (below).
 
-## L0: pure GETs
+## L0: pure GETs — ✅ done
+
+**As implemented** (`docs/APP.md` "Pure GETs", "Fight engine", "Fight API"): schema
+version 15 adds `fights.outcome`, `fights.log` and `fights.result`;
+`app/fight/encounter.lua` holds how a fight begins (`encounter.begin(user_id)`, from `POST
+/move`: the monster picked where the player stands, its first strike played and saved, a
+death included) and ends (`encounter.win`: the rewards paid in the winning round and kept
+for `GET /victory`; `encounter.die`). One change from the design below: **`POST /fight`
+still answers with the fight page itself** (no redirect), as in 2.4. `GET /fight` now
+renders the same page from the saved fight and its last round's lines, so the two can't
+differ, no-JS players keep 2.4's single request per round, and the live client gets the
+same answer either way. A stale form shows the fight as `GET /fight` does, with its note
+(no `?stale=1`). A "Continue" when nothing blocks the turn plays nothing and shows the page
+as it is. A finished fight is forgotten on the next move, travel or encounter
+(`state.forget`, `state.clear`). Test hooks: `POST /__test/encounter` (`t_fight_new`) and
+`GET /__test/routes` in `app/routes/test.lua`; `t_fight_win` pays a won fight through a
+round. `tests/e2e/pure.sh` snapshots every game table (all but `sessions`, `meta`,
+`users.onlinetime`/`online`) around every GET and HEAD route of the router, in town,
+exploring, fighting (with a status and an ally), after a victory with a drop, after a death
+and as an administrator; `migrate.sh` covers v14 → v15 (`schema_v14.sql`, `seed_v14.sql`)
+and v7 → 15.
+
+The design as approved:
 
 A **GET (or HEAD) changes no game state.** Bookkeeping stays allowed: the session touch
 and expiry slide, presence (join, sweep), the content sync, the CSRF cookie seed. This is

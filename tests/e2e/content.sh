@@ -78,7 +78,7 @@ t_login ctknight ctpw1
 t_get /character;     expect_body 'Class: Knight'; expect_body 'Next Level: 10'
 # a Blue Slime gives 1 experience: 89 + 1 = 90 = level 10 (10 per level)
 t_fight ctknight 1 0 3; t_sql "UPDATE users SET experience = 89 WHERE username = 'ctknight'"
-t_get /victory;       expect_status 200; expect_body 'You have gained 9 levels!'; expect_body 'You have learned 2 new spells.'
+t_fight_win;          expect_status 200; expect_body 'You have gained 9 levels!'; expect_body 'You have learned 2 new spells.'
 # HP: 9 x 2 + 10 (milestone at 10); TP: 1 + 8 x 2; MP, strength, dexterity: 9 x 1
 ct_eq "SELECT level || '|' || experience || '|' || base_maxhp || '|' || base_maxmp || '|' || base_maxtp || '|' || strength || '|' || dexterity || '|' || (strength + base_attack) || '|' || (dexterity + base_defense) FROM users WHERE username = 'ctknight'" \
 	"10|90|58|9|29|16|12|16|12" "level-up of the new class"
@@ -126,7 +126,7 @@ t_jar ctknight
 t_get /;              expect_status 200
 t_get /character;     expect_body 'Class: Knight'
 t_fight ctknight 1 0 3; t_sql "UPDATE users SET experience = 99 WHERE username = 'ctknight'"
-t_get /victory;       expect_status 200; expect_body 'You have gained a level!'
+t_fight_win;          expect_status 200; expect_body 'You have gained a level!'
 ct_eq "SELECT level || '|' || base_maxhp FROM users WHERE username = 'ctknight'" "11|60" "a retired class keeps leveling"
 t_get /help;          expect_no_body '<b>Knight</b>'
 t_jar admin
@@ -216,7 +216,7 @@ done
 ct_eq "SELECT spell_id FROM class_spells WHERE class_id = 4 AND level = 12" "26" "class learns the new spell"
 t_jar ctknight
 t_fight ctknight 1 0 3; t_sql "UPDATE users SET experience = 109 WHERE username = 'ctknight'"
-t_get /victory;       expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
+t_fight_win;          expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
 ct_eq "SELECT us.learned_level FROM user_spells us JOIN users u ON u.id = us.user_id WHERE u.username = 'ctknight' AND us.spell_id = 26" \
 	"12" "learned at level 12"
 t_get /;              expect_no_body 'action="/spell/26"'   # fight-only: not a Fast Spell

@@ -1140,6 +1140,33 @@ local function v14_after_sync()
 		"WHERE t.id = 1 AND i.key = 'wand' AND i.retired = 0")
 end
 
+-- 15: pure GETs (3.0): a fight keeps its outcome, its last round's lines and a victory's
+-- rewards (a finished fight stays for its page). GET /fight used to pick the monster of an
+-- encounter that had just begun, and GET /victory paid the rewards: an encounter still
+-- waiting for its monster is cancelled (the player is exploring again, where they were),
+-- and after the sync a won fight that wasn't paid yet is paid, as the winning round does now.
+local function v15_pure_gets()
+	dk.db:exec_script([[
+ALTER TABLE fights ADD COLUMN outcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE fights ADD COLUMN log TEXT NOT NULL DEFAULT '';
+ALTER TABLE fights ADD COLUMN result TEXT NOT NULL DEFAULT '';
+UPDATE users SET currentaction = 'Exploring' WHERE currentaction = 'Fighting' AND id IN (SELECT f.user_id FROM fights f
+	WHERE NOT EXISTS (SELECT 1 FROM fight_combatants c WHERE c.user_id = f.user_id AND c.side = 'enemy'));
+DELETE FROM fights WHERE NOT EXISTS (SELECT 1 FROM fight_combatants c WHERE c.user_id = fights.user_id AND c.side = 'enemy');
+]])
+end
+
+local function v15_after_sync()
+	local encounter = require("fight.encounter")
+	local game = require("lib.game")
+	local state = require("fight.state")
+	for _, u in ipairs(dk.db:query("SELECT u.* FROM users u JOIN fights f ON f.user_id = u.id " ..
+		"WHERE f.outcome = '' AND u.currentaction = 'Fighting' ORDER BY u.id")) do
+		local f = state.load(u, game.player(u))
+		if f and #state.side(f, "enemy", true) > 0 and state.won(f) then encounter.win(u, f, nil) end
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1165,6 +1192,9 @@ migrations.STEPS = {
 	{ name = "starting spells, items that cast spells with charges, item icons; Mages start with 5 MP " ..
 		"(existing Mages get +5 MP and learn Magic Bolt), Midworld sells the Wand",
 		up = v14_charged_items, after_sync = v14_after_sync },
+	{ name = "GETs don't change the game: an encounter begins on the move, a victory is paid in the " ..
+		"winning round, a finished fight is kept for its page (pending encounters are cancelled, won fights " ..
+		"are paid)", up = v15_pure_gets, after_sync = v15_after_sync },
 }
 
 migrations.VERSION = #migrations.STEPS

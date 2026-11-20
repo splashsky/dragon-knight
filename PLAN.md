@@ -89,7 +89,7 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, schema_v11.sql, seed_v3 .. seed_v9.sql, seed_v11.sql:
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, schema_v11.sql .. schema_v14.sql, seed_v3 .. seed_v9.sql, seed_v11.sql .. seed_v14.sql:
                       frozen old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
@@ -260,14 +260,12 @@ urlencoded (e.g. multipart) → the C side passes `form = {}`; the app doesn't n
 
 ## URL map (legacy → new)
 
-All player actions are POST with a CSRF token. GETs that change state by design (kept
-from the original; guarded by game state so a reload is harmless):
-
-- every authenticated request touches `users.onlinetime` and slides the session expiry;
-- `GET /fight` picks the monster when an encounter has just started (the fight's round
-	is 1), runs the monster's first strike, and bumps the fight's round counter;
-- `GET /victory` pays the rewards (exp, gold, level-up or drop roll) once: it then ends
-	the fight (its rows go), so a reload redirects.
+All player actions are POST with a CSRF token. **GETs never change the game** (3.0,
+`docs/APP.md` "Pure GETs"; until 2.4 `GET /fight` picked the encounter's monster, played
+its first strike and counted a round, and `GET /victory` paid the rewards): the encounter
+begins in `POST /move`, a victory is paid in the winning `POST /fight`, and a finished fight
+is kept so its page can be shown again. Only bookkeeping writes on a GET: every
+authenticated request touches `users.onlinetime` and slides the session expiry.
 
 HEAD is routed like GET, but `main.lua` rolls the request's transaction back (and drops
 queued cookies), so HEAD never changes state.
@@ -407,6 +405,12 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	+5 base and current MP (the Mage's start_mp is 5 since 2.4) and Magic Bolt, filled the
 	charges of items that cast, added the Wand to Midworld's shop and pinned the spells
 	after the original 19 to a fresh install's ids (20-25) where those were free.
+- Pure GETs (schema version 15, `docs/APP.md` "Pure GETs"): `fights.outcome` ('' in
+	progress, 'victory', 'death': a finished fight is kept for its page until the next
+	encounter, a move or travel), `fights.log` (the last round's lines) and `fights.result`
+	(a victory's rewards). `fights.round` counts rounds played. The step cancelled encounters
+	still waiting for `GET /fight` to pick their monster and paid won fights still waiting
+	for `GET /victory`.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.

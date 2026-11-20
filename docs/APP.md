@@ -10,7 +10,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
-| Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
+| Core | `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/test.lua` (test-only routes) | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/e2e/pure.sh` (pure GETs), `tests/lua/test_{php,router}.lua` |
 | Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js` | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
 | Tooltips, lore | `app/lib/tips.lua`, `app/lib/view.lua` (`tip`, `paragraphs`), the kinds' `lore` field (`app/lib/content/schema.lua`) | `templates/tip/tip.html`, `public/js/tooltip.js`, `public/css/dk.css` (`.dk-tip`, `.tip-*`) | `tests/e2e/tips.sh`, `tests/js/test_tooltip.js`, `tests/lua/test_content.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
@@ -18,7 +18,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
-| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
+| Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Smooth fights (the JSON fight API) | `app/fight/events.lua`, `app/routes/fight.lua`, `app/lib/view.lua` (`view.fragments`) | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
@@ -117,10 +117,16 @@ end
 - `r:get(pattern, guard..., handler)`, `r:post(...)`, `r:route({"GET","POST"}, ...)`.
 	A trailing `/` is ignored. HEAD requests run the GET route, then `main.lua` rolls the
 	transaction back and drops queued cookies, so HEAD never changes state.
-- GETs should not change state. The deliberate exceptions are guarded by game state, so
-	a reload is harmless: the `onlinetime`/session touch (and the presence join and sweep),
-	`GET /fight` (monster pick, first
-	strike, the fight's `round` counter) and `GET /victory` (pays out once).
+- **Pure GETs** (3.0): a GET (or HEAD) never changes the game. Only bookkeeping may
+	write: the `onlinetime`/session touch, the presence join and sweep, the content sync and
+	the CSRF cookie seed. So any page can be fetched again at any time (a reload,
+	back/forward, the live client refreshing it) and shows the game as it is. What used to
+	happen on a GET happens in the POST that causes it: an encounter begins (its monster
+	picked, its first strike played) on the map move, a victory is paid in the winning
+	round (`fight/encounter.lua`), and a finished fight is kept so `GET /fight` and `GET
+	/victory` can show it again. `tests/e2e/pure.sh` requests every GET route of the router
+	(`GET /__test/routes` lists them) in every game state and fails if any game table
+	changed; a new GET route has to be added to its list.
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
 	only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
 	handler's second argument and also as `req.params`.
@@ -1081,12 +1087,16 @@ fight.js disables the buttons while a round plays. A turn a status blocks shows 
 
 | | |
 |---|---|
-| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id }`. `round` is the original `currentfight` counter (1: the encounter just began, no monster picked; +1 per fight page, without the original's cap of 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`) |
+| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result }`. `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the last round's lines (`encounter.log_of`, `encounter.lines`); `result`: a victory's rewards |
 | combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's `immune` and item stock (`stock_<position>`) |
 | status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
 
-`state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (victory, escape, death)
-and `state.begin(user_id)` (a new encounter: explore). Saved values are **names and plain
+`state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (an escape, a new
+encounter) and `state.forget(user_id)` (a move or travel: a finished fight's page goes).
+How a fight begins and ends is `fight/encounter.lua`: `encounter.begin(user_id)` (POST
+`/move`'s 1-in-5: the monster picked where the player stands, its first strike played when
+it is quicker), `encounter.win(user, f, r)` (the rewards paid in the winning round, kept in
+`fights.result` for `GET /victory`) and `encounter.die(user, r)`. Saved values are **names and plain
 data only** (whole numbers, text, booleans: `state.encode`, "name=i:5" lines;
 `action.params` refuses functions and tables), so a fight in progress never holds code: a
 charged spell's release step is saved by name.
@@ -1094,9 +1104,9 @@ charged spell's release step is saved by name.
 **Encounters and waves.** A fight is an ordered list of waves of enemies (`c.wave`); today
 every encounter is one wave with one monster (the original random pick). The pipeline
 already acts with every enemy of the current wave; when the wave is defeated the next one
-enters ("Another monster appears: ..."), and the victory is "no enemy left". `/victory`
-pays each defeated enemy's rewards (summed) and rolls for a drop once (at the highest
-level). The player's actions aim at "the current target" (`engine.target`: the first
+enters ("Another monster appears: ..."), and the victory is "no enemy left". The winning
+round pays each defeated enemy's rewards (summed) and rolls for a drop once (at the highest
+level); `GET /victory` shows them. The player's actions aim at "the current target" (`engine.target`: the first
 living enemy of the wave, `s.target` in spells), so a target picker can come later without
 changing spell files.
 
@@ -1342,11 +1352,11 @@ Lists are present only when not empty; `turns` is absent for an unlimited status
 Changes go with their step's latest line (a spell's line, then its damage and MP cost).
 
 **Stale rounds.** Every fight form carries the round it was shown at (`<input type="hidden"
-name="round">`, the `fights.round` the page saved). A `POST /fight` with another round (a
-second click, an older tab, a resubmitted page) plays nothing: the answer is the fight as
-`GET /fight` shows it (that GET counts a round, as always) with the note "That command came
-from an older page, so nothing happened." (`stale = true` in JSON); a won fight goes on to
-`/victory`, and a fight that is over (not fighting any more) redirects to `/`. A form
+name="round">`, `fights.round`, which only a played round counts up). A `POST /fight` with
+another round (a second click, an older tab, a resubmitted page) plays nothing: the answer
+is the fight as `GET /fight` shows it (with its last round's lines) and the note "That
+command came from an older page, so nothing happened." (`stale = true` in JSON); a fight
+that is over (not fighting any more) redirects to `/`. A form
 without the field (from before 2.3) plays as before. The counter has no cap (the original's
 stopped at 255), so long fights are protected too.
 
@@ -1848,8 +1858,8 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
 | `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`; an item that casts with full charges); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
-| `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_clear username`, `t_fight_status username who key [data [turns]]` | a fight in progress against a monster (round 2 by default); an encounter that just began; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
-| `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight (0 when there is none) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
+| `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_win`, `t_fight_clear username`, `t_fight_status username who key [data [turns]]` | a fight in progress against a monster (round 2 by default); an encounter beginning where the player stands, as on a map move (the current jar's player: `POST /__test/encounter`; `$BODY` is the fight page); the current jar's won fight (`t_fight user m 0`) paid by a round, `$BODY` the victory page; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
+| `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight in progress (0 when there is none; a finished fight kept for its page doesn't count) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
