@@ -53,24 +53,27 @@ app/                  Lua application (hot-reloaded)
   main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
   routes.lua          route table assembly (requires the route modules listed in it)
   routes/             thin route modules: auth, home, town, fight, community, admin, theme,
-                      live (GET /live, the event stream)
+                      live (GET /live, the event stream; /live/state; /banner/dismiss)
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount, json,
                       news, paging, migrations (schema versions), leveling, classes,
                       spells, items, inventory, stats (derived stats, gear modifiers),
                       action (the API scripted spells, items, statuses and summons run
                       against), statuses, summons, monsters (rows, loadouts, stats with
-                      equipment), world (world statuses on map moves),
+                      equipment), world (world statuses on map moves), chat (the Babble
+                      Box), presence (who's online), notices (live toasts), banner
+                      (the broadcast banner),
                       content/ (content loader, sandbox, schemas, scripted kinds, sync)
   content/            content files: classes/, spells/, items/, statuses/, summons/,
                       monsters/ <key>.lua (synced into the DB)
   town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
+                      (the chat's routes)
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested);
                       state.lua: the fight model and its tables; round.lua: the round
                       pipeline; engine.lua: handles, events, statuses, summons; ai.lua:
                       weighted choices; act.lua: the actions of a turn (attack, spell, item);
                       monster.lua: a monster's spells and items (AI candidates, using them)
   community/          forum (boards), news archive, help pages, changelog
-  admin/              admin control panel (settings, news, classes, spells, items, statuses,
+  admin/              admin control panel (settings, news, broadcast, classes, spells, items, statuses,
                       summons and monsters, generic CRUD editor for towns and users)
   cli/user.lua        `dk user`
   cli/migrate.lua     `dk migrate`: runs lib/migrations.lua steps on an existing database
@@ -80,13 +83,13 @@ app/                  Lua application (hot-reloaded)
   sql/seed.sql        default game data ported 1:1 from legacy install.php
 templates/            *.html templates (hot-reloaded): layout/ (main, minimal, admin, head,
                       nav), auth/, home/, town/, fight/, community/{forum,help}/, admin/, errors/
-public/               served at /static/ (images/, css/, js/)
+public/               served at /static/ (images/, css/, js/: dk.js popups, live.js live pages)
 tests/c/              C unit tests (one main() per file, built by `make test`)
 tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v8.sql, seed_v3 .. seed_v8.sql:
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, seed_v3 .. seed_v9.sql:
                       frozen old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
@@ -189,6 +192,7 @@ Global `dk` table installed in every VM:
 | `dk.vmstats()` | table of vmpool stats (`built`, `reaped`, `recycled`, `hot_acquires`, ...), `generation` (code cache) and `boot_id` (random per process) |
 | `dk.server_stats()` | the server's metrics (`dk stats`) as `{name = number}`, and a second table `{name = description}` |
 | `dk.publish(channel, event, data)` | queue a server-sent event (data: a string, e.g. JSON from `lib/json.lua`) for the streams on `channel`; sent only after the request's transaction commits, dropped on rollback or error. Channel `[a-z0-9:_-]{1,64}`, event `[A-Za-z0-9_.:-]{1,64}`, data up to 64 KiB without NUL bytes, at most 256 per request; invalid arguments raise. In CLI commands (no server in the process): a warning, nothing sent |
+| `dk.subscribers(channel)` | the number of open event streams on the channel now (0 when none or in CLI processes); thread-safe. Presence uses `user:<id>` |
 | `dk.list_modules(prefix)` | sorted module names of the `*.lua` files directly under `app/<prefix as path>` (`"content.classes"` → `{"content.classes.mage", ...}`); read live, so new files count at once |
 | `require(name)` | loads `app/<name with . → />.lua` from codecache; `package.path`/`cpath` disabled |
 
@@ -288,13 +292,14 @@ queued cookies), so HEAD never changes state.
 | `do=showchar` | `GET /character` (minimal layout, popup-friendly) |
 | `do=onlinechar:id` | `GET /character/:id` |
 | `do=showmap` | `GET /map` |
-| `do=babblebox` | `GET/POST /babble` (iframe-able minimal page) |
+| `do=babblebox` | the Babble Box panel on every game page; `GET /babble` (the chat on its own page), `POST /babble` (fetch with JSON or a form), `POST /babble/:id/delete` (admins) |
+| (new) | `GET /live` (event stream), `GET /live/state` (the live parts of a page, JSON), `POST /banner/dismiss` |
 | `do=ninja` | `GET /ninja` → 302 to the original shirt-ninja URL (keep the easter egg) |
 | `forum.php` | `GET /forum` (boards), `GET /forum/:board[?start=n]`, `GET/POST /forum/:board/new`, `GET /forum/thread/:id[?start=n]`, `POST /forum/reply/:id` (`/forum/new` → `/forum/1/new`) |
 | (new) | `GET /news[?start=n]`, `GET /news/:id` (news archive) |
 | `help.php`, `help_items.php`, … | `GET /help`, `/help/items`, `/help/spells`, `/help/monsters`, `/help/levels` |
 | (new) | `POST /theme` (theme selector: sets the `dk_theme` cookie, back to the page) |
-| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/monsters[/:id]` (content overrides since schema version 9), `/admin/{statuses,summons}[/:id]` (new), `/admin/news` |
+| `admin.php?do=…` | `/admin`, `/admin/settings`, `/admin/{towns,users}[/:id]`, `/admin/classes[/:id]` (was levels), `/admin/spells[/:id]`, `/admin/items[/:id]` (was items and drops; content overrides), `/admin/monsters[/:id]` (content overrides since schema version 9), `/admin/{statuses,summons}[/:id]` (new), `/admin/news`, `/admin/broadcast` (new: the banner) |
 | `install.php`, `upgrade_*.php` | `./dk install` CLI; legacy upgrades dropped (fresh SQLite schema); `./dk migrate` for schema changes since |
 
 Guard order for game routes (port of index.php header): not logged in → `/login`;
@@ -382,6 +387,11 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	spell_id, weight, has_when)` (`when` conditions stay in the files).
 	`fight_combatants.mp`/`maxmp` hold a monster's MP; its item stock is in the combatant's
 	data (`stock_<position>`).
+- Realtime (schema version 10, `docs/APP.md` "Realtime"): `babble.author_id` (→ `users.id`
+	ON DELETE SET NULL; index `(author_id, posttime)` for the chat's rate limit),
+	`users.online` (1: announced as online, `lib/presence.lua`), `control.banner`,
+	`banner_id`, `banner_expires` (the broadcast banner); `meta.presence_sweep` holds the
+	last presence sweep.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -476,8 +486,8 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 ✅ E2 monsters as content with MP, equipment, items, spells and weighted loadouts
 	 (schema version 9).
 7. **2.3 realtime** (`docs/plans/realtime.md`): ✅ R0 measure, then tune the server
-	 (`docs/PERF.md`); R1 SSE hub, R2 chat/presence/notices, R3 smooth fights, R4 load
-	 and soak tests.
+	 (`docs/PERF.md`); ✅ R1 SSE hub; ✅ R2 chat, presence, notices, broadcast banner
+	 (schema version 10); R3 smooth fights, R4 load and soak tests.
 
 ## Definition of done
 
@@ -485,7 +495,7 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	green under ASan/UBSan.
 - `./dk install --admin <user> <email> <password>` then `./dk serve` gives a fully
 	playable game: register, log in, explore, fight, level up, drops, inn, shop, maps,
-	travel, heal spells, babble box, forum, help, admin panel.
+	travel, heal spells, babble box (live chat), forum, help, admin panel.
 - Editing any `app/**/*.lua`, `templates/**/*.html`, or app keys in `config.lua` is
 	visible on the next refresh without restart.
 - No SQL built from user input; every POST checks CSRF; output escaped by default.

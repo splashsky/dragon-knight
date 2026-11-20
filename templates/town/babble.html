@@ -1,14 +1,17 @@
-{#- Babble box iframe (legacy babblebox()). Minimal layout. The box is a column-reverse
-		scroller so it opens scrolled to the newest post (legacy: onload scrollTo). -#}
-<div class="babble">
-<form class="babble-form" action="/babble" method="post">
-{{{ csrf_field() }}}
-<input type="text" name="babble" size="15" maxlength="120" aria-label="Message"><br>
-<input type="submit" name="submit" value="Babble"> <input type="reset" name="reset" value="Clear">
-</form>
-<div class="babble-posts">
-{%- for _, p in ipairs(posts) do %}
-<div class="babble-post">[<b>{{ p.author }}</b>] {{ p.babble }}</div>
+{#- GET /babble: the Babble Box on a page of its own (it was the town page's iframe), with
+		who's online. -#}
+<div class="panel-row">
+<div>
+{%- if chat then %}
+{{{ include("layout/chat", chat) }}}
+{%- else %}
+<div class="title">Babble Box</div>
+<div class="box-body">The Babble Box is turned off.</div>
 {%- end %}
 </div>
+{%- if online then %}
+<div>
+{{{ include("layout/online", online) }}}
+</div>
+{%- end %}
 </div>

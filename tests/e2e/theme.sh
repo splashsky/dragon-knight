@@ -34,14 +34,14 @@ t_section "theme: default markup, logged in"
 t_jar themeplayer; t_reset_jar
 t_register themer themepw1 themer@example.com Themer; t_login themer themepw1
 t_get /;           expect_status 200; theme_is default
-expect_body '<body class="theme-default">'; expect_body 'src="/static/images/themes/default/logo.png"'
+expect_body '<body class="theme-default" data-live'; expect_body 'src="/static/images/themes/default/logo.png"'
 expect_body 'name="back" value="/"'
 t_get /character;  expect_status 200; theme_is default; expect_body '<body class="minimal theme-default">'
-t_get /babble;     expect_status 200; theme_is default; expect_no_body 'theme-picker'
+t_get /babble;     expect_status 200; theme_is default; expect_body 'name="back" value="/babble"'
 t_jar themeadmin; t_reset_jar
 t_login "$ADMIN_USER" "$ADMIN_PASS"
 t_get /admin;      expect_status 200; theme_is default
-expect_body '<body class="admin theme-default">'; expect_body 'src="/static/images/themes/default/logo.png"'
+expect_body '<body class="admin theme-default" data-live'; expect_body 'src="/static/images/themes/default/logo.png"'
 expect_body 'class="theme-picker"'; expect_body 'name="back" value="/admin"'
 t_get "/admin/users?start=0"; expect_status 200; expect_body 'name="back" value="/admin/users?start=0"'
 
@@ -123,7 +123,7 @@ t_section "theme: logged in, kept across login"
 t_jar themeplayer
 t_get /
 theme_post retro /;                      expect_redirect /
-t_get /;           expect_status 200; theme_is retro; expect_body '<body class="theme-retro">'
+t_get /;           expect_status 200; theme_is retro; expect_body '<body class="theme-retro" data-live'
 expect_body 'src="/static/images/logo.gif"'
 t_get /character;  theme_is retro; expect_body '<body class="minimal theme-retro">'
 t_logout
@@ -132,6 +132,6 @@ t_login themer themepw1; t_get /; theme_is retro
 t_jar themeadmin
 t_get /admin
 theme_post retro /admin;                 expect_redirect /admin
-t_get /admin;      theme_is retro; expect_body '<body class="admin theme-retro">'; expect_body 'src="/static/images/logo.gif"'
+t_get /admin;      theme_is retro; expect_body '<body class="admin theme-retro" data-live'; expect_body 'src="/static/images/logo.gif"'
 theme_post default /admin;               expect_redirect /admin
 t_get /admin;      theme_is default

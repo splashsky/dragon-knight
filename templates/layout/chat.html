@@ -1,0 +1,15 @@
+{#- The Babble Box (lib/chat.lua): in the right column of in-game pages, larger on the town
+		page and /babble. Without JavaScript the form posts and the page reloads; live.js posts
+		with fetch and adds and removes messages as they come. ctx: view.chat(req, large). -#}
+<details class="chat{% if large then %} chat-large{% end %}" data-chat open>
+<summary class="title">Babble Box</summary>
+<div class="chat-scroll"><ol class="chat-posts" data-chat-posts>
+{{{ include("layout/chat_posts") }}}
+</ol></div>
+<form class="chat-form" method="post" action="/babble" data-chat-form>
+{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}">
+<input type="text" name="babble" maxlength="{{ max_chars }}" aria-label="Message" autocomplete="off">
+<input type="submit" name="submit" value="Babble">
+<div class="chat-status small" data-chat-status role="status" aria-live="polite"></div>
+</form>
+</details>

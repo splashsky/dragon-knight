@@ -4,12 +4,16 @@
 -- This is the latest schema (`dk install` sets PRAGMA user_version to
 -- migrations.VERSION); change it together with a new migration in app/lib/migrations.lua.
 
+-- The Babble Box (chat, app/lib/chat.lua). author is the charname at posting time (shown);
+-- author_id links the account (schema version 10; the rate limit counts by it).
 CREATE TABLE babble (
 	id        INTEGER PRIMARY KEY AUTOINCREMENT,
 	posttime  INTEGER NOT NULL DEFAULT 0,
 	author    TEXT    NOT NULL DEFAULT '',
-	babble    TEXT    NOT NULL DEFAULT ''
+	babble    TEXT    NOT NULL DEFAULT '',
+	author_id INTEGER REFERENCES users (id) ON DELETE SET NULL
 );
+CREATE INDEX babble_author ON babble (author_id, posttime);
 
 -- Character classes: content files app/content/classes/<key>.lua synced into these tables
 -- (app/lib/content/sync.lua). Rows are never deleted: a class whose file is gone is
@@ -71,7 +75,7 @@ CREATE TABLE content_adopt (
 	PRIMARY KEY (kind, key, field)
 ) WITHOUT ROWID;
 
--- Small key/value store: content_fingerprint, content_seen, content_error.
+-- Small key/value store: content_fingerprint, content_seen, content_error, presence_sweep.
 CREATE TABLE meta (
 	key    TEXT PRIMARY KEY,
 	value  TEXT NOT NULL
@@ -92,7 +96,12 @@ CREATE TABLE control (
 	showbabble    INTEGER NOT NULL DEFAULT 0,
 	showonline    INTEGER NOT NULL DEFAULT 0,
 	inventory_size INTEGER NOT NULL DEFAULT 12,
-	max_allies    INTEGER NOT NULL DEFAULT 1
+	max_allies    INTEGER NOT NULL DEFAULT 1,
+	-- the broadcast banner (app/lib/banner.lua): text ('' = none), id (+1 per banner),
+	-- expiry (unix time, 0 = never)
+	banner        TEXT    NOT NULL DEFAULT '',
+	banner_id     INTEGER NOT NULL DEFAULT 0,
+	banner_expires INTEGER NOT NULL DEFAULT 0
 );
 
 -- Forum boards. admin_threads = 1: only administrators start threads (replies are open).
@@ -328,7 +337,8 @@ CREATE TABLE users (
 	base_attack           INTEGER NOT NULL DEFAULT 0,
 	base_defense          INTEGER NOT NULL DEFAULT 0,
 	base_exp_bonus        INTEGER NOT NULL DEFAULT 0,
-	base_gold_bonus       INTEGER NOT NULL DEFAULT 0
+	base_gold_bonus       INTEGER NOT NULL DEFAULT 0,
+	online                INTEGER NOT NULL DEFAULT 0    -- 1: announced as online (app/lib/presence.lua)
 );
 CREATE UNIQUE INDEX users_username ON users (username);
 CREATE INDEX users_charname ON users (charname);

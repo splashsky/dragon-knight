@@ -23,16 +23,12 @@
 <div class="panel-row">
 <div>
 {%- if online then %}
-<div class="title">Who's Online</div>
-<div class="box-body">There are <b>{{ #online }}</b> user(s) online within the last 10 minutes:
-{%- for i, u in ipairs(online) do %}{% if i > 1 then %},{% end %} <a href="/character/{{ u.id }}">{{ u.charname }}</a>{% end %}
-</div>
+{{{ include("layout/online", online) }}}
 {%- end %}
 </div>
 <div>
-{%- if babble then %}
-<div class="title">Babble Box</div>
-<div class="box-body"><iframe src="/babble" name="sbox" id="bbox" class="babble-frame" title="Babble Box"></iframe></div>
+{%- if chat then %}
+{{{ include("layout/chat", chat) }}}
 {%- end %}
 </div>
 </div>

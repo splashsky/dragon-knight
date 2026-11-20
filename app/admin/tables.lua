@@ -6,6 +6,7 @@ local auth = require("lib.auth")
 local classes = require("lib.classes")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
+local session = require("lib.session")
 local spells = require("lib.spells")
 
 local tables = {}
@@ -136,6 +137,7 @@ tables.users = function()
 			-- log the user out everywhere (but keep the admin's own current session)
 			dk.db:exec("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", row.id,
 								 req.session and req.session.token_hash or "")
+			session.publish_logout(row.id)
 		end,
 		fields = {
 			ID,

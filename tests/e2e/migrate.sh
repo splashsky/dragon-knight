@@ -1,12 +1,13 @@
 # tests/e2e/migrate.sh :: schema versioning: `dk migrate` from the pre-versioning schema
-# (tests/fixtures/schema_v0.sql) and from versions 1 to 8 (tests/fixtures/schema_vN.sql,
-# with the game data of that time, tests/fixtures/seed_v3.sql to seed_v8.sql), the 503
+# (tests/fixtures/schema_v0.sql) and from versions 1 to 9 (tests/fixtures/schema_vN.sql,
+# with the game data of that time, tests/fixtures/seed_v3.sql to seed_v9.sql), the 503
 # page for an outdated database, and no-op runs. Version 5 -> 6 checks that every
 # character's effective stats are the same before and after; version 6 -> 7 that edited
 # effect amounts become power overrides and a fight goes on; version 7 -> 8 that fights in
 # progress move to the fight tables (sleep and buffs as statuses) and go on; version 8 -> 9
 # that monsters become content (edits as overrides, hand-made ones retired) and fights in
-# progress keep their monster.
+# progress keep their monster; version 9 -> 10 that chat messages get their author's
+# account and recent players count as online.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
@@ -299,7 +300,7 @@ V1_DATA="SELECT id, username, charname, charclass, gold, authlevel FROM users OR
 before=$(mig_sql "$V1_DB" "$V1_DATA")
 "$BIN" migrate --config "$MIG/v1.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v1) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 2: remove difficulty levels' "$T/migrate.log" && t_ok || t_fail "step 2 not reported (v1)"
-grep -qF 'Migrating to version 1' "$T/migrate.log" && t_fail "step 1 ran on a version 1 database" || t_ok
+grep -qF 'Migrating to version 1:' "$T/migrate.log" && t_fail "step 1 ran on a version 1 database" || t_ok
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message (v1)"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v1 stamped"
 mig_eq "SELECT count(*) FROM pragma_table_info('control') WHERE name LIKE 'diff%';
@@ -950,6 +951,53 @@ mig_eq "SELECT entity_id FROM fight_combatants WHERE user_id = 2 AND id = 2" "15
 t_get /help/monsters; expect_body '>Big Slime</td>'; expect_no_body 'Homebrew'
 mig_unserve "$MIG/v8server.log"
 "$BIN" migrate --config "$MIG/v8.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v8)"
+
+t_section "migrate: version 9 database"
+# version 9 schema + its game data, chat messages (by a player, by a name in another case,
+# by a deleted player) and a player seen a minute ago; only step 10 runs: messages get
+# their author's account, recent players count as online, no banner.
+V9_DB="$MIG/v9.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V9_DB\"#" "$CONFIG" > "$MIG/v9.lua"
+mig_script "$V9_DB" "$ROOT/tests/fixtures/schema_v9.sql"
+mig_script "$V9_DB" "$ROOT/tests/fixtures/seed_v9.sql"
+cat > "$MIG/v9_data.sql" <<SQL
+INSERT INTO users (id, username, email, charname, verify, onlinetime) VALUES
+	(1, 'chatter', 'c@example.com', 'Chatter', '1', strftime('%s', 'now') - 60),
+	(2, 'idler', 'i@example.com', 'Idler', '1', 100);
+INSERT INTO babble (id, posttime, author, babble) VALUES
+	(1, 100, 'Chatter', 'hello <there>'), (2, 200, 'chatter', 'lower case'), (3, 300, 'Gone', 'by a deleted player');
+PRAGMA user_version = 9;
+SQL
+mig_script "$V9_DB" "$MIG/v9_data.sql"
+MIG_DB=$V9_DB
+mig_eq "PRAGMA user_version" "9" "fixture is version 9"
+V9_USERS=$(mig_users "$V9_DB")
+"$BIN" migrate --config "$MIG/v9.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v9) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version [1-9]:' "$T/migrate.log" && t_fail "steps 1-9 ran on a version 9 database" || t_ok
+grep -qF 'Migrating to version 10: realtime: chat messages keep their author' "$T/migrate.log" && t_ok || t_fail "step 10 not reported: $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v9 stamped"
+[ "$(mig_layout "$V9_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v9 schema differs from a fresh install:"
+	diff <(mig_layout "$V9_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v9)"
+[ "$(mig_users "$V9_DB")" = "$V9_USERS" ] && t_ok || t_fail "users changed (v9)"
+mig_eq "SELECT id || '|' || coalesce(author_id, '-') FROM babble ORDER BY id" "1|1
+2|1
+3|-" "messages get their author's account"
+mig_eq "SELECT username || '|' || online FROM users ORDER BY id" "chatter|1
+idler|0" "recent players are online"
+mig_eq "SELECT banner || '|' || banner_id || '|' || banner_expires FROM control" "|0|0" "no banner"
+mig_serve "$MIG/v9.lua" "$MIG/v9server.log"
+"$BIN" user --config "$MIG/v9.lua" passwd chatter v9pass1 >/dev/null && t_ok || t_fail "dk user passwd (v9)"
+t_jar migv9; t_reset_jar
+t_login chatter v9pass1; expect_redirect /
+t_get /babble;     expect_status 200; expect_body '[<b>Chatter</b>] hello &lt;there&gt;</li>'
+expect_body '>Chatter</a>'; expect_no_body '>Idler</a>'
+t_fetch /babble "babble=after+the+migration"; expect_status 200
+mig_eq "SELECT author_id FROM babble WHERE babble = 'after the migration'" "1" "a new message after the migration"
+mig_unserve "$MIG/v9server.log"
+"$BIN" migrate --config "$MIG/v9.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v9)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

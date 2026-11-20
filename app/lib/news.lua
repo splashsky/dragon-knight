@@ -112,7 +112,7 @@ end
 
 -- Posts news as `user` (an empty title gets the default) with its discussion thread,
 -- whatever the forum setting, so the threads exist if the built-in forum is enabled later.
--- Returns the post id.
+-- Returns the post id and its title.
 function news.post(user, title, content)
 	if title == "" then title = news.default_title(content) end
 	local now = dk.now()
@@ -120,7 +120,7 @@ function news.post(user, title, content)
 	local _, id = dk.db:exec(
 		"INSERT INTO news (postdate, title, content, author_id, thread_id) VALUES (?, ?, ?, ?, ?)",
 		now, title, content, user.id, thread)
-	return id
+	return id, title
 end
 
 -- `dk install`: posts without an author (the seeded one) become `admin`'s; posts without a

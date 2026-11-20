@@ -1,0 +1,31 @@
+<h1 class="admin-heading">Broadcast</h1>
+{%- if saved == "set" then %}
+<p class="admin-saved">Banner shown.</p>
+{%- elseif saved == "cleared" then %}
+<p class="admin-saved">Banner cleared.</p>
+{%- end %}
+{%- if errors then %}
+<div class="admin-errors"><b>Errors:</b><br>
+<div class="error">
+{%- for _, e in ipairs(errors) do %}
+{{ e }}<br>
+{%- end %}
+</div>
+Please try again.</div>
+{%- end %}
+<p>A short message shown at the top of every page (and straight away on pages that are open) until you clear it or it expires. Players can dismiss it in their browser.</p>
+<p><b>Current banner:</b>
+{%- if current then %}
+<span class="admin-banner-current">{{ current.text }}</span>
+{%- if current.expires then %} <span class="light">(until {{ datetime(current.expires) }})</span>{% end %}
+{%- else %}
+<span class="light">none</span>
+{%- end %}</p>
+<form action="/admin/broadcast" method="post">
+{{{ csrf_field() }}}
+Text (up to {{ max_chars }} characters; a new banner replaces the current one):<br>
+<input type="text" name="text" size="60" maxlength="{{ max_chars }}" value="{{ text }}"><br>
+Expires after <input type="text" name="minutes" size="6" maxlength="6" value="{{ minutes }}"> minutes (empty: until cleared)<br>
+<input type="submit" name="set" value="Show Banner">
+{%- if current then %} <input type="submit" name="clear" value="Clear Banner">{% end %}
+</form>

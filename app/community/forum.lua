@@ -2,6 +2,7 @@
 -- (`forums` table; legacy had one list of threads, which is board 1 "General").
 local auth = require("lib.auth")
 local game = require("lib.game")
+local notices = require("lib.notices")
 local paging = require("lib.paging")
 local php = require("lib.php")
 local view = require("lib.view")
@@ -152,6 +153,7 @@ function forum.reply(req, params)
 	local last = (count - 1) // forum.POSTS_PER_PAGE * forum.POSTS_PER_PAGE
 	local url = "/forum/thread/" .. thread.id
 	if last > 0 then url = url .. "?start=" .. last end
+	notices.forum_reply(thread, req.user, url)
 	return view.redirect(url)
 end
 

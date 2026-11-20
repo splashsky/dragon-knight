@@ -203,7 +203,55 @@ BENCH_SCENARIO=realtime` (dkbench `-s realtime -l LISTENERS -e EVENTS_PER_S`).
 	restart id, slow-client cutoff, heartbeat timing, shutdown), e2e with `curl -N` (publish
 	after commit only, rollback publishes nothing, authorization, Last-Event-ID replay).
 
-## R2: global chat, presence, notices, broadcast
+## R2: global chat, presence, notices, broadcast — ✅ done
+
+**As implemented** (details in `docs/APP.md`, "Realtime": the event catalogue, live
+pages, chat, presence, notices, banner, adding a live feature). Schema version 10:
+`babble.author_id` (backfilled by charname) + index `(author_id, posttime)`,
+`users.online`, `control.banner`/`banner_id`/`banner_expires`. C: one binding,
+`dk.subscribers(channel)` (`hub_count`: the hub's hash table and counts are now changed
+under the stats mutex, so any thread can look a channel up; unit-tested across threads in
+`test_hub.c`). Lua: `lib/{chat,presence,notices,banner}.lua`, `town/babble.lua` (`GET
+/babble` page, `POST /babble`, `POST /babble/#id/delete`), `routes/live.lua` (`GET
+/live/state`: the live parts as server-rendered HTML in JSON; `POST /banner/dismiss`),
+`admin/broadcast.lua`; layout partials `layout/{chat,chat_posts,online,online_list,
+side_live,banner,live_attrs}.html` (the layouts get `banner`, `back`, `live`, `side`;
+`view.json`, `view.wants_json`, `view.back_to`). Events: `babble` (`babble`, `delete`),
+`presence` (`join`, `leave` with the online count), `notices` (`news`, `banner`,
+`clear`), `user:<id>` (`reply`, `logout` with the session's public id or `all`).
+Presence: online = a stream open (`dk.subscribers("user:<id>")`) or a request within
+`online_seconds` (600); `users.online` marks the announced players (the list and count are
+exactly those); joins come from `session.load`, leaves from a sweep run by the first
+request at least `presence_sweep_seconds` (60) after the last (`meta.presence_sweep`; at
+most 40 leaves per request) — on a server with no requests at all departures wait for the
+next one. `public/js/live.js` (~350 lines, no framework): leader election over
+localStorage (2 s heartbeat, 6 s stale) + BroadcastChannel, per-tab fallback, event-id
+dedup, backoff via `GET /live/state` (stop on a redirect or 4xx), resync by swapping in
+`/live/state`, textContent only, same-site links only, banner dismissal as a cookie (also
+without JS). Chat rate limit in whole seconds (`posttime`), 429 with `Retry-After`;
+length cut to 120 as before. Tests: `tests/e2e/{chat,presence,notices}.sh` (two-plus
+users with `curl -N` streams; live helpers moved into `tests/run.sh`), the v9 → v10
+migration in `migrate.sh` (fixtures `schema_v9.sql`, `seed_v9.sql`),
+`tests/lua/test_chat.lua`, `node --check` of live.js when node is installed.
+
+**Notes for R3**:
+- JSON answers: `view.json(t, status)` and `view.wants_json(req)` (`Accept:
+	application/json`) exist; `t_fetch` in `tests/run.sh` posts like fetch (CSRF token in
+	`X-CSRF-Token` from the page's `<body data-csrf>`). Reuse them for the fight API.
+- live.js is not a module system: R3's `fight.js` should stay a separate small file loaded
+	only on fight pages (`head.html` includes scripts by ctx flags; add a layout opt), and
+	can read `data-csrf` from `<body>` the same way.
+- Fragments: the layouts' live parts are partials rendered by `view.render(name, ctx,
+	req)` (`layout/chat_posts`, `layout/banner`, ...); the nav columns are
+	`layout/nav_left`/`nav_right` with `game.nav(user)`. `GET /live/state` is the model
+	for "render the same templates into JSON".
+- Don't re-fetch the current URL to refresh a page part: `GET /fight` and `GET /victory`
+	change state. That is why resync uses `/live/state`.
+- The right column now carries the chat panel; the fight page's swapped `nav` fragment
+	must not replace it (swap `nav_right`'s boxes, not the whole `<aside>`), or the chat
+	loses its scroll position and typed text.
+- Publishing per request is capped at 256 events: a fight round that publishes (e.g. to
+	spectators later) shares that budget with presence (`join`, up to 40 `leave`s).
 
 - **Client** (`public/js/live.js`, no framework): one `EventSource` per browser, shared
 	between tabs (leader election via `BroadcastChannel` + `localStorage` heartbeat; the

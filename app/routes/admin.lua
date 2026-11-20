@@ -1,5 +1,6 @@
 -- routes/admin.lua :: admin control panel (port of legacy admin.php).
 -- Modules live in app/admin/; templates in templates/admin/ + templates/layout/admin.html.
+local broadcast = require("admin.broadcast")
 local classes = require("admin.classes")
 local effects = require("admin.effects")
 local common = require("admin.common")
@@ -23,6 +24,8 @@ return function(r)
 	r:post("/admin/settings", guard, settings.save)
 	r:get("/admin/news", guard, news.show)
 	r:post("/admin/news", guard, news.save)
+	r:get("/admin/broadcast", guard, broadcast.show)
+	r:post("/admin/broadcast", guard, broadcast.save)
 	r:get("/admin/classes", guard, classes.index)
 	r:get("/admin/classes/#id", guard, classes.edit)
 	r:post("/admin/classes/#id", guard, classes.save)

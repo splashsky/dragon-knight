@@ -1,8 +1,13 @@
 -- view.lua :: rendering, the template helper table `h`, layouts and responses.
+local banner = require("lib.banner")
+local chat = require("lib.chat")
 local csrf = require("lib.csrf")
 local dbcount = require("lib.dbcount")
 local game = require("lib.game")
+local json = require("lib.json")
 local php = require("lib.php")
+local presence = require("lib.presence")
+local session = require("lib.session")
 local themes = require("lib.themes")
 
 local view = {}
@@ -55,14 +60,28 @@ end
 
 view.helpers = base
 
--- The theme selector (a POST form to /theme), returning to this page.
-local function theme_picker(req)
+-- This page, for forms that come back to it (`back`): the path and query string, or the
+-- path on a page answering a POST.
+function view.back_path(req)
 	local back = req.path
 	if req.method == "GET" or req.method == "HEAD" then back = req.target or back end
+	return themes.safe_path(back) or "/"
+end
+
+-- Where a form with a `back` field returns to: that page when it is a same-site path with
+-- a GET route, else `fallback` (default "/").
+function view.back_to(req, fallback)
+	local back = themes.safe_path(req.form.back)
+	if back and require("routes"):match("GET", back:match("^[^?#]*")) then return back end
+	return fallback or "/"
+end
+
+-- The theme selector (a POST form to /theme), returning to this page.
+local function theme_picker(req)
 	return view.render("layout/theme_picker", {
 		themes = themes.list,
 		current = themes.current(req).key,
-		back = themes.safe_path(back) or "/",
+		back = view.back_path(req),
 	}, req)
 end
 
@@ -101,10 +120,46 @@ function view.elapsed()
 	return string.format("%.4f", dk.clock() - dk.request_start)
 end
 
+-- The Babble Box's template ctx (layout/chat.html); nil when the chat is turned off.
+function view.chat(req, large)
+	if game.control().showbabble ~= 1 then return nil end
+	return {
+		posts = chat.history(),
+		is_admin = req.user and req.user.authlevel == 1,
+		back = view.back_path(req),
+		large = large,
+		max_chars = chat.MAX_CHARS,
+	}
+end
+
+-- The who's-online list's ctx (layout/online.html); nil when it is turned off.
+function view.online()
+	if game.control().showonline ~= 1 then return nil end
+	return { online = presence.list() }
+end
+
+-- The live parts of the layout (docs/APP.md "Live pages"): `live` (the page loads live.js:
+-- the user is logged in) and `side` (the online count and the chat in the right column).
+local function live_ctx(req, ctx, layout, nav, opts)
+	local user = req.user
+	if not user or layout == "minimal" then return end
+	ctx.live = {
+		csrf = csrf.token(req),
+		session = req.session and session.live_id(req.session) or "",
+		admin = user.authlevel == 1,
+	}
+	if not nav then return end
+	local side = {}
+	if game.control().showonline == 1 then side.online_count = presence.count() end
+	if not opts.chat_inline then side.chat = view.chat(req, false) end
+	ctx.side = side
+end
+
 -- Wraps already-rendered HTML in a layout.
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
 --       body_class (extra class(es) on <body>, for page-specific CSS; the layouts add
 --       "theme-<key>"),
+--       chat_inline (the page shows the chat itself: not in the right column),
 --       status, headers (extra {name, value} pairs), vars (extra layout ctx values).
 function view.layout(req, title, content, opts)
 	opts = opts or {}
@@ -116,6 +171,7 @@ function view.layout(req, title, content, opts)
 		user = game.user(user.id) or user
 		req.user = user
 	end
+	local layout = opts.layout or "main"
 	local ctx = {
 		title = title,
 		content = content,
@@ -128,9 +184,12 @@ function view.layout(req, title, content, opts)
 		build = view.BUILD,
 		elapsed = view.elapsed,
 		queries = dbcount.count,
+		banner = banner.current(req),
+		back = view.back_path(req),
 	}
+	live_ctx(req, ctx, layout, nav and user ~= nil, opts)
 	for k, v in pairs(opts.vars or {}) do ctx[k] = v end
-	local body = view.render("layout/" .. (opts.layout or "main"), ctx, req)
+	local body = view.render("layout/" .. layout, ctx, req)
 	return html_response(body, opts.status, opts.headers)
 end
 
@@ -169,6 +228,19 @@ end
 
 function view.redirect(url, status)
 	return { status = status or 302, headers = { { "Location", url } }, body = "" }
+end
+
+-- A JSON answer (t: a table for lib/json.lua).
+function view.json(t, status, headers)
+	local hs = { { "Content-Type", "application/json; charset=utf-8" }, { "Cache-Control", "no-store" } }
+	for _, hd in ipairs(headers or {}) do hs[#hs + 1] = hd end
+	return { status = status or 200, headers = hs, body = json.encode(t) }
+end
+
+-- Whether the request asks for JSON (fetch from live.js: Accept: application/json).
+function view.wants_json(req)
+	local accept = req.headers["accept"]
+	return type(accept) == "string" and accept:find("application/json", 1, true) ~= nil
 end
 
 function view.text(body, status)

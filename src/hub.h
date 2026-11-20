@@ -73,6 +73,8 @@ int      hub_publish(const char *channel, const char *event, const char *data, s
 					 char *err, size_t errlen);
 /* 1 while a hub accepts events (a server runs in this process). */
 int      hub_active(void);
+/* Streams subscribed to a channel of the running hub (0 without one). */
+int      hub_count(const char *channel);
 /* Per-channel subscriber counts for stats_format: "channel.<name> <n>" for channels
  * without ':', and "channel.<prefix>:* <n>" summed over the others. */
 int      hub_format_stats(sbuf *out);

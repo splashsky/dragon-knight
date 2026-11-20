@@ -381,7 +381,10 @@ static void test_queue(void)
 	sb_init(&st);
 	CHECK(hub_format_stats(&st) == 0);
 	CHECK(st.p && strstr(st.p, "channel.babble 2\n") && strstr(st.p, "channel.user:* 2\n"));
+	/* subscriber counts for any thread (dk.subscribers) */
+	CHECK(hub_count("babble") == 2 && hub_count("user:1") == 1 && hub_count("user:3") == 0);
 	hub_close(h, s1);
+	CHECK(hub_count("babble") == 1 && hub_count("user:1") == 0);
 	hub_close(h, s2);
 	fake_free(&g1);
 	fake_free(&g2);
@@ -389,6 +392,7 @@ static void test_queue(void)
 
 	hub_detach(h);
 	CHECK(!hub_active());
+	CHECK(hub_count("babble") == 0);
 	CHECK(hub_publish("x", "e", "v", 1, err, sizeof err) == 1);
 	hub_free(h);
 	hub_free(h2);
@@ -673,6 +677,7 @@ static void test_http_streams(int use_poll)
 	CHECK(strstr(a.buf.p, "Content-Length") == NULL);
 	CHECK(cl_wait(&a, "retry: 1500\nid: ", 2) == 1);
 	CHECK(wait_stat(ST_conn_streaming, 1, 2));
+	CHECK(hub_count("room") == 1 && hub_count("user:1") == 1 && hub_count("user:2") == 0);
 
 	/* events reach it; other channels don't */
 	publish(port, "ch=room&ev=hello&data=first");
@@ -717,6 +722,7 @@ static void test_http_streams(int use_poll)
 	cl_close(&a);
 	CHECK(wait_stat(ST_conn_streaming, 0, 2));
 	CHECK(wait_stat(ST_stream_subscriptions, 0, 2));
+	CHECK(hub_count("room") == 0 && hub_count("user:1") == 0);
 
 	/* shutdown: "event: bye", then the connection closes */
 	CHECK(open_stream(&a, port, "ch=room", NULL) == 0);

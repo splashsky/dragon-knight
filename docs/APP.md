@@ -11,10 +11,11 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
+| Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js` | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
-| Town, shop, explore, heal, character, map, babble | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
+| Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
@@ -45,7 +46,9 @@ for one request only):
 2. `content_sync.check()` syncs the content files into the database when they changed
 	 (one query when they didn't; see [Content](#content)).
 3. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
-	 row) and `req.session`, and updates `users.onlinetime`.
+	 row) and `req.session`, and updates `users.onlinetime` (a player not marked online is
+	 announced: see [Presence](#presence-whos-online)). Then the presence sweep runs when
+	 one is due (once a minute).
 4. The router matches the method and path. No match gives a 404 page; the wrong method
 	 gives a 405 page with an `Allow` header.
 5. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
@@ -113,7 +116,8 @@ end
 	A trailing `/` is ignored. HEAD requests run the GET route, then `main.lua` rolls the
 	transaction back and drops queued cookies, so HEAD never changes state.
 - GETs should not change state. The deliberate exceptions are guarded by game state, so
-	a reload is harmless: the `onlinetime`/session touch, `GET /fight` (monster pick, first
+	a reload is harmless: the `onlinetime`/session touch (and the presence join and sweep),
+	`GET /fight` (monster pick, first
 	strike, the fight's `round` counter) and `GET /victory` (pays out once).
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
 	only and gives an **integer**, so `/shop/buy/abc` is a 404. Params arrive as the
@@ -131,7 +135,7 @@ end
 | `auth.game` | legacy index.php chain: not logged in → `/login`; `control.gameopen == 0` → "Game Closed" page; `verifyemail == 1` and not verified → `/verify`; `authlevel == 2` → 403 blocked page |
 | `auth.admin` | not logged in → `/login`; `authlevel ~= 1` → 403 |
 
-Use `auth.game` for every game page (town, fight, character, babble, news). The forum
+Use `auth.game` for every game page (town, fight, character, babble, news, `/live`). The forum
 routes use `forum.guard`, which wraps it.
 
 ### Request table
@@ -153,6 +157,9 @@ Form and query values are raw strings. Validate them, and convert them with
 | `view.unavailable(req, text)` | standalone 503 page (no DB access; used for the schema check) |
 | `view.redirect(url [, status])` | 302 (legacy `header("Location: …")`) |
 | `view.text(body [, status])` | text/plain |
+| `view.json(t [, status, headers])` | `application/json` (`lib/json.lua`), `Cache-Control: no-store`; `view.wants_json(req)`: the request sent `Accept: application/json` (live.js's fetch) |
+| `view.back_path(req)` / `view.back_to(req [, fallback])` | this page's path and query (for a form's `back` field) / where to redirect after a form with `back`: that path if it is same-site with a GET route, else `fallback` (`/`) |
+| `view.chat(req, large)` / `view.online()` | ctx for `layout/chat.html` / `layout/online.html`, or nil when the Babble Box / Who's Online is turned off |
 | `view.render(name, ctx, req)` | a rendered template string (for building fragments) |
 | `view.layout(req, title, html, opts)` | wraps already-rendered HTML |
 
@@ -160,13 +167,15 @@ Form and query values are raw strings. Validate them, and convert them with
 
 - `nav`: show the side columns and the logged-in top nav. Defaults to true when logged
 	in. Legacy pages called with `display(..., false, false, false)` pass `nav = false`.
-- `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup and iframe
-	pages (`/character`, `/map`, `/babble`). Any other name uses
+- `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup pages
+	(`/character`, `/map`). Any other name uses
 	`templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
 - `body_class`: extra class(es) on `<body>` for page-specific CSS (the layouts also add
 	`theme-<key>`, see [Themes](#themes)). The help pages pass
 	`{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
 	page (`body.minimal.help` in `community.css`).
+- `chat_inline`: the page shows the Babble Box itself (town page, `/babble`), so the
+	right column doesn't.
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -176,10 +185,15 @@ stats itself after changing them reads the row again (`game.user(id)`).
 
 Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class`,
 `theme` (the request's theme, see [Themes](#themes)), `gamename`, `nav` (table or nil),
-`logged_in`, `version`, `build`, `elapsed()`, `queries()`. Include
-`{{{ include("layout/head") }}}` in `<head>` to get the CSS links (`dk.css` + the four
-feature stylesheets + the theme's) and `dk.js`, put `theme-{{ theme.key }}` in the
-`<body>` class, and use `{{{ logo() }}}` and `{{{ theme_picker() }}}`.
+`logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
+or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
+live.js) and `side` (with `nav`: the online count and the Babble Box for the right column,
+`layout/side_live.html`). Include `{{{ include("layout/head") }}}` in `<head>` to get the
+CSS links (`dk.css` + the four feature stylesheets + the theme's), `dk.js` and, with
+`live`, `live.js`; put `theme-{{ theme.key }}` in the `<body>` class followed by
+`{{{ include("layout/live_attrs") }}}`, start the body with
+`<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>`, and
+use `{{{ logo() }}}` and `{{{ theme_picker() }}}`.
 
 ## Realtime (event streams)
 
@@ -206,8 +220,8 @@ return { sse = { channels = { "babble", "user:" .. req.user.id }, retry = 3000 }
 	`Retry-After: 5`. `EventSource` does not retry after an error status: the client
 	script has to (with a backoff).
 - The stream is fixed once open: the server does not re-check the session. A logout or
-	password change should publish an event on `user:<id>` that makes the page close its
-	stream (2.3, R2).
+	password change publishes `logout` on `user:<id>`, and live.js closes the page's
+	stream and reloads it (see [Live pages](#live-pages)).
 
 `GET /live` (`app/routes/live.lua`) is the game's stream: `babble`, `presence`,
 `notices`, `user:<id>`, plus `admin` for administrators (`live.channels(user)`).
@@ -216,7 +230,7 @@ return { sse = { channels = { "babble", "user:" .. req.user.id }, retry = 3000 }
 
 ```lua
 local json = require("lib.json")
-dk.publish("babble", "chat", json.encode({ id = id, author = name, text = text, time = dk.now() }))
+dk.publish("babble", "babble", json.encode({ id = id, author = name, text = text, time = dk.now() }))
 ```
 
 - `data` is a string; encode tables with `lib/json.lua` (`json.encode`, see its header:
@@ -235,6 +249,11 @@ dk.publish("babble", "chat", json.encode({ id = id, author = name, text = text, 
 - From CLI commands (`dk user ...`) `dk.publish` logs a warning and sends nothing: the
 	streams belong to the server process.
 
+**Who listens.** `dk.subscribers(channel)` is the number of open streams on a channel
+(0 when none, and in CLI processes): `dk.subscribers("user:12") > 0` means player 12 has
+a live page open. It reads the server's counts as they are now (thread-safe, a hash
+lookup under a short lock); a stream the request itself opens isn't counted yet.
+
 **Reconnects.** The browser reconnects by itself and sends the last id it saw
 (`Last-Event-ID`; also visible to the handler as `req.headers["last-event-id"]`). The
 server replays the stream's channels' events after that id from each channel's ring
@@ -246,12 +265,140 @@ blip replays instead of resyncing. At shutdown streams get `event: bye`.
 
 **Limits.** A client that stops reading is cut off once `stream_queue_bytes` (256 KiB)
 are waiting for it. `max_streams` (512) and `max_streams_per_ip` (8) bound the number of
-open streams; a browser has at most 6 connections per host over HTTP/1.1, so a page
-should share one stream between tabs (R2).
+open streams; a browser has at most 6 connections per host over HTTP/1.1, so live.js
+shares one stream between a browser's tabs.
 
 **Testing.** `test_routes = true` in the config (the e2e config sets it) enables
 `POST /__test/publish` (`channel`, `event`, `data`, optional `delay_ms`, `fail=1`) for any
-logged-in user; `tests/e2e/live.sh` reads streams with `curl -N`.
+logged-in user; `tests/e2e/live.sh` reads streams with `curl -N` (the `live_*` helpers
+of `tests/run.sh`, see [End-to-end tests](#end-to-end-tests)).
+
+### Events
+
+What the game publishes (data is JSON; event names are unique across channels, because
+the browser sees only the name):
+
+| Channel | Event | Data | Published by |
+|---|---|---|---|
+| `babble` | `babble` | `{ id, author, text, time }` (a new chat message; `time`: unix seconds) | `POST /babble` (`chat.post`) |
+| `babble` | `delete` | `{ id }` | `POST /babble/#id/delete` (administrators) |
+| `presence` | `join` | `{ id, name, online }` (`online`: how many are online now) | a player's first request while not online (`session.load`) |
+| `presence` | `leave` | `{ id, name, online }` | the presence sweep |
+| `notices` | `news` | `{ id, title, author, url }` | a news post (`/admin/news`) |
+| `notices` | `banner` | `{ id, text, expires, ttl }` (`expires`, `ttl`: unix time and seconds left, absent without an expiry) | `/admin/broadcast` (set) |
+| `notices` | `clear` | `{ id }` | `/admin/broadcast` (clear) |
+| `user:<id>` | `reply` | `{ thread, title, author, url }` | a reply in a forum thread the player started or posted in (not to the one replying; at most 200 players) |
+| `user:<id>` | `logout` | `{ session }` (one session's pages) or `{ all = true }` | logout; password change, lost password, a new password set in the user editor |
+| (server) | `resync`, `bye` | empty | the hub: missed events are gone / shutdown |
+
+The `admin` channel exists for administrators' streams; nothing uses it yet.
+
+### Live pages
+
+`public/js/live.js` runs on the pages of logged-in players (main and admin layouts:
+`<body data-live data-csrf=... data-live-session=... [data-live-admin]>`, from
+`layout/live_attrs.html`). Everything it does is also there without it: forms post and
+pages reload.
+
+- **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
+	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
+	and leads if its claim is still there 100–200 ms later. The leader holds the
+	`EventSource("/live")` and forwards each event over `BroadcastChannel("dk-live")`; a
+	leader closing (`pagehide`) clears the claim and says so, and another tab takes over
+	(and resyncs: events in between are lost). A leader that finds another tab's fresh
+	claim steps down. Without `BroadcastChannel` or `localStorage` every tab has its own
+	stream. Events carry their id; a tab ignores an id it has seen.
+- **Errors.** A dropped connection is reconnected by `EventSource` itself (with
+	`Last-Event-ID`: replay). An error status (503 at the limits; a redirect to `/login`
+	when logged out) closes it: live.js then asks `GET /live/state`; a redirect or a 4xx
+	(but 429) stops it for good, anything else is retried with a backoff (1 s doubling to
+	60 s, with jitter); a stream opened after that resyncs. On `bye` (server shutdown) it
+	reconnects after 2–5 s the same way.
+- **Resync.** On `resync` (and after a reconnect or a takeover) every tab fetches
+	`GET /live/state?back=<page>`: `{ chat, online = { count, html }, banner }`, the live
+	parts rendered by the same templates as the page, and swaps them in.
+- **Event data goes in with `textContent` only.** Links in notices are used only when they
+	are same-site paths (`/...`, not `//`).
+- **Logout.** `logout` with `all`, or with the page's own `data-live-session`
+	(`session.live_id`, a hash of the session row: not the token), closes the stream and
+	reloads (to `/login`); the pages of the player's other sessions ignore it.
+- Not covered: events published between a page's render and its stream opening are lost
+	(the stream starts at the server's current position); the page shows the state of its
+	render. Navigating keeps that window to a few milliseconds.
+
+### Chat
+
+The Babble Box (`lib/chat.lua`, routes in `town/babble.lua`, `layout/chat.html`): a
+`<details>` panel (folding it is remembered by live.js in `localStorage`) in the right
+column of every in-game page, and larger in the middle of the town page and of `/babble`
+(its own page; old links to the iframe land there). `control.showbabble` turns it off
+everywhere.
+
+- History: the last 50 messages (`chat.HISTORY`), oldest first, rendered on the page;
+	live ones arrive as `babble` events (live.js builds the same markup).
+- `POST /babble` (`babble`, `back`): blank messages are ignored, longer ones cut to 120
+	characters (`chat.MAX_CHARS`, like before), at most one message per 2 seconds per player
+	(`chat.INTERVAL`, in whole seconds from `babble.posttime` of the player's last message,
+	by `author_id`: a message is taken once the clock's second is 2 past the last one's, so
+	messages are at least 1 s and on average 2 s apart): `429` with `Retry-After` and a
+	message. With `Accept:
+	application/json` (live.js's fetch, CSRF in `X-CSRF-Token`) the answer is `{ message =
+	{ id, author, text, time } | null }` or `{ error, wait }`; otherwise a redirect to
+	`back` (or `/babble`), or the 429 page.
+- `POST /babble/#id/delete` (administrators; the button shows for them): deletes the
+	message and publishes `delete`; JSON `{ deleted }` or a redirect back.
+- `babble.author` keeps the name at posting time (shown), `author_id` the account.
+
+### Presence (who's online)
+
+`lib/presence.lua`. **Online** = has a stream open (`dk.subscribers("user:<id>") > 0`) or
+made a request within `online_seconds` (600). `users.online = 1` marks the players
+announced as online; the Who's Online list (town page, `/babble`) and the count in the
+right column ("Online: N", when `control.showonline` is on) are those players, so they
+always match the events.
+
+- **Join**: `session.load` → `presence.touch`: a request by a player with `online = 0`
+	sets it and publishes `join`. Any number of requests, tabs or streams make one join.
+- **Leave**: `presence.sweep()` (every request, from `main.lua`, after the session) runs
+	when `meta.presence_sweep` is at least `presence_sweep_seconds` (60) old: it stamps
+	the time and publishes `leave` for marked players with no request in the window and no
+	open stream (at most 40 per request, the rest next time). So departures show within
+	about a minute, and on a quiet server (no requests at all) when the next request comes.
+- A player's own request counts before the sweep, so nobody leaves and rejoins at once.
+- Logging out doesn't announce a leave: the player stays online for the window, as by
+	the definition.
+
+### Notices
+
+`lib/notices.lua`: toasts at the bottom right of open pages, gone after 12 s or when
+closed; live only (a player who isn't online doesn't get them later). `notices.news(id,
+title, author)` from `/admin/news`; `notices.forum_reply(thread, author, url)` from
+`POST /forum/reply/#id`, to every account that started or posted in the thread except
+the replier.
+
+### Broadcast banner
+
+`lib/banner.lua`, `/admin/broadcast` (Broadcast in the admin menu): a text (200
+characters) with an optional expiry in minutes, kept in `control` (`banner`, `banner_id`:
++1 per new banner, `banner_expires`: unix time, 0 = never). Every layout renders it at
+the top (`layout/banner.html`, logged out too) while it is active; open pages get
+`banner` / `clear` and drop it at its expiry. "×" dismisses it in this browser: the
+cookie `dk_banner=<id>` (set by live.js, or by `POST /banner/dismiss` without JS), so a
+new banner shows again.
+
+### Adding a live feature
+
+1. Decide the channel: a public one (`babble`, `presence`, `notices`) or the player's
+	`user:<id>` (a new public channel goes into `live.PUBLIC` in `routes/live.lua`; only add
+	private channels a player may read) and a **new event name** (names are global).
+2. Publish from the handler that commits the change, after validation:
+	`dk.publish(channel, "my_event", json.encode({...}))`. Keep data small and plain
+	(ids, names, short texts, same-site URLs); never HTML.
+3. Render the same thing server-side so a page load (and no JS) shows it, with a
+	`data-...` hook live.js can find; if it can go stale, add it to `GET /live/state`.
+4. In live.js add the event to `EVENTS` and a handler to `handlers` that updates the
+	page with `textContent`/DOM methods (idempotent: an event may come twice).
+5. Test with two jars and `live_open` streams (`tests/e2e/chat.sh` is the model).
 
 ## Templates
 
@@ -263,7 +410,7 @@ starting with `__` are reserved.
 	for HTML your own code built.
 - **HTML-returning helpers need triple braces**: `{{{ csrf_field() }}}`,
 	`{{{ include("x") }}}`, `{{{ nl2br(text) }}}`.
-- Every POST form needs `{{{ csrf_field() }}}`, including the babble iframe form.
+- Every POST form needs `{{{ csrf_field() }}}` (the chat's and the banner's too).
 - Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
 	sized window; without JS it's a normal link).
 - Images: `/static/images/<file>`. A link-styled submit button:
@@ -320,8 +467,8 @@ every theme. `app/lib/themes.lua` lists them:
 	string; on a page answering a POST, its path). The route sets the `dk_theme` cookie
 	(`Path=/`, one year, `SameSite=Lax`) and redirects to `back` if it is a same-site path
 	with a GET route (`themes.safe_path`: no scheme, host, `//`, backslash or control
-	characters), else to `/`. An unknown key is a 400 page and changes nothing. Popups and
-	the babble iframe (minimal layout) have no selector but use the theme. No database: the
+	characters), else to `/`. An unknown key is a 400 page and changes nothing. Popups
+	(minimal layout) have no selector but use the theme. No database: the
 	choice belongs to the browser, logged in or out.
 - **Rendering.** `themes.current(req)` is the cookie's theme, or `themes.DEFAULT`
 	(`default`) when there is none or it names no theme. The layouts get it as ctx `theme`:
@@ -361,7 +508,7 @@ browser; to use SemiBold or Black, add the file and its `@font-face`.
 | `game.statbar(cur, max)` | `{pct, height, color}` |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
 | `game.forum_link()` | `/forum`, the external address, or nil |
-| `game.online_users()` | users seen in the last 10 minutes (`id, charname`) |
+| `game.online_users()` | the players online (`id, charname`; `lib/presence.lua`) |
 | `game.nav(user)` | the table the side columns render |
 
 ## Classes (`lib/classes.lua`)
@@ -1211,6 +1358,7 @@ read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 	and `news.page(start, per)` return rows with `author` ("Unknown" when the account is gone)
 	and, when `forumtype == 1` and the thread exists, `thread_url` / `thread_label`
 	(`news.reply_label(n)`: "Reply", "1 reply", "N replies").
+- A news post and a forum reply also send live notices (see [Notices](#notices)).
 - Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,
 	start, per, total)` builds the links that `include("community/forum/pager")` renders.
 
@@ -1287,16 +1435,18 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v8.sql` (version 8) with the
-	 game data of that time (`seed_v3.sql` to `seed_v8.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9) with the
+	 game data of that time (`seed_v3.sql` to `seed_v9.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
 
 ## Sessions, CSRF, accounts
 
-- `lib/session.lua`: `session.create(req, user_id, remember)`, `session.destroy(req)`,
-	`session.destroy_user(user_id)`. The cookie `dk_session` holds 32 random bytes as hex
+- `lib/session.lua`: `session.create(req, user_id, remember)`, `session.destroy(req)`
+	(also publishes `logout` for the session's pages), `session.destroy_user(user_id)`,
+	`session.publish_logout(user_id [, s])` (`logout` for one session's pages or all),
+	`session.live_id(s)`. The cookie `dk_session` holds 32 random bytes as hex
 	(HttpOnly, SameSite=Lax, Path=/, plus Secure when `cookie_secure = true`). The DB
 	stores only `sha256(token)`. Expiry slides: 1 day normally, 1 year with "remember me"
 	(`Max-Age=31536000`).
@@ -1348,6 +1498,10 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
+| `t_fetch path 'a=1'` | POST like live.js: `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
+| `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
+| `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |
+| `live_publish channel event data`, `live_frames_ok name` | `POST /__test/publish`; the stream is well-formed (retry, id/event/data blocks, comments) |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.

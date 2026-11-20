@@ -98,6 +98,11 @@ return {
 	pbkdf2_iterations = 210000,
 	-- Add "Secure" to cookies (set true when the game is served over HTTPS).
 	cookie_secure = false,
+	-- Who's online: a player counts as online while they have a page with live updates
+	-- open, or made a request within online_seconds; departures are checked (and announced
+	-- to open pages) at most every presence_sweep_seconds, by the first request after that.
+	online_seconds = 600,
+	presence_sweep_seconds = 60,
 	-- Test-only routes (POST /__test/publish) for the end-to-end tests and the realtime
 	-- benchmark. Never on a real server.
 	test_routes = false,

@@ -4,6 +4,8 @@
 -- hex(sha256(token)). Normal sessions: browser-session cookie, server expiry 1 day,
 -- sliding. "Remember me": Max-Age 1 year, server expiry 1 year, sliding.
 local cookie = require("lib.cookie")
+local json = require("lib.json")
+local presence = require("lib.presence")
 
 local session = {}
 
@@ -20,7 +22,8 @@ local function ttl_of(remember)
 end
 
 -- Loads req.session and req.user from the cookie. Touches users.onlinetime (legacy
--- cookies.php did this on every authenticated request) and slides the expiry.
+-- cookies.php did this on every authenticated request; a player not online yet is
+-- announced, lib/presence.lua) and slides the expiry.
 function session.load(req)
 	local token = req.cookies[session.COOKIE]
 	if not token then return nil end
@@ -49,8 +52,7 @@ function session.load(req)
 			cookie.set(req, session.COOKIE, token, { max_age = ttl })
 		end
 	end
-	dk.db:exec("UPDATE users SET onlinetime = ? WHERE id = ?", now, user.id)
-	user.onlinetime = now
+	presence.touch(user, now)
 	req.session, req.user = s, user
 	return user
 end
@@ -80,10 +82,24 @@ function session.create(req, user_id, remember)
 	return s
 end
 
--- Logs the current request out (deletes the row, clears the cookie).
+-- A short public id of a session (pages carry it so the `logout` event only closes the
+-- streams of the session that logged out): not the token, nor its hash.
+function session.live_id(s)
+	return dk.crypto.hex(dk.crypto.sha256("live:" .. s.token_hash)):sub(1, 16)
+end
+
+-- Tells the user's open pages (event streams, user:<id>) they were logged out: those of
+-- one session (`s`), or all of them (nil).
+function session.publish_logout(user_id, s)
+	local data = s and { session = session.live_id(s) } or { all = true }
+	dk.publish("user:" .. user_id, "logout", json.encode(data))
+end
+
+-- Logs the current request out (deletes the row, clears the cookie, tells its pages).
 function session.destroy(req)
 	if req.session then
 		dk.db:exec("DELETE FROM sessions WHERE token_hash = ?", req.session.token_hash)
+		session.publish_logout(req.session.user_id, req.session)
 	end
 	if req.cookies[session.COOKIE] then cookie.clear(req, session.COOKIE) end
 	req.session, req.user = nil, nil

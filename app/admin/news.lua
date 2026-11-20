@@ -2,6 +2,7 @@
 -- author and a discussion thread in the forum's News board).
 local common = require("admin.common")
 local news = require("lib.news")
+local notices = require("lib.notices")
 local php = require("lib.php")
 local view = require("lib.view")
 
@@ -30,7 +31,8 @@ function handlers.save(req)
 		return form(req, { errors = errors, title = common.field(req, "title"), content = content })
 	end
 	-- stored raw and escaped on output (legacy printed it as HTML)
-	news.post(req.user, title, content)
+	local id, final_title = news.post(req.user, title, content)
+	notices.news(id, final_title, req.user.charname)
 	return view.redirect("/admin/news?saved=1")
 end
 

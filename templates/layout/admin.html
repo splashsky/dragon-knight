@@ -4,7 +4,8 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body class="admin theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
+<body class="admin theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
+<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
 <div class="admin-page">
 	<nav class="admin-menu">
 		{{{ logo() }}}
@@ -16,6 +17,7 @@
 		<b>Primary Data:</b><br>
 		<a href="/admin/settings">Main Settings</a><br>
 		<a href="/admin/news">Add News Post</a><br>
+		<a href="/admin/broadcast">Broadcast</a><br>
 		<a href="/admin/users">Edit Users</a><br><br>
 		<b>Game Data:</b><br>
 		<a href="/admin/towns">Edit Towns</a><br>

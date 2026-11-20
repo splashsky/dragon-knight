@@ -46,6 +46,7 @@ return function(r)
 
 	r:get("/babble", game_ok, babble.show)
 	r:post("/babble", game_ok, babble.post)
+	r:post("/babble/#id/delete", game_ok, babble.delete)
 
 	r:get("/ninja", game_ok, function() return view.redirect("http://www.se7enet.com/img/shirtninja.jpg") end)
 end

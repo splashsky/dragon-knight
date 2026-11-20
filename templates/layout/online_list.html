@@ -1,0 +1,1 @@
+{%- for i, u in ipairs(online) do %}{% if i > 1 then %},{% end %} <a data-id="{{ u.id }}" href="/character/{{ u.id }}">{{ u.charname }}</a>{% end -%}

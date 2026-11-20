@@ -213,6 +213,17 @@ static int l_publish(lua_State *L)
 	return 0;
 }
 
+/* dk.subscribers(channel) -> the number of open streams listening to the channel (0 when
+ * none, or without a server in this process). */
+static int l_subscribers(lua_State *L)
+{
+	size_t n;
+	const char *ch = luaL_checklstring(L, 1, &n);
+	if (!hub_valid_channel(ch, n)) return luaL_error(L, "dk.subscribers: invalid channel name");
+	lua_pushinteger(L, hub_count(ch));
+	return 1;
+}
+
 /* dk.list_modules(prefix) -> sorted array of module names under app/<prefix as path>. */
 static int l_list_modules(lua_State *L)
 {
@@ -461,6 +472,7 @@ int bind_install(lua_State *L, const dk_config *cfg)
 		{ "server_stats", l_server_stats },
 		{ "list_modules", l_list_modules },
 		{ "publish", l_publish },
+		{ "subscribers", l_subscribers },
 		{ NULL, NULL }
 	};
 	luaL_newlib(L, funcs);

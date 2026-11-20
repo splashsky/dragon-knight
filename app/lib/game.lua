@@ -3,12 +3,11 @@
 local classes = require("lib.classes")
 local inventory = require("lib.inventory")
 local php = require("lib.php")
+local presence = require("lib.presence")
 local spells = require("lib.spells")
 local stats = require("lib.stats")
 
 local game = {}
-
-game.ONLINE_SECONDS = 600   -- "Who's Online": last 10 minutes
 
 local cache = {}
 
@@ -107,9 +106,9 @@ function game.forum_link()
 	return nil
 end
 
+-- "Who's Online": the players online (id, charname), by name (lib/presence.lua).
 function game.online_users()
-	return dk.db:query("SELECT id, charname FROM users WHERE onlinetime >= ? ORDER BY charname",
-										 dk.now() - game.ONLINE_SECONDS)
+	return presence.list()
 end
 
 -- Everything layout/nav_left + layout/nav_right need (port of legacy display()).

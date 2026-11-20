@@ -2,37 +2,9 @@
 # head, events published only after their transaction commits (none on rollback), which
 # channels a player gets (their own user:<id>, admin only for administrators),
 # Last-Event-ID replay and resync, heartbeats, 405 for other methods, the metrics. Uses
-# POST /__test/publish (config test_routes = true, set by tests/run.sh) and a 1 s
-# heartbeat (stream_heartbeat_ms = 1000). Sourced by tests/run.sh.
-
-LIVE_PIDS=()
-# live_open NAME [curl args...]: GET /live with the current jar in the background; the
-# stream goes to $T/live.NAME, its head to $T/live.NAME.h
-live_open() {
-	local name=$1
-	shift
-	rm -f "$T/live.$name" "$T/live.$name.h"
-	curl -sN -m 20 -b "$JAR" -D "$T/live.$name.h" "$@" "$BASE/live" > "$T/live.$name" 2>/dev/null &
-	LIVE_PIDS+=($!)
-	live_wait "$name" 'id: ' || t_fail "stream $name did not open"
-}
-# live_wait NAME TEXT [TRIES]: wait (100 ms steps, default 3 s) until the stream has TEXT
-live_wait() {
-	local i
-	for ((i = 0; i < ${3:-30}; i++)); do
-		grep -qF -- "$2" "$T/live.$1" 2>/dev/null && return 0
-		sleep 0.1
-	done
-	return 1
-}
-live_has() { if live_wait "$1" "$2" "${3:-30}"; then t_ok; else t_fail "stream $1 lacks: $2"; fi; }
-live_lacks() { if grep -qF -- "$2" "$T/live.$1"; then t_fail "stream $1 unexpectedly has: $2"; else t_ok; fi; }
-live_stop() { kill "${LIVE_PIDS[@]}" 2>/dev/null; wait "${LIVE_PIDS[@]}" 2>/dev/null; LIVE_PIDS=(); }
-# live_publish CHANNEL EVENT DATA [extra form fields]: POST /__test/publish (current jar)
-live_publish() {
-	t_get /changepassword
-	t_post /__test/publish "csrf=$(t_csrf)&channel=$1&event=$2&data=$(t_enc "$3")${4:+&$4}"
-}
+# POST /__test/publish (config test_routes = true, set by tests/run.sh), a 1 s heartbeat
+# (stream_heartbeat_ms = 1000) and the live_* helpers of tests/run.sh. Sourced by
+# tests/run.sh.
 
 t_section "live: guards and methods"
 t_jar liveanon; t_reset_jar

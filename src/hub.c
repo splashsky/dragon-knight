@@ -79,7 +79,8 @@ static size_t   qlen;
 static hub     *qhub;
 static void   (*qwake)(void);
 
-/* the channel list and subscriber counts, for stats readers on other threads */
+/* the channel list, hash table and subscriber counts, for readers on other threads (stats,
+ * hub_count); the I/O thread changes them only while holding it */
 static pthread_mutex_t smu = PTHREAD_MUTEX_INITIALIZER;
 static hub *shub;
 
@@ -302,12 +303,12 @@ static chan *channel_new(hub *h, const char *name)
 	snprintf(c->name, sizeof c->name, "%s", name);
 	/* events of an earlier channel with this name may have been dropped with it */
 	c->evicted = h->freed_evicted;
+	pthread_mutex_lock(&smu);
 	if (h->nchannels >= 2 * h->nbuckets)
 		rehash(h);
 	size_t k = hash_name(name) & (h->nbuckets - 1);
 	c->hnext = h->buckets[k];
 	h->buckets[k] = c;
-	pthread_mutex_lock(&smu);
 	c->next = h->channels;
 	if (h->channels)
 		h->channels->prev = c;
@@ -375,11 +376,11 @@ static void ring_push(const hub *h, chan *c, uint64_t seq, double now, iobuf *b,
 
 static void channel_free(hub *h, chan *c)
 {
+	pthread_mutex_lock(&smu);
 	chan **pp = &h->buckets[hash_name(c->name) & (h->nbuckets - 1)];
 	while (*pp != c)
 		pp = &(*pp)->hnext;
 	*pp = c->hnext;
-	pthread_mutex_lock(&smu);
 	if (c->prev)
 		c->prev->next = c->next;
 	else
@@ -542,6 +543,17 @@ int hub_subscribers(const hub *h, const char *name)
 {
 	const chan *c = find(h, name);
 	return c ? c->nsubs : 0;
+}
+
+int hub_count(const char *name)
+{
+	int n = 0;
+	pthread_mutex_lock(&smu);
+	const chan *c = shub ? find(shub, name) : NULL;
+	if (c)
+		n = c->nsubs;
+	pthread_mutex_unlock(&smu);
+	return n;
 }
 
 int hub_replay_count(const hub *h, const char *name)

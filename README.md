@@ -2,6 +2,8 @@
 
 A browser RPG inspired by *Dragon Warrior* for the NES: explore a map, fight monsters,
 level up, collect drops, buy gear and maps in towns, chat in the babble box and the forum.
+Open pages update live: chat messages, who's online, news and forum notices, and the
+administrator's announcements.
 
 This is a rewrite of **Dragon Knight 1.1.11** (originally PHP/MySQL by renderse7en,
 released 3/26/2006) as a single self-contained program: a small HTTP server written in C
@@ -167,10 +169,18 @@ read timeout longer than the heartbeat.
 
 **`GET /live`** (logged-in players): the player's event stream with the channels
 `babble`, `presence`, `notices`, `user:<id>` (their own) and, for administrators,
-`admin`. It carries nothing yet: chat, presence and notices arrive in 2.3's next steps.
-The app-level key `test_routes = true` adds `POST /__test/publish` (publish an event as
-any logged-in user) for the end-to-end tests and the realtime benchmark; never set it on
-a real server.
+`admin`. `public/js/live.js` opens one per browser (its tabs share it) and keeps the page
+live: the Babble Box (the chat, in the right column of every game page), who's online,
+toasts for news posts and replies in your forum threads, and the broadcast banner
+(`/admin/broadcast`); a logout or password change closes the pages' streams. Without
+JavaScript the same parts work with forms and page loads. The event catalogue and how to
+add a live feature are in `docs/APP.md`, "Realtime".
+
+Who's online counts a player while they have a live page open or made a request within
+`online_seconds` (app-level key, default 600); departures are checked every
+`presence_sweep_seconds` (default 60) by the first request after that. The app-level key
+`test_routes = true` adds `POST /__test/publish` (publish an event as any logged-in user)
+for the end-to-end tests and the realtime benchmark; never set it on a real server.
 
 ## Deployment
 
@@ -474,6 +484,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 - Character stats are derived: the database keeps base stats (grown by level-ups) and the
 	equipped items add theirs, instead of adding and subtracting item bonuses on every
 	change.
+- The Babble Box is a live chat (2.3) in the right column of every game page instead of an
+	iframe in towns (at most one message per 2 seconds; administrators can delete
+	messages), and who's online, news, replies to your forum threads and the
+	administrator's broadcast banner show up on open pages as they happen.
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

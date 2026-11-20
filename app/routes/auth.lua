@@ -213,6 +213,7 @@ local function lostpassword_post(req)
 	local newpass = auth.random_letters(8)
 	dk.db:exec("UPDATE users SET password = ? WHERE id = ?", auth.hash_password(newpass), user.id)
 	session.destroy_user(user.id)
+	session.publish_logout(user.id)
 	local c = game.control()
 	local body = table.concat({
 		"You or someone using your email address submitted a Lost Password application on the " ..
@@ -257,6 +258,7 @@ local function changepassword_post(req)
 	if newpass1 ~= newpass2 then return fail("New passwords don't match.") end
 	dk.db:exec("UPDATE users SET password = ? WHERE id = ?", auth.hash_password(newpass1), user.id)
 	session.destroy_user(user.id)
+	session.publish_logout(user.id)
 	session.destroy(req)
 	return view.message(req, "Change Password",
 		"Your password was changed successfully.<br /><br />You have been logged out of the game " ..

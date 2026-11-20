@@ -1,0 +1,8 @@
+{#- The broadcast banner (lib/banner.lua), inside the layouts' data-banner-slot; live.js
+		puts new ones there and removes cleared ones. ctx: banner, back. -#}
+{%- if banner then %}
+<div class="dk-banner" role="status" data-banner="{{ banner.id }}"{% if banner.ttl then %} data-banner-ttl="{{ banner.ttl }}"{% end %}>
+<span class="dk-banner-text">{{ banner.text }}</span>
+<form class="inline dk-banner-dismiss" method="post" action="/banner/dismiss">{{{ csrf_field() }}}<input type="hidden" name="id" value="{{ banner.id }}"><input type="hidden" name="back" value="{{ back }}"><button class="link" type="submit" title="Dismiss" aria-label="Dismiss">&times;</button></form>
+</div>
+{%- end %}

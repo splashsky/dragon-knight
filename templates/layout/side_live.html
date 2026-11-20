@@ -1,0 +1,7 @@
+{#- Under the right column: the online count and the Babble Box. ctx: side. -#}
+{%- if online_count then %}
+<p class="online-count small"><a href="/babble">Online: <span data-online-count>{{ online_count }}</span></a></p>
+{%- end %}
+{%- if chat then %}
+{{{ include("layout/chat", chat) }}}
+{%- end %}

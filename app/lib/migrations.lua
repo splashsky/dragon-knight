@@ -1050,6 +1050,23 @@ ALTER TABLE fight_combatants ADD COLUMN maxmp INTEGER;
 	end
 end
 
+-- 10: realtime (2.3): babble.author_id (by charname, like forum posts in step 1) for the
+-- chat's rate limit and deletions, users.online (presence; players seen within the last 10
+-- minutes count as announced), the broadcast banner in control.
+local function v10_realtime()
+	local db = dk.db
+	db:exec_script([[
+ALTER TABLE babble ADD COLUMN author_id INTEGER REFERENCES users (id) ON DELETE SET NULL;
+UPDATE babble SET author_id = (SELECT min(u.id) FROM users u WHERE u.charname = babble.author);
+CREATE INDEX babble_author ON babble (author_id, posttime);
+ALTER TABLE users ADD COLUMN online INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE control ADD COLUMN banner TEXT NOT NULL DEFAULT '';
+ALTER TABLE control ADD COLUMN banner_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE control ADD COLUMN banner_expires INTEGER NOT NULL DEFAULT 0;
+]])
+	db:exec("UPDATE users SET online = 1 WHERE onlinetime >= ?", dk.now() - 600)
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1067,6 +1084,8 @@ migrations.STEPS = {
 		"buffs become statuses); statuses and summons are content files", up = v8_fight_engine },
 	{ name = "monsters are content files with MP, equipment, items and spells (admin edits are kept as " ..
 		"overrides; fights in progress keep their monster)", up = v9_monsters_content },
+	{ name = "realtime: chat messages keep their author's account, who's online is kept live, and " ..
+		"the broadcast banner", up = v10_realtime },
 }
 
 migrations.VERSION = #migrations.STEPS

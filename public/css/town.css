@@ -18,15 +18,18 @@ table.inventory td + td { width: 100%; }
 /* world map popup */
 .world-map { text-align: center; }
 
-/* babble box iframe: fills the frame, starts scrolled to the newest post */
-.babble {
-	position: fixed;
-	inset: 0;
+/* the Babble Box (layout/chat.html): in the right column, larger on the town page and
+	 /babble; the list scrolls from the bottom (column-reverse) so the newest message shows */
+.chat { margin-bottom: 12px; }
+.chat > summary { cursor: pointer; margin: 0 0 3px; }
+.chat-scroll {
+	max-height: 260px;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column-reverse;
-	text-align: left;
 }
+.chat-large .chat-scroll { max-height: 360px; }
+.chat-posts { list-style: none; margin: 0; padding: 0; }
 .babble-post {
 	padding: 2px;
 	border: solid 1px black;
@@ -37,7 +40,12 @@ table.inventory td + td { width: 100%; }
 /* legacy alternated from the newest post (#eeeeee) upwards */
 .babble-post:nth-last-child(odd) { background-color: #eeeeee; }
 .babble-post:nth-last-child(even) { background-color: #ffffff; }
-.babble-form { text-align: center; margin: 4px 0 auto; }   /* auto: few posts stay at the top */
+.chat-delete button.link { font-weight: normal; padding: 0 2px; }
+.chat-form { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 2px 0; }
+.chat-form input[type="text"] { flex: 1 1 6em; min-width: 0; }
+.chat-status { flex: 1 1 100%; color: red; }
+.chat-status:empty { display: none; }
+.online-count { margin: 0 0 6px; }
 
 /* inventory (/inventory) */
 .inv-notice { font-weight: bold; }

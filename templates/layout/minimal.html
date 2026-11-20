@@ -5,6 +5,7 @@
 {{{ include("layout/head") }}}
 </head>
 <body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
+<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
 <div class="dk-content">
 {{{ content }}}
 </div>

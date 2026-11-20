@@ -4,7 +4,8 @@
 <title>{{ title }}</title>
 {{{ include("layout/head") }}}
 </head>
-<body class="theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
+<body class="theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
+<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
 <div class="dk-page">
 <header class="dk-top">
 	{{{ logo() }}}
@@ -31,6 +32,9 @@
 	<aside class="dk-right">
 {%- if nav then %}
 {{{ include("layout/nav_right", nav) }}}
+{%- end %}
+{%- if side then %}
+{{{ include("layout/side_live", side) }}}
 {%- end %}
 	</aside>
 </div>

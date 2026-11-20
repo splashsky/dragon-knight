@@ -44,6 +44,8 @@ return {
 	pbkdf2_iterations = 1000,
 	test_routes = true,
 	stream_heartbeat_ms = 1000,
+	online_seconds = 600,
+	presence_sweep_seconds = 60,
 }
 EOF
 CONFIG="$T/config.lua"
@@ -294,6 +296,69 @@ t_wait_for() {
 	return 1
 }
 
+# Event streams (GET /live, server-sent events), read with curl -N in the background.
+LIVE_PIDS=()
+declare -A LIVE_PID
+# live_open NAME [curl args...]: GET /live with the current jar in the background (60 s at
+# most); the stream goes to $T/live.NAME, its head to $T/live.NAME.h
+live_open() {
+	local name=$1
+	shift
+	rm -f "$T/live.$name" "$T/live.$name.h"
+	curl -sN -m 60 -b "$JAR" -D "$T/live.$name.h" "$@" "$BASE/live" > "$T/live.$name" 2>/dev/null &
+	LIVE_PIDS+=($!)
+	LIVE_PID[$name]=$!
+	live_wait "$name" 'id: ' || t_fail "stream $name did not open"
+}
+# live_wait NAME TEXT [TRIES]: wait (100 ms steps, default 3 s) until the stream has TEXT
+live_wait() {
+	local i
+	for ((i = 0; i < ${3:-30}; i++)); do
+		grep -qF -- "$2" "$T/live.$1" 2>/dev/null && return 0
+		sleep 0.1
+	done
+	return 1
+}
+live_has() { if live_wait "$1" "$2" "${3:-30}"; then t_ok; else t_fail "stream $1 lacks: $2"; fi; }
+live_lacks() { if grep -qF -- "$2" "$T/live.$1"; then t_fail "stream $1 unexpectedly has: $2"; else t_ok; fi; }
+# live_count NAME TEXT: how many lines of the stream contain TEXT
+live_count() { grep -cF -- "$2" "$T/live.$1" 2>/dev/null; }
+# live_close NAME: end one stream; live_stop: end them all
+live_close() { kill "${LIVE_PID[$1]}" 2>/dev/null; wait "${LIVE_PID[$1]}" 2>/dev/null; unset "LIVE_PID[$1]"; }
+live_stop() { kill "${LIVE_PIDS[@]}" 2>/dev/null; wait "${LIVE_PIDS[@]}" 2>/dev/null; LIVE_PIDS=(); LIVE_PID=(); }
+# live_publish CHANNEL EVENT DATA [extra form fields]: POST /__test/publish (current jar)
+live_publish() {
+	t_get /changepassword
+	t_post /__test/publish "csrf=$(t_csrf)&channel=$1&event=$2&data=$(t_enc "$3")${4:+&$4}"
+}
+# live_frames_ok NAME: the stream is well-formed server-sent events (a retry line, then
+# blocks of id:/event:/data: lines or ": " comments, each ended by an empty line, every
+# event block with an id and one data line)
+live_frames_ok() {
+	if awk '
+		NR == 1 { if ($0 !~ /^retry: [0-9]+$/) bad = "first line: " $0; next }
+		$0 == "" { if (ev && (!id || data != 1)) bad = "event block at line " NR; ev = id = data = 0; next }
+		/^id: [0-9a-z]+-[0-9]+$/ { id = 1; next }
+		/^event: [A-Za-z0-9_.:-]+$/ { ev = 1; next }
+		/^data: / || $0 == "data:" { data++; next }
+		/^: / { next }
+		{ bad = "line " NR ": " $0 }
+		END { if (bad) { print bad; exit 1 } }' "$T/live.$1" >"$T/live.$1.check"; then
+		t_ok
+	else
+		t_fail "stream $1 is not well-formed: $(cat "$T/live.$1.check")"
+	fi
+}
+# t_fetch PATH 'a=1&b=2': POST like live.js (fetch): Accept: application/json and the
+# CSRF token in X-CSRF-Token, from a game page's <body data-csrf> (the last page, or the
+# last one this jar loaded with it)
+t_fetch() {
+	local token
+	token=$(grep -o 'data-csrf="[0-9a-f]*"' "$BODY" | head -n1 | cut -d'"' -f2)
+	if [ -n "$token" ]; then echo "$token" > "$JAR.csrf"; else token=$(cat "$JAR.csrf" 2>/dev/null); fi
+	t_req POST "$1" --data "${2:-}" -H 'Accept: application/json' -H "X-CSRF-Token: $token"
+}
+
 # ---------------------------------------------------------------------------------
 # install + serve
 
@@ -382,7 +447,7 @@ expect_body 'Passwords don&#39;t match.'; expect_body 'Character Class is invali
 t_login alice wrongpw;   expect_status 200; expect_body 'Invalid username or password'
 t_login alice secretpw;  expect_redirect /; expect_header '^set-cookie: dk_session=[0-9a-f]{64}; Path=/; HttpOnly; SameSite=Lax'
 t_get /;                 expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
-expect_body 'Latest News'; expect_body "Who's Online"; expect_body '>Alice</a>'; expect_body 'src="/babble"'
+expect_body 'Latest News'; expect_body "Who's Online"; expect_body '>Alice</a>'; expect_body 'data-chat-form'
 expect_body 'action="/move"'; expect_body 'Seconds,'
 t_post /logout "";       expect_status 403
 t_get /;                 expect_status 200

@@ -4,6 +4,7 @@ local content_sync = require("lib.content.sync")
 local csrf = require("lib.csrf")
 local dbcount = require("lib.dbcount")
 local migrations = require("lib.migrations")
+local presence = require("lib.presence")
 local router = require("lib.router")
 local routes = require("routes")
 local session = require("lib.session")
@@ -32,6 +33,8 @@ local function dispatch(req)
 	-- content files changed since the last check (one query when not): sync them
 	content_sync.check()
 	session.load(req)
+	-- departures (who's online) once a minute, by whichever request comes first
+	presence.sweep()
 	local route, params, allowed = routes:match(req.method, req.path)
 	if not route then
 		if params == "405" then return view.method_not_allowed(req, allowed) end

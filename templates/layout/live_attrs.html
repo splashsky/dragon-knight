@@ -1,0 +1,2 @@
+{#- <body> attributes of a page with live updates (live.js reads them). ctx: live. -#}
+{%- if live then %} data-live data-csrf="{{ live.csrf }}" data-live-session="{{ live.session }}"{% if live.admin then %} data-live-admin{% end %}{% end -%}

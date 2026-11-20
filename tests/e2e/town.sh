@@ -336,11 +336,15 @@ t_get /character/999999;          expect_body 'No such user.'
 t_get /map;                       expect_status 200; expect_body 'src="/static/images/map.gif"'
 
 t_section "town: babble"
+# (the chat in detail, live: tests/e2e/chat.sh; the rate limit is lifted here by aging the
+# player's messages)
+babble_unlimit() { t_sql "UPDATE babble SET posttime = posttime - 10"; }
 t_get /babble;                    expect_status 200; expect_body 'name="babble"'; expect_body 'maxlength="120"'
 BC=$(t_csrf)
 before=$(t_sql "SELECT count(*) FROM babble")
 t_post /babble "babble=hi";       expect_status 403
 t_post /babble "csrf=$BC&babble=$(t_enc '<script>alert(1)</script> & "q"')"; expect_redirect /babble
+babble_unlimit
 t_post /babble "csrf=$BC&babble=$(t_enc '   ')"; expect_redirect /babble
 [ "$(t_sql "SELECT count(*) FROM babble")" = $((before + 1)) ] && t_ok || t_fail "blank babble stored"
 [ "$(t_sql "SELECT babble FROM babble ORDER BY id DESC LIMIT 1")" = '<script>alert(1)</script> & "q"' ] && t_ok || t_fail "babble not stored raw"
@@ -349,11 +353,12 @@ expect_body '[<b>Townie</b>] &lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q
 long=$(printf 'x%.0s' $(seq 1 200))
 t_post /babble "csrf=$BC&babble=$long&submit=Babble"
 [ "$(t_sql "SELECT length(babble) FROM babble ORDER BY id DESC LIMIT 1")" = 120 ] && t_ok || t_fail "babble not cut to 120"
-for i in $(seq 1 22); do t_post /babble "csrf=$BC&babble=msg$i"; done
+t_sql "INSERT INTO babble (posttime, author, author_id, babble) WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 52)
+	SELECT 1000 + i, 'Townie', NULL, 'msg' || i FROM n"
 t_get /babble
-[ "$(grep -c 'class="babble-post"' "$BODY")" = 20 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post"' "$BODY") posts"
+[ "$(grep -c 'class="babble-post"' "$BODY")" = 50 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post"' "$BODY") posts"
 expect_no_body '] msg2<'; expect_body '] msg3<'
-[ "$(grep -o '] msg[0-9]*<' "$BODY" | head -n1)" = '] msg3<' ] && [ "$(grep -o '] msg[0-9]*<' "$BODY" | tail -n1)" = '] msg22<' ] \
+[ "$(grep -o '] msg[0-9]*<' "$BODY" | head -n1)" = '] msg3<' ] && [ "$(grep -o '] msg[0-9]*<' "$BODY" | tail -n1)" = '] msg52<' ] \
 	&& t_ok || t_fail "babble order (oldest first)"
 
 t_section "town: ninja"

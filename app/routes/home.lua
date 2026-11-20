@@ -14,9 +14,10 @@ local function town_page(req)
 	local control = game.control()
 	local ctx = { town = town }
 	if control.shownews == 1 then ctx.news = news.latest() end
-	if control.showonline == 1 then ctx.online = game.online_users() end
-	ctx.babble = control.showbabble == 1
-	return view.page(req, "In Town", "home/town", ctx)
+	ctx.online = view.online()
+	-- the town shows the Babble Box larger, instead of in the right column
+	ctx.chat = view.chat(req, true)
+	return view.page(req, "In Town", "home/town", ctx, { chat_inline = true })
 end
 
 local function home(req)
