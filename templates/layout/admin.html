@@ -39,7 +39,7 @@
 {{{ region("foot") }}}<footer class="dk-footer copyright admin-footer" data-r="foot">
 	<div>Powered by <a href="http://dragon.se7enet.com/dev.php" target="_blank" rel="noopener">Dragon Knight</a></div>
 	<div>&copy; 2003-2006 by renderse7en</div>
-	<div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
+	{{{ region("foot-time") }}}<div data-r="foot-time">{{ elapsed() }} Seconds, {{ queries() }} Queries</div>{{{ endregion() }}}
 	<div><a href="/changelog">Version {{ version }}</a> {{ build }}</div>
 </footer>{{{ endregion() }}}
 {{{ region("themes") }}}<div class="dk-themes small" data-r="themes">{{{ theme_picker() }}}</div>{{{ endregion() }}}

@@ -122,18 +122,40 @@ function wire.page(html)
 	return out:sub(1, at - 1) .. ' data-h="' .. wire.hashes(doc) .. '"' .. out:sub(at + #wire.HASHES)
 end
 
--- The regions the client must get: walking from `root`, a region whose hash the client
--- has is skipped and its children compared; any other is sent whole.
+-- The regions the client must get, as { { node, html }, ... }: walking from `root`, a
+-- region whose hash the client has is skipped and its children compared; any other is
+-- sent whole, except that a region inside it the client has with the same hash goes as a
+-- placeholder, <template data-r-keep="name"></template>: the client moves its own element
+-- there, untouched (a panel that moves to another column keeps its scroll and typed text,
+-- and its HTML doesn't travel), and that region's children are compared in turn.
 function wire.changed(doc, have)
-	local out = {}
-	local function visit(node)
-		if have[node.name] == node.hash then
-			for _, c in ipairs(node.children) do visit(c) end
-		else
-			out[#out + 1] = node
+	local out, visit = {}, nil
+	local function build(node, buf)
+		for _, p in ipairs(node.parts) do
+			if type(p) == "string" then
+				buf[#buf + 1] = p
+			elseif have[p.name] == p.hash then
+				buf[#buf + 1] = '<template data-r-keep="' .. p.name .. '"></template>'
+				visit(p)
+			else
+				build(p, buf)
+			end
+		end
+		return buf
+	end
+	local function send(node)
+		local html = table.concat(build(node, {}))   -- (may add the regions it keeps' children first)
+		out[#out + 1] = { node = node, html = html }
+	end
+	visit = function(node)
+		for _, c in ipairs(node.children) do
+			if have[c.name] == c.hash then visit(c) else send(c) end
 		end
 	end
-	if doc.regions.root then visit(doc.regions.root) end
+	local root = doc.regions.root
+	if root then
+		if have.root == root.hash then visit(root) else send(root) end
+	end
 	return out
 end
 

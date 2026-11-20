@@ -140,7 +140,7 @@ local function live_response(req, res)
 		local frames = { { "title", "", res.live.title or "" } }
 		if url then frames[#frames + 1] = { "url", "", url } end
 		for _, e in ipairs(events) do frames[#frames + 1] = { "events", e.kind, e.json } end
-		for _, node in ipairs(wire.changed(doc, have)) do frames[#frames + 1] = { "region", node.name, wire.html(node) } end
+		for _, c in ipairs(wire.changed(doc, have)) do frames[#frames + 1] = { "region", c.node.name, c.html } end
 		frames[#frames + 1] = { "hashes", "", wire.hashes(doc, have) }
 		return wire_response(res.status, frames, res.headers)
 	end

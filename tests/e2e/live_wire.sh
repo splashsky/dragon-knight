@@ -42,14 +42,14 @@ t_get /; t_live_page
 t_live GET /; expect_status 200
 # the page as the client has it: nothing but the footer's timing
 # (the footer's timing, unless it came out the same)
-[ -z "$(w_ops | grep '^region' | grep -v '^region foot ')" ] && t_ok || t_fail "unchanged page sent: $(w_ops | tr '\n' ';')"
+[ -z "$(w_ops | grep '^region' | grep -v '^region foot-time ')" ] && t_ok || t_fail "unchanged page sent: $(w_ops | tr '\n' ';')"
 [ "$(w_payload title)" = "In Town" ] && t_ok || t_fail "title: $(w_payload title)"
 # a change in the gold: the Character panel
 t_sql "UPDATE users SET gold = gold + 7 $LQ"
 t_live GET /
 w_has region charpanel; w_lacks region right; w_lacks region main; w_lacks region invpanel
 w_payload region charpanel | grep -q '<section class="box" data-r="charpanel">' && t_ok || t_fail "charpanel payload"
-w_payload hashes | grep -qE '^charpanel=[0-9a-f]+( foot=[0-9a-f]+)?$' && t_ok \
+w_payload hashes | grep -qE '^charpanel=[0-9a-f]+( foot-time=[0-9a-f]+)?$' && t_ok \
 	|| t_fail "hashes: only what changed: $(w_payload hashes)"
 # another page: its middle column, the chat moves from the middle to the right column
 t_live GET /inn

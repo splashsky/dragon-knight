@@ -51,12 +51,16 @@ async function main() {
 // A DevTools session with one tab: send(method, params), js(expr) (its value; promises
 // awaited), until(expr, ms), nav(path) (a normal page load), loads (page loads so far).
 async function session(wsUrl) {
-	var ws = new WebSocket(wsUrl), id = 0, waiting = {}, t = { loads: 0, ws: ws };
+	var ws = new WebSocket(wsUrl), id = 0, waiting = {}, t = { loads: 0, ws: ws, log: [] };
 	await new Promise(function (r, j) { ws.onopen = r; ws.onerror = j; });
 	ws.onmessage = function (m) {
 		var d = JSON.parse(m.data);
 		if (d.id && waiting[d.id]) { waiting[d.id](d); delete waiting[d.id]; }
 		if (d.method === "Page.loadEventFired") t.loads++;
+		if (d.method === "Runtime.consoleAPICalled" && /^(warning|error)$/.test(d.params.type)) {
+			t.log.push(d.params.type + ": " + d.params.args.map(function (a) { return a.value || a.description; }).join(" "));
+		}
+		if (d.method === "Runtime.exceptionThrown") t.log.push("exception: " + JSON.stringify(d.params.exceptionDetails.exception && d.params.exceptionDetails.exception.description || d.params.exceptionDetails.text));
 	};
 	t.send = function (method, params) {
 		return new Promise(function (r) { var n = ++id; waiting[n] = r; ws.send(JSON.stringify({ id: n, method: method, params: params || {} })); });
@@ -124,6 +128,22 @@ async function run(wsUrl, port) {
 		await js("document.querySelector('[data-chat-form] [name=babble]').value"));
 	check("still no reload", await js("window.__dk === 1"));
 	check("the same input element", await js("document.querySelector('[data-chat-form] [name=babble]') === window.__inp"), await js("window.__mut.slice(0, 40)"));
+
+	section = "a panel that moves";
+	// the town page has the chat in its middle column, the others in the right one: the
+	// region comes as a placeholder, and the page's own panel moves there untouched
+	await js("DK.visit('/')");
+	await until("location.pathname === '/' && !DK.busy()");
+	if (await js("!!document.querySelector('[data-r=main] [data-r=chat]')")) {
+		await js("window.__chat = document.querySelector('[data-r=chat]'); document.querySelector('[data-r=chat] [name=babble]').value = 'typed in town'");
+		await js("document.querySelector('a[href=\"/inventory\"]').click()");
+		check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
+		check("the chat in the right column", await js("!!document.querySelector('[data-r=right] [data-r=chat]')"));
+		check("the same panel (moved, not rebuilt)", await js("document.querySelector('[data-r=chat]') === window.__chat"));
+		check("with what was typed", await js("document.querySelector('[data-r=chat] [name=babble]').value === 'typed in town'"));
+		check("its address field follows the page", await js("document.querySelector('[data-r=chat-form] [name=back]').value === '/inventory'"));
+		await js("document.querySelector('[data-r=chat] [name=babble]').value = ''");
+	}
 
 	section = "the chat";
 	await js("var f = document.querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'hello from the browser'; f.requestSubmit()");
@@ -262,6 +282,7 @@ async function run(wsUrl, port) {
 		"document.querySelector('a[href=\"/news\"]').click()");
 	check("reloaded natively", await until("window.__dk === undefined && document.readyState === 'complete'"));
 
+	if (fails && tab.log.length) console.log("the page's console:\n  " + tab.log.slice(-20).join("\n  "));
 	console.log(fails ? fails + " of " + count + " failed" : "ok " + count);
 	ws.close();
 }

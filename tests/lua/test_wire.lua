@@ -20,7 +20,7 @@ end
 
 local function names(list)
 	local out = {}
-	for _, n in ipairs(list) do out[#out + 1] = n.name end
+	for _, n in ipairs(list) do out[#out + 1] = n.name or n.node.name end
 	return table.concat(out, ",")
 end
 
@@ -51,7 +51,19 @@ function T.changed()
 	assert(names(wire.changed(a, have_of(a))) == "")
 	assert(names(wire.changed(b, {})) == "root", "nothing known: the whole body")
 	local c = wire.split(page("1,2", "x", "<footer>"))
-	assert(names(wire.changed(c, have_of(a))) == "root", "a changed parent goes whole")
+	local sent = wire.changed(c, have_of(a))
+	assert(names(sent) == "root", "a changed parent goes whole")
+	-- ... but the regions in it the client has go as placeholders
+	assert(sent[1].html == '<body><template data-r-keep="left"></template><template data-r-keep="main"></template>' ..
+		'<footer></body>', sent[1].html)
+	-- a placeholder's own children are compared: a changed one comes on its own
+	local d = wire.split(page("1,3", "x", "<footer>"))
+	sent = wire.changed(d, have_of(a))
+	assert(names(sent) == "loc,root", names(sent))
+	assert(sent[1].html == '<section data-r="loc">1,3</section>')
+	assert(sent[2].html:find('<template data-r-keep="left"></template>', 1, true))
+	-- nothing known: everything inline
+	assert(wire.changed(d, {})[1].html == wire.html(d.regions.root))
 end
 
 function T.hashes()

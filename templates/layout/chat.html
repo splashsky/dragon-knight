@@ -11,7 +11,7 @@
 </ol>{{{ endregion() }}}</div>
 <template data-proto="chat-post"><li class="babble-post" data-slot-attr="data-id:id title:when">[<b data-slot="author"></b>] <span data-slot="text" data-unwrap></span>{% if is_admin then %} <form class="inline chat-delete" method="post" data-slot-attr="action:delete">{{{ csrf_field() }}}<button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end %}</li></template>
 {{{ region("chat-form") }}}<form class="chat-form" method="post" action="/babble" data-r="chat-form" data-chat-form>
-{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}">
+{{{ csrf_field() }}}{{{ region("chat-back") }}}<input type="hidden" name="back" value="{{ back }}" data-r="chat-back">{{{ endregion() }}}
 <input type="text" name="babble" maxlength="{{ max_chars }}" aria-label="Message" autocomplete="off">
 <input type="submit" name="submit" value="Babble">
 <div class="chat-status small" data-chat-status role="status" aria-live="polite"></div>

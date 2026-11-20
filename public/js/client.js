@@ -162,6 +162,17 @@
 		for (var i = 0; i < news.length; i++) {
 			var n = news[i], match = null;
 			while (cur && isClient(cur)) cur = cur.nextSibling;
+			// a region the page has as the server has it: the page's own element, from here
+			// or from elsewhere in the page, moved here untouched
+			var keep = n.nodeType === 1 && n.nodeName === "TEMPLATE" && n.getAttribute("data-r-keep");
+			if (keep) {
+				match = keyed["r:" + keep] || pageRegion(keep);
+				if (!match) throw new Error("client.js: no region " + keep + " to keep");
+				delete keyed["r:" + keep];
+				if (match === cur) cur = cur.nextSibling;
+				else from.insertBefore(match, cur);
+				continue;
+			}
 			k = keyOf(n);
 			if (k) {
 				match = keyed[k] && same(keyed[k], n) ? keyed[k] : null;
@@ -170,7 +181,8 @@
 				match = cur;
 			}
 			if (!match) {
-				from.insertBefore(n, cur);   // adopted from the parsed document
+				// a new node: the regions in it the page shows are the page's own (moved here)
+				from.insertBefore(adopt(n, function (el) { if (el === cur) cur = cur.nextSibling; }), cur);
 				continue;
 			}
 			if (match === cur) cur = cur.nextSibling;
@@ -180,9 +192,48 @@
 		}
 		while (cur) {
 			var next = cur.nextSibling;
-			if (!isClient(cur)) from.removeChild(cur);
+			if (!isClient(cur)) { park(cur); from.removeChild(cur); }
 			cur = next;
 		}
+	}
+	// The page's own element for region `name` (in the page, or taken out by this answer).
+	function pageRegion(name) {
+		return document.querySelector('[data-r="' + name + '"]') || parked[name] || null;
+	}
+	// A new subtree going into the page: a region in it the page already shows is the page's
+	// own element instead, morphed into the new markup (typed text, scroll and focus stay);
+	// a placeholder (<template data-r-keep>) is the page's element as it is. moving(el) is
+	// told about each element taken from its place.
+	function adopt(n, moving) {
+		if (n.nodeType !== 1) return n;
+		var name = n.getAttribute("data-r"), old = name && pageRegion(name);
+		if (old && old.nodeName === n.nodeName) {
+			moving(old);
+			morph(old, n);
+			return old;
+		}
+		Array.prototype.slice.call(n.childNodes).forEach(function (c) {
+			if (c.nodeType !== 1) return;
+			var keep = c.nodeName === "TEMPLATE" && c.getAttribute("data-r-keep"), r;
+			if (keep) {
+				r = pageRegion(keep);
+				if (!r) throw new Error("client.js: no region " + keep + " to keep");
+				moving(r);
+			} else {
+				r = adopt(c, moving);
+			}
+			if (r !== c) n.replaceChild(r, c);
+		});
+		return n;
+	}
+
+	// Regions taken out of the page while an answer applies wait here: a later region of the
+	// same answer may keep them (the chat moving from the middle column to the right one).
+	var parked = {};
+	function park(node) {
+		if (node.nodeType !== 1) return;
+		if (node.hasAttribute("data-r")) parked[node.getAttribute("data-r")] = node;
+		Array.prototype.forEach.call(node.querySelectorAll("[data-r]"), function (e) { parked[e.getAttribute("data-r")] = e; });
 	}
 
 	// What is on screen in region `name` (and the regions in it) is not what the server's
@@ -200,14 +251,16 @@
 			morph(document.body, doc.body);
 			return true;
 		}
-		var target = document.querySelector('[data-r="' + name + '"]');
+		// (a region taken out by an earlier region of this answer, waiting to be kept by a later one)
+		var target = pageRegion(name);
 		if (!target) return false;
 		var t = document.createElement("template");
 		t.innerHTML = html;
 		var el = t.content.firstElementChild;
 		if (!el || el.nodeName !== target.nodeName) {
 			if (!el) return false;
-			target.parentNode.replaceChild(el, target);
+			park(target);
+			target.parentNode.replaceChild(adopt(el, function () {}), target);
 			return true;
 		}
 		morph(target, el);
@@ -338,11 +391,16 @@
 		if (a.doc != null) { showDocument(a.doc); return; }
 		return play(a.events).then(function () {
 			var focused = document.activeElement;
+			parked = {};
 			for (var i = 0; i < a.regions.length; i++) {
 				if (a.regions[i].name === o.keep) continue;
 				// a region the page lacks: the page isn't what the server thinks; load it
-				if (!applyRegion(a.regions[i].name, a.regions[i].html)) return native(a.url || view.url);
+				if (!applyRegion(a.regions[i].name, a.regions[i].html)) {
+					if (window.console) console.warn("client.js: the page has no region " + a.regions[i].name + ": loading it");
+					return native(a.url || view.url);
+				}
 			}
+			parked = {};
 			if (a.hashes != null) mergeHashes(have, a.hashes);
 			if (o.keep) forget(o.keep);
 			if (o.form && o.form.isConnected && o.method === "POST") o.form.reset();
