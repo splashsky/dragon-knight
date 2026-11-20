@@ -29,10 +29,15 @@ local state = require("fight.state")
 local round = {}
 
 -- A new encounter: each enemy's HP is rolled (in order), then who swings first (the
--- player against the first enemy). Returns true when the player swings first.
+-- player against the first enemy). Returns true when the player swings first. The rolled
+-- HP is the enemy's full health for this encounter (its HP bar starts full, and heals stop
+-- there), not the listed maxhp it was rolled from.
 function round.start(f)
 	for _, c in ipairs(f.combatants) do
-		if c.side == "enemy" then c.hp = combat.start_hp(c.row, f.rand) end
+		if c.side == "enemy" then
+			c.hp = combat.start_hp(c.row, f.rand)
+			c.maxhp = c.hp
+		end
 	end
 	local first = state.side(f, "enemy", true)[1]
 	return combat.swing_first(f.st, first.row, f.rand)

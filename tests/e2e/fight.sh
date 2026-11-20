@@ -33,6 +33,9 @@ lvl=$(t_sql "SELECT m.level FROM users JOIN monsters m ON m.id = $T_MONSTER $FQ"
 [ -n "$lvl" ] && [ "$lvl" -ge 9 ] && [ "$lvl" -le 11 ] && t_ok || t_fail "monster level $lvl not in 9..11"
 hp=$(f_col "$T_MONSTER_HP")
 [ "$hp" -gt 0 ] && t_ok || t_fail "monster hp $hp"
+# the rolled HP is the monster's full health in this encounter: its bar starts full
+expect_body "data-value=\"$hp\" data-max=\"$hp\">Monster's HP: $hp</p>"
+f_is "(SELECT c.maxhp FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'enemy')" "$hp"
 f_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id)" 2
 t_post /fight "fight=Fight"; expect_status 403          # CSRF required
 f_is "$T_ROUND" 2
