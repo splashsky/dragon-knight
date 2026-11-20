@@ -3,5 +3,6 @@ return {
 	name = "Branch",
 	category = "weapon",
 	price = 30,
+	icon = "branch",                    -- public/images/items/branch.png
 	attack = 4,
 }

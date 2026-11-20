@@ -169,20 +169,59 @@ async function run(wsUrl, port) {
 	await js("document.querySelector('a[href=\"/\"]').click()");
 	await until("location.pathname === '/'");
 	// walk out of town (a POST answered by the page it redirects to)
-	await js("document.querySelector('form.compass input[name=north]').click()");
+	await js("document.querySelector('form.compass button[name=north]').click()");
 	check("moved", await until("/Latitude: 1/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"),
 		await js("document.querySelector('[data-r=loc]').textContent"));
 	check("no reload after a POST", await js("window.__dk === 1"));
 	var fighting = await js("location.pathname === '/fight'");
 	check("exploring or fighting", await js("/^(Exploring|Fighting)$/.test(document.title)"), await js("document.title"));
 	if (!fighting) {
-		await js("document.querySelector('form.compass input[name=south]').click()");
+		await js("document.querySelector('form.compass button[name=south]').click()");
 		check("back in Midworld", await until("document.title === 'Travel To' || location.pathname === '/fight'"), await js("document.title"));
 		// "You have travelled to Midworld" is the POST's own page: no address shows it, the
 		// address stays, and a reload shows the town
 		if (await js("document.title === 'Travel To'")) {
 			check("the address stays", await js("location.pathname === '/'"), await js("location.pathname"));
 			check("marked as a POST's page", await js("history.state.post === true && DK.view().post === true"));
+		}
+	}
+
+	section = "the compass";
+	// one picture, a button per quarter (the triangles between its diagonals): a real click
+	// on the east arm walks east; the arrow keys walk, but not while typing
+	await js("DK.visit('/')");
+	await until("!DK.busy()");
+	function where() { return js("(function(){var t=document.querySelector('[data-r=loc]').textContent;return [(t.match(/Latitude: (\\d+[NS]?)/)||[])[1],(t.match(/Longitude: (\\d+[EW]?)/)||[])[1],location.pathname].join('|')})()"); }
+	if (await js("!!document.querySelector('form.compass')")) {
+		check("one picture", await js("document.querySelectorAll('.compass-rose img').length === 1 && /compass\\.png$/.test(document.querySelector('.compass-rose img').src)"));
+		var start = await where();
+		var box = await js("(function(){var r=document.querySelector('.compass-rose').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()");
+		var x = box[0] + box[2] * 0.9, y = box[1] + box[3] * 0.5;
+		check("the east arm is the east button", await js("document.elementFromPoint(" + x + "," + y + ").name === 'east'"));
+		await send("Input.dispatchMouseEvent", { type: "mousePressed", x: x, y: y, button: "left", clickCount: 1 });
+		await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x, y: y, button: "left", clickCount: 1 });
+		check("a click walks east", await until("!DK.busy() && /Longitude: 1E/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
+		if (await js("location.pathname !== '/fight'")) {
+			await js("document.activeElement && document.activeElement.blur()");
+			var key = function (k, code) {
+				return send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code: k, windowsVirtualKeyCode: code })
+					.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
+			};
+			await key("ArrowUp", 38);
+			check("the up arrow walks north", await until("!DK.busy() && /Latitude: 1N/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
+			if (await js("location.pathname !== '/fight'")) {
+				var here2 = await where();
+				await js("document.querySelector('[data-chat-form] [name=babble]').focus()");
+				await key("ArrowDown", 40);
+				await sleep(600);
+				check("not while typing", await where() === here2, [here2, await where()]);
+				await js("document.activeElement.blur()");
+				await key("ArrowDown", 40);
+				await until("!DK.busy()");
+				await key("ArrowLeft", 37);
+				check("down and left: back to Midworld", await until("!DK.busy() && document.title === 'Travel To' || location.pathname === '/fight'"), await where());
+			}
+			check("no reload", await js("window.__dk === 1"));
 		}
 	}
 
@@ -197,7 +236,7 @@ async function run(wsUrl, port) {
 	var lat = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
 	var where = await js("location.pathname");
 	if (where === "/" && await js("!!document.querySelector('form.compass')")) {
-		await js("document.querySelector('form.compass input[name=north]').click()");
+		await js("document.querySelector('form.compass button[name=north]').click()");
 		await until("!DK.busy()");
 		var lat2 = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
 		check("moved here", lat2 !== lat, [lat, lat2]);

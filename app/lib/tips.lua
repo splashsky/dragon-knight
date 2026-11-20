@@ -62,6 +62,22 @@ function tips.consumable(it, qty)
 	return t
 end
 
+-- An item for sale (the shop's buttons): the item's tooltip with its price.
+function tips.shop(it)
+	local t = tips.item(it)
+	table.insert(t.meta, 2, it.price .. " gold")
+	return t
+end
+
+-- A bag entry the shop buys (the Sell buttons): the item's tooltip with how many and what
+-- the shop pays for each.
+function tips.sell(entry, price)
+	local t = tips.item(entry.item, entry)
+	if entry.qty > 1 then table.insert(t.meta, 2, "x" .. entry.qty) end
+	table.insert(t.meta, 2, "Sells for " .. price .. " gold" .. (entry.qty > 1 and " each" or ""))
+	return t
+end
+
 -- A monster: name; level; its description; its lore.
 function tips.monster(m)
 	return { title = m.name, meta = { "Level " .. m.level }, body = m.description, lore = m.lore }

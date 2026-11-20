@@ -50,9 +50,16 @@ TOWN_BASE="base_maxhp=15, currenthp=15, base_maxmp=0, currentmp=0, base_maxtp=10
 t_items_clear townie
 tu "$TOWN_HOME, gold=1000, $TOWN_BASE"
 t_get /shop;                      expect_status 200
-expect_body 'href="/shop/buy/1" data-tip>Stick<template class="tip">'; expect_body 'Price: <b>10 gold</b>'; expect_body 'Attack Power: 2'
-expect_body '</template></a><span class="highlight">*</span>'; expect_text 'Skivvies*'; expect_no_body 'Dagger'
-expect_body 'href="/shop/buy/66" data-tip>Herb<template class="tip">'; expect_no_body '>Potion<'
+# icon buttons in groups (weapons, armor, shields, items), each with its price and its
+# tooltip (what it adds, its specials, the price)
+SHOP_GROUPS=$(grep -o 'class="shop-group-label" id="shop-[a-z]*-label">[A-Za-z]*' "$BODY" | sed 's/.*>//' | tr '\n' ' ')
+[ "$SHOP_GROUPS" = "Weapons Armor Shields Items " ] && t_ok || t_fail "shop groups: $SHOP_GROUPS"
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">10</span></a>'
+expect_body '<div class="tip-meta">Weapon · 10 gold</div><ul class="tip-lines"><li>Attack Power +2</li></ul>'
+expect_body 'href="/shop/buy/17" title="Skivvies (25 gold)"'; expect_body '<li>Defense Power +2</li><li>Gold Bonus +10%</li>'
+expect_no_body 'Dagger'
+expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'; expect_no_body 'Potion'
+expect_no_body 'shop-short'                       # 1000 gold covers everything here
 expect_no_body 'I will buy these from your bag'
 t_get /shop/buy/4;                expect_body 'Cheat attempt detected.'
 t_post /shop/buy/4 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
@@ -71,7 +78,7 @@ expect_stats "15 0 10 5 5 7 5" "stick"
 t_get /;                          expect_body 'Weapon: Stick'
 # a copy of the weapon you wear can be bought too (2.4: no more "Already purchased"): the
 # old one is kept in the bag or sold, as with any other
-t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" data-tip>Stick<template'
+t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" title="Stick (10 gold)"'
 t_get /shop/buy/1;                expect_text 'You are buying the Stick for 10 gold. What should I do with your Stick?'
 t_post /shop/buy/1 "csrf=$TC&keep=x"; expect_body 'Thank you for purchasing this item.'
 expect_db "gold,$T_ITEMS" "980|stick,stick@weapon" "a second stick, the first kept"
@@ -96,7 +103,7 @@ t_section "town: shop sell section"
 STICK_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.item_id = 1")
 WEAPON_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.equipped = 'weapon'")
 t_get /shop;                      expect_body 'I will buy these from your bag'; expect_body "action=\"/shop/sell/$STICK_E\""
-expect_text 'Stick5 gold'; expect_no_body "action=\"/shop/sell/$WEAPON_E\""
+expect_body 'aria-label="Sell Stick for 5 gold"><img src="/static/images/items/stick.png"'; expect_no_body "action=\"/shop/sell/$WEAPON_E\""
 t_post "/shop/sell/$STICK_E" "qty=1"; expect_status 403
 t_post "/shop/sell/$STICK_E" "csrf=$TC&submit=Sell"; expect_body 'You sold the Stick for 5 gold.'
 expect_db "gold,$T_ITEMS" "930|branch@weapon" "stick sold"
@@ -144,6 +151,13 @@ t_post /shop/buy/3 "csrf=$TC&sell=x"      # Club 40/5; sells the Destiny Blade (
 expect_db "gold" "25060" "club sells destiny blade"
 expect_stats "20 10 10 5 5 10 14" "club"
 tu "gold=5"
+# what the gold doesn't cover is greyed out (with what the worn piece sells back for):
+# 5 + 25 for the Clothes buys the Skivvies, not the Clothes again; nothing else but the Stick
+t_get /shop
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/17"'
+expect_body '<span class="spell-tip shop-short" data-tip><a class="spell-btn" href="/shop/buy/18"'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1"'
+[ "$(grep -o 'spell-tip shop-short' "$BODY" | wc -l)" = 7 ] && t_ok || t_fail "short items: $(grep -o 'spell-tip shop-short' "$BODY" | wc -l)"
 t_get /shop/buy/18;               expect_body 'You do not have enough gold to buy this item.'   # Clothes again: 5 + 25 < 50
 t_get /shop/buy/19;               expect_body 'You do not have enough gold to buy this item.'
 t_post /shop/buy/19 "csrf=$TC&sell=x"; expect_body 'You do not have enough gold to buy this item.'
@@ -162,7 +176,7 @@ expect_db "gold" "0" "sell-back alone too little"
 t_section "town: shop at Endworld + Bris"
 t_sql "DELETE FROM user_items WHERE equipped = 'shield' AND user_id = (SELECT id FROM users WHERE username = 'townie')"
 tu "currentaction='In Town', latitude=-250, longitude=-250, gold=30000, base_maxhp=20, currenthp=20"
-t_get /shop;                      expect_body 'Destiny Aegis'; expect_body 'data-tip>Potion<template'; expect_body 'data-tip>Ether<template'
+t_get /shop;                      expect_body 'title="Destiny Aegis (25000 gold)"'; expect_body 'title="Potion (60 gold)"'; expect_body 'title="Ether (80 gold)"'
 t_post /shop/buy/33 "csrf=$TC&submit=Yes"
 expect_db "gold,currenthp" "5000|20" "buy aegis"
 expect_stats "70 10 10 5 5 10 110" "aegis"
@@ -214,7 +228,7 @@ expect_db "gold" "520" "topped up a stack in a full bag"
 t_get /shop/buy/67;               expect_body 'Your bag is full.'
 # selling part of a stack
 POTION_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.item_id = 67")
-t_get /shop;                      expect_text 'Potion x1030 gold each'
+t_get /shop;                      expect_body 'aria-label="Sell Potion for 30 gold each">'; expect_body '<span class="item-badge item-badge-qty" aria-hidden="true">x10</span>'
 t_post "/shop/sell/$POTION_E" "csrf=$TC&submit=Sell&qty=11"; expect_body 'Please enter a quantity from 1 to 10.'
 t_post "/shop/sell/$POTION_E" "csrf=$TC&submit=Sell&qty=3"; expect_body 'You sold 3 x Potion for 90 gold.'
 expect_db "gold" "610" "sold 3 potions"
@@ -427,7 +441,7 @@ expect_body '<li class="invpanel-first-slot" title="Slot 1: None" data-tip data-
 t_give townie stick 1 weapon; t_give townie life_pebble 1 accessory2
 for k in herb potion ether antidote branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
 t_get /inventory
-expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
+expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/stick.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
 expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul></template></li>'
 expect_body '<a class="invpanel-bag full" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>12</b>/12</span></a>'
 t_items_clear townie

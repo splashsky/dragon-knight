@@ -45,7 +45,7 @@ still answers with the fight page itself** (no redirect), as in 2.4. `GET /fight
 renders the same page from the saved fight and its last round's lines, so the two can't
 differ, no-JS players keep 2.4's single request per round, and the live client gets the
 same answer either way. A stale form shows the fight as `GET /fight` does, with its note
-(no `?stale=1`). **3.0.1 then did the redirect after all**: every `POST /fight` ends with
+(no `?stale=1`). **Later in 3.0 the redirect came after all**: every `POST /fight` ends with
 `302 /fight` (or `/victory`, `/`), a stale form's note and a refused command's reason are
 kept with the last round's lines (`fights.log`, `encounter.with_note`), and refusals became
 a note on the fight page instead of an error page (for JavaScript and plain forms alike). A "Continue" when nothing blocks the turn plays nothing and shows the page

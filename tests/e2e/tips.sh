@@ -111,9 +111,10 @@ t_fight_clear tipper
 
 t_section "tips: the inventory panel's gear"
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 WHERE username = 'tipper'"
-t_give tipper herb 1 && t_give tipper stick 1 weapon
+t_give tipper herb 1 && t_give tipper dagger 1 weapon
 t_get /inventory
-expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
+# an item without a picture: the slot's icon
+expect_body '<li title="Weapon: Dagger" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Dagger</span><template class="tip"><div class="tip-title">Dagger</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +8</li></ul></template></li>'
 expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
 # an item with a picture shows it instead of the slot's icon; its tooltip says its charges
 t_items_clear tipper; t_give tipper wand 1 weapon
@@ -129,39 +130,44 @@ t_jar tipadmin; t_reset_jar; t_login "$ADMIN_USER" "$ADMIN_PASS"
 t_get /admin/items/2
 t_form_submit /admin/items/2 "description=<img src=x onerror=alert(3)>" "lore=$(printf '<script>alert(4)</script> & "q"')"
 expect_redirect '/admin/items/2\?saved=1'
-TP_BRANCH='>Branch<template class="tip"><div class="tip-title">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
+TP_BRANCH='>Branch<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/branch.png" width="20" height="20" alt="">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
 TP_HERB='>Herb<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
-TP_STICK='>Stick<template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
+TP_STICK='>Stick<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
+# the same, as the shop's buttons say them (the price after the category)
+tp_shop() { printf '%s' "$1" | sed 's#<div class="tip-meta">\([^<·]*[^<· ]\)#<div class="tip-meta">\1 · '"$2"' gold#'; }
 tp_no_xss() { expect_no_body '<script>alert(4)'; expect_no_body '<img src=x'; }
 t_jar tips
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, gold = 1000 WHERE username = 'tipper'"
-t_give tipper stick 1 weapon && t_give tipper herb 3 && t_give tipper branch 1
+t_give tipper stick 1 weapon && t_give tipper herb 3 && t_give tipper branch 1 && t_give tipper dagger 1
 TP_HERB_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'tipper' AND ui.item_id = 66")
 TP_BRANCH_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'tipper' AND ui.item_id = 2")
 # /inventory: the equipped slots and every bag entry (focusable names), the actions as before
 t_get /inventory; expect_status 200
-expect_body '<td><b class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</b> <span class="small">(Attack Power +2)</span></td>'
+expect_body '<td><img class="item-icon" src="/static/images/items/stick.png" width="22" height="22" alt=""> <b class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</b> <span class="small">(Attack Power +2)</span></td>'
 expect_body '<img class="inv-icon" src="/static/images/items/herb.png" width="32" height="32" alt="">'
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></b> x3'
-expect_body '<img class="inv-icon" src="/static/images/skills/default.png" width="32" height="32" alt="">'   # the Branch
+expect_body '<img class="inv-icon" src="/static/images/items/branch.png" width="32" height="32" alt="">'
+expect_body '<img class="inv-icon" src="/static/images/skills/default.png" width="32" height="32" alt="">'   # the Dagger
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</b>'; tp_no_xss
 expect_body "action=\"/inventory/equip/$TP_BRANCH_E\""; expect_body "action=\"/inventory/use/$TP_HERB_E\""
 expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'action="/inventory/unequip/weapon"'
-# the shop: the links carry their tooltip (no tabindex: a link is focusable), the item
-# worn is for sale too (2.4), and the Sell list's names are focusable terms
+# the shop: an icon button per item (a link: focusable), its tooltip with the price; the
+# item worn is for sale too (2.4); the Sell buttons with what the shop pays
 t_get /shop; expect_status 200
-expect_body 'href="/shop/buy/2" data-tip'"$TP_BRANCH"'</a>'; tp_no_xss
-expect_body 'href="/shop/buy/66" data-tip'"$TP_HERB"
-expect_body 'href="/shop/buy/1" data-tip'"$TP_STICK"'</a>'; expect_no_body 'Already purchased'
-expect_body '<td class="shop-icon"><img class="item-icon" src="/static/images/items/herb.png" width="22" height="22" alt=""></td>'
-expect_body '<td class="shop-icon"><img src="/static/images/icon_weapon.gif" alt="weapon"></td>'
-expect_body '<tr><td><img class="item-icon" src="/static/images/items/herb.png" width="22" height="22" alt=""> <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></span> x3</td><td>8 gold each</td>'
-expect_body '<tr><td><span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span></td><td>15 gold</td>'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">30</span></a><template class="tip">'
+expect_body "$(tp_shop "${TP_BRANCH#>Branch}" 30)"'</span>'; tp_no_xss
+expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'; expect_body "$(tp_shop "${TP_HERB#>Herb}" 15)"
+expect_body 'href="/shop/buy/1" title="Stick (10 gold)"'; expect_body "$(tp_shop "${TP_STICK#>Stick}" 10)"'</span>'
+expect_no_body 'Already purchased'
+expect_body "<form class=\"spell-tip shop-sell-item\" method=\"post\" action=\"/shop/sell/$TP_HERB_E\" data-tip>"
+expect_body '<button class="spell-btn" type="submit" title="Sell Herb for 8 gold each" aria-label="Sell Herb for 8 gold each"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">8</span><span class="item-badge item-badge-qty" aria-hidden="true">x3</span></button><input type="text" name="qty" size="2" value="1" aria-label="How many Herb to sell"><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · Sells for 8 gold each · x3 · In fights and in town</div>'
+expect_body 'title="Sell Branch for 15 gold" aria-label="Sell Branch for 15 gold"><img src="/static/images/items/branch.png"'
+expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold"><img src="/static/images/skills/default.png"'   # no picture: the default
 # the purchase page: the item bought and the one it replaces
 t_get /shop/buy/2; expect_status 200
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span> for 30 gold. What should I do with your <span class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</span>?'
 expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'; tp_no_xss
-expect_no_body 'shop-buy-icon'
+expect_body '<img class="shop-buy-icon" src="/static/images/items/branch.png" width="44" height="44" alt="">'
 t_get /shop/buy/66
 expect_body '<img class="shop-buy-icon" src="/static/images/items/herb.png" width="44" height="44" alt="">'
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"

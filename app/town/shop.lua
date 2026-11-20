@@ -1,6 +1,7 @@
 -- town/shop.lua :: legacy towns.php buy() / buy2() / buy3(), with the bag: the town's
 -- items (town_items) and selling bag items back.
---   GET  /shop               the town's items + the Sell section (sellable bag items)
+--   GET  /shop               the town's items (icon buttons by group) + the Sell section
+--                            (sellable bag items)
 --   GET  /shop/buy/#id       confirmation; POST: gear in a slot that holds something:
 --                            "keep" (the old item goes into the bag: needs a free slot) or
 --                            "sell" (the old item is sold back, its value counts toward the
@@ -14,11 +15,13 @@ local common = require("town.common")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
+local tips = require("lib.tips")
 local view = require("lib.view")
 
 local shop = {}
 
-local ICONS = { weapon = "weapon", armor = "armor", shield = "shield" }
+-- the group of an item by its slot (accessories, consumables, ...: "other")
+local SLOT_GROUP = { weapon = "weapon", armor = "armor", shield = "shield" }
 
 -- Shared buy checks. Returns the offer (item, slot, old entry, sellback, can_keep,
 -- can_sell, max qty) or nil, error response.
@@ -58,33 +61,42 @@ local function check(req, id)
 	return o
 end
 
--- GET /shop
+-- The shop's groups of items, in order (an item's slot; anything else is an "Item").
+local GROUPS = { { key = "weapon", label = "Weapons" }, { key = "armor", label = "Armor" },
+	{ key = "shield", label = "Shields" }, { key = "other", label = "Items" } }
+
+-- GET /shop: the town's items as icon buttons in groups ({ key, label, items = { item,
+-- icon (URL: its picture or the default one), label, tip, short (the gold doesn't cover it
+-- now: greyed out; the purchase page says why) } }; empty groups left out) and the Sell
+-- section (sellable bag entries: { entry, price (each), icon, label, tip }).
 function shop.list(req)
 	local user = req.user
 	local town = common.town_here(req)
 	if not town then return common.cheat(req) end
-	local list = {}
+	local equipped = inventory.equipped(user.id)
+	local by_key, groups = {}, {}
+	for _, g in ipairs(GROUPS) do by_key[g.key] = { key = g.key, label = g.label, items = {} } end
 	for _, it in ipairs(items.town(town.id)) do
-		local line
-		if it.attack ~= 0 or it.slot == "weapon" then
-			line = "Attack Power: " .. it.attack
-		elseif it.defense ~= 0 or it.slot == "armor" or it.slot == "shield" then
-			line = "Defense Power: " .. it.defense
-		else
-			line = table.concat(items.is_gear(it) and items.special_lines(it) or items.use_lines(it), ", ")
-		end
-		list[#list + 1] = {
-			item = it, image = items.icon(it), icon = ICONS[it.slot], line = line,
-			special = #it.modifiers > 0 and it.slot ~= "accessory",
-		}
+		-- gear replaces what is in its slot, whose sell-back counts toward the price (check())
+		local gold = user.gold
+		local old = it.slot and it.slot ~= "accessory" and equipped[it.slot]
+		if old and items.can_sell(old.item) then gold = gold + items.sell_price(old.item) end
+		local g = by_key[SLOT_GROUP[it.slot] or "other"]
+		g.items[#g.items + 1] = { item = it, icon = items.icon_url(it), tip = tips.shop(it),
+			label = it.name .. " (" .. it.price .. " gold)", short = gold < it.price }
+	end
+	for _, g in ipairs(GROUPS) do
+		if #by_key[g.key].items > 0 then groups[#groups + 1] = by_key[g.key] end
 	end
 	local sell = {}
 	for _, e in ipairs(inventory.bag(user.id)) do
 		if items.can_sell(e.item) then
-			sell[#sell + 1] = { entry = e, price = items.sell_price(e.item), image = items.icon(e.item) }
+			local price = items.sell_price(e.item)
+			sell[#sell + 1] = { entry = e, price = price, icon = items.icon_url(e.item), tip = tips.sell(e, price),
+				label = "Sell " .. e.item.name .. " for " .. price .. " gold" .. (e.qty > 1 and " each" or "") }
 		end
 	end
-	return view.page(req, "Buy Items", "town/shop", { items = list, sell = sell })
+	return view.page(req, "Buy Items", "town/shop", { groups = groups, sell = sell })
 end
 
 -- GET /shop/buy/#id

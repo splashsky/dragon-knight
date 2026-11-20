@@ -93,7 +93,7 @@ pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"
 pt_is "currentmp,base_maxmp,$T_KNOWN" "5|5|25" "a new Mage: 5 MP and Magic Bolt"
 t_get /inn;      expect_body 'Resting at the inn'
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed and ready for action.'
-t_get /shop;     expect_body 'href="/shop/buy/1" data-tip>Stick<template class="tip">'
+t_get /shop;     expect_body 'href="/shop/buy/1" title="Stick (10 gold)"'
 t_get /shop/buy/1; expect_text 'You are buying the Stick, is that ok?'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
 t_get /shop/buy/66; expect_text 'You are buying the Herb for 15 gold each.'

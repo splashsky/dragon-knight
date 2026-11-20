@@ -597,6 +597,18 @@ starting with `__` are reserved.
 - Every POST form needs `{{{ csrf_field() }}}` (the chat's and the banner's too).
 - Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
 	sized window; without JS it's a normal link).
+- The compass (`layout/nav_left.html`): the original's picture (`public/images/compass.png`,
+	its four pieces joined) with a submit button over each quarter (`.compass-rose`: the
+	triangles between the diagonals, `clip-path`, lit within the parchment by a `mask`),
+	named `north`, `west`, `east`, `south` like the old text buttons, so `POST /move` reads
+	them as before. `dk.js` presses them for the arrow keys (not while a field has the
+	keyboard or a modifier is held; a held key walks on only while the live client is free).
+- Icon buttons for items (`.spell-btn` with an `.item-badge`): the fight menu's Items and
+	Gear, the shop's wares (`town/shop.html`: grouped Weapons, Armor, Shields, Items; the
+	price on a gold badge, `.item-badge-price`; greyed, `.shop-short`, when the gold, with
+	what the worn piece sells back for, doesn't cover it — still a link: the purchase page
+	says why) and its Sell buttons (what the shop pays; a stack's size, `.item-badge-qty`,
+	and how many to sell).
 - Images: `/static/images/<file>`. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
@@ -754,7 +766,8 @@ the Inventory panel (item name, kind, stats or power, description, lore; an empt
 label), the fight menu's Gear and Items buttons (`tips.gear(entry)`: the item, the spell it
 casts, its charges, "No MP"; `tips.consumable(row, qty)`), item names wherever a page lists items (`tip("item", row)`: on `/inventory` the
 equipped slots and every bag entry, quest items saying "Quest item"; on `/shop` the items
-for sale, a link carrying `data-tip` itself, and the Sell list; the purchase page's item and
+for sale (`tips.shop`: with the price) and the Sell buttons (`tips.sell`: what the shop
+pays, how many); the purchase page's item and
 the one it replaces; the discard confirmation), the monster's name on the fight page (name,
 level, description, lore) and the class names on the registration page (starting HP/MP, the
 description's points, lore). Names that aren't links get `class="tip-term" tabindex="0"`.
@@ -1498,7 +1511,7 @@ stock, immunity).
 Lists are present only when not empty; `turns` is absent for an unlimited status or ally.
 Changes go with their step's latest line (a spell's line, then its damage and MP cost).
 
-**Every command comes back to the fight page** (Post/Redirect/Get, since 3.0.1): a `POST
+**Every command comes back to the fight page** (Post/Redirect/Get): a `POST
 /fight` that played a round saves its lines (`fights.log`) and redirects to `/fight` (a
 victory to `/victory`, an escape to `/`), and `GET /fight` shows them, as often as it is
 loaded. The live client follows the redirect on the server, so a round is still one
@@ -1714,14 +1727,15 @@ return {
 	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
 	(default true; with a `drop_level`), `icon`, `casts` and `charges` (below).
 - **Icons** (schema version 14): `icon = "herb"` names `public/images/items/herb.png`
-	(`[a-z0-9_]+`, square; the Herb, Potion, Ether and Wand have one). Absent or `""`: pages
-	keep what they showed before (the slot's icon in the shop and the Inventory panel) and
-	icon buttons and the bag grid show `/static/images/skills/default.png` (the spells'
+	(`[a-z0-9_]+`, square; Midworld's wares — the Stick, Branch, Club, Skivvies, Clothes,
+	Leather Armor, Reed Shield, Buckler, Herb and Wand — and the Potion and Ether have one).
+	Absent or `""`: the Inventory panel keeps the slot's icon, and icon buttons (the shop,
+	the fight menu) and the bag grid show `/static/images/skills/default.png` (the spells'
 	default). `dk check` fails, naming the item file, when the PNG is missing; an icon deleted
 	after the sync falls back at once (`items.icon` checks the file). Overridable in the admin
 	panel. Shown in the bag grid on `/inventory` (32px) and before the equipped items' names,
-	in the Inventory panel instead of the slot icon, in the shop's list, Sell list and
-	purchase page, in the fight menu's Gear and Items buttons and in item tooltips (`.tip-icon`).
+	in the Inventory panel instead of the slot icon, on the shop's buttons and its purchase
+	page, in the fight menu's Gear and Items buttons and in item tooltips (`.tip-icon`).
 - **Items that cast** (2.4): gear with `casts = "<spell key>"` (a spell usable in fights)
 	and `charges = <max>` (1-1000) casts that spell in fights while equipped, a charge
 	instead of MP (see [Fight engine](#fight-engine) for the button and its contract). Each

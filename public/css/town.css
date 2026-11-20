@@ -1,9 +1,6 @@
 /* town.css :: town/explore/character/map/babble. Linked by every layout. */
 
-/* shop + map lists (legacy column widths) */
-table.shop-list { width: 80%; }
-table.shop-list td.shop-icon { width: 4%; }
-table.shop-list td { width: 32%; }
+/* map list (legacy column widths) */
 table.maps-list { width: 90%; }
 table.maps-list td:nth-child(1), table.maps-list td:nth-child(2) { width: 25%; }
 table.maps-list td:nth-child(3) { width: 35%; }
@@ -59,10 +56,20 @@ table.inv-equipped td.inv-slot { white-space: nowrap; }
 .inv-cell.inv-quest { border-color: #c00; }
 .inv-actions { clear: left; margin-top: 3px; }
 
-/* item pictures in lists (shop, sell list, equipped slots) and the purchase page */
+/* item pictures in lists (equipped slots) and the purchase page */
 img.item-icon { vertical-align: middle; border-radius: 3px; }
 .shop-buy { display: flex; align-items: flex-start; gap: 12px; }
 .shop-buy-icon { flex: none; border-radius: 4px; }
 
-/* shop: sell section */
-table.shop-sell td { padding: 1px 8px 1px 0; }
+/* the shop (town/shop.html): groups of item buttons (dk.css .spell-btn, .item-badge) with
+	their price; one the gold doesn't cover greyed out (still a link: the purchase page says
+	why); the Sell buttons with what the shop pays, a stack's size and how many to sell */
+.shop-group { margin: 1em 0 0; }
+.shop-group-label { display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold; }
+.shop-group .spell-grid { gap: 7px; margin-top: 3px; }
+.item-badge-price { background-image: linear-gradient(to bottom, #f6dc7c 0%, #d4a21c 45%, #8c6406 100%); }
+.item-badge-qty { right: auto; bottom: auto; left: -3px; top: -3px; }
+.shop-short .spell-btn { opacity: 0.45; filter: grayscale(1); }
+.shop-short .spell-btn:hover { opacity: 0.7; }
+.shop-sell-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.shop-sell-item input[name="qty"] { width: 2.5em; text-align: center; }

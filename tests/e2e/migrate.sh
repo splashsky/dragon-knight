@@ -1200,7 +1200,7 @@ mig_eq "SELECT id || '|' || item_id || '|' || charges FROM user_items ORDER BY i
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's (v13)"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's (v13)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's (v13)"
-mig_eq "SELECT group_concat(k) FROM (SELECT key || '=' || icon AS k FROM items WHERE icon <> '' ORDER BY id)" "herb=herb,potion=potion,ether=ether,wand=wand" "item icons (v13)"
+mig_eq "SELECT group_concat(k) FROM (SELECT key || '=' || icon AS k FROM items WHERE icon <> '' ORDER BY id)" "stick=stick,branch=branch,club=club,skivvies=skivvies,clothes=clothes,leather_armor=leather_armor,reed_shield=reed_shield,buckler=buckler,herb=herb,potion=potion,ether=ether,wand=wand" "item icons (v13)"
 mig_eq "SELECT key || '|' || casts || '|' || charges || '|' || price FROM items WHERE casts <> ''" "wand|magic_bolt|5|75" "the Wand (v13)"
 mig_eq "SELECT town_id FROM town_items WHERE item_id = 71" "1" "Midworld sells the Wand"
 mig_eq "$MIG_MONSTERS" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS")" "monsters equal a fresh install's (v13)"

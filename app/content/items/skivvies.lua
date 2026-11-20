@@ -3,6 +3,7 @@ return {
 	name = "Skivvies",
 	category = "armor",
 	price = 25,
+	icon = "skivvies",                  -- public/images/items/skivvies.png
 	defense = 2,
 	modifiers = { { kind = "stat", stat = "gold_bonus_pct", amount = 10 } },
 }

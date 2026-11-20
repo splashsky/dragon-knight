@@ -8,15 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "3.0.1", date = "unreleased",
-		changes = {
-			"A command that can't be carried out in a fight (not enough MP, a spell you haven't learned, an empty wand) is now explained right on the fight page, above your commands, instead of on a page of its own.",
-			"Reloading the fight page after a round no longer offers to send the command again: every command now comes back to the fight page, which shows what happened.",
-			"Taking a dropped item into a full bag without choosing what to discard now says so on the drop page.",
-		},
-	},
-	{
-		version = "3.0.0", date = "11.20.2026",
+		version = "3.0.0", date = "unreleased",
 		changes = {
 			"Loading a page no longer changes the game: reloading the fight page shows the last round again instead of counting a turn, and the victory page can be reloaded or revisited without losing it (schema version 15, run dk migrate).",
 			"An encounter now begins the moment you step into it, the monster's first strike included, and the rewards are paid by the blow that wins the fight.",
@@ -24,6 +16,12 @@ changelog.RELEASES = {
 			"The game no longer loads whole pages as you play: links and buttons bring only the parts of the page that changed, so the page stays put, the chat keeps what you were typing, and the live chat stays connected; Back and Forward work as before. Without JavaScript everything works as it always did.",
 			"A thin bar at the top of the page shows when the server takes more than a moment to answer.",
 			"Pages you have open in other tabs or on another device keep up: what you do in one shows in the others within a moment, without reloading them.",
+			"A command that can't be carried out in a fight (not enough MP, a spell you haven't learned, an empty wand) is now explained right on the fight page, above your commands, instead of on a page of its own.",
+			"Reloading the fight page after a round no longer offers to send the command again: every command now comes back to the fight page, which shows what happened.",
+			"Taking a dropped item into a full bag without choosing what to discard now says so on the drop page.",
+			"Shops show their wares as pictures, grouped into weapons, armor, shields and items, each with its price on it; point at one (or focus it) to see what it does. What your gold can't cover yet is greyed out. Selling works the same way, with what the shop pays on each.",
+			"Midworld's wares have pictures: the Stick, Branch, Club, Skivvies, Clothes, Leather Armor, Reed Shield and Buckler, in the shop, your bag, the Inventory panel and their tooltips.",
+			"The compass is the original picture again: click its north, west, east or south arm to walk, or use the arrow keys.",
 		},
 	},
 	{

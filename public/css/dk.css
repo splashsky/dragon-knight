@@ -154,8 +154,32 @@ button.link {
 }
 input[type="image"] { vertical-align: middle; }
 
-.compass { text-align: center; margin: 6px 0 0; }
-.compass input { min-width: 58px; }
+/* the compass (layout/nav_left.html): the picture, and over it a button per quarter, the
+	triangle between the diagonals towards its side; lit when pointed at, focused or pressed
+	(dk.js lights it for an arrow key) */
+.compass { margin: 6px 0 0; }
+.compass-rose { position: relative; width: 128px; height: 128px; margin: 0 auto; }
+.compass-rose img { display: block; }
+.compass-rose button {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	/* the light stays on the parchment (its ragged edge is transparent) */
+	-webkit-mask: url(/static/images/compass.png) 0 0 / 128px 128px no-repeat;
+	mask: url(/static/images/compass.png) 0 0 / 128px 128px no-repeat;
+}
+.compass-n { clip-path: polygon(0 0, 100% 0, 50% 50%); }
+.compass-s { clip-path: polygon(0 100%, 100% 100%, 50% 50%); }
+.compass-w { clip-path: polygon(0 0, 0 100%, 50% 50%); }
+.compass-e { clip-path: polygon(100% 0, 100% 100%, 50% 50%); }
+.compass-rose button:hover { background-color: rgba(102, 51, 0, 0.16); }
+.compass-rose button:focus { outline: none; }
+.compass-rose button:focus-visible { background-color: rgba(102, 51, 0, 0.24); }
+.compass-rose button:active, .compass-rose button.compass-pressed { background-color: rgba(102, 51, 0, 0.36); }
 
 /* ---- HP/MP/TP bars: CSS gradients (no images), shared with the fight bars (fight.css) ---- */
 :root {

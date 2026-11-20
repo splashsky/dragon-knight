@@ -1,4 +1,7 @@
-{#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). Each box is a region. -#}
+{#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). Each box is a region.
+		The compass is the original's picture (public/images/compass.png, its four pieces
+		joined) with a button over each quarter (the triangles between its diagonals: dk.css
+		.compass-rose), as named as the old text buttons; dk.js presses them for the arrow keys. -#}
 {{{ region("loc") }}}<section class="box" data-r="loc">
 <div class="title"><img src="/static/images/button_location.gif" alt="Location" title="Location"></div>
 <div class="box-body">
@@ -8,11 +11,12 @@ Longitude: {{ longitude }}<br>
 <a href="/map" target="_blank" data-popup="520x520">View Map</a><br>
 {%- if user.currentaction ~= "Fighting" then %}
 <form class="compass" method="post" action="/move">
-{{{ csrf_field() }}}
-<input name="north" type="submit" value="North"><br>
-<input name="west" type="submit" value="West"><input name="east" type="submit" value="East"><br>
-<input name="south" type="submit" value="South">
-</form>
+{{{ csrf_field() }}}<div class="compass-rose"><img src="/static/images/compass.png" width="128" height="128" alt="">
+<button class="compass-n" type="submit" name="north" value="North" title="North (&uarr;)" aria-label="North" aria-keyshortcuts="ArrowUp"></button>
+<button class="compass-w" type="submit" name="west" value="West" title="West (&larr;)" aria-label="West" aria-keyshortcuts="ArrowLeft"></button>
+<button class="compass-e" type="submit" name="east" value="East" title="East (&rarr;)" aria-label="East" aria-keyshortcuts="ArrowRight"></button>
+<button class="compass-s" type="submit" name="south" value="South" title="South (&darr;)" aria-label="South" aria-keyshortcuts="ArrowDown"></button>
+</div></form>
 {%- end %}
 </div>
 </section>{{{ endregion() }}}
