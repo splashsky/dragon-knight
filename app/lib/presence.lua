@@ -38,13 +38,18 @@ function presence.streaming(id)
 	return dk.subscribers("user:" .. id) > 0
 end
 
+-- Both read the partial index users_online (only the players online; tests/lua/test_chat.lua
+-- checks the query plans): every game page shows the count.
+presence.COUNT_SQL = "SELECT count(*) FROM users WHERE online = 1"
+presence.LIST_SQL = "SELECT id, charname FROM users WHERE online = 1 ORDER BY charname, id"
+
 function presence.count()
-	return dk.db:value("SELECT count(*) FROM users WHERE online = 1")
+	return dk.db:value(presence.COUNT_SQL)
 end
 
 -- The players online (id, charname), by name.
 function presence.list()
-	return dk.db:query("SELECT id, charname FROM users WHERE online = 1 ORDER BY charname, id")
+	return dk.db:query(presence.LIST_SQL)
 end
 
 local function publish(event, id, name)

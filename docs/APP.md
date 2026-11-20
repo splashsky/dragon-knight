@@ -364,7 +364,8 @@ everywhere.
 made a request within `online_seconds` (600). `users.online = 1` marks the players
 announced as online; the Who's Online list (town page, `/babble`) and the count in the
 right column ("Online: N", when `control.showonline` is on) are those players, so they
-always match the events.
+always match the events. Both read the partial index `users_online` (schema version 11:
+only the players online), so their cost follows the players online, not the accounts.
 
 - **Join**: `session.load` → `presence.touch`: a request by a player with `online = 0`
 	sets it and publishes `join`. Any number of requests, tabs or streams make one join.
@@ -891,7 +892,7 @@ the player's choice (known spell, MP, item in the bag) and saves.
 
 | | |
 |---|---|
-| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id }`. `round` is the original `currentfight` counter (1: the encounter just began, no monster picked; +1 per fight page, at most 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`) |
+| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id }`. `round` is the original `currentfight` counter (1: the encounter just began, no monster picked; +1 per fight page, without the original's cap of 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`) |
 | combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's `immune` and item stock (`stock_<position>`) |
 | status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
 
@@ -1157,8 +1158,8 @@ second click, an older tab, a resubmitted page) plays nothing: the answer is the
 `GET /fight` shows it (that GET counts a round, as always) with the note "That command came
 from an older page, so nothing happened." (`stale = true` in JSON); a won fight goes on to
 `/victory`, and a fight that is over (not fighting any more) redirects to `/`. A form
-without the field (from before 2.3) plays as before. The counter stops at 255
-(`state.MAX_ROUND`): from there on rounds can't be told apart.
+without the field (from before 2.3) plays as before. The counter has no cap (the original's
+stopped at 255), so long fights are protected too.
 
 **fight.js.** Forms marked `data-fight` (the fight commands, the drop's Take/Leave) and links
 in the middle column to the four fight pages (the victory page's drop link) go through

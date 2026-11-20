@@ -27,8 +27,11 @@ changelog.RELEASES = {
 			"Logging out or changing the password ends the live updates of the pages left open.",
 			"A browser keeps one live connection, shared by its tabs; without JavaScript everything works as before, with page loads.",
 			"Chat messages keep their author's account (schema version 10, run dk migrate); added online_seconds and presence_sweep_seconds to the config.",
+			"Game pages read Who's Online from an index of the players online instead of going through every account (schema version 11, run dk migrate).",
 			"Fights play out in place: each round's lines appear one by one while the HP and MP bars, statuses and allies change, then the page updates without reloading; the victory, item drop and death pages follow the same way. A click or any key skips ahead, and there are no delays for players who prefer reduced motion.",
 			"Every fight command carries its round, so a double click or an old tab no longer plays an extra round: it shows the fight as it is now.",
+			"The fight round counter no longer stops at 255 (the original's limit), so the protection against double clicks also holds in very long fights.",
+			"Added make bench BENCH_SCENARIO=realtime-mixed (1,000 players with live connections, 50 of them playing, chatting and reconnecting) and BENCH_SCENARIO=soak (the same for an hour, checking memory, file descriptors and errors); both also run against the sanitizer builds (BENCH_BUILD=dbg or tsan).",
 		},
 	},
 	{

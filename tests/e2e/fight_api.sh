@@ -340,6 +340,21 @@ t_fetch /fight "fight=Fight&round=5"; expect_status 200; fa_check
 fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 7 and "fight-stale" in d["fragments"]["main"]'
 fa_is "$T_MONSTER_HP" "$HP"
 t_fetch /fight "fight=Fight&round=x"; fa_check; fa_expect 'd["stale"] is True'
+# long fights: the counter goes past the original's cap of 255, stale rounds are still caught
+fa_player; t_fight fapi 2 5000 255
+t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 256
+expect_body 'name="round" value="256"'
+t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'fight-stale'; fa_is "$T_ROUND" 257
+fa_sql "UPDATE users SET currenthp = 300"
+t_sql "UPDATE fights SET round = 301 WHERE user_id = (SELECT id FROM users $FAQ)"
+t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 302
+HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
+t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'; expect_no_body 'You attack the monster for'
+fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 303
+t_fetch /fight "fight=Fight&round=303"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 304'
+HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
+t_fetch /fight "fight=Fight&round=303"; fa_check; fa_expect 'd["stale"] is True and d["events"] == [] and d["round"] == 305'
+fa_is "$T_MONSTER_HP" "$HP"
 # a won fight: on to the victory; a fight that is over: home
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fight_combatants SET hp = 0 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FAQ)"

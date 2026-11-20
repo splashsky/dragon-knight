@@ -1195,6 +1195,7 @@ static void test_stats_socket(void)
 	CHECK(strstr(buf, "\nworkers 1\n") != NULL);
 	CHECK(strstr(buf, "\nrequests ") != NULL && strstr(buf, "\nconn_open ") != NULL);
 	CHECK(strstr(buf, "\nrss_kb ") != NULL);
+	CHECK(strstr(buf, "\nsqlite_mem_kb ") != NULL);
 	CHECK(srv_stop(&s) == 0);
 	struct stat st;
 	CHECK(stat(path, &st) < 0);               /* removed at shutdown */

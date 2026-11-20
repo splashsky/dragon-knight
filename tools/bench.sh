@@ -4,10 +4,16 @@
 # Environment (all optional):
 #   BIN=build/release/dk  DKBENCH=build/release/dkbench
 #   BENCH_SCENARIO=mixed      comma list of pages, fights, static, mixed, idle, realtime,
-#                             or "all" (all but realtime)
+#                             realtime-mixed, soak, or "all" (pages to idle)
 #   BENCH_CLIENTS=50  BENCH_RATE=10 (req/s per client; 0 = closed loop)  BENCH_THREADS=4
-#   BENCH_DURATION=10  BENCH_WARMUP=3  BENCH_IDLE=1000 (connections for "idle")
-#   BENCH_LISTENERS=1000 (event streams for "realtime")  BENCH_EVENTS=10 (events/s published)
+#   BENCH_SECONDS (or BENCH_DURATION): measured seconds (default 10; realtime-mixed 20,
+#                             soak 3600)  BENCH_WARMUP=3  BENCH_IDLE=1000 (connections for "idle")
+#   BENCH_LISTENERS=1000 (event streams for "realtime"; idle players for realtime-mixed and
+#                             soak)  BENCH_EVENTS=10 (events/s published by "realtime")
+#   realtime-mixed and soak: BENCH_CHAT=2 (chat messages/s)  BENCH_CHURN=1 (stream
+#                             reconnects/s)  BENCH_SAMPLE=30 (soak: seconds between samples)
+#                             BENCH_RSS_SLOPE=1024 (soak: KiB/h)  BENCH_CSV=file (soak samples;
+#                             default ${TMPDIR:-/tmp}/dk-soak-<date>.csv)
 #   BENCH_SERVER_CPUS=10,11   taskset CPU list for the server ("" = no pinning)
 #   BENCH_CLIENT_CPUS=4-7     taskset CPU list for dkbench
 #   BENCH_WORKERS=            config `workers` (unset: the config default)
@@ -28,11 +34,13 @@ SCENARIOS=${BENCH_SCENARIO:-mixed}
 CLIENTS=${BENCH_CLIENTS:-50}
 RATE=${BENCH_RATE:-10}
 THREADS=${BENCH_THREADS:-4}
-DURATION=${BENCH_DURATION:-10}
+DURATION=${BENCH_SECONDS:-${BENCH_DURATION:-}}
 WARMUP=${BENCH_WARMUP:-3}
 IDLE=${BENCH_IDLE:-1000}
 LISTENERS=${BENCH_LISTENERS:-1000}
 EVENTS=${BENCH_EVENTS:-10}
+CHAT=${BENCH_CHAT:-2}
+CHURN=${BENCH_CHURN:-1}
 SERVER_CPUS=${BENCH_SERVER_CPUS-10,11}
 CLIENT_CPUS=${BENCH_CLIENT_CPUS-4-7}
 
@@ -61,6 +69,8 @@ cp -r "$ROOT/app" "$ROOT/templates" "$ROOT/public" "$T/"
 	echo "	public_dir = \"$T/public\", outbox_dir = \"$T/outbox\", secret = \"bench\", dev = false,"
 	echo "	pbkdf2_iterations = 1000, keepalive_timeout = 120, max_connections = 4096,"
 	echo "	max_streams = 4096, max_streams_per_ip = 0, test_routes = true,"
+	# realtime-mixed, soak: presence leaves within seconds, so stream churn makes them
+	case ",$SCENARIOS," in *,realtime-mixed,*|*,soak,*) echo "	online_seconds = 10, presence_sweep_seconds = 5," ;; esac
 	[ -n "${BENCH_WORKERS:-}" ] && echo "	workers = $BENCH_WORKERS,"
 	[ -n "${BENCH_CONFIG:-}" ] && echo "	$BENCH_CONFIG,"
 	echo "}"
@@ -74,7 +84,7 @@ t0=$(date +%s.%N)
 "${PIN_SERVER[@]}" "$BIN" serve --config "$T/config.lua" >"${BENCH_LOG:-$T/server.log}" 2>&1 &
 SERVER_PID=$!
 PORT=
-for _ in $(seq 1 500); do
+for _ in $(seq 1 3000); do   # sanitizer builds start slowly
 	if [ -n "${BENCH_PORT:-}" ]; then
 		curl -s -o /dev/null "http://127.0.0.1:$BENCH_PORT/login" && PORT=$BENCH_PORT
 	else
@@ -93,6 +103,7 @@ echo "machine: $(nproc) CPUs ($(uname -m)), $(uname -sr); server on CPUs ${SERVE
 echo "cold start to first response: $(awk "BEGIN { printf \"%.0f\", ($t1 - $t0) * 1000 }") ms"
 grep -m1 'dk listening' "$T/server.log" | sed 's/^.*\] /server: /'
 
+STATUS=0
 IFS=, read -r -a LIST <<< "$SCENARIOS"
 for s in "${LIST[@]}"; do
 	echo
@@ -104,12 +115,25 @@ for s in "${LIST[@]}"; do
 	realtime)
 		echo "-- realtime: $LISTENERS event streams, $EVENTS events/s"
 		"${PIN_CLIENT[@]}" "$DKBENCH" -p "$PORT" -s realtime -l "$LISTENERS" -e "$EVENTS" -t "$THREADS" \
-			-d "$DURATION" -x "$SERVER_PID" -u live
+			-d "${DURATION:-10}" -x "$SERVER_PID" -u live
 		;;
 	pages|fights|static|mixed)
 		echo "-- $s"
 		"${PIN_CLIENT[@]}" "$DKBENCH" -p "$PORT" -s "$s" -c "$CLIENTS" -t "$THREADS" -r "$RATE" \
-			-d "$DURATION" -w "$WARMUP" -x "$SERVER_PID" -S "$T/static.txt"
+			-d "${DURATION:-10}" -w "$WARMUP" -x "$SERVER_PID" -S "$T/static.txt"
+		;;
+	realtime-mixed|soak)
+		secs=${DURATION:-20}
+		extra=()
+		if [ "$s" = soak ]; then
+			secs=${DURATION:-3600}
+			extra=(-i "${BENCH_SAMPLE:-30}" -g "${BENCH_RSS_SLOPE:-1024}"
+				-o "${BENCH_CSV:-${TMPDIR:-/tmp}/dk-soak-$(date +%Y%m%d-%H%M%S).csv}")
+		fi
+		echo "-- $s: $LISTENERS idle players and $CLIENTS active ones with event streams, $CHAT chat messages/s, $CHURN reconnects/s, $secs s"
+		"${PIN_CLIENT[@]}" "$DKBENCH" -p "$PORT" -s "$s" -l "$LISTENERS" -c "$CLIENTS" -t "$THREADS" -r "$RATE" \
+			-e "$CHAT" -j "$CHURN" -d "$secs" -w "$WARMUP" -x "$SERVER_PID" -S "$T/static.txt" \
+			-k "$T/dk.sock" -D "$T/dk.db" "${extra[@]}" || STATUS=1
 		;;
 	*) echo "bench: unknown scenario $s" >&2; exit 2 ;;
 	esac
@@ -131,3 +155,12 @@ if grep -q '\[error\]' "$T/server.log"; then
 	echo "bench: errors in the server log:" >&2
 	grep -A3 '\[error\]' "$T/server.log" | head -20 >&2
 fi
+# sanitizer builds (make bench BENCH_BUILD=dbg|tsan) report to the server's stderr
+if grep -qE 'ERROR: (Address|Leak)Sanitizer|runtime error:|WARNING: ThreadSanitizer' "$T/server.log"; then
+	echo "bench: sanitizer reports in the server log:" >&2
+	grep -E -A20 'ERROR: (Address|Leak)Sanitizer|runtime error:|WARNING: ThreadSanitizer' "$T/server.log" | head -80 >&2
+	STATUS=1
+elif nm "$BIN" 2>/dev/null | grep -qE '__(a|t)san_init'; then
+	echo "sanitizers: no reports in the server log"
+fi
+exit $STATUS

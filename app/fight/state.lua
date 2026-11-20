@@ -24,8 +24,6 @@ local summons = require("lib.summons")
 
 local state = {}
 
-state.MAX_ROUND = 255   -- the fight counter was a TINYINT UNSIGNED (MySQL clamped it)
-
 ---------------------------------------------------------------------------------------
 -- Values as text: "name=value" lines; i: integers, s: text, b: booleans.
 

@@ -5,7 +5,7 @@ local common = require("admin.common")
 local server = {}
 
 local GROUPS = {
-	{ "Process", { "uptime_s", "rss_kb", "event_backend", "workers" } },
+	{ "Process", { "uptime_s", "rss_kb", "sqlite_mem_kb", "event_backend", "workers" } },
 	{ "Connections", { "conn_open", "conn_reading", "conn_busy", "conn_writing", "conn_closing",
 		"conn_streaming", "conn_accepted", "conn_rejected" } },
 	{ "Requests", { "requests", "requests_static", "responses_2xx", "responses_3xx", "responses_4xx",

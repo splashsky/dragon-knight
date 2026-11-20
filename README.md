@@ -258,7 +258,7 @@ does the same check, backup and migration.
 | `make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]` | build and serve in the foreground; first use creates the config and installs the game (admin / admin), an old database is backed up and migrated (see [Quick start](#quick-start)) |
 | `make test` | lint, C unit tests, Lua unit tests and end-to-end tests |
 | `make lint` | check tab indentation |
-| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, `realtime` — 1,000 event streams and the fan-out latency of published events —, or `all`; see `docs/PERF.md`) |
+| `make bench [BENCH_SCENARIO=mixed]` | release build + `tools/dkbench`, then load a temporary install with scripted keep-alive clients and print latency percentiles, req/s and server CPU/RSS (`pages`, `fights`, `static`, `mixed`, `idle`, `realtime` — 1,000 event streams and the fan-out latency of published events —, `realtime-mixed` — the target scale: 1,000 idle players with streams, 50 active ones playing (form and JSON fights), chat, reconnects —, `soak` — the same for an hour (`BENCH_SECONDS`), sampled every 30 s, with a pass/fail summary and a CSV —, or `all`; `BENCH_BUILD=dbg\|tsan` serves with the ASan/UBSan or ThreadSanitizer build; see `docs/PERF.md`) |
 | `make release` | optimized build in `build/release/dk` (`-O2`, no sanitizers) |
 | `make dist` | release tarball `dist/dk-VERSION-OS-ARCH.tar.gz` |
 | `make backup [CONFIG=config.lua]` | `./dk backup` |

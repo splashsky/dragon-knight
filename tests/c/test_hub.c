@@ -811,6 +811,45 @@ static void test_slow_reader(void)
 	CHECK(stat_get(ST_stream_queued_bytes) == 0);
 }
 
+/* More streams than the I/O loop writes per iteration (FLUSH_BATCH in http.c): every
+ * stream gets every event, in order, also while others leave during a fan-out (a closed
+ * stream is freed only once it is off the flush list: ASan checks it in DEBUG builds). */
+static void test_many_streams(int use_poll)
+{
+	http_force_poll(use_poll);
+	srv s;
+	srv_config(&s);
+	s.cfg.max_streams = 1000;
+	s.cfg.max_streams_per_ip = 0;
+	CHECK(srv_start(&s) == 0);
+	enum { N = 300 };
+	client *c = calloc(N, sizeof *c);
+	CHECK(c != NULL);
+	int opened = 0;
+	for (int i = 0; i < N; i++)
+		opened += open_stream(&c[i], s.port, "ch=many", NULL) == 0;
+	CHECK(opened == N);
+	CHECK(wait_stat(ST_conn_streaming, N, 5));
+	publish(s.port, "ch=many&ev=first&n=2&size=8000");
+	for (int i = 1; i < N; i += 2)
+		cl_close(&c[i]);          /* half leave while it goes out */
+	publish(s.port, "ch=many&ev=second&data=x");
+	int got = 0;
+	for (int i = 0; i < N; i += 2) {
+		if (cl_wait(&c[i], "event: second\ndata: x\n\n", 5) != 1)
+			continue;
+		const char *a = strstr(c[i].buf.p, "event: first\n"), *b = strstr(c[i].buf.p, "event: second\n");
+		got += a && b && a < b;
+	}
+	CHECK(got == N / 2);
+	CHECK(wait_stat(ST_conn_streaming, N / 2, 5));
+	for (int i = 0; i < N; i += 2)
+		cl_close(&c[i]);
+	CHECK(wait_stat(ST_conn_streaming, 0, 5));
+	free(c);
+	CHECK(srv_stop(&s) == 0);
+}
+
 int main(void)
 {
 	test_names();
@@ -824,6 +863,8 @@ int main(void)
 
 	test_http_streams(0);
 	test_http_streams(1);
+	test_many_streams(0);
+	test_many_streams(1);
 	test_limits();
 	test_slow_reader();
 	CHECK(stat_get(ST_stream_subscriptions) == 0 && stat_get(ST_stream_channels) == 0);

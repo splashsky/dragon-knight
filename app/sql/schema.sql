@@ -344,6 +344,9 @@ CREATE UNIQUE INDEX users_username ON users (username);
 CREATE INDEX users_charname ON users (charname);
 CREATE INDEX users_email ON users (email);
 CREATE INDEX users_onlinetime ON users (onlinetime);
+-- Only the players online (lib/presence.lua: every game page counts them, the town page
+-- lists them by name), so reading who's online doesn't cost a scan of every account.
+CREATE INDEX users_online ON users (charname, id) WHERE online = 1;
 
 -- Spells a character knows. learned_level: the level it was learned at (NULL: unknown,
 -- e.g. known before schema version 5 without a matching class schedule, or given by an admin).
@@ -380,8 +383,9 @@ CREATE INDEX sessions_expires ON sessions (expires);
 
 -- A fight in progress (app/fight/state.lua), one per player, loaded and saved once per
 -- request. round: the fight's counter (1: the encounter just began, no monster picked
--- yet; +1 per fight page, at most 255, like the original currentfight); wave: the enemies'
--- wave on the field; data: fight-level values ("name=value" lines, typed).
+-- yet; +1 per fight page, like the original currentfight but without its cap of 255);
+-- wave: the enemies' wave on the field; data: fight-level values ("name=value" lines,
+-- typed).
 CREATE TABLE fights (
 	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
 	round    INTEGER NOT NULL DEFAULT 1,

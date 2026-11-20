@@ -7,6 +7,7 @@
 
 #include "codecache.h"
 #include "hub.h"
+#include "sqlite3.h"
 #include "vmpool.h"
 
 _Atomic uint64_t dk_stat[ST_COUNT];
@@ -62,6 +63,7 @@ int stats_format(sbuf *out)
 	int err = 0;
 	err |= sb_printf(out, "uptime_s %.0f\n", started > 0 ? now_mono() - started : 0.0);
 	err |= sb_printf(out, "rss_kb %ld\n", stats_rss_kb());
+	err |= sb_printf(out, "sqlite_mem_kb %lld\n", (long long)(sqlite3_memory_used() / 1024));
 	const char *be = atomic_load(&server_backend);
 	if (be)
 		err |= sb_printf(out, "event_backend %s\nworkers %d\n", be, atomic_load(&server_workers));

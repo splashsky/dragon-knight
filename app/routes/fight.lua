@@ -266,7 +266,7 @@ local function fight(req)
 		page.locked = round.locked(f)
 		page.spells = spells.known(user, "fight")
 		page.items = usable_items(user)
-		f.round = math.min(f.round + 1, state.MAX_ROUND)
+		f.round = f.round + 1
 		page.round = f.round
 		state.save(f)
 		dk.db:exec("UPDATE users SET currentaction = 'Fighting', currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",

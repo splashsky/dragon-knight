@@ -8,8 +8,10 @@
 #   make TSAN=1 CC=clang BUILD=build/tsan BIN=build/tsan/dk ctest
 #                        C unit tests under ThreadSanitizer (make ctest: C tests only)
 #   make bench           release build + tools/dkbench, then tools/bench.sh against a temp
-#                        install (BENCH_SCENARIO=pages|fights|static|mixed|idle|realtime|all,
-#                        see docs/PERF.md)
+#                        install (BENCH_SCENARIO=pages|fights|static|mixed|idle|realtime|
+#                        realtime-mixed|soak|all, BENCH_SECONDS=N, see docs/PERF.md);
+#                        BENCH_BUILD=dbg|tsan serves with the ASan+UBSan (build/dbg/dk) or
+#                        ThreadSanitizer (build/tsan/dk, clang) build instead
 #   make run [PORT=8080] [BIND=addr] [CONFIG=config.lua]
 #                        build and serve in the foreground; on first use creates CONFIG
 #                        (random secret) and installs the game with ADMIN_USER/ADMIN_PASS
@@ -40,6 +42,7 @@ BIND    ?=
 ADMIN_USER  ?= admin
 ADMIN_EMAIL ?= admin@example.com
 ADMIN_PASS  ?= admin
+BENCH_BUILD ?= release
 
 WARN    := -Wall -Wextra -Wshadow -Wno-unused-parameter -Wstrict-prototypes -Wmissing-prototypes
 CSTD    := -std=c11 -D_GNU_SOURCE
@@ -132,9 +135,21 @@ release:
 $(BUILD)/dkbench: tools/dkbench.c | $(BUILD)/src
 	$(CC) $(CSTD) $(OPT) $(WARN) -pthread -o $@ $< -lm $(LDOPT)
 
+ifeq ($(BENCH_BUILD),dbg)
+BENCH_BIN  := build/dbg/dk
+BENCH_MAKE := DEBUG=1 BUILD=build/dbg BIN=$(BENCH_BIN)
+else ifeq ($(BENCH_BUILD),tsan)
+BENCH_BIN  := build/tsan/dk
+BENCH_MAKE := TSAN=1 CC=clang BUILD=build/tsan BIN=$(BENCH_BIN)
+else
+BENCH_BIN  := $(RELEASE_BIN)
+BENCH_MAKE :=
+endif
+
 bench: release
 	@$(MAKE) -s --no-print-directory BUILD=$(RELEASE_BUILD) BIN=$(RELEASE_BIN) DEBUG=0 RELEASE=1 $(RELEASE_BUILD)/dkbench
-	@BIN=$(RELEASE_BIN) DKBENCH=$(RELEASE_BUILD)/dkbench tools/bench.sh
+	@if [ -n "$(BENCH_MAKE)" ]; then $(MAKE) -s --no-print-directory $(BENCH_MAKE) $(BENCH_BIN); fi
+	@BIN=$(BENCH_BIN) DKBENCH=$(RELEASE_BUILD)/dkbench tools/bench.sh
 
 dist: release
 	@test -n "$(VERSION)" || { echo "dist: no view.GAME_VERSION in app/lib/view.lua" >&2; exit 1; }

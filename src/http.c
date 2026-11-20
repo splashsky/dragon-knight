@@ -24,7 +24,8 @@
  * job comes back to the I/O thread, which sends the stream head and the opening (hub.h)
  * and keeps the connection in CS_STREAM: no deadline, input discarded, output queued as
  * shared frames by the hub (one iobuf per event for all subscribers). Delivered streams
- * are written once per loop iteration; one left with more than stream_queue_bytes unsent
+ * are written in the order their output came, at most FLUSH_BATCH per loop iteration
+ * (requests are read in between); one left with more than stream_queue_bytes unsent
  * is closed. Published events are drained on the same eventfd wake-up as completions. */
 #include "http.h"
 
@@ -352,7 +353,7 @@ struct conn {
 	size_t   qbytes;        /* unsent bytes in it */
 	seg      qinline[4];
 	hub_stream *hs;         /* CS_STREAM: its subscriptions */
-	conn    *dirty_next;    /* streams with new output this iteration */
+	conn    *dirty_next;    /* streams with output to write (server.dirty) */
 	int      dirty;
 	int      kill;          /* stream out of memory: close */
 	double   req_start;     /* first byte of the current request; 0 = idle */
@@ -385,7 +386,7 @@ typedef struct server {
 	conn    *dead;              /* closed this iteration, freed at its end */
 	hub     *hub;
 	size_t   nstreams;
-	conn    *dirty;             /* streams to flush */
+	conn    *dirty, *dirty_tail;    /* streams to flush, in order (FIFO) */
 
 	pthread_mutex_t qmu;
 	pthread_cond_t  qcv;
@@ -687,7 +688,7 @@ static void reap(server *s)
 	s->dead = NULL;
 	while (c) {
 		conn *nx = c->dead_next;
-		if (c->inflight) {
+		if (c->inflight || c->dirty) {
 			c->dead_next = s->dead;          /* not yet: keep it on the list */
 			s->dead = c;
 		} else {
@@ -1550,8 +1551,12 @@ static void mark_dirty(server *s, conn *c)
 {
 	if (!c->dirty) {
 		c->dirty = 1;
-		c->dirty_next = s->dirty;
-		s->dirty = c;
+		c->dirty_next = NULL;
+		if (s->dirty)
+			s->dirty_tail->dirty_next = c;
+		else
+			s->dirty = c;
+		s->dirty_tail = c;
 	}
 }
 
@@ -1608,9 +1613,15 @@ static void stream_drive(server *s, conn *c)
 	}
 }
 
-static void flush_dirty(server *s)
+/* Writes the streams' queued output, in the order it came; at most max streams (0: all).
+ * An event to many streams is many writes (on loopback each also runs the reader's side
+ * of TCP): the I/O loop writes FLUSH_BATCH of them per iteration and reads requests in
+ * between, so a fan-out doesn't hold up every other connection (docs/PERF.md, R4). */
+#define FLUSH_BATCH 256
+
+static void flush_dirty(server *s, int max)
 {
-	while (s->dirty) {
+	for (int n = 0; s->dirty && (max <= 0 || n < max); n++) {
 		conn *c = s->dirty;
 		s->dirty = c->dirty_next;
 		c->dirty_next = NULL;
@@ -2001,7 +2012,7 @@ static void begin_stop(server *s)
 	}
 	/* streams: "event: bye", closed once it is written */
 	hub_bye(s->hub);
-	flush_dirty(s);
+	flush_dirty(s, 0);
 }
 
 static void io_loop(server *s)
@@ -2034,7 +2045,7 @@ static void io_loop(server *s)
 
 		if (s->now >= hub_next_tick(s->hub)) {
 			hub_tick(s->hub, s->now);
-			flush_dirty(s);
+			flush_dirty(s, FLUSH_BATCH);
 		}
 
 		double next = ev_timer_next(&s->timers);
@@ -2046,7 +2057,9 @@ static void io_loop(server *s)
 		if (!s->listening && s->lfd >= 0 && (!next || next > s->accept_pause_until))
 			next = s->accept_pause_until;
 		int timeout = -1;
-		if (next) {
+		if (s->dirty) {
+			timeout = 0;                  /* streams still to write: just look for requests */
+		} else if (next) {
 			double d = next - s->now;
 			timeout = d <= 0 ? 0 : (int)(d * 1000.0) + 1;
 		}
@@ -2078,7 +2091,7 @@ static void io_loop(server *s)
 			hub_drain(s->hub, s->now);
 			process_completions(s);
 		}
-		flush_dirty(s);
+		flush_dirty(s, FLUSH_BATCH);
 		reap(s);             /* now, not at the next wake-up (gauges stay current) */
 	}
 }
@@ -2244,7 +2257,7 @@ static void free_server(server *s)
 		conn_free(s, c);
 	}
 	s->dead = NULL;
-	s->dirty = NULL;
+	s->dirty = s->dirty_tail = NULL;
 	hub_free(s->hub);
 	s->hub = NULL;
 	if (s->lfd >= 0)

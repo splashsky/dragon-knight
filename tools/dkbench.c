@@ -1,8 +1,10 @@
 /* dkbench.c :: HTTP/1.1 load generator for dk (`make bench`, see docs/PERF.md).
  *
- *   dkbench -p PORT [-s pages|fights|static|mixed|idle|realtime|jitter] [-c CLIENTS]
- *           [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX] [-S PATHS]
- *           [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]
+ *   dkbench -p PORT [-s pages|fights|static|mixed|idle|realtime|realtime-mixed|soak|jitter]
+ *           [-c CLIENTS] [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX]
+ *           [-S PATHS] [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]
+ *           [-j CHURN_PER_SECOND] [-i SAMPLE_SECONDS] [-o CSV] [-k STATS_SOCKET] [-D DB_PATH]
+ *           [-g RSS_SLOPE_KIB_PER_HOUR]
  *
  * Every client is one keep-alive connection running a scripted sequence. Logged-in
  * scenarios first register (when needed) and log in one account per client
@@ -20,6 +22,21 @@
  *           POST /__test/publish (config test_routes = true) for the duration; each event
  *           carries its send time, and every listener measures publish -> receive
  *           latency (the fan-out). Needs max_streams and max_streams_per_ip >= LISTENERS.
+ *   realtime-mixed  the target scale: LISTENERS idle players (accounts live<n>) and CLIENTS
+ *           active ones (PREFIX<n>) each hold an event stream; the active players run
+ *           the mixed script at RATE (pages, fights: half of them through the JSON fight
+ *           API like fight.js, half with forms, both sending the round), other players
+ *           post EVENTS_PER_SECOND chat messages (POST /babble like live.js, each player
+ *           at most once per 3 s), and CHURN_PER_SECOND streams close and come back (half
+ *           a blip: back after 1-3 s with Last-Event-ID; half a player leaving: back after
+ *           15-30 s, after the presence sweep announced the leave). Reports every kind,
+ *           the chat fan-out (POST sent -> message read on each stream open at the time),
+ *           presence events, the server's RSS and CPU and its error counters (-k).
+ *   soak    realtime-mixed for the duration, sampling the server every SAMPLE_SECONDS
+ *           (RSS, descriptors, streams, WAL and database size (-D), VM pool, errors,
+ *           latencies) into CSV; ends with a pass/fail summary: no RSS growth trend
+ *           (least-squares slope after the first sixth below RSS_SLOPE, default 1024 KiB
+ *           per hour), no descriptor growth, a bounded WAL, and no errors.
  *   jitter  no server: THREADS threads sleep 1 ms in a loop and report how late they
  *           wake up (the machine's scheduling noise floor; run it pinned like the server)
  * RATE is requests per second per client (0: closed loop, as fast as answers come).
@@ -30,6 +47,7 @@
 #define _GNU_SOURCE
 #endif
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -46,7 +64,9 @@
 #include <sys/epoll.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -56,12 +76,17 @@
 #define SUB_HALF   (1 << (SUB_BITS - 1))
 #define NBUCKETS   (SUB_HALF * 40)
 
-enum { K_PAGE, K_FIGHT, K_FIGHT_OPEN, K_MOVE, K_VICTORY, K_OTHER, K_STATIC, NKINDS };
+enum {
+	K_PAGE, K_FIGHT, K_FIGHT_JSON, K_FIGHT_OPEN, K_MOVE, K_VICTORY, K_OTHER, K_STATIC, K_CHAT, NKINDS
+};
 static const char *const kind_names[NKINDS] = {
-	"page GET /", "fight POST", "fight GET", "move POST", "victory GET", "other", "static",
+	"page GET /", "fight POST", "fight POST json", "fight GET", "move POST", "victory GET", "other",
+	"static", "chat POST",
 };
 
-enum { SC_PAGES, SC_FIGHTS, SC_STATIC, SC_MIXED, SC_IDLE, SC_REALTIME, SC_JITTER };
+enum {
+	SC_PAGES, SC_FIGHTS, SC_STATIC, SC_MIXED, SC_IDLE, SC_REALTIME, SC_RTMIXED, SC_SOAK, SC_JITTER
+};
 
 static struct {
 	const char *host;
@@ -74,8 +99,15 @@ static struct {
 	int    npaths;
 	int    server_pid;
 	int    listeners;
-	double events;
-} O = { "127.0.0.1", 0, SC_MIXED, 50, 4, 10, 2, 0, "bench", { 0 }, 0, 0, 1000, 10 };
+	double events;               /* < 0: the scenario's default */
+	double churn, sample, rss_slope;
+	const char *csv, *stats_sock, *db_path;
+} O = { "127.0.0.1", 0, SC_MIXED, 50, 4, 10, 2, 0, "bench", { 0 }, 0, 0, 1000, -1, 1, 0, 1024,
+		NULL, NULL, NULL };
+
+/* realtime-mixed and soak: requests and errors while measuring (the soak's samples take
+ * the difference), and stale fight rounds (a script error: always 0) */
+static atomic_ullong g_win_requests, g_win_errors, g_stale;
 
 static void die(const char *fmt, ...)
 {
@@ -305,9 +337,10 @@ static void bc_close(bconn *c)
 	c->in.len = 0;
 }
 
-/* One request/response; the body (NUL-terminated) stays in c->in.p + r->head_len. */
-static int bc_request(bconn *c, const char *method, const char *path, const char *cookies,
-					  const char *body, hresp *r)
+/* One request/response; the body (NUL-terminated) stays in c->in.p + r->head_len. extra:
+ * more header lines ("Name: value\r\n"...) or NULL. */
+static int bc_request_ex(bconn *c, const char *method, const char *path, const char *cookies,
+						 const char *body, const char *extra, hresp *r)
 {
 	if (c->fd < 0 && bc_open(c) < 0)
 		return -1;
@@ -315,6 +348,8 @@ static int bc_request(bconn *c, const char *method, const char *path, const char
 	buf_printf(&q, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n", method, path, O.host);
 	if (cookies && *cookies)
 		buf_printf(&q, "Cookie: %s\r\n", cookies);
+	if (extra)
+		buf_add(&q, extra, strlen(extra));
 	if (body)
 		buf_printf(&q, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: %zu\r\n",
 				   strlen(body));
@@ -358,6 +393,12 @@ static int bc_request(bconn *c, const char *method, const char *path, const char
 	return 0;
 }
 
+static int bc_request(bconn *c, const char *method, const char *path, const char *cookies,
+					  const char *body, hresp *r)
+{
+	return bc_request_ex(c, method, path, cookies, body, NULL, r);
+}
+
 /* value="..." after name="NAME" in html */
 static int find_field(const char *html, const char *name, char *out, size_t n)
 {
@@ -392,6 +433,11 @@ typedef struct client {
 	int     fstate, dir, static_i, step_fight;
 	char    follow[256];    /* redirect to follow next (immediately) */
 	unsigned rng;
+	int     json;           /* fights through the JSON fight API (like fight.js) */
+	int     json_req;       /* the request in flight asked for JSON */
+	int     follow_json;    /* follow[] is fetched with JSON too (a fight page) */
+	int     round;          /* the fight round the last fight page showed (0: none) */
+	int64_t last_chat;      /* when this account last posted to the chat */
 } client;
 
 typedef struct {
@@ -402,9 +448,16 @@ typedef struct {
 	uint64_t errors[NKINDS], s5xx[NKINDS], s503[NKINDS];
 	uint64_t conn_errors, reconnects, bytes_in;
 	pthread_t th;
+	pthread_mutex_t mu;     /* win: latencies since the sampler's last look (soak) */
+	hist   *win;
 } worker;
 
 static atomic_int g_phase;   /* 0 warmup, 1 measure, 2 stop */
+
+static int is_live_mix(void)
+{
+	return O.scenario == SC_RTMIXED || O.scenario == SC_SOAK;
+}
 
 static double rnd(client *c)
 {
@@ -427,13 +480,20 @@ static void schedule_next(client *c, int64_t now)
 		c->next_at = now;
 }
 
-static void build_request(client *c, const char *method, const char *path, const char *body, int kind)
+/* json: like fetch in fight.js (Accept: application/json, the CSRF token in a header) */
+static void build_request_ex(client *c, const char *method, const char *path, const char *body, int kind,
+							 int json)
 {
 	c->out.len = 0;
 	c->out_off = 0;
 	buf_printf(&c->out, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n", method, path, O.host);
 	if (c->cookie[0])
 		buf_printf(&c->out, "Cookie: %s\r\n", c->cookie);
+	if (json) {
+		buf_printf(&c->out, "Accept: application/json\r\n");
+		if (body)
+			buf_printf(&c->out, "X-CSRF-Token: %s\r\n", c->csrf);
+	}
 	if (body) {
 		buf_printf(&c->out, "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: %zu\r\n\r\n%s",
 				   strlen(body), body);
@@ -442,6 +502,12 @@ static void build_request(client *c, const char *method, const char *path, const
 	}
 	c->kind = kind;
 	c->is_post = body != NULL;
+	c->json_req = json;
+}
+
+static void build_request(client *c, const char *method, const char *path, const char *body, int kind)
+{
+	build_request_ex(c, method, path, body, kind, 0);
 }
 
 static int kind_of_path(const char *path)
@@ -457,20 +523,32 @@ static int kind_of_path(const char *path)
 	return K_OTHER;
 }
 
+/* the pages fight.js fetches as JSON when the API redirects there */
+static int is_fight_page(const char *path)
+{
+	return !strcmp(path, "/fight") || !strcmp(path, "/victory") || !strcmp(path, "/drop")
+		   || !strcmp(path, "/dead");
+}
+
 static void next_fight_request(client *c)
 {
-	char body[160];
+	char body[200], rnd_field[24] = "";
+	if (c->round > 0 && is_live_mix())
+		snprintf(rnd_field, sizeof rnd_field, "&round=%d", c->round);
+	/* the JSON API takes the token from the header, a form from its field */
+	const char *csrf = c->json ? "" : c->csrf;
+	const char *amp = c->json ? "" : "&";
 	switch (c->fstate) {
 	case F_FIGHT:
 		build_request(c, "GET", "/fight", NULL, K_FIGHT_OPEN);
 		break;
 	case F_FIGHT_POST:
-		snprintf(body, sizeof body, "csrf=%s&fight=Fight", c->csrf);
-		build_request(c, "POST", "/fight", body, K_FIGHT);
+		snprintf(body, sizeof body, "%s%s%sfight=Fight%s", c->json ? "" : "csrf=", csrf, amp, rnd_field);
+		build_request_ex(c, "POST", "/fight", body, c->json ? K_FIGHT_JSON : K_FIGHT, c->json);
 		break;
 	case F_CONTINUE:
-		snprintf(body, sizeof body, "csrf=%s&continue=Continue", c->csrf);
-		build_request(c, "POST", "/fight", body, K_FIGHT);
+		snprintf(body, sizeof body, "%s%s%scontinue=Continue%s", c->json ? "" : "csrf=", csrf, amp, rnd_field);
+		build_request_ex(c, "POST", "/fight", body, c->json ? K_FIGHT_JSON : K_FIGHT, c->json);
 		break;
 	default:
 		c->dir = !c->dir;
@@ -482,14 +560,18 @@ static void next_fight_request(client *c)
 static void next_request(client *c)
 {
 	if (c->follow[0]) {
-		build_request(c, "GET", c->follow, NULL, kind_of_path(c->follow));
+		build_request_ex(c, "GET", c->follow, NULL, kind_of_path(c->follow), c->follow_json);
 		c->follow[0] = '\0';
+		c->follow_json = 0;
 		return;
 	}
 	int what = O.scenario;
 	if (what == SC_MIXED) {
 		double u = rnd(c);
 		what = u < 0.5 ? SC_PAGES : u < 0.8 ? SC_FIGHTS : SC_STATIC;
+	} else if (is_live_mix()) {
+		double u = rnd(c);
+		what = u < 0.45 ? SC_PAGES : u < 0.85 ? SC_FIGHTS : SC_STATIC;
 	}
 	if (what == SC_PAGES) {
 		build_request(c, "GET", "/", NULL, K_PAGE);
@@ -500,11 +582,50 @@ static void next_request(client *c)
 	}
 }
 
+/* a fight form's button in HTML, or in HTML inside a JSON string */
+static int has_button(const char *body, const char *name)
+{
+	char a[48], b[48];
+	snprintf(a, sizeof a, "name=\"%s\"", name);
+	snprintf(b, sizeof b, "name=\\\"%s\\\"", name);
+	return body && (strstr(body, a) || strstr(body, b));
+}
+
+/* the round a fight page shows (its form's field, or the JSON answer's "round"), or 0 */
+static int find_round(const char *body)
+{
+	if (!body)
+		return 0;
+	const char *p = strstr(body, "name=\"round\" value=\"");
+	if (p)
+		return atoi(p + 20);
+	p = strstr(body, "\"round\":");
+	return p ? atoi(p + 8) : 0;
+}
+
 /* Response complete: update the client's script state. */
 static void on_response(client *c, const hresp *r, const char *body)
 {
-	int is_fight_flow = c->kind == K_FIGHT || c->kind == K_FIGHT_OPEN || c->kind == K_MOVE
-						|| c->kind == K_VICTORY || (c->kind == K_PAGE && O.scenario == SC_FIGHTS);
+	int is_fight_flow = c->kind == K_FIGHT || c->kind == K_FIGHT_JSON || c->kind == K_FIGHT_OPEN
+						|| c->kind == K_MOVE || c->kind == K_VICTORY
+						|| (c->kind == K_PAGE && O.scenario == SC_FIGHTS);
+	const char *jr = c->json_req && r->status == 200 && body ? strstr(body, "\"redirect\":\"") : NULL;
+	if (c->json_req && body && strstr(body, "\"stale\":true"))
+		atomic_fetch_add(&g_stale, 1);
+	if (jr) {
+		/* the JSON API's redirect: fight pages are fetched as JSON again, others loaded */
+		char path[256];
+		size_t n = 0;
+		for (const char *p = jr + 12; *p && *p != '"' && n < sizeof path - 1; p++)
+			if (!(p[0] == '\\' && p[1] == '/'))
+				path[n++] = *p;
+		path[n] = '\0';
+		snprintf(c->follow, sizeof c->follow, "%s", path);
+		c->follow_json = is_fight_page(path);
+		c->fstate = strcmp(path, "/fight") == 0 ? F_FIGHT : F_MOVE;
+		c->round = 0;
+		return;
+	}
 	if (r->status == 302 || r->status == 303) {
 		const char *loc = r->location;
 		const char *path = strstr(loc, "://") ? strchr(strstr(loc, "://") + 3, '/') : loc;
@@ -517,10 +638,11 @@ static void on_response(client *c, const hresp *r, const char *body)
 			c->fstate = F_MOVE;
 		return;
 	}
-	if (c->kind == K_FIGHT || c->kind == K_FIGHT_OPEN) {
-		if (body && strstr(body, "name=\"fight\""))
+	if (c->kind == K_FIGHT || c->kind == K_FIGHT_JSON || c->kind == K_FIGHT_OPEN) {
+		c->round = find_round(body);
+		if (has_button(body, "fight"))
 			c->fstate = F_FIGHT_POST;
-		else if (body && strstr(body, "name=\"continue\""))
+		else if (has_button(body, "continue"))
 			c->fstate = F_CONTINUE;
 		else
 			c->fstate = F_MOVE;             /* died, or no fight */
@@ -615,12 +737,21 @@ static void record(worker *w, client *c, int status, int64_t now)
 		return;
 	uint64_t us = (uint64_t)((now - c->t_start) / 1000);
 	hist_add(&w->h[c->kind], us);
-	if (status < 200 || status >= 400)
+	int bad = status < 200 || status >= 400;
+	if (bad)
 		w->errors[c->kind]++;
 	if (status >= 500)
 		w->s5xx[c->kind]++;
 	if (status == 503)
 		w->s503[c->kind]++;
+	if (w->win) {
+		pthread_mutex_lock(&w->mu);
+		hist_add(&w->win[c->kind], us);
+		pthread_mutex_unlock(&w->mu);
+	}
+	atomic_fetch_add(&g_win_requests, 1);
+	if (bad)
+		atomic_fetch_add(&g_win_errors, 1);
 }
 
 static void try_recv(worker *w, client *c, int epfd, int64_t now)
@@ -639,8 +770,10 @@ static void try_recv(worker *w, client *c, int epfd, int64_t now)
 				c->retries++;
 				w->reconnects++;
 			} else {
-				if (atomic_load(&g_phase) == 1)
+				if (atomic_load(&g_phase) == 1) {
 					w->errors[c->kind]++;
+					atomic_fetch_add(&g_win_errors, 1);
+				}
 				w->conn_errors++;
 				c->retries = 0;
 				schedule_next(c, now);
@@ -662,6 +795,8 @@ static void try_recv(worker *w, client *c, int epfd, int64_t now)
 		return;
 	if (st < 0) {
 		w->conn_errors++;
+		if (atomic_load(&g_phase) == 1)
+			atomic_fetch_add(&g_win_errors, 1);
 		conn_reset(w, c, epfd);
 		c->state = CS_WAITING;
 		schedule_next(c, now);
@@ -767,6 +902,7 @@ typedef struct {
 	client *cl;
 	int     from, to;
 	int     failed;
+	const char *prefix;     /* NULL: O.prefix */
 } setup_arg;
 
 static void cookie_merge(char *jar, size_t n, const hresp *r)
@@ -792,12 +928,12 @@ static void cookie_merge(char *jar, size_t n, const hresp *r)
 	snprintf(jar, n, "%s%s%s=%s", tmp, tmp[0] ? "; " : "", r->cookie_name, r->cookie_val);
 }
 
-static int login_client(bconn *bc, client *c)
+static int login_client(bconn *bc, client *c, const char *prefix)
 {
 	char jar[512] = "", tok[160], body[1024];
 	hresp r;
 	char user[64];
-	snprintf(user, sizeof user, "%s%d", O.prefix, c->id);
+	snprintf(user, sizeof user, "%s%d", prefix, c->id);
 	for (int attempt = 0; attempt < 2; attempt++) {
 		if (bc_request(bc, "GET", "/login", jar, NULL, &r) < 0)
 			return -1;
@@ -844,6 +980,7 @@ static int login_client(bconn *bc, client *c)
 	if (!find_field(html, "csrf", c->csrf, sizeof c->csrf))
 		return -1;
 	c->fstate = strcmp(path, "/fight") == 0 && strstr(html, "name=\"fight\"") ? F_FIGHT_POST : F_MOVE;
+	c->round = find_round(html);
 	return 0;
 }
 
@@ -852,7 +989,7 @@ static void *setup_main(void *arg)
 	setup_arg *a = arg;
 	bconn bc = { -1, { 0 } };
 	for (int i = a->from; i < a->to; i++) {
-		if (login_client(&bc, &a->cl[i]) < 0) {
+		if (login_client(&bc, &a->cl[i], a->prefix ? a->prefix : O.prefix) < 0) {
 			a->failed++;
 			bc_close(&bc);
 		}
@@ -860,6 +997,28 @@ static void *setup_main(void *arg)
 	bc_close(&bc);
 	free(bc.in.p);
 	return NULL;
+}
+
+/* Logs in (registering when needed) accounts PREFIX<id> for cl[0..n) on 8 threads. */
+static void setup_accounts(client *cl, int n, const char *prefix)
+{
+	int64_t t0 = now_ns();
+	int ns = n < 8 ? n : 8;
+	pthread_t th[8];
+	setup_arg sa[8];
+	for (int i = 0; i < ns; i++) {
+		sa[i] = (setup_arg){ cl, n * i / ns, n * (i + 1) / ns, 0, prefix };
+		pthread_create(&th[i], NULL, setup_main, &sa[i]);
+	}
+	int failed = 0;
+	for (int i = 0; i < ns; i++) {
+		pthread_join(th[i], NULL);
+		failed += sa[i].failed;
+	}
+	if (failed)
+		die("%d of %d accounts %s<n> could not log in (is the game installed at %s:%d?)", failed, n, prefix,
+			O.host, O.port);
+	printf("setup: %d accounts %s<n> logged in in %.2f s\n", n, prefix, (double)(now_ns() - t0) / 1e9);
 }
 
 /* ------------------------------------------------------------------ server process info */
@@ -985,21 +1144,46 @@ typedef struct {
 	int     fd, state;            /* RT_* */
 	buf     out, in;
 	size_t  out_off;
+	client *acct;                 /* whose stream (cookie) */
+	int     churnable;            /* an idle player's stream (realtime-mixed: may churn) */
+	int     blip;                 /* the next opening sends Last-Event-ID */
+	int64_t opened_at;            /* when the stream's head arrived */
+	int64_t reopen_at;            /* RT_CLOSED: when to open again (0: never) */
+	char    last_id[64];
 } listener;
 
 enum { RT_CONNECTING, RT_HEAD, RT_STREAM, RT_CLOSED };
+/* rt_close(): why an opening failed (0: the stream ended, or a player closed it) */
+enum { RT_FAIL_NONE, RT_FAIL_CONNECT, RT_FAIL_EOF, RT_FAIL_503, RT_FAIL_STATUS };
 
 typedef struct {
 	listener *ls;
-	client   *cl;                 /* the accounts (cookies) */
 	int       n;
 	hist      h;
 	uint64_t  events, pings, bytes, closed, failed;
+	uint64_t  chat, replayed, joins, leaves, resyncs, byes, churned, reopened;
+	uint64_t  why[4];             /* failed openings: RT_FAIL_* */
+	unsigned  rng;
+	int64_t   next_churn;
 	pthread_t th;
+	pthread_mutex_t mu;           /* win: fan-out since the sampler's last look (soak) */
+	hist     *win;
 } lworker;
 
 static atomic_int g_rt_phase;     /* 0 opening/idle, 1 measuring, 2 draining, 3 stop */
 static atomic_int g_rt_open;
+static atomic_ullong g_rt_closed, g_rt_failed;   /* streams ended by the server, failed openings */
+
+static double lrnd(lworker *w)
+{
+	w->rng = w->rng * 1103515245u + 12345u;
+	return ((w->rng >> 8) & 0xFFFFFF) / 16777216.0;
+}
+
+static double exp_gap_s(double u, double rate)
+{
+	return -log(u < 1e-9 ? 1e-9 : u) / rate;
+}
 
 static void rt_close(lworker *w, listener *l, int epfd, int failed)
 {
@@ -1011,29 +1195,104 @@ static void rt_close(lworker *w, listener *l, int epfd, int failed)
 	if (l->state == RT_STREAM) {
 		w->closed++;
 		atomic_fetch_sub(&g_rt_open, 1);
+		atomic_fetch_add(&g_rt_closed, 1);
 	} else if (failed) {
 		w->failed++;
+		w->why[failed - 1]++;
+		atomic_fetch_add(&g_rt_failed, 1);
 	}
 	l->state = RT_CLOSED;
+	/* realtime-mixed: like EventSource, come back (a refusal is answered 503 Retry-After: 5) */
+	if (is_live_mix() && atomic_load(&g_rt_phase) < 3) {
+		l->reopen_at = now_ns() + (failed ? 5000000000LL : 3000000000LL);
+		l->blip = 1;
+	}
 }
 
-/* One frame (without its blank line): a bench event, a heartbeat, or anything else. */
-static void rt_frame(lworker *w, const char *f, int64_t now)
+static int rt_connect(lworker *w, listener *l, int epfd)
 {
-	if (strncmp(f, ": ping", 6) == 0) {
-		w->pings++;
-		return;
+	l->out.len = 0;
+	l->out_off = 0;
+	l->in.len = 0;
+	buf_printf(&l->out, "GET /live HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n"
+			   "Accept: text/event-stream\r\nCookie: %s\r\n", O.host, l->acct->cookie);
+	if (l->blip && l->last_id[0])
+		buf_printf(&l->out, "Last-Event-ID: %s\r\n", l->last_id);
+	buf_add(&l->out, "\r\n", 2);
+	l->state = RT_CONNECTING;
+	l->reopen_at = 0;
+	int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+	struct sockaddr_in a = { 0 };
+	a.sin_family = AF_INET;
+	a.sin_port = htons((unsigned short)O.port);
+	inet_pton(AF_INET, O.host, &a.sin_addr);
+	struct epoll_event ev = { .events = EPOLLIN | EPOLLOUT, .data.ptr = l };
+	if (fd < 0 || (connect(fd, (struct sockaddr *)&a, sizeof a) < 0 && errno != EINPROGRESS)
+		|| epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+		if (fd >= 0)
+			close(fd);
+		l->fd = -1;
+		rt_close(w, l, epfd, RT_FAIL_CONNECT);
+		return -1;
 	}
-	const char *e = strstr(f, "event: bench\ndata: ");
-	if (!e)
-		return;
+	l->fd = fd;
+	return 0;
+}
+
+/* One frame (without its blank line): an event, a heartbeat, or an opening's id line. */
+static void rt_frame(lworker *w, listener *l, char *f, int64_t now)
+{
+	const char *event = "", *data = "";
+	for (char *line = f; line; ) {
+		char *nl = strchr(line, '\n');
+		if (nl)
+			*nl = '\0';
+		if (strncmp(line, ": ping", 6) == 0)
+			w->pings++;
+		else if (strncmp(line, "id: ", 4) == 0)
+			snprintf(l->last_id, sizeof l->last_id, "%s", line + 4);
+		else if (strncmp(line, "event: ", 7) == 0)
+			event = line + 7;
+		else if (strncmp(line, "data: ", 6) == 0)
+			data = line + 6;
+		line = nl ? nl + 1 : NULL;
+	}
 	unsigned long long seq;
 	long long t;
-	if (sscanf(e + 19, "%llu %lld", &seq, &t) != 2)
-		return;
-	w->events++;
-	if (atomic_load(&g_rt_phase) >= 1 && now > t)
-		hist_add(&w->h, (uint64_t)((now - t) / 1000));
+	if (!strcmp(event, "bench")) {
+		if (sscanf(data, "%llu %lld", &seq, &t) != 2)
+			return;
+		w->events++;
+		if (atomic_load(&g_rt_phase) >= 1 && now > t)
+			hist_add(&w->h, (uint64_t)((now - t) / 1000));
+	} else if (!strcmp(event, "babble")) {
+		/* a chat message: {"author":...,"id":...,"text":"b <seq> <sent>","time":...} */
+		const char *x = strstr(data, "\"text\":\"b ");
+		if (!x || sscanf(x + 10, "%llu %lld", &seq, &t) != 2)
+			return;
+		if (t < l->opened_at) {
+			w->replayed++;              /* sent while this stream was away */
+			return;
+		}
+		w->chat++;
+		if (atomic_load(&g_phase) == 1 && now > t) {
+			uint64_t us = (uint64_t)((now - t) / 1000);
+			hist_add(&w->h, us);
+			if (w->win) {
+				pthread_mutex_lock(&w->mu);
+				hist_add(w->win, us);
+				pthread_mutex_unlock(&w->mu);
+			}
+		}
+	} else if (!strcmp(event, "join")) {
+		w->joins++;
+	} else if (!strcmp(event, "leave")) {
+		w->leaves++;
+	} else if (!strcmp(event, "resync")) {
+		w->resyncs++;
+	} else if (!strcmp(event, "bye")) {
+		w->byes++;
+	}
 }
 
 static void rt_read(lworker *w, listener *l, int epfd)
@@ -1044,7 +1303,7 @@ static void rt_read(lworker *w, listener *l, int epfd)
 		if (n < 0 && (errno == EAGAIN || errno == EINTR))
 			break;
 		if (n <= 0) {
-			rt_close(w, l, epfd, 1);
+			rt_close(w, l, epfd, RT_FAIL_EOF);
 			return;
 		}
 		l->in.len += (size_t)n;
@@ -1059,18 +1318,42 @@ static void rt_read(lworker *w, listener *l, int epfd)
 		int status = 0;
 		sscanf(l->in.p, "HTTP/1.%*d %d", &status);
 		if (status != 200 || !strcasestr(l->in.p, "content-type: text/event-stream")) {
-			rt_close(w, l, epfd, 1);
+			rt_close(w, l, epfd, status == 503 ? RT_FAIL_503 : RT_FAIL_STATUS);
 			return;
 		}
 		buf_consume(&l->in, (size_t)(end - l->in.p) + 4);
 		l->state = RT_STREAM;
+		l->opened_at = now;
 		atomic_fetch_add(&g_rt_open, 1);
 	}
 	char *p;
 	while (l->in.len && (p = strstr(l->in.p, "\n\n"))) {
 		*p = '\0';
-		rt_frame(w, l->in.p, now);
+		rt_frame(w, l, l->in.p, now);
 		buf_consume(&l->in, (size_t)(p - l->in.p) + 2);
+	}
+}
+
+/* realtime-mixed: a player's stream goes away; half are blips (back after 1-3 s with
+ * Last-Event-ID, as EventSource does), half leave (back after 15-30 s: the presence
+ * sweep has announced the leave by then, the return is a join) */
+static void rt_churn(lworker *w, int epfd, int64_t now)
+{
+	for (int tries = 0; tries < 8; tries++) {
+		listener *l = &w->ls[(int)(lrnd(w) * w->n) % w->n];
+		if (!l->churnable || l->state != RT_STREAM)
+			continue;
+		if (l->fd >= 0) {
+			epoll_ctl(epfd, EPOLL_CTL_DEL, l->fd, NULL);
+			close(l->fd);
+		}
+		l->fd = -1;
+		l->state = RT_CLOSED;
+		atomic_fetch_sub(&g_rt_open, 1);
+		w->churned++;
+		l->blip = lrnd(w) < 0.5;
+		l->reopen_at = now + (int64_t)((l->blip ? 1 + 2 * lrnd(w) : 15 + 15 * lrnd(w)) * 1e9);
+		return;
 	}
 }
 
@@ -1080,28 +1363,11 @@ static void *rt_listen_main(void *arg)
 	int epfd = epoll_create1(EPOLL_CLOEXEC);
 	if (epfd < 0)
 		die("epoll_create1: %s", strerror(errno));
-	for (int i = 0; i < w->n; i++) {
-		listener *l = &w->ls[i];
-		l->state = RT_CONNECTING;
-		buf_printf(&l->out, "GET /live HTTP/1.1\r\nHost: %s\r\nUser-Agent: dkbench\r\n"
-				   "Accept: text/event-stream\r\nCookie: %s\r\n\r\n", O.host, w->cl[i].cookie);
-		int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-		struct sockaddr_in a = { 0 };
-		a.sin_family = AF_INET;
-		a.sin_port = htons((unsigned short)O.port);
-		inet_pton(AF_INET, O.host, &a.sin_addr);
-		struct epoll_event ev = { .events = EPOLLIN | EPOLLOUT, .data.ptr = l };
-		if (fd < 0 || (connect(fd, (struct sockaddr *)&a, sizeof a) < 0 && errno != EINPROGRESS)
-			|| epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
-			if (fd >= 0)
-				close(fd);
-			l->fd = -1;
-			l->state = RT_CLOSED;
-			w->failed++;
-			continue;
-		}
-		l->fd = fd;
-	}
+	for (int i = 0; i < w->n; i++)
+		rt_connect(w, &w->ls[i], epfd);
+	double churn = is_live_mix() && O.churn > 0 ? O.churn : 0;   /* per second, all threads */
+	int nthreads = O.threads < O.listeners ? O.threads : O.listeners;
+	w->next_churn = now_ns() + (churn > 0 ? (int64_t)(exp_gap_s(lrnd(w), churn / nthreads) * 1e9) : 0);
 	struct epoll_event evs[256];
 	while (atomic_load(&g_rt_phase) < 3) {
 		int n = epoll_wait(epfd, evs, 256, 50);
@@ -1114,7 +1380,7 @@ static void *rt_listen_main(void *arg)
 				socklen_t el = sizeof err;
 				getsockopt(l->fd, SOL_SOCKET, SO_ERROR, &err, &el);
 				if (err) {
-					rt_close(w, l, epfd, 1);
+					rt_close(w, l, epfd, RT_FAIL_CONNECT);
 					continue;
 				}
 				while (l->out_off < l->out.len) {
@@ -1131,6 +1397,22 @@ static void *rt_listen_main(void *arg)
 			}
 			if (evs[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR))
 				rt_read(w, l, epfd);
+		}
+		if (!is_live_mix())
+			continue;
+		int64_t now = now_ns();
+		if (churn > 0 && atomic_load(&g_rt_phase) >= 1 && now >= w->next_churn) {
+			rt_churn(w, epfd, now);
+			w->next_churn += (int64_t)(exp_gap_s(lrnd(w), churn / nthreads) * 1e9);
+			if (w->next_churn < now)
+				w->next_churn = now;
+		}
+		for (int i = 0; i < w->n; i++) {
+			listener *l = &w->ls[i];
+			if (l->state == RT_CLOSED && l->reopen_at && now >= l->reopen_at) {
+				w->reopened++;
+				rt_connect(w, l, epfd);
+			}
 		}
 	}
 	for (int i = 0; i < w->n; i++) {
@@ -1215,22 +1497,7 @@ static int run_realtime(void)
 		cl[i].fd = -1;
 		cl[i].rng = 0x9e3779b9u * (unsigned)(i + 1);
 	}
-	int64_t t0 = now_ns();
-	int ns = 8;
-	pthread_t th[8];
-	setup_arg sa[8];
-	for (int i = 0; i < ns; i++) {
-		sa[i] = (setup_arg){ cl, (nl + 1) * i / ns, (nl + 1) * (i + 1) / ns, 0 };
-		pthread_create(&th[i], NULL, setup_main, &sa[i]);
-	}
-	int failed = 0;
-	for (int i = 0; i < ns; i++) {
-		pthread_join(th[i], NULL);
-		failed += sa[i].failed;
-	}
-	if (failed)
-		die("%d of %d accounts could not log in", failed, nl + 1);
-	printf("setup: %d accounts logged in in %.2f s\n", nl + 1, (double)(now_ns() - t0) / 1e9);
+	setup_accounts(cl, nl + 1, O.prefix);
 
 	sleep_s(1);
 	long rss0 = server_rss_kb();
@@ -1240,11 +1507,12 @@ static int run_realtime(void)
 		die("out of memory");
 	atomic_store(&g_rt_phase, 0);
 	atomic_store(&g_rt_open, 0);
-	t0 = now_ns();
+	int64_t t0 = now_ns();
+	for (int i = 0; i < nl; i++)
+		ls[i].acct = &cl[i];
 	for (int i = 0; i < nt; i++) {
 		int from = nl * i / nt, to = nl * (i + 1) / nt;
 		w[i].ls = ls + from;
-		w[i].cl = cl + from;
 		w[i].n = to - from;
 		pthread_create(&w[i].th, NULL, rt_listen_main, &w[i]);
 	}
@@ -1328,6 +1596,655 @@ static int run_realtime(void)
 	return opened == nl && events == want && !closed ? 0 : 1;
 }
 
+/* ------------------------------------------------------------------ realtime-mixed and soak */
+
+static void print_row(const char *name, const hist *h, uint64_t errs, uint64_t s503, double secs);
+
+/* One snapshot of the server's metrics from its stats socket ("name value" lines; free
+ * it), or NULL. */
+static char *stats_snapshot(void)
+{
+	struct sockaddr_un a = { 0 };
+	a.sun_family = AF_UNIX;
+	if (!O.stats_sock || strlen(O.stats_sock) >= sizeof a.sun_path)
+		return NULL;
+	strcpy(a.sun_path, O.stats_sock);
+	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (fd < 0)
+		return NULL;
+	if (connect(fd, (struct sockaddr *)&a, sizeof a) < 0) {
+		close(fd);
+		return NULL;
+	}
+	struct timeval tv = { 5, 0 };
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+	buf b = { 0 };
+	for (;;) {
+		buf_reserve(&b, 16384);
+		ssize_t n = read(fd, b.p + b.len, b.cap - b.len - 1);
+		if (n <= 0)
+			break;
+		b.len += (size_t)n;
+		b.p[b.len] = '\0';
+	}
+	close(fd);
+	return b.p;
+}
+
+/* a metric of a snapshot, or -1 */
+static long long stat_value(const char *text, const char *name)
+{
+	size_t n = strlen(name);
+	for (const char *p = text; p && *p; ) {
+		if (!strncmp(p, name, n) && p[n] == ' ')
+			return atoll(p + n + 1);
+		p = strchr(p, '\n');
+		if (p)
+			p++;
+	}
+	return -1;
+}
+
+static long server_fds(void)
+{
+	char p[64];
+	snprintf(p, sizeof p, "/proc/%d/fd", O.server_pid);
+	DIR *d = O.server_pid ? opendir(p) : NULL;
+	if (!d)
+		return -1;
+	long n = 0;
+	struct dirent *e;
+	while ((e = readdir(d)))
+		if (e->d_name[0] != '.')
+			n++;
+	closedir(d);
+	return n;
+}
+
+static long long file_size(const char *path, const char *suffix)
+{
+	char p[1024];
+	struct stat st;
+	if (!path)
+		return -1;
+	snprintf(p, sizeof p, "%s%s", path, suffix);
+	return stat(p, &st) == 0 ? (long long)st.st_size : -1;
+}
+
+/* least-squares slope of y over x */
+static double fit_slope(const double *x, const double *y, int n)
+{
+	double mx = 0, my = 0, sxy = 0, sxx = 0;
+	for (int i = 0; i < n; i++)
+		mx += x[i], my += y[i];
+	mx /= n;
+	my /= n;
+	for (int i = 0; i < n; i++) {
+		sxy += (x[i] - mx) * (y[i] - my);
+		sxx += (x[i] - mx) * (x[i] - mx);
+	}
+	return sxx > 0 ? sxy / sxx : 0;
+}
+
+/* The chat: messages "b <seq> <sent ns>" posted like live.js by random idle players, each
+ * at most every 3 s (the server allows one per 2 s), EVENTS_PER_SECOND on average. */
+typedef struct {
+	client  *acct;
+	int      n;
+	hist     h;
+	uint64_t sent, errors, s429;
+	pthread_mutex_t mu;
+	hist    *win;
+} chatter;
+
+static void *chat_main(void *arg)
+{
+	chatter *ch = arg;
+	bconn bc = { -1, { 0 } };
+	unsigned rng = 0x2545f491u, seq = 0;
+	int64_t next = now_ns();
+	while (atomic_load(&g_rt_phase) < 2) {
+		sleep_until(next);
+		if (atomic_load(&g_rt_phase) >= 2)
+			break;
+		int64_t now = now_ns();
+		client *c = NULL;
+		for (int tries = 0; tries < 20 && !c; tries++) {
+			rng = rng * 1103515245u + 12345u;
+			client *x = &ch->acct[((rng >> 8) & 0xFFFFFF) % (unsigned)ch->n];
+			if (!x->last_chat || now - x->last_chat >= 3000000000LL)
+				c = x;
+		}
+		if (c) {
+			char body[96], extra[160];
+			snprintf(body, sizeof body, "babble=b+%u+%lld", ++seq, (long long)now);
+			snprintf(extra, sizeof extra, "Accept: application/json\r\nX-CSRF-Token: %s\r\n", c->csrf);
+			c->last_chat = now;
+			hresp r;
+			int ok = bc_request_ex(&bc, "POST", "/babble", c->cookie, body, extra, &r) == 0 && r.status == 200;
+			uint64_t us = (uint64_t)((now_ns() - now) / 1000);
+			if (atomic_load(&g_phase) == 1) {
+				hist_add(&ch->h, us);
+				if (ok) {
+					ch->sent++;
+				} else {
+					ch->errors++;
+					if (r.status == 429)
+						ch->s429++;
+					atomic_fetch_add(&g_win_errors, 1);
+				}
+				atomic_fetch_add(&g_win_requests, 1);
+				if (ch->win) {
+					pthread_mutex_lock(&ch->mu);
+					hist_add(ch->win, us);
+					pthread_mutex_unlock(&ch->mu);
+				}
+			}
+		}
+		rng = rng * 1103515245u + 12345u;
+		next += (int64_t)(exp_gap_s(((rng >> 8) & 0xFFFFFF) / 16777216.0, O.events) * 1e9);
+		if (next < now_ns() - 1000000000)
+			next = now_ns();
+	}
+	bc_close(&bc);
+	free(bc.in.p);
+	return NULL;
+}
+
+typedef struct {
+	double    t, cpu;
+	long      rss, fds;
+	long long conn_open, streams, wal, db, vm_ready, vm_built, vm_cold, channels, replay_bytes,
+			  s5xx, s503, slow, refused, published, dropped, sqlite_kb;
+	uint64_t  reqs, errs, page99, fight99, fan99, chat99;
+} sample;
+
+/* the latencies since the last call (and reset them) */
+static void take_windows(worker *aw, int na, lworker *lw, int nl, chatter *ch, hist *page, hist *fight,
+						 hist *fan, hist *chat)
+{
+	for (int i = 0; i < na; i++) {
+		pthread_mutex_lock(&aw[i].mu);
+		hist_merge(page, &aw[i].win[K_PAGE]);
+		hist_merge(fight, &aw[i].win[K_FIGHT]);
+		hist_merge(fight, &aw[i].win[K_FIGHT_JSON]);
+		memset(aw[i].win, 0, NKINDS * sizeof *aw[i].win);
+		pthread_mutex_unlock(&aw[i].mu);
+	}
+	for (int i = 0; i < nl; i++) {
+		pthread_mutex_lock(&lw[i].mu);
+		hist_merge(fan, lw[i].win);
+		memset(lw[i].win, 0, sizeof *lw[i].win);
+		pthread_mutex_unlock(&lw[i].mu);
+	}
+	pthread_mutex_lock(&ch->mu);
+	hist_merge(chat, ch->win);
+	memset(ch->win, 0, sizeof *ch->win);
+	pthread_mutex_unlock(&ch->mu);
+}
+
+static void sample_stats(sample *s, const char *st)
+{
+	s->conn_open = stat_value(st, "conn_open");
+	s->streams = stat_value(st, "conn_streaming");
+	s->vm_ready = stat_value(st, "vm_ready");
+	s->vm_built = stat_value(st, "vm_built");
+	s->vm_cold = stat_value(st, "vm_cold");
+	s->channels = stat_value(st, "stream_channels");
+	s->replay_bytes = stat_value(st, "replay_bytes");
+	s->s5xx = stat_value(st, "responses_5xx");
+	s->s503 = stat_value(st, "backpressure_503");
+	s->slow = stat_value(st, "streams_slow_closed");
+	s->refused = stat_value(st, "streams_refused");
+	s->published = stat_value(st, "events_published");
+	s->dropped = stat_value(st, "events_dropped");
+	s->sqlite_kb = stat_value(st, "sqlite_mem_kb");
+}
+
+static void check(int *all, int ok, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+static void check(int *all, int ok, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	printf("  %s  ", ok ? "pass" : "FAIL");
+	vprintf(fmt, ap);
+	putchar('\n');
+	va_end(ap);
+	if (!ok)
+		*all = 0;
+}
+
+static int run_live_mix(void)
+{
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < rl.rlim_max) {
+		rl.rlim_cur = rl.rlim_max;
+		setrlimit(RLIMIT_NOFILE, &rl);
+	}
+	int soak = O.scenario == SC_SOAK;
+	int nl = O.listeners, na = O.clients, nstreams = nl + na;
+	client *lc = calloc((size_t)nl, sizeof *lc), *ac = calloc((size_t)na, sizeof *ac);
+	listener *ls = calloc((size_t)nstreams, sizeof *ls);
+	if (!lc || !ac || !ls)
+		die("out of memory");
+	for (int i = 0; i < nl; i++) {
+		lc[i].id = i;
+		lc[i].fd = -1;
+	}
+	for (int i = 0; i < na; i++) {
+		ac[i].id = i;
+		ac[i].fd = -1;
+		ac[i].rng = 0x9e3779b9u * (unsigned)(i + 1);
+		ac[i].static_i = i;
+		ac[i].json = i % 2 == 0;
+	}
+	setup_accounts(lc, nl, "live");
+	setup_accounts(ac, na, O.prefix);
+	for (int i = 0; i < nstreams; i++) {
+		ls[i].acct = i < nl ? &lc[i] : &ac[i - nl];
+		ls[i].churnable = i < nl;
+	}
+
+	sleep_s(1);
+	long rss0 = server_rss_kb();
+	int nt = O.threads < nstreams ? O.threads : nstreams;
+	lworker *lw = calloc((size_t)nt, sizeof *lw);
+	worker *aw = calloc((size_t)O.threads, sizeof *aw);
+	chatter ch;
+	memset(&ch, 0, sizeof ch);
+	if (!lw || !aw)
+		die("out of memory");
+	atomic_store(&g_rt_phase, 0);
+	atomic_store(&g_rt_open, 0);
+	atomic_store(&g_phase, 0);
+	int64_t t0 = now_ns();
+	for (int i = 0; i < nt; i++) {
+		int from = nstreams * i / nt, to = nstreams * (i + 1) / nt;
+		lw[i].ls = ls + from;
+		lw[i].n = to - from;
+		lw[i].rng = 0x51ed27u * (unsigned)(i + 1);
+		pthread_mutex_init(&lw[i].mu, NULL);
+		if (soak && !(lw[i].win = calloc(1, sizeof *lw[i].win)))
+			die("out of memory");
+		pthread_create(&lw[i].th, NULL, rt_listen_main, &lw[i]);
+	}
+	while (atomic_load(&g_rt_open) < nstreams && now_ns() - t0 < 30 * 1000000000LL)
+		sleep_s(0.01);
+	int opened = atomic_load(&g_rt_open);
+	printf("streams: %d of %d open in %.2f s (%d idle players, %d active)\n", opened, nstreams,
+		   (double)(now_ns() - t0) / 1e9, nl, na);
+	if (opened < nstreams)
+		die("not every stream opened (max_streams?)");
+	sleep_s(1);
+	long rss1 = server_rss_kb();
+	if (rss0 >= 0)
+		printf("server RSS: %ld KiB before the streams, %ld KiB with them open (+%.1f KiB per stream)\n", rss0, rss1,
+			   (double)(rss1 - rss0) / nstreams);
+
+	printf("load: %d active players at %.1f req/s each (%s), %.1f chat messages/s, %.1f stream reconnects/s; "
+		   "warmup %.0f s, measure %.0f s\n", na, O.rate, O.rate > 0 ? "Poisson" : "closed loop", O.events,
+		   O.churn, O.warmup, O.duration);
+	atomic_store(&g_rt_phase, 1);
+	ch.acct = lc;
+	ch.n = nl;
+	pthread_mutex_init(&ch.mu, NULL);
+	if (soak && !(ch.win = calloc(1, sizeof *ch.win)))
+		die("out of memory");
+	pthread_t cth;
+	pthread_create(&cth, NULL, chat_main, &ch);
+	int naw = O.threads < na ? O.threads : na;
+	for (int i = 0; i < naw; i++) {
+		aw[i].id = i;
+		aw[i].cl = ac + na * i / naw;
+		aw[i].n = na * (i + 1) / naw - na * i / naw;
+		pthread_mutex_init(&aw[i].mu, NULL);
+		if (soak && !(aw[i].win = calloc(NKINDS, sizeof *aw[i].win)))
+			die("out of memory");
+		pthread_create(&aw[i].th, NULL, worker_main, &aw[i]);
+	}
+	if (O.warmup > 0)
+		sleep_s(O.warmup);
+	atomic_store(&g_phase, 1);
+	char *st0 = stats_snapshot();
+	double cpu0 = server_cpu_s(), sys0 = server_cpu_part(1);
+	uint64_t closed0 = atomic_load(&g_rt_closed), failed0 = atomic_load(&g_rt_failed);
+	int64_t m0 = now_ns();
+
+	/* soak: a sample every O.sample seconds */
+	FILE *csv = NULL;
+	sample *sm = NULL;
+	int nsm = 0, capsm = 0;
+	if (soak && O.csv) {
+		if (!(csv = fopen(O.csv, "w")))
+			die("%s: %s", O.csv, strerror(errno));
+		fprintf(csv, "t_s,rss_kb,sqlite_mem_kb,fds,conn_open,streams,wal_bytes,db_bytes,vm_ready,vm_built,vm_cold,"
+				"stream_channels,replay_bytes,requests,errors,responses_5xx,backpressure_503,"
+				"streams_slow_closed,streams_refused,events_published,events_dropped,page_p99_us,"
+				"fight_p99_us,chat_post_p99_us,fanout_p99_us,cpu_cores\n");
+		fflush(csv);
+	}
+	if (soak)
+		printf("%6s %8s %7s %5s %6s %7s %8s %8s %4s %7s %5s %9s %9s %9s %9s %5s\n", "t", "RSS", "SQLite", "fds",
+			   "conns", "streams", "WAL", "DB", "vms", "req/s", "errs", "page p99", "fight p99", "chat p99",
+			   "fan p99", "CPU");
+	double last_cpu = cpu0, last_t = 0;
+	uint64_t last_reqs = 0, last_errs = 0;
+	for (;;) {
+		double el = (double)(now_ns() - m0) / 1e9;
+		if (el >= O.duration)
+			break;
+		double step = soak ? O.sample - fmod(el, O.sample) : O.duration - el;
+		if (el + step > O.duration)
+			step = O.duration - el;
+		sleep_s(step);
+		if (!soak)
+			continue;
+		sample s;
+		memset(&s, 0, sizeof s);
+		s.t = (double)(now_ns() - m0) / 1e9;
+		s.rss = server_rss_kb();
+		s.fds = server_fds();
+		char *st = stats_snapshot();
+		sample_stats(&s, st);
+		free(st);
+		s.wal = file_size(O.db_path, "-wal");
+		s.db = file_size(O.db_path, "");
+		double cpu = server_cpu_s();
+		s.cpu = s.t > last_t ? (cpu - last_cpu) / (s.t - last_t) : 0;
+		uint64_t reqs = atomic_load(&g_win_requests), errs = atomic_load(&g_win_errors);
+		s.reqs = reqs - last_reqs;
+		s.errs = errs - last_errs;
+		hist *hp = calloc(4, sizeof *hp);
+		if (!hp)
+			die("out of memory");
+		take_windows(aw, naw, lw, nt, &ch, &hp[0], &hp[1], &hp[2], &hp[3]);
+		s.page99 = hist_pct(&hp[0], 99);
+		s.fight99 = hist_pct(&hp[1], 99);
+		s.fan99 = hist_pct(&hp[2], 99);
+		s.chat99 = hist_pct(&hp[3], 99);
+		free(hp);
+		char a[16], b[16], c[16], d[16];
+		fmt_us(a, sizeof a, s.page99);
+		fmt_us(b, sizeof b, s.fight99);
+		fmt_us(c, sizeof c, s.chat99);
+		fmt_us(d, sizeof d, s.fan99);
+		printf("%5.0fs %6.1fMB %5.1fMB %5ld %6lld %7lld %6.1fMB %6.1fMB %4lld %7.1f %5llu %9s %9s %9s %9s %5.2f\n",
+			   s.t, s.rss / 1024.0, s.sqlite_kb / 1024.0, s.fds, s.conn_open, s.streams, s.wal / 1048576.0,
+			   s.db / 1048576.0, s.vm_ready, (double)s.reqs / (s.t - last_t), (unsigned long long)s.errs, a, b, c, d,
+			   s.cpu);
+		fflush(stdout);
+		if (csv) {
+			fprintf(csv, "%.1f,%ld,%lld,%ld,%lld,%lld,%lld,%lld,%lld,%lld,%lld,%lld,%lld,%llu,%llu,%lld,%lld,%lld,"
+					"%lld,%lld,%lld,%llu,%llu,%llu,%llu,%.3f\n", s.t, s.rss, s.sqlite_kb, s.fds, s.conn_open, s.streams,
+					s.wal, s.db, s.vm_ready, s.vm_built, s.vm_cold, s.channels, s.replay_bytes, (unsigned long long)s.reqs,
+					(unsigned long long)s.errs, s.s5xx, s.s503, s.slow, s.refused, s.published, s.dropped,
+					(unsigned long long)s.page99, (unsigned long long)s.fight99, (unsigned long long)s.chat99,
+					(unsigned long long)s.fan99, s.cpu);
+			fflush(csv);
+		}
+		if (nsm == capsm) {
+			capsm = capsm ? capsm * 2 : 128;
+			sm = realloc(sm, (size_t)capsm * sizeof *sm);
+			if (!sm)
+				die("out of memory");
+		}
+		sm[nsm++] = s;
+		last_cpu = cpu;
+		last_t = s.t;
+		last_reqs = reqs;
+		last_errs = errs;
+	}
+	atomic_store(&g_phase, 2);
+	atomic_store(&g_rt_phase, 2);
+	uint64_t mclosed = atomic_load(&g_rt_closed) - closed0, mfailed = atomic_load(&g_rt_failed) - failed0;
+	double secs = (double)(now_ns() - m0) / 1e9;
+	double cpu1 = server_cpu_s(), sys1 = server_cpu_part(1);
+	long rss2 = server_rss_kb();
+	char *st1 = stats_snapshot();
+	for (int i = 0; i < naw; i++)
+		pthread_join(aw[i].th, NULL);
+	pthread_join(cth, NULL);
+	sleep_s(1);                                   /* deliveries still under way */
+	atomic_store(&g_rt_phase, 3);
+	hist *per = calloc(NKINDS + 2, sizeof *per);
+	if (!per)
+		die("out of memory");
+	hist *tot = &per[NKINDS], *fan = &per[NKINDS + 1];
+	uint64_t errs[NKINDS] = { 0 }, s503[NKINDS] = { 0 }, terr = 0, t503 = 0, conn_errors = 0, reconnects = 0,
+			 abytes = 0;
+	for (int i = 0; i < naw; i++) {
+		for (int k = 0; k < NKINDS; k++) {
+			hist_merge(&per[k], &aw[i].h[k]);
+			errs[k] += aw[i].errors[k];
+			s503[k] += aw[i].s503[k];
+		}
+		conn_errors += aw[i].conn_errors;
+		reconnects += aw[i].reconnects;
+		abytes += aw[i].bytes_in;
+	}
+	hist_merge(&per[K_CHAT], &ch.h);
+	errs[K_CHAT] = ch.errors;
+	uint64_t chat = 0, replayed = 0, joins = 0, leaves = 0, resyncs = 0, closed = 0, failed = 0, pings = 0,
+			 churned = 0, reopened = 0, bytes = 0, why[4] = { 0 };
+	for (int i = 0; i < nt; i++) {
+		pthread_join(lw[i].th, NULL);
+		hist_merge(fan, &lw[i].h);
+		chat += lw[i].chat;
+		replayed += lw[i].replayed;
+		joins += lw[i].joins;
+		leaves += lw[i].leaves;
+		resyncs += lw[i].resyncs;
+		closed += lw[i].closed;
+		failed += lw[i].failed;
+		pings += lw[i].pings;
+		churned += lw[i].churned;
+		reopened += lw[i].reopened;
+		bytes += lw[i].bytes;
+		for (int k = 0; k < 4; k++)
+			why[k] += lw[i].why[k];
+	}
+
+	printf("\n%-16s %8s %9s %9s %9s %9s %9s %9s %7s %6s\n", "kind", "count", "req/s", "p50", "p90", "p99",
+		   "p99.9", "max", "errors", "503");
+	for (int k = 0; k < NKINDS; k++) {
+		if (!per[k].n)
+			continue;
+		print_row(kind_names[k], &per[k], errs[k], s503[k], secs);
+		hist_merge(tot, &per[k]);
+		terr += errs[k];
+		t503 += s503[k];
+	}
+	print_row("total", tot, terr, t503, secs);
+	char a[16], b[16], c[16], d[16], e[16];
+	fmt_us(a, sizeof a, hist_pct(fan, 50));
+	fmt_us(b, sizeof b, hist_pct(fan, 90));
+	fmt_us(c, sizeof c, hist_pct(fan, 99));
+	fmt_us(d, sizeof d, hist_pct(fan, 99.9));
+	fmt_us(e, sizeof e, fan->max);
+	printf("chat fan-out (POST sent -> message read on a stream): %llu deliveries (%llu messages posted); "
+		   "p50 %s p90 %s p99 %s p99.9 %s max %s\n", (unsigned long long)fan->n, (unsigned long long)ch.sent,
+		   a, b, c, d, e);
+	printf("streams: %llu chat messages read (%llu more replayed after a reconnect), %llu joins and %llu leaves, "
+		   "%llu resyncs, %llu heartbeats, %.1f MB; %llu closed and %llu reopened by the players, %llu closed by "
+		   "the server, %llu openings failed (%llu not connected, %llu closed before the head, %llu 503, %llu "
+		   "other status)\n", (unsigned long long)chat, (unsigned long long)replayed,
+		   (unsigned long long)joins, (unsigned long long)leaves, (unsigned long long)resyncs,
+		   (unsigned long long)pings, (double)bytes / 1e6, (unsigned long long)churned,
+		   (unsigned long long)reopened, (unsigned long long)closed, (unsigned long long)failed,
+		   (unsigned long long)why[0], (unsigned long long)why[1], (unsigned long long)why[2],
+		   (unsigned long long)why[3]);
+	printf("active players: received %.1f MB, %llu connection errors, %llu keep-alive reconnects, %llu stale fight "
+		   "rounds\n", (double)abytes / 1e6, (unsigned long long)conn_errors, (unsigned long long)reconnects,
+		   (unsigned long long)atomic_load(&g_stale));
+	long long d5xx = -1, d503 = -1, dslow = -1, drefused = -1, ddropped = -1, conns = -1;
+	if (st0 && st1) {
+		d5xx = stat_value(st1, "responses_5xx") - stat_value(st0, "responses_5xx");
+		d503 = stat_value(st1, "backpressure_503") - stat_value(st0, "backpressure_503");
+		dslow = stat_value(st1, "streams_slow_closed") - stat_value(st0, "streams_slow_closed");
+		drefused = stat_value(st1, "streams_refused") - stat_value(st0, "streams_refused");
+		ddropped = stat_value(st1, "events_dropped") - stat_value(st0, "events_dropped");
+		conns = stat_value(st1, "conn_open");
+		printf("server: %lld requests, %lld events published, %lld frames to streams; 5xx %lld, fast 503 %lld, "
+			   "slow readers closed %lld, streams refused %lld, events dropped %lld\n",
+			   stat_value(st1, "requests") - stat_value(st0, "requests"),
+			   stat_value(st1, "events_published") - stat_value(st0, "events_published"),
+			   stat_value(st1, "events_sent") - stat_value(st0, "events_sent"), d5xx, d503, dslow, drefused,
+			   ddropped);
+		long long handled = stat_value(st1, "handled") - stat_value(st0, "handled");
+		if (handled > 0)
+			printf("server per handled request: %.0f us at a worker, %.0f us in SQLite, %.0f us waiting for the "
+				   "write lock, %.0f us in the queue\n",
+				   (double)(stat_value(st1, "worker_busy_us") - stat_value(st0, "worker_busy_us")) / handled,
+				   (double)(stat_value(st1, "db_time_us") - stat_value(st0, "db_time_us")) / handled,
+				   (double)(stat_value(st1, "db_begin_wait_us") - stat_value(st0, "db_begin_wait_us")) / handled,
+				   (double)(stat_value(st1, "queue_wait_us") - stat_value(st0, "queue_wait_us")) / handled);
+	}
+	if (cpu0 >= 0 && cpu1 >= 0)
+		printf("server: %.0f%% CPU (%.2f cores; %.0f%% of it in the kernel), RSS %ld KiB at the end",
+			   (cpu1 - cpu0) / secs * 100, (cpu1 - cpu0) / secs,
+			   cpu1 > cpu0 ? (sys1 - sys0) / (cpu1 - cpu0) * 100 : 0.0, rss2);
+	if (conns >= 0)
+		printf(" (budget for %lld connections: 64 MB + 16 KiB each = %.1f MB)", conns, 64 + conns * 16.0 / 1024);
+	printf("\n");
+
+	int all = 1;
+	uint64_t client_errors = terr + conn_errors;
+	if (soak) {
+		printf("\nsoak summary (%d samples every %.0f s over %.0f s):\n", nsm, O.sample, secs);
+		int from = 0;
+		while (from < nsm && sm[from].t < secs / 6)
+			from++;
+		int n = nsm - from;
+		if (n < 3) {
+			check(&all, 0, "too few samples after the warm-up (%d)", n);
+		} else {
+			double *x = calloc((size_t)n, sizeof *x), *y = calloc((size_t)n, sizeof *y);
+			if (!x || !y)
+				die("out of memory");
+			long rmin = sm[from].rss, rmax = rmin;
+			long long omin = 0, omax = 0, cmin = 0, cmax = 0;
+			for (int i = 0; i < n; i++) {
+				const sample *s = &sm[from + i];
+				x[i] = s->t / 3600;
+				y[i] = (double)s->rss;
+				rmin = s->rss < rmin ? s->rss : rmin;
+				rmax = s->rss > rmax ? s->rss : rmax;
+				long long other = s->fds - s->conn_open, plain = s->conn_open - s->streams;
+				if (i == 0 || other < omin)
+					omin = other;
+				if (i == 0 || other > omax)
+					omax = other;
+				if (i == 0 || plain < cmin)
+					cmin = plain;
+				if (i == 0 || plain > cmax)
+					cmax = plain;
+			}
+			double rs = fit_slope(x, y, n);
+			check(&all, rs < O.rss_slope, "RSS trend after %.0f s: %+.0f KiB/h (limit %.0f), range %.1f-%.1f MB",
+				  sm[from].t, rs, O.rss_slope, rmin / 1024.0, rmax / 1024.0);
+			double budget = 65536 + sm[nsm - 1].conn_open * 16.0;   /* KiB */
+			check(&all, rmax < budget, "RSS within the budget: %.1f MB at most (64 MB + 16 KiB x %lld connections = "
+				  "%.1f MB)", rmax / 1024.0, sm[nsm - 1].conn_open, budget / 1024.0);
+			check(&all, omax - omin <= 4 && cmax - cmin <= 8,
+				  "no descriptor leak: descriptors besides connections %lld-%lld (spread limit 4), connections "
+				  "besides streams %lld-%lld (limit 8)", omin, omax, cmin, cmax);
+			for (int i = 0; i < n; i++)
+				y[i] = (double)sm[from + i].sqlite_kb;
+			double ss = fit_slope(x, y, n);
+			for (int i = 0; i < n; i++)
+				y[i] = (double)(sm[from + i].rss - sm[from + i].sqlite_kb);
+			printf("  info  SQLite's heap (page caches, statements) %.1f -> %.1f MB, trend %+.0f KiB/h; the rest "
+				   "of RSS: trend %+.0f KiB/h\n", sm[from].sqlite_kb / 1024.0, sm[nsm - 1].sqlite_kb / 1024.0, ss,
+				   fit_slope(x, y, n));
+			for (int i = 0; i < n; i++)
+				y[i] = (double)sm[from + i].fds;
+			printf("  info  descriptors %ld-%ld (streams come and go with the reconnects), trend %+.1f/h\n",
+				   sm[from].fds, sm[nsm - 1].fds, fit_slope(x, y, n));
+			long long wmax = 0, whalf = 0;
+			for (int i = 0; i < nsm; i++) {
+				if (sm[i].wal > wmax)
+					wmax = sm[i].wal;
+				if (sm[i].t <= secs / 2)
+					whalf = wmax;
+			}
+			check(&all, wmax <= whalf + whalf / 10 + 1048576 && wmax < 64LL * 1048576,
+				  "WAL bounded: %.1f MB at most, %.1f MB by half time", wmax / 1048576.0, whalf / 1048576.0);
+			for (int i = 0; i < n; i++)
+				y[i] = (double)sm[from + i].db / 1024;
+			printf("  info  database: %.1f -> %.1f MB (%+.0f KiB/h: the chat's rows)\n", sm[0].db / 1048576.0,
+				   sm[nsm - 1].db / 1048576.0, fit_slope(x, y, n));
+			printf("  info  VMs built: %lld -> %lld, ready %lld at the end\n", sm[0].vm_built, sm[nsm - 1].vm_built,
+				   sm[nsm - 1].vm_ready);
+			/* latency drift: the median of the windows' p99 in the first and second half */
+			uint64_t *v = calloc((size_t)n, sizeof *v);
+			if (!v)
+				die("out of memory");
+			const char *what[] = { "page GET / p99", "fight POST p99", "chat fan-out p99" };
+			for (int m = 0; m < 3; m++) {
+				uint64_t med[2];
+				for (int half = 0; half < 2; half++) {
+					int a0 = half ? n / 2 : 0, a1 = half ? n : n / 2, k = 0;
+					for (int i = a0; i < a1; i++) {
+						const sample *s = &sm[from + i];
+						uint64_t val = m == 0 ? s->page99 : m == 1 ? s->fight99 : s->fan99;
+						int j = k++;
+						while (j > 0 && v[j - 1] > val) {
+							v[j] = v[j - 1];
+							j--;
+						}
+						v[j] = val;
+					}
+					med[half] = k ? v[k / 2] : 0;
+				}
+				char h0[16], h1[16];
+				fmt_us(h0, sizeof h0, med[0]);
+				fmt_us(h1, sizeof h1, med[1]);
+				printf("  info  %s (median of the %.0f s windows): %s in the first half, %s in the second\n",
+					   what[m], O.sample, h0, h1);
+			}
+			free(v);
+			free(x);
+			free(y);
+		}
+	}
+	if (!soak)
+		printf("\nchecks:\n");
+	check(&all, client_errors == 0 && !atomic_load(&g_stale),
+		  "no client-side errors: %llu (incl. %llu chat 429s), %llu stale rounds",
+		  (unsigned long long)client_errors, (unsigned long long)ch.s429,
+		  (unsigned long long)atomic_load(&g_stale));
+	check(&all, d5xx == 0 && d503 == 0, "no 5xx or fast 503 from the server: %lld, %lld", d5xx, d503);
+	check(&all, dslow == 0 && drefused == 0 && mclosed == 0 && mfailed == 0,
+		  "streams while measuring: none closed by the server (%llu; slow readers %lld), no failed openings "
+		  "(%llu; refused for the limits %lld)", (unsigned long long)mclosed, dslow, (unsigned long long)mfailed,
+		  drefused);
+	check(&all, ddropped == 0, "no events dropped: %lld", ddropped);
+	printf("%s\n", all ? "PASS" : "FAIL");
+	if (csv) {
+		fclose(csv);
+		printf("samples: %s\n", O.csv);
+	}
+	free(sm);
+	free(st0);
+	free(st1);
+	free(per);
+	for (int i = 0; i < naw; i++)
+		free(aw[i].win);
+	for (int i = 0; i < nt; i++)
+		free(lw[i].win);
+	free(ch.win);
+	free(aw);
+	free(lw);
+	free(ls);
+	for (int i = 0; i < na; i++) {
+		free(ac[i].in.p);
+		free(ac[i].out.p);
+	}
+	free(ac);
+	free(lc);
+	return all ? 0 : 1;
+}
+
 /* ------------------------------------------------------------------ jitter mode */
 
 static void *jitter_main(void *arg)
@@ -1371,9 +2288,12 @@ static int run_jitter(void)
 static void usage(void)
 {
 	fprintf(stderr,
-			"usage: dkbench -p PORT [-h HOST] [-s pages|fights|static|mixed|idle|realtime|jitter]\n"
+			"usage: dkbench -p PORT [-h HOST]\n"
+			"               [-s pages|fights|static|mixed|idle|realtime|realtime-mixed|soak|jitter]\n"
 			"               [-c CLIENTS] [-t THREADS] [-d SECONDS] [-w WARMUP] [-r RATE] [-u PREFIX]\n"
-			"               [-S PATHS_FILE] [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]\n");
+			"               [-S PATHS_FILE] [-x SERVER_PID] [-l LISTENERS] [-e EVENTS_PER_SECOND]\n"
+			"               [-j CHURN_PER_SECOND] [-i SAMPLE_SECONDS] [-o CSV] [-k STATS_SOCKET]\n"
+			"               [-D DB_PATH] [-g RSS_SLOPE_KIB_PER_HOUR]\n");
 	exit(2);
 }
 
@@ -1409,14 +2329,14 @@ static void print_row(const char *name, const hist *h, uint64_t errs, uint64_t s
 	fmt_us(c, sizeof c, hist_pct(h, 99));
 	fmt_us(d, sizeof d, hist_pct(h, 99.9));
 	fmt_us(e, sizeof e, h->max);
-	printf("%-12s %8llu %9.1f %9s %9s %9s %9s %9s %7llu %6llu\n", name, (unsigned long long)h->n,
+	printf("%-16s %8llu %9.1f %9s %9s %9s %9s %9s %7llu %6llu\n", name, (unsigned long long)h->n,
 		   (double)h->n / secs, a, b, c, d, e, (unsigned long long)errs, (unsigned long long)s503);
 }
 
 int main(int argc, char **argv)
 {
 	int opt;
-	while ((opt = getopt(argc, argv, "h:p:s:c:t:d:w:r:u:S:x:l:e:")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:s:c:t:d:w:r:u:S:x:l:e:j:i:o:k:D:g:")) != -1) {
 		switch (opt) {
 		case 'h': O.host = optarg; break;
 		case 'p': O.port = atoi(optarg); break;
@@ -1427,6 +2347,8 @@ int main(int argc, char **argv)
 			else if (!strcmp(optarg, "mixed")) O.scenario = SC_MIXED;
 			else if (!strcmp(optarg, "idle")) O.scenario = SC_IDLE;
 			else if (!strcmp(optarg, "realtime")) O.scenario = SC_REALTIME;
+			else if (!strcmp(optarg, "realtime-mixed")) O.scenario = SC_RTMIXED;
+			else if (!strcmp(optarg, "soak")) O.scenario = SC_SOAK;
 			else if (!strcmp(optarg, "jitter")) O.scenario = SC_JITTER;
 			else usage();
 			break;
@@ -1440,6 +2362,12 @@ int main(int argc, char **argv)
 		case 'x': O.server_pid = atoi(optarg); break;
 		case 'l': O.listeners = atoi(optarg); break;
 		case 'e': O.events = atof(optarg); break;
+		case 'j': O.churn = atof(optarg); break;
+		case 'i': O.sample = atof(optarg); break;
+		case 'o': O.csv = optarg; break;
+		case 'k': O.stats_sock = optarg; break;
+		case 'D': O.db_path = optarg; break;
+		case 'g': O.rss_slope = atof(optarg); break;
 		default: usage();
 		}
 	}
@@ -1457,9 +2385,20 @@ int main(int argc, char **argv)
 	if (O.scenario == SC_IDLE)
 		return run_idle();
 	if (O.scenario == SC_REALTIME) {
+		if (O.events < 0)
+			O.events = 10;
 		if (O.listeners < 1 || O.events <= 0)
 			usage();
 		return run_realtime();
+	}
+	if (is_live_mix()) {
+		if (O.events < 0)
+			O.events = 2;
+		if (O.scenario == SC_SOAK && O.sample <= 0)
+			O.sample = 30;
+		if (O.listeners < 1 || O.events <= 0 || O.churn < 0)
+			usage();
+		return run_live_mix();
 	}
 
 	client *cl = calloc((size_t)O.clients, sizeof *cl);
@@ -1472,25 +2411,8 @@ int main(int argc, char **argv)
 		cl[i].static_i = i;
 	}
 
-	if (O.scenario != SC_STATIC) {
-		int64_t t0 = now_ns();
-		int ns = O.clients < 8 ? O.clients : 8;
-		pthread_t th[8];
-		setup_arg sa[8];
-		for (int i = 0; i < ns; i++) {
-			sa[i] = (setup_arg){ cl, O.clients * i / ns, O.clients * (i + 1) / ns, 0 };
-			pthread_create(&th[i], NULL, setup_main, &sa[i]);
-		}
-		int failed = 0;
-		for (int i = 0; i < ns; i++) {
-			pthread_join(th[i], NULL);
-			failed += sa[i].failed;
-		}
-		if (failed)
-			die("%d of %d clients could not log in (is the game installed at %s:%d?)", failed,
-				O.clients, O.host, O.port);
-		printf("setup: %d accounts logged in in %.2f s\n", O.clients, (double)(now_ns() - t0) / 1e9);
-	}
+	if (O.scenario != SC_STATIC)
+		setup_accounts(cl, O.clients, O.prefix);
 
 	static const char *const names[] = { "pages", "fights", "static", "mixed", "idle" };
 	printf("scenario %s: %d keep-alive clients on %d threads, %s, warmup %.0f s, measure %.0f s\n",
@@ -1544,7 +2466,7 @@ int main(int argc, char **argv)
 		reconnects += w[i].reconnects;
 		bytes += w[i].bytes_in;
 	}
-	printf("%-12s %8s %9s %9s %9s %9s %9s %9s %7s %6s\n", "kind", "count", "req/s", "p50", "p90",
+	printf("%-16s %8s %9s %9s %9s %9s %9s %9s %7s %6s\n", "kind", "count", "req/s", "p50", "p90",
 		   "p99", "p99.9", "max", "errors", "503");
 	for (int k = 0; k < NKINDS; k++) {
 		if (!per[k].n)

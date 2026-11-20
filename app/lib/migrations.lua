@@ -1067,6 +1067,12 @@ ALTER TABLE control ADD COLUMN banner_expires INTEGER NOT NULL DEFAULT 0;
 	db:exec("UPDATE users SET online = 1 WHERE onlinetime >= ?", dk.now() - 600)
 end
 
+-- 11: who's online is read through a partial index of the players online (every game page
+-- counts them, the town page lists them) instead of a scan of every account.
+local function v11_online_index()
+	dk.db:exec("CREATE INDEX users_online ON users (charname, id) WHERE online = 1")
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1086,6 +1092,7 @@ migrations.STEPS = {
 		"overrides; fights in progress keep their monster)", up = v9_monsters_content },
 	{ name = "realtime: chat messages keep their author's account, who's online is kept live, and " ..
 		"the broadcast banner", up = v10_realtime },
+	{ name = "who's online is read from an index of the players online", up = v11_online_index },
 }
 
 migrations.VERSION = #migrations.STEPS

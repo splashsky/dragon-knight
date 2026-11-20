@@ -31,4 +31,14 @@ function T.config_seconds()
 	dk.config.online_seconds, dk.config.presence_sweep_seconds = saved[1], saved[2]
 end
 
+-- Who's online costs what the players online cost, not a scan of every account: the count
+-- (every game page) and the list (the town page) read the partial index users_online.
+function T.online_index()
+	for _, sql in ipairs({ presence.COUNT_SQL, presence.LIST_SQL }) do
+		local plan = dk.db:query("EXPLAIN QUERY PLAN " .. sql)
+		assert(#plan == 1 and plan[1].detail:find("USING COVERING INDEX users_online", 1, true),
+			sql .. ": " .. tostring(plan[1] and plan[1].detail))
+	end
+end
+
 return T

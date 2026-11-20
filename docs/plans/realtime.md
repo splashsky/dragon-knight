@@ -5,7 +5,8 @@ starts with `view.GAME_VERSION = "2.3.0-dev"`, `DK_VERSION "2.3.0-dev"` and a ne
 changelog entry `version = "2.3.0", date = "unreleased"`). Implemented in five steps:
 **R0** server performance and resource tuning (measure first), **R1** engine SSE hub,
 **R2** chat + presence + notices + broadcast, **R3** smooth fights, **R4** load and soak
-tests at the target scale. Everything is progressive enhancement: with JavaScript off the
+tests at the target scale — all five done (measured outcome: `docs/PERF.md`, "2.3 in
+short"). Everything is progressive enhancement: with JavaScript off the
 game works exactly as before.
 
 **Target scale**: a small server — 1–2 cores, 512 MB–1 GB RAM — with up to ~1,000
@@ -326,8 +327,8 @@ against a dev server during development (not part of `make test`: no JS runtime 
 - Fights publish nothing yet (the 256-per-request publish budget is untouched); spectators
 	or party fights would publish the events list as is (it is plain JSON, < 64 KiB for
 	any realistic round; the trace is capped by `engine.MAX_TICKS`).
-- The stale-round check needs `fights.round`, which stops at 255; a soak that fights very
-	long encounters will see rounds past 255 accepted without the check.
+- The stale-round check needs `fights.round`, which stopped at 255 (R4 removed the cap):
+	very long encounters saw rounds past 255 accepted without the check.
 
 - With JavaScript, `public/js/fight.js` intercepts fight forms (attack, spell, item, run,
 	continue, drop take/leave): `fetch` POST with the CSRF token and `Accept:
@@ -349,7 +350,37 @@ against a dev server during development (not part of `make test`: no JS runtime 
 	run the same scenario both ways and compare DB state + messages), stale-round rejection,
 	CSRF, and that the no-JS path is unchanged.
 
-## R4: load and soak tests at the target scale
+## R4: load and soak tests at the target scale — ✅ done
+
+**As implemented** (method, tables and conclusions in `docs/PERF.md`, "R4: the target
+scale"): `dkbench -s realtime-mixed` (`make bench BENCH_SCENARIO=realtime-mixed`): 1,000
+idle players and 50 active ones, each with one event stream (as tab sharing gives); the
+active players run the mixed script at 10 req/s (pages, fights — half of them through the
+JSON fight API like `fight.js`, following its `redirect`s with JSON GETs, half with
+forms, both sending the round —, static files); other players post 2 chat messages/s
+through `POST /babble` like `live.js` (each at most once per 3 s); 1 stream/s goes away
+and comes back (half blips with `Last-Event-ID` after 1–3 s, half leaving for 15–30 s, so
+the presence sweep announces the leave and the return is a join; the bench config sets
+`online_seconds = 10`, `presence_sweep_seconds = 5`). Reported: every kind's latencies
+(JSON and form fight POSTs apart), the chat fan-out (POST sent → message read, on every
+stream open at the time; replays after a reconnect are counted apart), presence events,
+the server's CPU, RSS against the budget and the error counters from its stats socket,
+then pass/fail checks. `-s soak` (`BENCH_SCENARIO=soak`, default 3,600 s) samples every
+30 s (RSS, descriptors, connections and streams, WAL and database size, VM pool, errors,
+p99s and CPU per window) into a CSV and ends with a pass/fail summary. `BENCH_SECONDS`
+sets the duration; `make bench BENCH_BUILD=dbg|tsan` serves with the ASan/UBSan or
+ThreadSanitizer build and fails on any sanitizer report in the server log. Fight rounds
+count without the old 255 cap (`state.MAX_ROUND` is gone; e2e: stale rounds past 255 and
+300 in `fight_api.sh`). What the measurements changed: the I/O loop writes streams in
+batches of 256 per iteration (FIFO, `FLUSH_BATCH` in `src/http.c`) and reads requests in
+between, so a fan-out no longer holds up every request (page and fight p99 −35% at the
+target scale; a closed stream is freed only once off the list, `test_many_streams`);
+who's online is read through a partial index of the players online (`users_online`,
+schema version 11; the count on every game page scanned every account); `dk stats` has
+`sqlite_mem_kb` (SQLite's heap, to tell its page cache from other RSS in a soak). Results:
+the chat fan-out target is met (p99 ~65 ms), RSS 21 MB of an 81 MB budget, no errors;
+page/fight p99 ~27 ms on this noisy VM (the plain mixed load measured ~20 ms in the same
+minutes); the 1-hour soak passes (no RSS or descriptor growth, bounded WAL, no errors).
 
 - `make bench BENCH_SCENARIO=realtime`: 1,000 idle SSE listeners (shared-tab behaviour
 	simulated as one stream per player) + 50 active players (pages, fights, chat posts at
