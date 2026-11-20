@@ -604,11 +604,11 @@ starting with `__` are reserved.
 	them as before. `dk.js` presses them for the arrow keys (not while a field has the
 	keyboard or a modifier is held; a held key walks on only while the live client is free).
 - Icon buttons for items (`.spell-btn` with an `.item-badge`): the fight menu's Items and
-	Gear, the shop's wares (`town/shop.html`: grouped Weapons, Armor, Shields, Items; the
-	price on a gold badge, `.item-badge-price`; greyed, `.shop-short`, when the gold, with
-	what the worn piece sells back for, doesn't cover it — still a link: the purchase page
-	says why) and its Sell buttons (what the shop pays; a stack's size, `.item-badge-qty`,
-	and how many to sell).
+	Gear, the shop's wares (`town/shop.html`: grouped Weapons, Armor, Shields, Items;
+	greyed, `.shop-short`, when the gold, with what the worn piece sells back for, doesn't
+	cover it — still a link: the purchase page says why) and its Sell buttons (a stack's
+	size, `.item-badge-qty`, and how many to sell). The shop's prices are in its tooltips,
+	`tip/shop.html` (below).
 - Images: `/static/images/<file>`. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
@@ -766,8 +766,12 @@ the Inventory panel (item name, kind, stats or power, description, lore; an empt
 label), the fight menu's Gear and Items buttons (`tips.gear(entry)`: the item, the spell it
 casts, its charges, "No MP"; `tips.consumable(row, qty)`), item names wherever a page lists items (`tip("item", row)`: on `/inventory` the
 equipped slots and every bag entry, quest items saying "Quest item"; on `/shop` the items
-for sale (`tips.shop`: with the price) and the Sell buttons (`tips.sell`: what the shop
-pays, how many); the purchase page's item and
+for sale and the Sell buttons (`tips.shop(item, { gold, old, sellback, short })`,
+`tips.sell(entry, price)`, rendered by their own template, `tip/shop.html`, made to be read
+at a glance: the price set large with the player's gold or what is missing, the stats as
+a table of figures with the change against the item worn in that slot, green or red, and
+the stats a swap loses, the effects (a consumable's, the spell gear casts, its charges),
+the trade-in, then the description; no lore); the purchase page's item and
 the one it replaces; the discard confirmation), the monster's name on the fight page (name,
 level, description, lore) and the class names on the registration page (starting HP/MP, the
 description's points, lore). Names that aren't links get `class="tip-term" tabindex="0"`.

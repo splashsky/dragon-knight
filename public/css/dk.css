@@ -176,10 +176,10 @@ input[type="image"] { vertical-align: middle; }
 .compass-s { clip-path: polygon(0 100%, 100% 100%, 50% 50%); }
 .compass-w { clip-path: polygon(0 0, 0 100%, 50% 50%); }
 .compass-e { clip-path: polygon(100% 0, 100% 100%, 50% 50%); }
-.compass-rose button:hover { background-color: rgba(102, 51, 0, 0.16); }
+.compass-rose button:hover { background-color: rgba(102, 51, 0, 0.38); }
 .compass-rose button:focus { outline: none; }
-.compass-rose button:focus-visible { background-color: rgba(102, 51, 0, 0.24); }
-.compass-rose button:active, .compass-rose button.compass-pressed { background-color: rgba(102, 51, 0, 0.36); }
+.compass-rose button:focus-visible { background-color: rgba(102, 51, 0, 0.45); }
+.compass-rose button:active, .compass-rose button.compass-pressed { background-color: rgba(102, 51, 0, 0.58); }
 
 /* ---- HP/MP/TP bars: CSS gradients (no images), shared with the fight bars (fight.css) ---- */
 :root {

@@ -19,7 +19,7 @@ changelog.RELEASES = {
 			"A command that can't be carried out in a fight (not enough MP, a spell you haven't learned, an empty wand) is now explained right on the fight page, above your commands, instead of on a page of its own.",
 			"Reloading the fight page after a round no longer offers to send the command again: every command now comes back to the fight page, which shows what happened.",
 			"Taking a dropped item into a full bag without choosing what to discard now says so on the drop page.",
-			"Shops show their wares as pictures, grouped into weapons, armor, shields and items, each with its price on it; point at one (or focus it) to see what it does. What your gold can't cover yet is greyed out. Selling works the same way, with what the shop pays on each.",
+			"Shops show their wares as pictures, grouped into weapons, armor, shields and items. Point at one (or focus it) for a tooltip made for shopping: the price and your gold (or how much more you need), its stats with how they compare to what you wear, what it does, and what your old piece sells back for. What your gold can't cover yet is greyed out. Selling works the same way, its tooltip saying what the shop pays.",
 			"Midworld's wares have pictures: the Stick, Branch, Club, Skivvies, Clothes, Leather Armor, Reed Shield and Buckler, in the shop, your bag, the Inventory panel and their tooltips.",
 			"The compass is the original picture again: click its north, west, east or south arm to walk, or use the arrow keys.",
 		},

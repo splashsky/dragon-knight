@@ -1,0 +1,17 @@
+{#- The tooltip of an item in the shop (tips.shop) or one the shop buys (tips.sell): made to
+		decide at a glance. A head (the picture, the name, the kind), the price set large with
+		the player's gold under it (red: what is missing), the stats as a table (with the item
+		worn in its slot: the change, green or red, and the stats the swap loses), the effects
+		(a consumable's, a spell it casts), what it replaces, then the description, small. ctx:
+		title, icon, kind, price_label, price, each, note, short, stats { label, value, delta,
+		better }, compare (the worn item's name), effects, replaces, body. All escaped. -#}
+<template class="tip"><div class="shop-tip"><div class="shop-tip-head">{% if icon then %}<img class="shop-tip-icon" src="{{ icon }}" width="36" height="36" alt="">{% end %}<div><div class="tip-title">{{ title }}</div><div class="tip-meta">{{ kind }}</div></div></div><div class="shop-tip-price"><span class="shop-tip-label">{{ price_label }}</span> <b class="shop-tip-gold">{{ number(price) }} gold</b>{% if each then %} <span class="shop-tip-label">each</span>{% end %}</div>
+{%- if note then %}<div class="shop-tip-note{% if short then %} shop-tip-short{% end %}">{{ note }}</div>{% end %}
+{%- if #stats > 0 then %}<table class="shop-tip-stats">
+{%- if compare then %}<tr><td></td><td></td><td class="shop-tip-vs">vs {{ compare }}</td></tr>{% end %}
+{%- for _, r in ipairs(stats) do %}<tr><th scope="row">{{ r.label }}</th><td class="shop-tip-value">{{ r.value }}</td><td class="shop-tip-delta{% if r.delta then %} shop-tip-{{ r.better and "up" or "down" }}{% end %}">{{ r.delta }}</td></tr>{% end %}</table>{% end %}
+{%- if #effects > 0 then %}<ul class="shop-tip-effects">{% for _, e in ipairs(effects) do %}<li>{{ e }}</li>{% end %}</ul>{% end %}
+{%- if replaces then %}<div class="shop-tip-replaces">{{ replaces }}</div>{% end %}
+{%- if body and body ~= "" then %}<div class="shop-tip-body">{{{ paragraphs(body) }}}</div>{% end -%}
+</div></template>
+{#- -#}

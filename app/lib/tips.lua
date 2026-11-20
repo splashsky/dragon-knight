@@ -7,6 +7,7 @@
 -- everything. Plain data: no HTML here.
 local classes = require("lib.classes")
 local items = require("lib.items")
+local php = require("lib.php")
 
 local tips = {}
 
@@ -62,19 +63,94 @@ function tips.consumable(it, qty)
 	return t
 end
 
--- An item for sale (the shop's buttons): the item's tooltip with its price.
-function tips.shop(it)
-	local t = tips.item(it)
-	table.insert(t.meta, 2, it.price .. " gold")
+-- What a piece of gear does, in order: { { stat, amount }, ... } (attack, defense, then
+-- its stat modifiers).
+local function stat_amounts(it)
+	local out = {}
+	if it.attack ~= 0 then out[#out + 1] = { "attack", it.attack } end
+	if it.defense ~= 0 then out[#out + 1] = { "defense", it.defense } end
+	for _, m in ipairs(type(it.modifiers) == "table" and it.modifiers or {}) do
+		if m.kind == "stat" then out[#out + 1] = { m.stat, m.amount } end
+	end
+	return out
+end
+
+local function signed(stat, n)
+	local pct = stat == "exp_bonus_pct" or stat == "gold_bonus_pct"
+	return (n >= 0 and "+" or "") .. n .. (pct and "%" or "")
+end
+
+-- The rows of templates/tip/shop.html's stats table: { label, value, delta, better }; with
+-- `old` (the item worn in that slot), every stat either has, the change if one replaces
+-- the other ("—": the new one hasn't it).
+local function stat_rows(it, old)
+	local rows, seen = {}, {}
+	local function row(stat, n, o)
+		local r = { label = items.STAT_LABELS[stat] or stat, value = n and signed(stat, n) or "—" }
+		if old then
+			local d = (n or 0) - (o or 0)
+			if d ~= 0 then r.delta, r.better = signed(stat, d), d > 0 end
+		end
+		rows[#rows + 1] = r
+	end
+	local olds = {}
+	for _, a in ipairs(old and stat_amounts(old) or {}) do olds[a[1]] = a[2] end
+	for _, a in ipairs(stat_amounts(it)) do
+		seen[a[1]] = true
+		row(a[1], a[2], olds[a[1]])
+	end
+	for _, a in ipairs(old and stat_amounts(old) or {}) do
+		if not seen[a[1]] then row(a[1], nil, a[2]) end
+	end
+	return rows
+end
+
+-- What it does besides its stats: a consumable's description (its effect), the spell gear
+-- casts and its charges.
+local function effects(it, charges)
+	local out = {}
+	if it.category == "consumable" and (it.description or "") ~= "" then out[#out + 1] = it.description end
+	for _, l in ipairs(items.charge_lines(it, charges)) do out[#out + 1] = l end
+	return out
+end
+
+local function kind_line(it)
+	local kind = CATEGORY[it.category] or CATEGORY.misc
+	if it.category == "consumable" then return kind .. " · " .. (USABLE[it.usable_in] or USABLE.fight) end
+	if items.is_gear(it) and it.slot ~= "accessory" then return kind .. " · worn when bought" end
+	return kind .. " · goes into your bag"
+end
+
+-- An item for sale (the shop's buttons; templates/tip/shop.html): name, picture and kind;
+-- the price and the player's gold (what is missing, when it is short); the stats, compared
+-- with what is worn in its slot; its effects; what it replaces and that sells back for;
+-- its description (a consumable's is its effect). o: { gold, old (the equipped entry it
+-- replaces), sellback (what that sells back for, 0: nothing), short }.
+function tips.shop(it, o)
+	local old = o.old and o.old.item
+	local t = { title = it.name, icon = items.icon(it), kind = kind_line(it), price_label = "Price", price = it.price,
+		stats = stat_rows(it, old), compare = old and old.name, effects = effects(it) }
+	if o.short then
+		t.note, t.short = "You need " .. php.number_format(it.price - o.gold - (o.sellback or 0)) .. " more gold", true
+	else
+		t.note = "You have " .. php.number_format(o.gold) .. " gold"
+	end
+	if old then
+		t.replaces = "Replaces your " .. old.name ..
+			((o.sellback or 0) > 0 and (", which sells back for " .. php.number_format(o.sellback) .. " gold") or "")
+	end
+	if it.category ~= "consumable" then t.body = it.description end
 	return t
 end
 
--- A bag entry the shop buys (the Sell buttons): the item's tooltip with how many and what
--- the shop pays for each.
+-- A bag entry the shop buys (the Sell buttons; templates/tip/shop.html): what the shop pays
+-- (each, and for the whole stack), the item's stats and effects, its description.
 function tips.sell(entry, price)
-	local t = tips.item(entry.item, entry)
-	if entry.qty > 1 then table.insert(t.meta, 2, "x" .. entry.qty) end
-	table.insert(t.meta, 2, "Sells for " .. price .. " gold" .. (entry.qty > 1 and " each" or ""))
+	local it = entry.item
+	local t = { title = it.name, icon = items.icon(it), kind = kind_line(it):gsub(" · .*", ""), price_label = "Sells for",
+		price = price, each = entry.qty > 1, stats = stat_rows(it), effects = effects(it, entry.charges) }
+	if entry.qty > 1 then t.note = "You have " .. entry.qty .. ": " .. php.number_format(entry.qty * price) .. " gold for all" end
+	if it.category ~= "consumable" then t.body = it.description end
 	return t
 end
 

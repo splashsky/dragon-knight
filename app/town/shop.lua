@@ -66,9 +66,10 @@ local GROUPS = { { key = "weapon", label = "Weapons" }, { key = "armor", label =
 	{ key = "shield", label = "Shields" }, { key = "other", label = "Items" } }
 
 -- GET /shop: the town's items as icon buttons in groups ({ key, label, items = { item,
--- icon (URL: its picture or the default one), label, tip, short (the gold doesn't cover it
--- now: greyed out; the purchase page says why) } }; empty groups left out) and the Sell
--- section (sellable bag entries: { entry, price (each), icon, label, tip }).
+-- icon (URL: its picture or the default one), label, tip (tips.shop: the price is in it),
+-- short (the gold doesn't cover it now: greyed out; the purchase page says why) } }; empty
+-- groups left out) and the Sell section (sellable bag entries: { entry, price (each),
+-- icon, label, tip (tips.sell) }).
 function shop.list(req)
 	local user = req.user
 	local town = common.town_here(req)
@@ -78,12 +79,13 @@ function shop.list(req)
 	for _, g in ipairs(GROUPS) do by_key[g.key] = { key = g.key, label = g.label, items = {} } end
 	for _, it in ipairs(items.town(town.id)) do
 		-- gear replaces what is in its slot, whose sell-back counts toward the price (check())
-		local gold = user.gold
-		local old = it.slot and it.slot ~= "accessory" and equipped[it.slot]
-		if old and items.can_sell(old.item) then gold = gold + items.sell_price(old.item) end
+		local old = it.slot and it.slot ~= "accessory" and equipped[it.slot] or nil
+		local sellback = old and items.can_sell(old.item) and items.sell_price(old.item) or 0
+		local short = user.gold + sellback < it.price
 		local g = by_key[SLOT_GROUP[it.slot] or "other"]
-		g.items[#g.items + 1] = { item = it, icon = items.icon_url(it), tip = tips.shop(it),
-			label = it.name .. " (" .. it.price .. " gold)", short = gold < it.price }
+		g.items[#g.items + 1] = { item = it, icon = items.icon_url(it), short = short,
+			tip = tips.shop(it, { gold = user.gold, old = old, sellback = sellback, short = short }),
+			label = it.name .. " (" .. it.price .. " gold)" }
 	end
 	for _, g in ipairs(GROUPS) do
 		if #by_key[g.key].items > 0 then groups[#groups + 1] = by_key[g.key] end

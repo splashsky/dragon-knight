@@ -50,13 +50,14 @@ TOWN_BASE="base_maxhp=15, currenthp=15, base_maxmp=0, currentmp=0, base_maxtp=10
 t_items_clear townie
 tu "$TOWN_HOME, gold=1000, $TOWN_BASE"
 t_get /shop;                      expect_status 200
-# icon buttons in groups (weapons, armor, shields, items), each with its price and its
-# tooltip (what it adds, its specials, the price)
+# icon buttons in groups (weapons, armor, shields, items), each with its tooltip (the
+# price, the gold, what it adds; nothing worn here, so nothing to compare)
 SHOP_GROUPS=$(grep -o 'class="shop-group-label" id="shop-[a-z]*-label">[A-Za-z]*' "$BODY" | sed 's/.*>//' | tr '\n' ' ')
 [ "$SHOP_GROUPS" = "Weapons Armor Shields Items " ] && t_ok || t_fail "shop groups: $SHOP_GROUPS"
-expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">10</span></a>'
-expect_body '<div class="tip-meta">Weapon · 10 gold</div><ul class="tip-lines"><li>Attack Power +2</li></ul>'
-expect_body 'href="/shop/buy/17" title="Skivvies (25 gold)"'; expect_body '<li>Defense Power +2</li><li>Gold Bonus +10%</li>'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""></a><template class="tip">'
+expect_body '<b class="shop-tip-gold">10 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table>'
+expect_body 'href="/shop/buy/17" title="Skivvies (25 gold)"'
+expect_body '<tr><th scope="row">Defense Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr><tr><th scope="row">Gold Bonus</th><td class="shop-tip-value">+10%</td><td class="shop-tip-delta"></td></tr></table>'
 expect_no_body 'Dagger'
 expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'; expect_no_body 'Potion'
 expect_no_body 'shop-short'                       # 1000 gold covers everything here
@@ -158,6 +159,9 @@ expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/b
 expect_body '<span class="spell-tip shop-short" data-tip><a class="spell-btn" href="/shop/buy/18"'
 expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1"'
 [ "$(grep -o 'spell-tip shop-short' "$BODY" | wc -l)" = 7 ] && t_ok || t_fail "short items: $(grep -o 'spell-tip shop-short' "$BODY" | wc -l)"
+# the tooltips say what is missing (the Clothes: 50 - 5 - 25), and what a swap loses
+expect_body 'title="Clothes (50 gold)"'; expect_body '<div class="shop-tip-note shop-tip-short">You need 20 more gold</div>'
+expect_body '<tr><td></td><td></td><td class="shop-tip-vs">vs Clothes</td></tr>'
 t_get /shop/buy/18;               expect_body 'You do not have enough gold to buy this item.'   # Clothes again: 5 + 25 < 50
 t_get /shop/buy/19;               expect_body 'You do not have enough gold to buy this item.'
 t_post /shop/buy/19 "csrf=$TC&sell=x"; expect_body 'You do not have enough gold to buy this item.'

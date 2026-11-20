@@ -79,7 +79,8 @@ t_section "wand: bought in Midworld"
 t_items_clear wizard
 wd_sql "UPDATE users SET gold = 200, base_maxhp = 17, currenthp = 17"
 t_get /shop; TC=$(t_csrf)
-expect_body "<a class=\"spell-btn\" href=\"/shop/buy/$WD_WAND_ITEM\" title=\"Wand (75 gold)\" aria-label=\"Wand (75 gold)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-price\" aria-hidden=\"true\">75</span></a><template class=\"tip\"><div class=\"tip-title\"><img class=\"tip-icon\" src=\"/static/images/items/wand.png\" width=\"20\" height=\"20\" alt=\"\">Wand</div><div class=\"tip-meta\">Weapon · 75 gold</div><ul class=\"tip-lines\"><li>Attack Power +2</li><li>Casts Magic Bolt</li><li>Charges 5</li></ul>"
+expect_body "<a class=\"spell-btn\" href=\"/shop/buy/$WD_WAND_ITEM\" title=\"Wand (75 gold)\" aria-label=\"Wand (75 gold)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"></a><template class=\"tip\">"
+expect_body '<b class="shop-tip-gold">75 gold</b></div><div class="shop-tip-note">You have 200 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table><ul class="shop-tip-effects"><li>Casts Magic Bolt</li><li>Charges 5</li></ul>'
 t_get "/shop/buy/$WD_WAND_ITEM"; expect_text 'You are buying the Wand, is that ok?'
 expect_body '<img class="shop-buy-icon" src="/static/images/items/wand.png" width="44" height="44" alt="">'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'

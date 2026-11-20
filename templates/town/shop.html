@@ -1,17 +1,18 @@
 {#- The town's shop (legacy towns.php buy()) and the Sell section. ctx: groups { key, label,
 		items { item, icon (URL), label, tip, short } }, sell { entry (bag entry), price (each),
 		icon, label, tip }. Items are icon buttons like the fight menu's (dk.css .spell-btn),
-		each with its price on a badge and its tooltip (name, what it adds, price); one the gold
-		doesn't cover is greyed out but still opens the purchase page, which says why. Any item
-		can be bought again (2.4: no "Already purchased"). Selling: a button per bag entry the
-		shop buys, with what it pays (and a quantity for a stack). -#}
+		each with a tooltip made for the shop (tip/shop.html: the price, the player's gold, the
+		stats against what is worn, the effects); one the gold doesn't cover is greyed out but
+		still opens the purchase page, which says why. Any item can be bought again (2.4: no
+		"Already purchased"). Selling: a button per bag entry the shop buys (a stack's size on
+		a badge, a quantity field), its tooltip saying what the shop pays. -#}
 <div class="town-message">
 Buying weapons will increase your Attack Power. Buying armor and shields will increase your Defense Power. Other items go into your bag.<br><br>Click an item to purchase it; point at it (or focus it) to see what it does.<br><br>The following items are available at this town:
 {%- for _, g in ipairs(groups) do %}
 <div class="shop-group" role="group" aria-labelledby="shop-{{ g.key }}-label"><span class="shop-group-label" id="shop-{{ g.key }}-label">{{ g.label }}</span>
 <div class="spell-grid">
 {%- for _, e in ipairs(g.items) do %}
-<span class="spell-tip{% if e.short then %} shop-short{% end %}" data-tip><a class="spell-btn" href="/shop/buy/{{ e.item.id }}" title="{{ e.label }}" aria-label="{{ e.label }}"><img src="{{ e.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">{{ e.item.price }}</span></a>{{{ include("tip/tip", e.tip) }}}</span>
+<span class="spell-tip{% if e.short then %} shop-short{% end %}" data-tip><a class="spell-btn" href="/shop/buy/{{ e.item.id }}" title="{{ e.label }}" aria-label="{{ e.label }}"><img src="{{ e.icon }}" width="44" height="44" alt=""></a>{{{ include("tip/shop", e.tip) }}}</span>
 {%- end %}
 </div>
 </div>
@@ -21,8 +22,8 @@ Buying weapons will increase your Attack Power. Buying armor and shields will in
 I will buy these from your bag:
 <div class="spell-grid shop-sell">
 {%- for _, s in ipairs(sell) do %}
-<form class="spell-tip shop-sell-item" method="post" action="/shop/sell/{{ s.entry.id }}" data-tip>{{{ csrf_field() }}}<button class="spell-btn" type="submit" title="{{ s.label }}" aria-label="{{ s.label }}"><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">{{ s.price }}</span>{% if s.entry.qty > 1 then %}<span class="item-badge item-badge-qty" aria-hidden="true">x{{ s.entry.qty }}</span>{% end %}</button>
-{%- if s.entry.qty > 1 then %}<input type="text" name="qty" size="2" value="1" aria-label="How many {{ s.entry.item.name }} to sell">{% end %}{{{ include("tip/tip", s.tip) }}}</form>
+<form class="spell-tip shop-sell-item" method="post" action="/shop/sell/{{ s.entry.id }}" data-tip>{{{ csrf_field() }}}<button class="spell-btn" type="submit" title="{{ s.label }}" aria-label="{{ s.label }}"><img src="{{ s.icon }}" width="44" height="44" alt="">{% if s.entry.qty > 1 then %}<span class="item-badge item-badge-qty" aria-hidden="true">x{{ s.entry.qty }}</span>{% end %}</button>
+{%- if s.entry.qty > 1 then %}<input type="text" name="qty" size="2" value="1" aria-label="How many {{ s.entry.item.name }} to sell">{% end %}{{{ include("tip/shop", s.tip) }}}</form>
 {%- end %}
 </div>
 </div>

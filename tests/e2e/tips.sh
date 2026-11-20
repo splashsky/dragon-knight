@@ -133,8 +133,6 @@ expect_redirect '/admin/items/2\?saved=1'
 TP_BRANCH='>Branch<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/branch.png" width="20" height="20" alt="">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
 TP_HERB='>Herb<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
 TP_STICK='>Stick<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
-# the same, as the shop's buttons say them (the price after the category)
-tp_shop() { printf '%s' "$1" | sed 's#<div class="tip-meta">\([^<·]*[^<· ]\)#<div class="tip-meta">\1 · '"$2"' gold#'; }
 tp_no_xss() { expect_no_body '<script>alert(4)'; expect_no_body '<img src=x'; }
 t_jar tips
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, gold = 1000 WHERE username = 'tipper'"
@@ -151,16 +149,28 @@ expect_body '<img class="inv-icon" src="/static/images/skills/default.png" width
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</b>'; tp_no_xss
 expect_body "action=\"/inventory/equip/$TP_BRANCH_E\""; expect_body "action=\"/inventory/use/$TP_HERB_E\""
 expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'action="/inventory/unequip/weapon"'
-# the shop: an icon button per item (a link: focusable), its tooltip with the price; the
-# item worn is for sale too (2.4); the Sell buttons with what the shop pays
+# the shop: an icon button per item (a link: focusable) with a tooltip made for the shop
+# (tip/shop.html): the price and the gold, the stats against the item worn in that slot
+# (the change, the trade-in), the effects, the description (escaped); the item worn is
+# for sale too (2.4); the Sell buttons say what the shop pays
 t_get /shop; expect_status 200
-expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">30</span></a><template class="tip">'
-expect_body "$(tp_shop "${TP_BRANCH#>Branch}" 30)"'</span>'; tp_no_xss
-expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'; expect_body "$(tp_shop "${TP_HERB#>Herb}" 15)"
-expect_body 'href="/shop/buy/1" title="Stick (10 gold)"'; expect_body "$(tp_shop "${TP_STICK#>Stick}" 10)"'</span>'
-expect_no_body 'Already purchased'
+expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""></a><template class="tip"><div class="shop-tip">'
+expect_body '<div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt=""><div><div class="tip-title">Branch</div><div class="tip-meta">Weapon · worn when bought</div></div></div>'
+expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Price</span> <b class="shop-tip-gold">30 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><td></td><td></td><td class="shop-tip-vs">vs Stick</td></tr><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+4</td><td class="shop-tip-delta shop-tip-up">+2</td></tr></table>'
+expect_body '<div class="shop-tip-replaces">Replaces your Stick, which sells back for 5 gold</div>'
+expect_body '<div class="shop-tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div></div></template></span>'
+tp_no_xss; expect_no_body 'alert(4)'      # the lore stays out of the shop
+# the Stick worn: the same figures, no change
+expect_body '<th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td>'
+# a consumable: where it works, its effect
+expect_body 'href="/shop/buy/66" title="Herb (15 gold)"'
+expect_body '<div class="tip-title">Herb</div><div class="tip-meta">Consumable · In fights and in town</div></div></div>'
+expect_body '<b class="shop-tip-gold">15 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><ul class="shop-tip-effects"><li>Restores 30 hit points, in a fight or out of it.</li></ul></div></template>'
+expect_no_body 'Already purchased'; expect_no_body 'item-badge-price'
 expect_body "<form class=\"spell-tip shop-sell-item\" method=\"post\" action=\"/shop/sell/$TP_HERB_E\" data-tip>"
-expect_body '<button class="spell-btn" type="submit" title="Sell Herb for 8 gold each" aria-label="Sell Herb for 8 gold each"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge item-badge-price" aria-hidden="true">8</span><span class="item-badge item-badge-qty" aria-hidden="true">x3</span></button><input type="text" name="qty" size="2" value="1" aria-label="How many Herb to sell"><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · Sells for 8 gold each · x3 · In fights and in town</div>'
+expect_body '<button class="spell-btn" type="submit" title="Sell Herb for 8 gold each" aria-label="Sell Herb for 8 gold each"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge item-badge-qty" aria-hidden="true">x3</span></button><input type="text" name="qty" size="2" value="1" aria-label="How many Herb to sell"><template class="tip"><div class="shop-tip">'
+expect_body '<div class="tip-title">Herb</div><div class="tip-meta">Consumable</div></div></div>'
+expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Sells for</span> <b class="shop-tip-gold">8 gold</b> <span class="shop-tip-label">each</span></div><div class="shop-tip-note">You have 3: 24 gold for all</div><ul class="shop-tip-effects"><li>Restores 30 hit points, in a fight or out of it.</li></ul>'
 expect_body 'title="Sell Branch for 15 gold" aria-label="Sell Branch for 15 gold"><img src="/static/images/items/branch.png"'
 expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold"><img src="/static/images/skills/default.png"'   # no picture: the default
 # the purchase page: the item bought and the one it replaces
