@@ -8,6 +8,14 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "2.3.1", date = "unreleased",
+		changes = {
+			"Fixed the monster's HP bar not starting full: the HP a monster is rolled with is now its full health for the fight.",
+			"Redesigned the Character panel to be more compact: name and level on one line, and HP, MP and TP as slim bars with their values.",
+			"HP, MP and TP bars are drawn with CSS gradients instead of images, in the Character panel and in fights.",
+		},
+	},
+	{
 		version = "2.3.0", date = "11.20.2026",
 		changes = {
 			"Made the server several times faster: each request's Lua VM is restored from a snapshot instead of being built anew, workers write responses themselves, and requests take turns on the database without sleeping.",

@@ -81,13 +81,13 @@ function game.longitude_str(lon)
 	return lon .. "E"
 end
 
--- Stat bar: pct = ceil(cur / max * 100) (0 when max == 0), color by thresholds 66/33.
+-- Stat bar: pct = ceil(cur / max * 100) (0 when max == 0), level by thresholds 66/33
+-- ("high", "mid", "low"), width = pct clamped to 0..100 (CSS %).
 function game.statbar(cur, max)
 	local pct = 0
 	if max ~= 0 then pct = php.ceil(cur / max * 100) end
-	local color = pct >= 66 and "green" or pct >= 33 and "yellow" or "red"
-	local h = math.max(0, math.min(100, pct))
-	return { pct = pct, height = h, color = color }
+	local level = pct >= 66 and "high" or pct >= 33 and "mid" or "low"
+	return { pct = pct, width = math.max(0, math.min(100, pct)), level = level }
 end
 
 -- "Low" numbers blink in the right nav: cur <= max / 5.
@@ -115,9 +115,18 @@ end
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
 	local s = game.stats(user)
-	local bars = { game.statbar(user.currenthp, s.maxhp), game.statbar(user.currentmp, s.maxmp),
-		game.statbar(user.currenttp, s.maxtp) }
-	bars[1].key, bars[2].key, bars[3].key = "hp", "mp", "tp"
+	-- HP is coloured by how full it is (as the original bars were); MP and TP have their own
+	-- colours. low: the number blinks (HP and MP at or below a fifth, as in the original).
+	local bars = {}
+	for _, b in ipairs({
+		{ key = "hp", label = "HP", value = user.currenthp, max = s.maxhp, low = game.is_low(user.currenthp, s.maxhp) },
+		{ key = "mp", label = "MP", value = user.currentmp, max = s.maxmp, low = game.is_low(user.currentmp, s.maxmp), tone = "mp" },
+		{ key = "tp", label = "TP", value = user.currenttp, max = s.maxtp, low = false, tone = "tp" },
+	}) do
+		local bar = game.statbar(b.value, b.max)
+		b.width, b.tone = bar.width, b.tone or bar.level
+		bars[#bars + 1] = b
+	end
 	return {
 		user = user,
 		stats = s,
@@ -129,9 +138,7 @@ function game.nav(user)
 		is_admin = user.authlevel == 1,
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),
-		hp_low = game.is_low(user.currenthp, s.maxhp),
-		mp_low = game.is_low(user.currentmp, s.maxmp),
-		bars = bars,   -- key: "hp", "mp", "tp" (fight.js animates them)
+		bars = bars,   -- { key = "hp"|"mp"|"tp", label, value, max, width, tone, low } (fight.js updates them)
 		spells = spells.known(user, "town"),
 		equipment = inventory.names(user.id),
 		bag_used = inventory.used(inventory.bag(user.id)),

@@ -519,7 +519,7 @@ browser; to use SemiBold or Black, add the file and its `@font-face`.
 | `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the spell and item actions (`fight/engine.lua` handles) take |
 | `game.user_towns(user)` | town rows in `users.towns`, ordered by id |
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
-| `game.statbar(cur, max)` | `{pct, height, color}` |
+| `game.statbar(cur, max)` | `{pct, width, level}`: width 0..100 (%), level `high`/`mid`/`low` (66/33); the Character panel's bars (`game.nav(user).bars`) and the fight bars share the CSS gradients `--bar-high/mid/low/mp/tp` in dk.css |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
 | `game.forum_link()` | `/forum`, the external address, or nil |
 | `game.online_users()` | the players online (`id, charname`; `lib/presence.lua`) |
@@ -1174,7 +1174,7 @@ fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the 
 1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
 	(in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms after the
 	previous one; its changes update the player's numbers and bars in the right column
-	(`[data-player-stats]`, `[data-bar=hp|mp|tp]`), the numbers and bars of the monsters and
+	(`[data-meter=hp|mp|tp]` values, `[data-bar=hp|mp|tp]` bar widths), the numbers and bars of the monsters and
 	allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`; fight.js adds the
 	bars), the status chips of a combatant's line (made if the page had none), allies
 	joining and leaving. A click in the middle column, any key (not while typing) or the

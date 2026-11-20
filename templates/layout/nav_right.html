@@ -1,23 +1,20 @@
 {#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). -#}
 <section class="box">
 <div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
-<div class="box-body" data-player-stats>
-<b>{{ user.charname }}</b><br>
-Level: {{ user.level }}<br>
-Exp: {{ experience }}<br>
-Gold: {{ gold }}<br>
-HP: {% if hp_low then %}<span class="highlight blink"><b>*{{ user.currenthp }}*</b></span>{% else %}{{ user.currenthp }}{% end %}<br>
-MP: {% if mp_low then %}<span class="highlight blink"><b>*{{ user.currentmp }}*</b></span>{% else %}{{ user.currentmp }}{% end %}<br>
-TP: {{ user.currenttp }}<br>
-<table class="statbars">
-<tr>
+<div class="box-body charpanel" data-player-stats>
+<div class="charpanel-head"><b>{{ user.charname }}</b> <span class="charpanel-level">Level {{ user.level }}</span></div>
+<dl class="charpanel-meta">
+<dt>Exp</dt><dd>{{ experience }}</dd>
+<dt>Gold</dt><dd>{{ gold }}</dd>
+</dl>
 {%- for _, b in ipairs(bars) do %}
-<td><div class="statbar"><div class="statbar-fill {{ b.color }}" data-bar="{{ b.key }}" style="height: {{ b.height }}px"></div></div></td>
+<div class="meter">
+<span class="meter-label">{{ b.label }}</span>
+<span class="meter-track"><span class="meter-fill bar-{{ b.tone }}" data-bar="{{ b.key }}" style="width: {{ b.width }}%"></span></span>
+<span class="meter-value{% if b.low then %} highlight blink{% end %}" data-meter="{{ b.key }}" data-max="{{ b.max }}"><b>{{ b.value }}</b>/{{ b.max }}</span>
+</div>
 {%- end %}
-</tr>
-<tr><td>HP</td><td>MP</td><td>TP</td></tr>
-</table>
-<a href="/character" target="_blank" data-popup="250x600">Extended Stats</a>
+<a class="charpanel-more" href="/character" target="_blank" data-popup="250x600">Extended Stats</a>
 </div>
 </section>
 

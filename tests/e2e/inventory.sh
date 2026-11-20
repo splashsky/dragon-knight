@@ -110,7 +110,7 @@ t_give invhero demons_sin
 iv_sql "UPDATE users SET base_maxhp = 60, currenthp = 60"
 t_post "/inventory/equip/$(iv_entry demons_sin)" "csrf=$TC&slot=1"
 iv_is currenthp 10; expect_stats "10 0 10 105 5 134 5" "demon's sin"
-t_get /;                          expect_body 'HP: 10<br>'
+t_get /;                          expect_body 'data-meter="hp" data-max="10"><b>10</b>/10</span>'
 t_post /inventory/unequip/accessory1 "csrf=$TC"
 iv_is currenthp 10                                        # never raised
 iv_sql "UPDATE users SET base_maxhp = 15"

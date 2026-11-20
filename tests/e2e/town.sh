@@ -364,6 +364,25 @@ expect_no_body '] msg2<'; expect_body '] msg3<'
 t_section "town: ninja"
 t_get /ninja;                     expect_redirect 'http://www\.se7enet\.com/img/shirtninja\.jpg'
 
+t_section "town: character panel (right column)"
+# compact panel: CSS-gradient bars with values; HP coloured by how full, MP and TP fixed;
+# HP/MP at or below a fifth blink (no bar images any more)
+t_items_clear townie
+tu "$TOWN_HOME, currenthp=3, base_maxhp=15, currentmp=9, base_maxmp=20, currenttp=10, base_maxtp=10"
+t_get /inventory;                 expect_status 200
+expect_body '<span class="meter-fill bar-low" data-bar="hp" style="width: 20%"></span>'
+expect_body '<span class="meter-value highlight blink" data-meter="hp" data-max="15"><b>3</b>/15</span>'
+expect_body '<span class="meter-fill bar-mp" data-bar="mp" style="width: 45%"></span>'
+expect_body '<span class="meter-value" data-meter="mp" data-max="20"><b>9</b>/20</span>'
+expect_body '<span class="meter-fill bar-tp" data-bar="tp" style="width: 100%"></span>'
+expect_no_body 'bars_'
+tu "currenthp=12"
+t_get /inventory;                 expect_body '<span class="meter-fill bar-high" data-bar="hp" style="width: 80%"></span>'
+expect_body '<span class="meter-value" data-meter="hp" data-max="15"><b>12</b>/15</span>'
+tu "currenthp=7"
+t_get /inventory;                 expect_body '<span class="meter-fill bar-mid" data-bar="hp" style="width: 47%"></span>'
+t_get /static/images/bars_green.gif; expect_status 404
+
 tu "$TOWN_HOME"
 t_jar default
 fi

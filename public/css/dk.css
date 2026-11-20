@@ -157,21 +157,42 @@ input[type="image"] { vertical-align: middle; }
 .compass { text-align: center; margin: 6px 0 0; }
 .compass input { min-width: 58px; }
 
-/* ---- HP/MP/TP bars ---- */
-table.statbars { width: 100px; }
-table.statbars td { width: 33%; text-align: left; }
-.statbar {
-	width: 15px;
-	height: 100px;
-	border: solid 1px black;
-	display: flex;
-	flex-direction: column;
-	justify-content: flex-end;
+/* ---- HP/MP/TP bars: CSS gradients (no images), shared with the fight bars (fight.css) ---- */
+:root {
+	--bar-high: linear-gradient(to bottom, #8be07a 0%, #4caf3a 45%, #2e7d22 100%);
+	--bar-mid: linear-gradient(to bottom, #f7e27c 0%, #e0b62e 45%, #a8820f 100%);
+	--bar-low: linear-gradient(to bottom, #f78a7c 0%, #d8392b 45%, #93190f 100%);
+	--bar-mp: linear-gradient(to bottom, #8fb6f7 0%, #3f74d8 45%, #1d4299 100%);
+	--bar-tp: linear-gradient(to bottom, #f9c97e 0%, #e3922c 45%, #a35b10 100%);
 }
-.statbar-fill { border-top: solid 1px black; }
-.statbar-fill.green { background-image: url(/static/images/bars_green.gif); }
-.statbar-fill.yellow { background-image: url(/static/images/bars_yellow.gif); }
-.statbar-fill.red { background-image: url(/static/images/bars_red.gif); }
+.bar-high { background-image: var(--bar-high); }
+.bar-mid { background-image: var(--bar-mid); }
+.bar-low { background-image: var(--bar-low); }
+.bar-mp { background-image: var(--bar-mp); }
+.bar-tp { background-image: var(--bar-tp); }
+
+/* ---- Character panel (right column) ---- */
+.charpanel { font-variant-numeric: lining-nums tabular-nums; }
+.charpanel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.charpanel-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charpanel-level { white-space: nowrap; font-size: 13px; }
+.charpanel-meta { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 2px 0 6px; font-size: 13px; }
+.charpanel-meta dt { margin: 0; }
+.charpanel-meta dd { margin: 0; text-align: right; }
+.meter { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 13px; }
+.meter-label { width: 1.7em; font-weight: bold; }
+.meter-track {
+	flex: 1;
+	height: 9px;
+	border: solid 1px rgba(0, 0, 0, 0.75);
+	border-radius: 2px;
+	background-color: rgba(255, 255, 255, 0.55);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+}
+.meter-fill { display: block; height: 100%; width: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.meter-value { min-width: 4.6em; text-align: right; white-space: nowrap; }
+.charpanel-more { display: inline-block; margin-top: 4px; font-size: 13px; }
 
 /* ---- forms on account pages ---- */
 .form-table td:first-child { white-space: nowrap; }

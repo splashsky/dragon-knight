@@ -143,30 +143,24 @@
 
 	// the player's numbers and bars in the right column (layout/nav_right.html)
 	function playerStat(kind, v, max) {
-		var box = $("[data-player-stats]");
-		var label = kind.toUpperCase() + ": ";
-		if (box) {
-			for (var n = box.firstChild; n; n = n.nextSibling) {
-				if (n.nodeType !== 3 || n.data.indexOf(label) < 0) continue;
-				var at = n.data.indexOf(label);
-				var next = n.nextSibling;
-				if (next && next.nodeType === 1 && next.tagName === "SPAN") remove(next);   // a blinking low number
-				if (kind !== "tp" && max > 0 && v <= max / 5) {
-					n.data = n.data.slice(0, at) + label;
-					var low = el("span", "highlight blink");
-					low.appendChild(el("b", null, "*" + v + "*"));
-					box.insertBefore(low, n.nextSibling);
-				} else {
-					n.data = n.data.slice(0, at) + label + v;
-				}
-				break;
-			}
+		var value = $('[data-meter="' + kind + '"]');
+		if (value) {
+			if (max == null) max = Number(value.getAttribute("data-max"));
+			else value.setAttribute("data-max", max);
+		}
+		var low = kind !== "tp" && max > 0 && v <= max / 5;
+		if (value) {
+			value.textContent = "";
+			value.appendChild(el("b", null, String(v)));
+			value.appendChild(txt("/" + max));
+			value.classList.toggle("highlight", low);
+			value.classList.toggle("blink", low);
 		}
 		var fill = $('[data-bar="' + kind + '"]');
 		if (fill && max > 0) {
 			var p = Math.ceil(v / max * 100);
-			fill.style.height = Math.max(0, Math.min(100, p)) + "px";
-			fill.className = "statbar-fill " + (p >= 66 ? "green" : p >= 33 ? "yellow" : "red");
+			fill.style.width = Math.max(0, Math.min(100, p)) + "%";
+			if (kind === "hp") fill.className = "meter-fill bar-" + level(p);
 		}
 	}
 
