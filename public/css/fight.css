@@ -2,3 +2,51 @@
 .fight .box-body p, .victory .box-body p, .drop .box-body p { margin: 0 0 1em; }
 .fight-command p { margin: 0 0 1em; }
 .fight-command input[type="submit"] { min-width: 4.5em; }
+.fight-stale { font-style: italic; }
+
+/* fight.js (docs/APP.md "Fight API"): the bars it adds, the round played line by line,
+	statuses and allies coming and going. Without JavaScript none of this shows. */
+.fight-bar {
+	display: inline-block;
+	vertical-align: middle;
+	width: 80px;
+	height: 7px;
+	margin-left: 8px;
+	border: solid 1px black;
+	background-color: rgba(255, 255, 255, 0.6);
+}
+.fight-bar-fill {
+	display: block;
+	height: 100%;
+	width: 0;
+	transition: width 0.35s ease-out, background-color 0.35s;
+}
+.fight-bar-high .fight-bar-fill { background-color: #3c8d2f; }
+.fight-bar-mid .fight-bar-fill { background-color: #c9a227; }
+.fight-bar-low .fight-bar-fill { background-color: #b3261e; }
+.fight-bar-mp .fight-bar-fill { background-color: #2f5fb3; }
+.fight-js .statbar-fill { transition: height 0.35s ease-out; }
+.fight-line { animation: fight-in 0.3s ease-out; }
+.fight-hurt { animation: fight-shake 0.35s ease-out; }
+.fight-healed, .fight-status-new, .fight-joined { animation: fight-glow 0.6s ease-out; }
+.fight-status-gone { text-decoration: line-through; animation: fight-out 0.8s ease-in forwards; }
+.fight-gone { opacity: 0.4; transition: opacity 0.4s; }
+.fight-skip { margin: 0 0 1em; }
+[data-main][aria-busy="true"] form[data-fight] { opacity: 0.75; }
+
+@keyframes fight-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fight-out { from { opacity: 1; } to { opacity: 0.2; } }
+@keyframes fight-shake {
+	0%, 100% { transform: none; }
+	25% { transform: translateX(-3px); }
+	75% { transform: translateX(3px); }
+}
+@keyframes fight-glow {
+	from { background-color: rgba(255, 230, 120, 0.8); }
+	to { background-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fight-bar-fill, .fight-js .statbar-fill, .fight-gone { transition: none; }
+	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone { animation: none; }
+}

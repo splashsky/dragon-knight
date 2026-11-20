@@ -1,43 +1,52 @@
 {#- Fight screen (legacy templates/fight.php + fight.php fight()); statuses, allies and the
-		locked "Continue" turn are new (fight/round.lua). -#}
+		locked "Continue" turn are new (fight/round.lua). The data-* attributes are fight.js's
+		hooks (docs/APP.md "Fight API"): data-fighter (a combatant's id), data-stat/-value/-max
+		(the numbers it animates), data-fight-log (the round's lines), data-fight (forms it
+		sends with fetch). Every form carries the round it was shown at (stale forms play
+		nothing). -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
+{%- if stale then %}
+<p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
+{%- end %}
 <p>You are fighting a <b>{{ monstername }}</b></p>
 {%- if monsterhp then %}
-<p class="fight-monsterhp">Monster's HP: {{ monsterhp }}</p>
+<p class="fight-monsterhp" data-fighter="{{ monsterid }}" data-stat="hp" data-value="{{ monsterhp }}" data-max="{{ monstermaxhp }}">Monster's HP: {{ monsterhp }}</p>
 {%- end %}
 {%- if monstermp then %}
-<p class="fight-monstermp">Monster's MP: {{ monstermp }}</p>
+<p class="fight-monstermp" data-fighter="{{ monsterid }}" data-stat="mp" data-value="{{ monstermp }}" data-max="{{ monstermaxmp }}">Monster's MP: {{ monstermp }}</p>
 {%- end %}
 {%- for _, e in ipairs(enemies) do %}
 {%- if #enemies > 1 or #e.statuses > 0 then %}
-<p class="fight-combatant fight-enemy"><b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>
+<p class="fight-combatant fight-enemy" data-fighter="{{ e.id }}"{% if #enemies > 1 then %} data-stat="hp" data-value="{{ e.hp }}" data-max="{{ e.maxhp }}"{% end %}><b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>
 {%- end %}
 {%- end %}
 {%- for _, al in ipairs(allies) do %}
-<p class="fight-combatant fight-ally">Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.turns then %} <span class="light">({{ al.turns }} {{ al.turns == 1 and "round" or "rounds" }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
+<p class="fight-combatant fight-ally" data-fighter="{{ al.id }}" data-stat="hp" data-value="{{ al.hp }}" data-max="{{ al.maxhp }}">Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.turns then %} <span class="light">({{ al.turns }} {{ al.turns == 1 and "round" or "rounds" }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
 {%- end %}
 {%- if #player_statuses > 0 then %}
-<p class="fight-combatant fight-you"><b>You</b>{{{ include("fight/statuses", { statuses = player_statuses }) }}}</p>
+<p class="fight-combatant fight-you" data-fighter="{{ player_id }}"><b>You</b>{{{ include("fight/statuses", { statuses = player_statuses }) }}}</p>
 {%- end %}
+<div class="fight-log" data-fight-log>
 {%- for _, part in ipairs({ { "fight-yourturn", yourturn }, { "fight-allyturn", allyturn }, { "fight-monsterturn", monsterturn }, { "fight-roundend", roundend } }) do %}
 {%- if #part[2] > 0 then %}
 <p class="{{ part[1] }}">{% for i, line in ipairs(part[2]) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
 {%- end %}
 {%- end %}
+</div>
 {%- if dead then %}
 {{{ include("fight/died") }}}
 {%- elseif locked then %}
 <p class="fight-locked">You can't act this turn.</p>
-<form class="fight-command" action="/fight" method="post">
-{{{ csrf_field() }}}
+<form class="fight-command" action="/fight" method="post" data-fight>
+{{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
 <p><input type="submit" name="continue" value="Continue"></p>
 </form>
 {%- else %}
 <p>Command?</p>
-<form class="fight-command" action="/fight" method="post">
-{{{ csrf_field() }}}
+<form class="fight-command" action="/fight" method="post" data-fight>
+{{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
 <p><input type="submit" name="fight" value="Fight"></p>
 <p><select name="userspell" aria-label="Spell"><option value="0">Choose One</option>
 {%- if #spells == 0 then %}<option value="0">None</option>{% end %}

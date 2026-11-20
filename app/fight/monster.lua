@@ -105,8 +105,10 @@ local function use(f, c, target, kind, entity)
 		free = kind == "spell" and not uses_mp(c), summon_room = engine.summon_room(f, c),
 	})
 	if not r.ok then return false end
-	for _, line in ipairs(r.lines) do f.out[#f.out + 1] = line end
+	local prev = engine.doing(f, c, kind)
+	for _, line in ipairs(r.lines) do engine.say(f, line) end
 	engine.apply(f, r.events, c)
+	engine.done(f, prev)
 	return true
 end
 

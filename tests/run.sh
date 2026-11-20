@@ -349,14 +349,14 @@ live_frames_ok() {
 		t_fail "stream $1 is not well-formed: $(cat "$T/live.$1.check")"
 	fi
 }
-# t_fetch PATH 'a=1&b=2': POST like live.js (fetch): Accept: application/json and the
-# CSRF token in X-CSRF-Token, from a game page's <body data-csrf> (the last page, or the
-# last one this jar loaded with it)
+# t_fetch PATH 'a=1&b=2' [curl args]: POST like live.js and fight.js (fetch): Accept:
+# application/json and the CSRF token in X-CSRF-Token, from a game page's <body data-csrf>
+# (the last page, or the last one this jar loaded with it)
 t_fetch() {
 	local token
 	token=$(grep -o 'data-csrf="[0-9a-f]*"' "$BODY" | head -n1 | cut -d'"' -f2)
 	if [ -n "$token" ]; then echo "$token" > "$JAR.csrf"; else token=$(cat "$JAR.csrf" 2>/dev/null); fi
-	t_req POST "$1" --data "${2:-}" -H 'Accept: application/json' -H "X-CSRF-Token: $token"
+	t_req POST "$1" --data "${2:-}" -H 'Accept: application/json' -H "X-CSRF-Token: $token" "${@:3}"
 }
 
 # ---------------------------------------------------------------------------------

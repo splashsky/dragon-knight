@@ -43,6 +43,11 @@ local function dispatch(req)
 	if req.method == "POST" and not csrf.verify(req) then
 		return view.csrf_failed(req)
 	end
+	-- end-to-end tests replay the same dice through two paths (tests/e2e/fight_api.sh)
+	if dk.config.test_routes == true then
+		local seed = req.headers["x-test-seed"]
+		if type(seed) == "string" and seed:match("^%d+$") and #seed <= 15 then math.randomseed(math.tointeger(tonumber(seed))) end
+	end
 	return router.run(route, req, params)
 end
 

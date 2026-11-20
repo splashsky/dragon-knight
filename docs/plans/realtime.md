@@ -282,7 +282,52 @@ migration in `migrate.sh` (fixtures `schema_v9.sql`, `seed_v9.sql`),
 	users only, banner set/clear and persistence; JS unit-free (keep JS small), but a
 	headless check that `/live` frames are well-formed.
 
-## R3: smooth fights (fetch + animated events)
+## R3: smooth fights (fetch + animated events) — ✅ done
+
+**As implemented** (details in `docs/APP.md`, "Fight API"): the round records a trace when
+asked (`f.trace`; `fight/engine.lua` "The trace": every line through `engine.say`, each
+change of HP/MP/TP, status applied/counted down/expiring/removed, ally joining/counting
+down/leaving, tagged with its step by `engine.doing`/`engine.done`; no dice, no changes:
+`test_round.lua` traces every other equivalence fight). `fight/events.lua` makes the API's
+events of it (`{ part, actor, actor_id, actor_name, type, text, hp, mp, tp, status, summon
+}`; texts exactly the page's lines; an enemy's MP only where the page shows it; the
+outcome `victory`/`death`/`escape` last). `routes/fight.lua` answers JSON on the same
+routes (`/fight`, `/victory`, `/drop`, `/dead`) when `view.wants_json`: `{ events,
+fragments = { main, nav_left, nav_right }, round, url, title, stale }`, `{ events, redirect
+}` instead of a 302 (fetch would follow it), `{ error }` instead of an error page.
+Fragments come from `view.fragments` / `view.fragment_page` (the page's own templates; the
+main layout marks `data-main`, `data-nav-left`, and `data-nav-right` around
+`layout/nav_right` only, so the chat stays). Stale rounds: the fight forms carry
+`round` (the saved `fights.round`); another value plays nothing and shows the fight as a
+GET would, with a note (`stale = true`); a won fight goes to `/victory`, an ended one to
+`/`; forms without the field play as before. `public/js/fight.js` (~430 lines, loaded via
+the new layout opt `scripts = { "fight" }` on the fight pages only): forms marked
+`data-fight` and middle-column links to fight pages go through fetch; controls disabled
+while busy; events played 400 ms apart (skip: click, key, "Skip"; none with
+`prefers-reduced-motion`), HP/MP bars (fight.js adds bars to `[data-stat][data-max]`, the
+right column's statbars get transitions), status chips, allies; then the fragments swap
+in, `history.replaceState(url)`, redirects to fight pages fetched the same way; errors
+before the answer fall back to a normal submit, after it to a reload. Test hook: with
+`test_routes`, `X-Test-Seed` seeds `math.random` before the route. Tests:
+`tests/e2e/fight_api.sh` (the same seeded scenarios as a form and with fetch: same
+database, same lines, for attacks, runs, spells, items, poison/regen, the wolf, hyper
+beam and recharge, refusals, the example monsters' spells and items, victory, death; the
+event shape; stale rounds both ways; CSRF; victory, drop and death fragments; the no-JS
+page), `T.round_events` in `tests/lua/test_round.lua`. fight.js was also driven in jsdom
+against a dev server during development (not part of `make test`: no JS runtime there).
+
+**Notes for R4**:
+- A fight round over fetch costs the same as before plus the JSON (the round's events and
+	three rendered fragments: about the size of the full page, ~8 KiB on a dev install; the
+	nav columns are rendered once, as the page did). The `fights` bench scenario posts forms;
+	add a variant with `Accept: application/json` to compare p99 with the form path.
+- `GET /victory` and `GET /fight` still change state (fight.js fetches them after a
+	redirect): a load generator following redirects must expect it.
+- Fights publish nothing yet (the 256-per-request publish budget is untouched); spectators
+	or party fights would publish the events list as is (it is plain JSON, < 64 KiB for
+	any realistic round; the trace is capped by `engine.MAX_TICKS`).
+- The stale-round check needs `fights.round`, which stops at 255; a soak that fights very
+	long encounters will see rounds past 255 accepted without the check.
 
 - With JavaScript, `public/js/fight.js` intercepts fight forms (attack, spell, item, run,
 	continue, drop take/leave): `fetch` POST with the CSRF token and `Accept:

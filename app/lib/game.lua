@@ -115,6 +115,9 @@ end
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
 	local s = game.stats(user)
+	local bars = { game.statbar(user.currenthp, s.maxhp), game.statbar(user.currentmp, s.maxmp),
+		game.statbar(user.currenttp, s.maxtp) }
+	bars[1].key, bars[2].key, bars[3].key = "hp", "mp", "tp"
 	return {
 		user = user,
 		stats = s,
@@ -128,8 +131,7 @@ function game.nav(user)
 		gold = php.number_format(user.gold),
 		hp_low = game.is_low(user.currenthp, s.maxhp),
 		mp_low = game.is_low(user.currentmp, s.maxmp),
-		bars = { game.statbar(user.currenthp, s.maxhp), game.statbar(user.currentmp, s.maxmp),
-						 game.statbar(user.currenttp, s.maxtp) },
+		bars = bars,   -- key: "hp", "mp", "tp" (fight.js animates them)
 		spells = spells.known(user, "town"),
 		equipment = inventory.names(user.id),
 		bag_used = inventory.used(inventory.bag(user.id)),

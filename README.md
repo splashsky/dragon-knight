@@ -3,7 +3,7 @@
 A browser RPG inspired by *Dragon Warrior* for the NES: explore a map, fight monsters,
 level up, collect drops, buy gear and maps in towns, chat in the babble box and the forum.
 Open pages update live: chat messages, who's online, news and forum notices, and the
-administrator's announcements.
+administrator's announcements; fights play out in place, blow by blow.
 
 This is a rewrite of **Dragon Knight 1.1.11** (originally PHP/MySQL by renderse7en,
 released 3/26/2006) as a single self-contained program: a small HTTP server written in C
@@ -180,7 +180,17 @@ Who's online counts a player while they have a live page open or made a request 
 `online_seconds` (app-level key, default 600); departures are checked every
 `presence_sweep_seconds` (default 60) by the first request after that. The app-level key
 `test_routes = true` adds `POST /__test/publish` (publish an event as any logged-in user)
-for the end-to-end tests and the realtime benchmark; never set it on a real server.
+and the `X-Test-Seed` request header (seeds the dice) for the end-to-end tests and the
+realtime benchmark; never set it on a real server.
+
+**Smooth fights**: on the fight pages `public/js/fight.js` sends the fight's forms with
+`fetch` (`Accept: application/json`); the same routes answer with the round as a list of
+events (each line of the fight page with the HP, MP, statuses and allies it changed) and
+the page's parts rendered by the same templates, and the script plays the round line by
+line (click or any key to skip; no delays with reduced motion) before swapping them in.
+Every fight form carries its round number, so a double click or an old tab plays nothing.
+Without JavaScript the fight pages are the same forms and page loads. The JSON shape is in
+`docs/APP.md`, "Fight API".
 
 ## Deployment
 
@@ -488,6 +498,9 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	iframe in towns (at most one message per 2 seconds; administrators can delete
 	messages), and who's online, news, replies to your forum threads and the
 	administrator's broadcast banner show up on open pages as they happen.
+- Fights play a round in place (2.3, with JavaScript): the lines appear one by one with the
+	HP and MP bars and the statuses changing, then the page updates without a reload; a
+	second click or an old tab no longer plays an extra round.
 - The built-in forum is only available when the forum type is set to "Internal". It has
 	boards (`/forum/1`, …): General, and News, where only administrators start threads.
 - News posts have a title and an author, and posting one also starts its discussion thread

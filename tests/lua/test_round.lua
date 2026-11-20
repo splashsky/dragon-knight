@@ -9,6 +9,7 @@
 -- world statuses on moves.
 local ai = require("fight.ai")
 local engine = require("fight.engine")
+local events = require("fight.events")
 local fm = require("tests.fight_model")
 local fo = require("tests.fight_original")
 local items = require("lib.items")
@@ -121,6 +122,9 @@ function T.fights_play_as_in_2_1()
 			local o = fo.round(old, monster, a, r_old.rand, function(st_, x)
 				return olds.run(x.kind, x.spell or x.item, st_, r_old.rand, true)
 			end)
+			-- every other fight traced (the JSON fight API): the same rolls, and the events say
+			-- the page's lines
+			f.trace = seed % 2 == 0 and {} or nil
 			local r = round.play(f, a)
 			eq(r.refused, o.refused, what .. ": refusal")
 			eq(table.concat(r_new.calls, " "), table.concat(r_old.calls, " "), what .. ": rolls")
@@ -128,6 +132,12 @@ function T.fights_play_as_in_2_1()
 				refusals = refusals + 1
 			else
 				f = r.f
+				if f.trace then
+					local page = {}
+					for _, line in ipairs(r.player) do page[#page + 1] = line end
+					for _, line in ipairs(r.enemies) do page[#page + 1] = line end
+					eq(lines(events.lines(events.build(f.trace))), lines(page), what .. ": events")
+				end
 				eq(lines(r.player), lines(o.yourturn), what .. ": your turn")
 				eq(lines(r.enemies), lines(o.monsterturn), what .. ": the monster's turn")
 				eq(lines(r.allies) .. lines(r.ending), "", what .. ": nothing else")
@@ -522,6 +532,86 @@ function T.refusal_after_ticks_changes_nothing()
 		eq(r.refused, "You don't need the Antidote now. Please go back and try again.")
 		eq(f.st.currenthp, 50); eq(keys(state.player(f)), "t_drain/3")
 	end)
+end
+
+-- A round's events (fight/events.lua) from a traced round.
+local function play_events(f, a)
+	f.trace = {}
+	local r = round.play(f, a)
+	local all = {}
+	for _, part in ipairs({ r.player, r.allies, r.enemies, r.ending }) do
+		for _, line in ipairs(part) do all[#all + 1] = line end
+	end
+	local list = events.build(r.f.trace)
+	eq(lines(events.lines(list)), lines(all), "the events' texts are the page's lines")
+	r.f.trace = nil
+	return r, list
+end
+
+local function find_event(list, fn, what)
+	for _, e in ipairs(list) do
+		if fn(e) then return e end
+	end
+	error("no event: " .. what, 2)
+end
+
+function T.round_events()
+	-- an attack: the line, then the monster's HP
+	local f = fight(recorder(30).rand, { attackpower = 50, strength = 0 }, { PUNCHBAG }, 900)
+	local r, list = play_events(f, { kind = "attack" })
+	local e = find_event(list, function(x) return x.actor == "player" and x.type == "attack" and x.hp end, "attack")
+	eq(e.part, "player"); eq(e.actor_name, "Tester"); eq(e.actor_id, 1)
+	eq(e.hp[1].who, "enemy"); eq(e.hp[1].id, 2); eq(e.hp[1].to, enemy(r.f).hp); eq(e.hp[1].max, 1000)
+	eq(e.hp[1].from - e.hp[1].to, 900 - enemy(r.f).hp)
+	has(e.text, "You attack the monster for")
+	e = find_event(list, function(x) return x.actor == "enemy" and x.type == "attack" end, "the monster's attack")
+	eq(e.part, "enemies"); eq(e.actor_name, "Punchbag")
+	-- a spell with a status: the status on the monster, then its tick at the end (the bearer)
+	f = fight(recorder(31).rand, nil, { PUNCHBAG }, 900)
+	r, list = play_events(f, { kind = "spell", spell = spells.by_key("poison") })
+	e = find_event(list, function(x) return x.type == "spell" end, "the spell")
+	eq(e.actor, "player"); eq(e.mp[1].who, "player"); eq(e.mp[1].from - e.mp[1].to, spells.by_key("poison").mp)
+	eq(e.status[1].who, "enemy"); eq(e.status[1].key, "poison"); eq(e.status[1].change, "add"); eq(e.status[1].turns, 3)
+	eq(e.status[1].status, "Poisoned"); eq(e.status[1].statuses[1].key, "poison")
+	e = find_event(list, function(x) return x.type == "status" and x.text end, "the tick")
+	eq(e.part, "ending"); eq(e.actor, "enemy"); eq(e.hp[1].who, "enemy")
+	e = find_event(list, function(x) return x.status and x.status[1].change == "turns" end, "the countdown")
+	eq(e.status[1].turns, 2)
+	-- an item on the player
+	f = fight(recorder(32).rand, { currenthp = 10, dexterity = 22500 }, { PUNCHBAG }, 900)
+	r, list = play_events(f, { kind = "item", item = items.by_key("herb") })
+	e = find_event(list, function(x) return x.type == "item" end, "the item")
+	eq(e.hp[1].who, "player"); eq(e.hp[1].from, 10); eq(e.hp[1].to, 40); eq(e.hp[1].max, 100)
+	-- a summon: it joins with the spell, then bites in the allies' part
+	f = fight(recorder(33).rand, nil, { CREATURE }, 500)
+	f.max_allies = 1
+	r, list = play_events(f, { kind = "spell", spell = spells.by_key("call_wolf") })
+	e = find_event(list, function(x) return x.summon end, "the summon")
+	eq(e.type, "spell"); eq(e.summon[1].change, "join"); eq(e.summon[1].name, "Wolf"); eq(e.summon[1].hp, 30)
+	eq(e.summon[1].turns, 5)
+	e = find_event(list, function(x) return x.actor == "ally" and x.text end, "the bite")
+	eq(e.type, "summon"); eq(e.part, "allies"); eq(e.actor_name, "Wolf"); eq(e.hp[1].who, "enemy")
+	-- a blocked turn; a status running out (the bearer's)
+	f = fight(recorder(35).rand)
+	engine.afflict(f, state.player(f), "recharging", { turns = 1 })
+	r, list = play_events(f, { kind = "continue" })
+	e = find_event(list, function(x) return x.type == "blocked" end, "blocked")
+	eq(e.text, "You must recharge this turn."); eq(e.actor, "player"); eq(e.part, "player")
+	e = find_event(list, function(x) return x.status and x.status[1].change == "expire" end, "the expiry")
+	eq(e.actor, "player"); eq(e.type, "status"); eq(e.status[1].key, "recharging"); eq(#e.status[1].statuses, 0)
+	-- waves
+	f = fight(recorder(17).rand, { attackpower = 2000, strength = 0 }, { SLIME, CREATURE, waves = { 1, 2 } }, 1)
+	r, list = play_events(f, { kind = "attack" })
+	e = find_event(list, function(x) return x.type == "wave" end, "the next wave")
+	eq(e.actor, "enemy"); eq(e.actor_name, "Creature")
+	-- the outcome, and hidden MP
+	list = events.outcome(events.build({ { change = "mp", side = "enemy", id = 2, from = 5, to = 0 } },
+		{ hide_mp = function() return true end }), "death", 1, "Tester")
+	eq(#list, 1); eq(list[1].type, "death"); eq(list[1].actor, "player")
+	-- not traced: nothing recorded
+	f = fight(recorder(34).rand)
+	r = round.play(f, { kind = "attack" })
+	eq(r.f.trace, nil); eq(r.f.doing, nil)
 end
 
 function T.codec_and_world_statuses()

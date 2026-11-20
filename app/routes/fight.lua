@@ -8,12 +8,21 @@
 -- plays at most one round of the pipeline (fight/round.lua), whose dice and formulas live
 -- in fight/combat.lua. This module picks the monster, checks the player's choice, and
 -- saves.
+--
+-- The JSON fight API (docs/APP.md "Fight API"; public/js/fight.js): the same routes, asked
+-- with Accept: application/json, run the same code and answer { events, fragments, round,
+-- redirect, url, title, stale } instead of the page (a redirect is a field, not a 302:
+-- fetch would follow it and lose the round's events), or { error } instead of an error
+-- page. Every fight form carries the round it was shown at: a POST /fight with another
+-- round (a second click, an older tab) plays nothing and shows the fight as it is now.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
 local combat = require("fight.combat")
+local events = require("fight.events")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
+local json = require("lib.json")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
@@ -23,8 +32,32 @@ local view = require("lib.view")
 
 local rand = php.rand
 
-local function error_page(req, html)
-	return view.message(req, "Error", html)
+-- The fight pages load fight.js.
+local PAGE = { scripts = { "fight" } }
+
+-- An error: the page (html: trusted HTML, by default the text escaped), or { error = text }.
+local function error_page(req, text, html)
+	if view.wants_json(req) then return view.json({ error = text }) end
+	return view.message(req, "Error", html or dk.html(text))
+end
+
+-- A page of the fight, or its fragments (view.fragment_page) with the fields of t.
+local function show(req, title, template, ctx, t)
+	if view.wants_json(req) then
+		t = t or {}
+		t.events = t.events or json.array()
+		return view.fragment_page(req, title, template, ctx, t)
+	end
+	return view.page(req, title, template, ctx, PAGE)
+end
+
+-- A redirect, or { redirect = url } with the fields of t.
+local function go(req, url, t)
+	if not view.wants_json(req) then return view.redirect(url) end
+	t = t or {}
+	t.redirect = url
+	t.events = t.events or json.array()
+	return view.json(t)
 end
 
 -- The original random pick among the roaming monsters of the level band (retired ones and
@@ -73,20 +106,37 @@ local function status_list(c)
 	return out
 end
 
+-- Whether the page shows enemy c's MP: only a monster with spells (what it means to the
+-- player).
+local function shows_mp(c)
+	return #monsters.loadout(c.row).spells > 0
+end
+
 -- What the fight page shows of the fight: the enemies of the wave, the allies, statuses.
 local function view_of(f)
 	local p = state.player(f)
 	local enemies, allies = {}, {}
 	for _, c in ipairs(state.side(f, "enemy", true)) do
-		-- MP only for monsters with spells (what it means to the player)
-		local casts = #monsters.loadout(c.row).spells > 0
-		enemies[#enemies + 1] = { name = c.row.name, hp = c.hp, mp = casts and c.mp or nil, statuses = status_list(c) }
+		local mp = shows_mp(c)
+		enemies[#enemies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, mp = mp and c.mp or nil,
+			maxmp = mp and c.maxmp or nil, statuses = status_list(c) }
 	end
 	for _, c in ipairs(state.allies(f)) do
-		allies[#allies + 1] = { name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
+		allies[#allies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
 			statuses = status_list(c) }
 	end
-	return { enemies = enemies, allies = allies, player_statuses = status_list(p) }
+	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p) }
+end
+
+-- The events of round r (fight/events.lua), with its outcome last.
+local function round_events(r)
+	local list = events.build(r.f.trace, { hide_mp = function(id)
+		local c = state.get(r.f, id)
+		return not (c and c.row and shows_mp(c))
+	end })
+	local outcome = r.escaped and "escape" or r.victory and "victory" or r.died and "death"
+	if outcome then events.outcome(list, outcome, state.player(r.f).id, r.f.st.charname) end
+	return json.array(list)
 end
 
 -- A new encounter against `monster` (the fight's counter is kept). Returns the model and
@@ -100,15 +150,24 @@ end
 
 local function fight(req)
 	local user = req.user
-	if user.currentaction ~= "Fighting" then
-		return error_page(req, "Cheat attempt detected.<br><br>Get a life, loser.")
-	end
 	local form = req.method == "POST" and req.form or {}
+	-- the round the form was shown at (absent: a form from before 2.3, or a GET)
+	local sent = form.round ~= nil and php.intval(form.round) or nil
+	if user.currentaction ~= "Fighting" then
+		-- a form of a fight that is over: the game as it is now
+		if sent then return go(req, "/", { stale = true }) end
+		return error_page(req, "Cheat attempt detected. Get a life, loser.", "Cheat attempt detected.<br><br>Get a life, loser.")
+	end
 	local st = game.player(user)
+
+	-- A form shown at another round than the fight's (a second click, an older tab) plays
+	-- nothing: the fight page as a GET would show it, with a note.
+	local f = state.load(user, st)
+	local stale = sent ~= nil and (not f or sent ~= f.round)
+	if stale then form = {} end
 
 	-- First, check to see if we need to pick a monster (an encounter just began, or its
 	-- monster was deleted mid-fight: start over with a new one).
-	local f = state.load(user, st)
 	local swing_first = true
 	if not f or f.round <= 1 or #state.side(f, "enemy", true) == 0 then
 		local monster = pick_monster(user)
@@ -118,7 +177,7 @@ local function fight(req)
 		f, swing_first = encounter(user, st, f and f.round or 1, monster)
 	elseif state.won(f) then
 		-- fixed: legacy showed a defeated monster (0 HP) until /victory was visited.
-		return view.redirect("/victory")
+		return go(req, "/victory", { stale = stale or nil })
 	end
 	f.rand = rand
 	f.max_allies = game.control().max_allies or 1
@@ -166,13 +225,16 @@ local function fight(req)
 		a = { kind = "ambush" }
 	end
 
-	local page = { yourturn = {}, allyturn = {}, monsterturn = {}, roundend = {} }
+	local page = { yourturn = {}, allyturn = {}, monsterturn = {}, roundend = {}, stale = stale }
+	local evs = json.array()
 	if a then
+		if view.wants_json(req) then f.trace = {} end
 		local r = round.play(f, a)
 		-- refusal texts may come from content files and admin overrides: escaped
-		if r.refused then return error_page(req, dk.html(r.refused)) end
+		if r.refused then return error_page(req, r.refused) end
 		if entry then inventory.take(entry, 1) end
 		f = r.f
+		if f.trace then evs = round_events(r) end
 		page.yourturn, page.allyturn, page.monsterturn, page.roundend = r.player, r.allies, r.enemies, r.ending
 		if r.escaped then
 			-- fixed: legacy always let the player escape (a failed run's damage was never saved,
@@ -180,12 +242,12 @@ local function fight(req)
 			state.clear(user.id)
 			save_player(user, f.st)
 			dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
-			return view.redirect("/")
+			return go(req, "/", { events = evs })
 		elseif r.victory then
 			-- the round's counter stays: /victory pays out and ends the fight
 			state.save(f)
 			save_player(user, f.st)
-			return view.redirect("/victory")
+			return go(req, "/victory", { events = evs })
 		elseif r.died then
 			save_death(user, f.st)
 			page.dead = true
@@ -199,16 +261,18 @@ local function fight(req)
 		if e.hp > 0 then first = e break end
 	end
 	page.monstername, page.monsterhp, page.monstermp = first.name, first.hp, first.mp
+	page.monsterid, page.monstermaxhp, page.monstermaxmp = first.id, first.maxhp, first.maxmp
 	if not page.dead then
 		page.locked = round.locked(f)
 		page.spells = spells.known(user, "fight")
 		page.items = usable_items(user)
 		f.round = math.min(f.round + 1, state.MAX_ROUND)
+		page.round = f.round
 		state.save(f)
 		dk.db:exec("UPDATE users SET currentaction = 'Fighting', currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
 			f.st.currenthp, f.st.currentmp, f.st.currenttp, user.id)
 	end
-	return view.page(req, "Fighting", "fight/fight", page)
+	return show(req, "Fighting", "fight/fight", page, { events = evs, round = page.round, stale = stale or nil })
 end
 
 local function victory(req)
@@ -217,8 +281,8 @@ local function victory(req)
 	local f = state.load(user, player)
 	-- fixed: legacy paid out for a missing monster (e.g. /victory right after an encounter
 	-- began, before the monster was picked).
-	if not f or #state.side(f, "enemy", true) == 0 then return view.redirect("/") end
-	if not state.won(f) then return view.redirect("/fight") end
+	if not f or #state.side(f, "enemy", true) == 0 then return go(req, "/") end
+	if not state.won(f) then return go(req, "/fight") end
 
 	-- rewards per defeated enemy (summed), the drop roll once per encounter
 	local r = { exp = 0, gold = 0, warnexp = "", warngold = "" }
@@ -273,7 +337,7 @@ local function victory(req)
 		dexterity = dexterity + ?, dropcode = ?, experience = ?, gold = ? WHERE id = ?]],
 		g.level, g.hp, g.mp, g.tp, g.strength, g.dexterity, dropcode, php.mysql_uint(r.newexp),
 		php.mysql_uint(r.newgold), user.id)
-	return view.page(req, title, "fight/victory", ctx)
+	return show(req, title, "fight/victory", ctx)
 end
 
 -- The pending drop (users.dropcode: an items.id), or nil.
@@ -297,12 +361,12 @@ local function drop_page(req, drop, ctx)
 			if e.item.category ~= "quest" then ctx.discardable[#ctx.discardable + 1] = e end
 		end
 	end
-	return view.page(req, "Item Drop", "fight/drop", ctx)
+	return show(req, "Item Drop", "fight/drop", ctx)
 end
 
 local function drop_get(req)
 	local drop = pending_drop(req.user)
-	if not drop then return view.redirect("/") end
+	if not drop then return go(req, "/") end
 	return drop_page(req, drop)
 end
 
@@ -311,10 +375,10 @@ end
 local function drop_post(req)
 	local user = req.user
 	local drop = pending_drop(user)
-	if not drop then return view.redirect("/") end
+	if not drop then return go(req, "/") end
 	if req.form.leave ~= nil then
 		dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
-		return view.redirect("/")
+		return go(req, "/")
 	end
 	if req.form.take == nil then return drop_page(req, drop) end
 	local discard_id = php.intval(req.form.discard)
@@ -332,13 +396,13 @@ local function drop_post(req)
 			drop.name .. "." })
 	end
 	dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
-	return view.page(req, "Item Drop", "fight/drop_taken", { drop = drop, discarded = discarded })
+	return show(req, "Item Drop", "fight/drop_taken", { drop = drop, discarded = discarded })
 end
 
 -- legacy dead() built this page but never displayed it; deaths are reported on the
 -- fight page. Kept as a read-only page.
 local function dead(req)
-	return view.page(req, "You Have Died", "fight/dead", {})
+	return show(req, "You Have Died", "fight/dead", {})
 end
 
 return function(r)

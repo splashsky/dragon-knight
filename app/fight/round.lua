@@ -57,7 +57,9 @@ local function over(f, r, player_struck)
 	if #state.enemies(f) == 0 and f.wave < state.last_wave(f) then
 		f.wave = f.wave + 1
 		for _, c in ipairs(state.enemies(f)) do
-			f.out[#f.out + 1] = "Another monster appears: the " .. tostring(c.row.name) .. "."
+			local prev = engine.doing(f, c, "wave")
+			engine.say(f, "Another monster appears: the " .. tostring(c.row.name) .. ".")
+			engine.done(f, prev)
 		end
 	end
 	return false
@@ -83,6 +85,8 @@ end
 -- | "item" | "run" | "continue" | "ambush", spell, item }. Returns r = { f (the model
 -- after the round), player, allies, enemies, ending (the lines of each part), and one of
 -- refused (nothing happened: f0 is unchanged and r.f is nil), escaped, victory, died }.
+-- With f0.trace = {} the round also records what happened, in order, in r.f.trace (see
+-- "The trace" in fight/engine.lua; fight/events.lua makes the JSON API's events of it).
 function round.play(f0, a)
 	local f = state.copy(f0)
 	f.ticks, f.ticks_warned, f.hp_changed = 0, nil, false
@@ -90,7 +94,7 @@ function round.play(f0, a)
 	local p = state.player(f)
 
 	-- 1. the player's turn starts
-	f.out = r.player
+	f.out, f.part = r.player, "player"
 	engine.turn_start(f, p)
 	if over(f, r) then return r end
 	local blocked, inst = engine.blocked(f, p)
@@ -104,30 +108,34 @@ function round.play(f0, a)
 			r.escaped = true
 			return r
 		end
-		f.out[#f.out + 1] = "You tried to run away, but were blocked in front!"
+		local prev = engine.doing(f, p, "run")
+		engine.say(f, "You tried to run away, but were blocked in front!")
+		engine.done(f, prev)
 	elseif a.kind == "attack" or a.kind == "spell" or a.kind == "item" then
 		local x = act.run(f, a)
 		if x.refused then return { refused = x.refused } end
 		f.hp_changed = true   -- the original checked the monster's HP after every attack and spell
 	elseif a.kind == "ambush" then
-		f.out[#f.out + 1] = "The monster attacks before you are ready!"
+		local prev = engine.doing(f, state.enemies(f)[1], "ambush")
+		engine.say(f, "The monster attacks before you are ready!")
+		engine.done(f, prev)
 	end
 	if over(f, r, true) then return r end
 
 	-- 3. the allies
-	f.out = r.allies
+	f.out, f.part = r.allies, "allies"
 	for _, c in ipairs(state.allies(f)) do
 		if state.get(f, c.id) and state.alive(f, c) and turn(f, r, c) then return r end
 	end
 
 	-- 4. the enemies of the current wave
-	f.out = r.enemies
+	f.out, f.part = r.enemies, "enemies"
 	for _, c in ipairs(state.enemies(f)) do
 		if state.alive(f, c) and turn(f, r, c) then return r end
 	end
 
 	-- 5. turn ends: ticks, countdowns, expiry
-	f.out = r.ending
+	f.out, f.part = r.ending, "ending"
 	local order = { p }
 	for _, c in ipairs(state.allies(f)) do order[#order + 1] = c end
 	for _, c in ipairs(state.enemies(f)) do order[#order + 1] = c end

@@ -21,17 +21,19 @@
 	</nav>
 </header>
 <div class="dk-cols">
-	<aside class="dk-left">
+	<aside class="dk-left" data-nav-left>
 {%- if nav then %}
 {{{ include("layout/nav_left", nav) }}}
 {%- end %}
 	</aside>
-	<main class="dk-middle">
+	<main class="dk-middle" data-main>
 {{{ content }}}
 	</main>
 	<aside class="dk-right">
 {%- if nav then %}
+<div class="dk-nav-right" data-nav-right>
 {{{ include("layout/nav_right", nav) }}}
+</div>
 {%- end %}
 {%- if side then %}
 {{{ include("layout/side_live", side) }}}

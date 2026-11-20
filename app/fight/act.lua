@@ -31,7 +31,7 @@ local function usable(kind, entity)
 end
 
 local function emit(f, lines)
-	for _, line in ipairs(lines) do f.out[#f.out + 1] = line end
+	for _, line in ipairs(lines) do engine.say(f, line) end
 end
 
 -- The player's action on fight model f (lines go to f.out). a: { kind = "attack" } or
@@ -46,8 +46,10 @@ function act.run(f, a)
 		local lines, damage = combat.attack(engine.handle(f, p), engine.handle(f, target), f.rand, function(d)
 			return engine.modify_damage(f, p, target, d)
 		end)
+		local prev = engine.doing(f, p, "attack")
 		emit(f, lines)
 		engine.damage(f, target, damage)
+		engine.done(f, prev)
 		return {}
 	end
 	local entity = a.kind == "spell" and a.spell or a.item
@@ -59,8 +61,10 @@ function act.run(f, a)
 		summon_room = engine.summon_room(f, p),
 	})
 	if not r.ok then return { refused = r.reason == "cannot" and act.CANNOT[a.kind] or r.refused } end
+	local prev = engine.doing(f, p, a.kind)
 	emit(f, r.lines)
 	engine.apply(f, r.events, p)
+	engine.done(f, prev)
 	return {}
 end
 
@@ -70,8 +74,10 @@ function act.enemy_attack(f, c, target)
 	local lines, damage = combat.monster_attack(c.row.maxdam, engine.handle(f, target), f.rand, function(d)
 		return engine.modify_damage(f, c, target, d)
 	end)
+	local prev = engine.doing(f, c, "attack")
 	emit(f, lines)
 	engine.damage(f, target, damage)
+	engine.done(f, prev)
 end
 
 return act

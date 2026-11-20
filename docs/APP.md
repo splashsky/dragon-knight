@@ -18,6 +18,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
+| Smooth fights (the JSON fight API) | `app/fight/events.lua`, `app/routes/fight.lua`, `app/lib/view.lua` (`view.fragments`) | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
 | Content (statuses, summons, classes, spells, items, monsters) | `app/content/{statuses,summons,classes,spells,items,monsters}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons,monsters}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
@@ -161,6 +162,8 @@ Form and query values are raw strings. Validate them, and convert them with
 | `view.back_path(req)` / `view.back_to(req [, fallback])` | this page's path and query (for a form's `back` field) / where to redirect after a form with `back`: that path if it is same-site with a GET route, else `fallback` (`/`) |
 | `view.chat(req, large)` / `view.online()` | ctx for `layout/chat.html` / `layout/online.html`, or nil when the Babble Box / Who's Online is turned off |
 | `view.render(name, ctx, req)` | a rendered template string (for building fragments) |
+| `view.fragments(req, template, ctx)` | the parts of the page `view.page` would draw, as HTML: `{ main, nav_left, nav_right }` (the middle column, and the side columns' boxes from the user row as it is now); same templates, so a page and its fragments can't drift |
+| `view.fragment_page(req, title, template, ctx [, t])` | JSON for a page fetched by a script: `t` plus `title`, `url` (`req.path` unless `t.url`) and `fragments` (fight.js, see [Fight API](#fight-api-smooth-fights)) |
 | `view.layout(req, title, html, opts)` | wraps already-rendered HTML |
 
 `opts`:
@@ -176,6 +179,8 @@ Form and query values are raw strings. Validate them, and convert them with
 	page (`body.minimal.help` in `community.css`).
 - `chat_inline`: the page shows the Babble Box itself (town page, `/babble`), so the
 	right column doesn't.
+- `scripts`: more scripts for the page, names of `public/js/<name>.js` (`{ "fight" }` on
+	the fight pages); `layout/head.html` adds them after `live.js`.
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -187,8 +192,11 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `theme` (the request's theme, see [Themes](#themes)), `gamename`, `nav` (table or nil),
 `logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
-live.js) and `side` (with `nav`: the online count and the Babble Box for the right column,
-`layout/side_live.html`). Include `{{{ include("layout/head") }}}` in `<head>` to get the
+live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
+`layout/side_live.html`) and `scripts` (opts). The main layout marks the parts a script may
+swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
+`<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
+column: the chat below it keeps its scroll position and typed text). Include `{{{ include("layout/head") }}}` in `<head>` to get the
 CSS links (`dk.css` + the four feature stylesheets + the theme's), `dk.js` and, with
 `live`, `live.js`; put `theme-{{ theme.key }}` in the `<body>` class followed by
 `{{{ include("layout/live_attrs") }}}`, start the body with
@@ -270,7 +278,8 @@ shares one stream between a browser's tabs.
 
 **Testing.** `test_routes = true` in the config (the e2e config sets it) enables
 `POST /__test/publish` (`channel`, `event`, `data`, optional `delay_ms`, `fail=1`) for any
-logged-in user; `tests/e2e/live.sh` reads streams with `curl -N` (the `live_*` helpers
+logged-in user, and the request header `X-Test-Seed: <digits>` (`math.randomseed` before the
+route runs: `tests/e2e/fight_api.sh` plays a round twice with the same dice); `tests/e2e/live.sh` reads streams with `curl -N` (the `live_*` helpers
 of `tests/run.sh`, see [End-to-end tests](#end-to-end-tests)).
 
 ### Events
@@ -925,6 +934,14 @@ model after the round (`r.f`) and `escaped`, `victory`, `died` or `refused`.
 `round.locked(f)`: the player has a blocking status, so the page offers only "Continue"
 and the route turns any command into `continue`.
 
+**The trace.** With `f.trace = {}` set on the model before `round.play` (the JSON fight
+API does), the round records in `r.f.trace`, in order, every line it says, every change
+of HP, MP or TP, every status applied, counted down, expiring or removed and every ally
+joining, counting down or leaving, each with its step (`f.doing`: who acts and how, set by
+`engine.doing(f, c, kind)` / `engine.done(f, prev)` around the code that acts). Lines go
+through `engine.say(f, line)`. Tracing rolls nothing and changes nothing (the equivalence
+test below traces every other fight); `fight/events.lua` turns it into the API's events.
+
 **Equivalence.** Fights without summons or new statuses roll exactly the original's dice,
 in the same order, with the same messages and results: no AI roll with one action and one
 target, sleep and the damage/defense buffs as statuses with the original formulas.
@@ -1076,6 +1093,108 @@ item (`s.target:afflict("<key>", ...)`, `s:summon("<key>", ...)`; declare it wit
 admin pages `/admin/statuses` and `/admin/summons` override names, descriptions, numbers
 and messages per server. Unit tests can run statuses and summons without files:
 `load.preload(kind, key, module)` primes the loaded module (see `tests/lua/test_round.lua`).
+
+### Fight API (smooth fights)
+
+With JavaScript the fight pages play a round in place: `public/js/fight.js` (loaded only on
+the fight pages: `scripts = { "fight" }`) sends the fight forms with `fetch` and plays the
+answer's events one by one. The server side is the same routes (`routes/fight.lua`) asked
+with `Accept: application/json` (`view.wants_json`): the same handlers, the same round
+code, the same templates.
+
+**Answers.** Instead of a page, `GET`/`POST /fight`, `GET /victory`, `GET`/`POST /drop` and
+`GET /dead` answer:
+
+```lua
+{
+	events = { ... },             -- the round (below); [] for a page without a round
+	fragments = {                 -- view.fragments: the page's parts, by the page's templates
+		main = "<section class=\"box fight\">...",   -- the middle column (fight, victory, drop, death)
+		nav_left = "...", nav_right = "...",        -- the side columns' boxes (HP, gold, bag, ...)
+	},
+	round = 7,                    -- the fight's round now (what the next form must carry); absent when over
+	url = "/fight", title = "Fighting",   -- the page's address and title
+	stale = true,                 -- only when the form was stale (below)
+}
+-- or, where the page would redirect (a 302 would be followed by fetch, losing the events):
+{ events = { ... }, redirect = "/victory" }   -- also "/" (escaped, nothing pending), "/fight"
+-- or, instead of an error page (refusals, invalid choices; nothing changed):
+{ error = "Your Hit Points are already full. Please go back and try again." }
+```
+
+**Events** (`fight/events.lua`, from the round's trace): one per line of the page, in the
+page's order, with what changed with it; a change in a step that hasn't said anything is
+an event without `text`. The texts are exactly the lines the page shows (unescaped:
+put them in with `textContent`). Nothing else of the model leaks (no status data, rolls,
+stock, immunity).
+
+```lua
+{
+	part = "player",               -- the page's paragraph: player, allies, enemies, ending
+	actor = "enemy", actor_id = 2, actor_name = "Goblin Shaman",   -- who acts (a status: its bearer)
+	type = "spell",                -- attack, spell, item, status (a status's tick or hook, or the
+	                               -- turn's countdown), summon (an ally acting, joining, leaving),
+	                               -- blocked (a status blocks the turn), run, ambush, wave (the next
+	                               -- enemy), say (anything else); the last event of a round that
+	                               -- ended: victory, death or escape (no text)
+	text = "The monster casts Hurt on you for 14 damage.",   -- absent: a change without a line
+	hp = { { who = "player", id = 1, name = "Fapi", from = 300, to = 286, max = 300 } },
+	mp = { { who = "enemy", id = 2, name = "Goblin Shaman", from = 17, to = 12, max = 17 } },
+	tp = { ... },                  -- who: player | ally | enemy; an enemy's MP only if the page shows it
+	status = { { who = "player", id = 1, name = "Fapi", key = "poison", status = "Poisoned",
+		turns = 3, change = "add",   -- add | remove | expire | turns (counted down)
+		statuses = { { key = "poison", name = "Poisoned", turns = 3 } } } },   -- the bearer's, after it
+	summon = { { change = "join", id = 3, name = "Wolf", hp = 30, max = 30, turns = 5 } },   -- join | leave | turns
+}
+```
+
+Lists are present only when not empty; `turns` is absent for an unlimited status or ally.
+Changes go with their step's latest line (a spell's line, then its damage and MP cost).
+
+**Stale rounds.** Every fight form carries the round it was shown at (`<input type="hidden"
+name="round">`, the `fights.round` the page saved). A `POST /fight` with another round (a
+second click, an older tab, a resubmitted page) plays nothing: the answer is the fight as
+`GET /fight` shows it (that GET counts a round, as always) with the note "That command came
+from an older page, so nothing happened." (`stale = true` in JSON); a won fight goes on to
+`/victory`, and a fight that is over (not fighting any more) redirects to `/`. A form
+without the field (from before 2.3) plays as before. The counter stops at 255
+(`state.MAX_ROUND`): from there on rounds can't be told apart.
+
+**fight.js.** Forms marked `data-fight` (the fight commands, the drop's Take/Leave) and links
+in the middle column to the four fight pages (the victory page's drop link) go through
+fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the form's
+`csrf` field or `<body data-csrf>`). Meanwhile the forms' controls are disabled and
+`data-main` is `aria-busy`. Then it:
+
+1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
+	(in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms after the
+	previous one; its changes update the player's numbers and bars in the right column
+	(`[data-player-stats]`, `[data-bar=hp|mp|tp]`), the numbers and bars of the monsters and
+	allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`; fight.js adds the
+	bars), the status chips of a combatant's line (made if the page had none), allies
+	joining and leaving. A click in the middle column, any key (not while typing) or the
+	"Skip" button plays the rest at once; with `prefers-reduced-motion` there are no delays
+	and no animations (`fight.css`).
+2. swaps the fragments in (`data-main`, `data-nav-left`, `data-nav-right`), sets the title
+	and `history.replaceState`s the answer's `url`, so a reload shows the same page (and
+	the screen ends up exactly as the server rendered it);
+3. follows a `redirect` after a short pause: another fight page is fetched the same way,
+	anything else (`/`) is a normal navigation;
+4. shows an `error` as a note above the form (the form stays; nothing was played).
+
+Any network error, non-JSON answer (a 403 for CSRF, a redirect to `/login`) or failure
+before the answer posts the form (or follows the link) as without JavaScript; a stale
+round then shows the fight as it is. A failure after the answer reloads the page.
+
+**Adding an animated event type.** A new kind of line needs nothing: give the code that
+says it a step (`local prev = engine.doing(f, c, "my_kind")` ... `engine.done(f, prev)`
+around `engine.say` and the changes) and it arrives with `type = "my_kind"`; add the type to
+the list above and to `TYPES` in `tests/e2e/fight_api.sh`. A new kind of change: record it
+in the trace where it happens (`trace(f, { my_change = ..., id = c.id, ... })` in
+`fight/engine.lua`), turn it into a field of the event in `events.build` (plain names and
+numbers only), apply it in fight.js's `show(e, log)` (look elements up by
+`data-fighter`; build DOM with `textContent`), add a CSS animation in `fight.css` (and its
+`prefers-reduced-motion` exception), and extend the shape check in `fight_api.sh`.
 
 ## Monsters
 
@@ -1498,7 +1617,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
-| `t_fetch path 'a=1'` | POST like live.js: `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
+| `t_fetch path 'a=1' [curl args]` | POST like live.js and fight.js: `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
 | `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
 | `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |
 | `live_publish channel event data`, `live_frames_ok name` | `POST /__test/publish`; the stream is well-formed (retry, id/event/data blocks, comments) |

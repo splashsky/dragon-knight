@@ -13,3 +13,6 @@
 {%- if live then %}
 <script src="/static/js/live.js" defer></script>
 {%- end %}
+{%- for _, name in ipairs(scripts or {}) do %}
+<script src="/static/js/{{ name }}.js" defer></script>
+{%- end %}

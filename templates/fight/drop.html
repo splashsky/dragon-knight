@@ -16,7 +16,7 @@
 {%- if error then %}
 <p class="error">{{ error }}</p>
 {%- end %}
-<form action="/drop" method="post">
+<form action="/drop" method="post" data-fight>
 {{{ csrf_field() }}}
 {%- if full then %}
 <p>Your bag is full. Choose an item to discard to make room for the {{ drop.name }}:</p>
