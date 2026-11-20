@@ -78,8 +78,8 @@ t_jar nother
 t_get /inn
 t_post /banner/dismiss "csrf=$(t_csrf)&id=$BANNER_ID&back=/inn"; expect_redirect /inn
 expect_header "^set-cookie: dk_banner=$BANNER_ID; Path=/; Max-Age=2592000; SameSite=Lax"
-t_get /inn;    expect_no_body 'dk-banner"'
-t_jar nreply;  t_get /inn; expect_body 'dk-banner"'
+t_get /inn;    expect_no_body 'class="dk-banner" role="status" data-banner='
+t_jar nreply;  t_get /inn; expect_body 'class="dk-banner" role="status" data-banner='
 t_get "/live/state?back=/inn"; expect_body '"banner":"\n\u003cdiv class=\"dk-banner\"'
 # a new banner shows again where the old one was dismissed; with an expiry
 t_jar nadmin
@@ -101,7 +101,7 @@ t_get /admin/broadcast
 t_post /admin/broadcast "csrf=$(t_csrf)&clear=1"; expect_redirect '/admin/broadcast\?saved=cleared'
 BANNER_ID3=$(t_sql "SELECT banner_id FROM control")
 live_has start $'event: clear\ndata: {"id":'"$BANNER_ID3"'}'
-t_jar nreply;  t_get /inn; expect_no_body 'Clear me'; expect_no_body 'dk-banner"'
+t_jar nreply;  t_get /inn; expect_no_body 'Clear me'; expect_no_body 'class="dk-banner" role="status" data-banner='
 [ "$(t_sql "SELECT banner || '|' || banner_expires FROM control")" = "|0" ] && t_ok || t_fail "banner not cleared"
 
 t_section "notices: logout closes the session's pages"

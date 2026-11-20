@@ -55,7 +55,8 @@ function presence.list(limit)
 end
 
 local function publish(event, id, name)
-	dk.publish(presence.CHANNEL, event, json.encode({ id = id, name = name, online = presence.count() }))
+	dk.publish(presence.CHANNEL, event, json.encode({ id = id, name = name, url = "/character/" .. id,
+		online = presence.count() }))
 end
 
 -- An authenticated request by `user` (session.load): updates onlinetime and announces

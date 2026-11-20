@@ -1,0 +1,11 @@
+{#- Prototypes live.js fills for what the event stream brings (docs/APP.md "Live pages"):
+		the broadcast banner (layout/banner.html's markup: keep the two alike) and a notice's
+		toast. They carry the session's CSRF token but not the page's address (`back`): they
+		would change with every page, and live.js sends these forms itself. ctx: live. -#}
+{%- if live then %}
+<template data-proto="banner"><div class="dk-banner" role="status" data-slot-attr="data-banner:id data-banner-ttl:ttl">
+<span class="dk-banner-text" data-slot="text"></span>
+<form class="inline dk-banner-dismiss" method="post" action="/banner/dismiss">{{{ csrf_field() }}}<input type="hidden" name="id" data-slot-attr="value:id"><button class="link" type="submit" title="Dismiss" aria-label="Dismiss">&times;</button></form>
+</div></template>
+<template data-proto="toast"><div class="dk-toast"><span data-slot="before" data-unwrap></span><a data-slot="title" data-slot-attr="href:url"></a><span data-slot="after" data-unwrap></span><button class="link dk-toast-close" type="button" aria-label="Close">&times;</button></div></template>
+{%- end %}

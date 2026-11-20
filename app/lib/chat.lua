@@ -31,9 +31,12 @@ function chat.history()
 	return out
 end
 
--- What a message looks like in events and JSON answers.
+-- What a message looks like in events and JSON answers (when: the time as the page shows
+-- it; delete: the address administrators delete it with; live.js fills the page's
+-- chat-post prototype, layout/chat.html, with these).
 function chat.event(row)
-	return { id = row.id, author = row.author, text = row.babble, time = row.posttime }
+	return { id = row.id, author = row.author, text = row.babble, time = row.posttime,
+		when = php.datetime(row.posttime), delete = "/babble/" .. row.id .. "/delete" }
 end
 
 -- Seconds `user` has to wait before posting again (0: may post now).

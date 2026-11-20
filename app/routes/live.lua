@@ -54,6 +54,7 @@ end
 
 -- form: id (the banner's), back
 function live.dismiss_banner(req)
+	req.quiet = true   -- a cookie of this browser: nothing for the player's other pages
 	local id = math.tointeger(tonumber(req.form.id))
 	if id then cookie.set(req, banner.COOKIE, tostring(id), { max_age = 30 * 86400, httponly = false }) end
 	return view.redirect(view.back_to(req))
@@ -62,6 +63,7 @@ end
 -- form: channel, event, data; delay_ms (wait before the commit), fail=1 (error after
 -- publishing: the transaction rolls back and the event is dropped)
 function live.test_publish(req)
+	req.quiet = true
 	if dk.config.test_routes ~= true then return view.not_found(req) end
 	local f = req.form
 	dk.publish(f.channel or "", f.event or "", f.data or "")

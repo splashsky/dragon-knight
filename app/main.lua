@@ -2,6 +2,7 @@
 -- handles exactly one request.
 local content_sync = require("lib.content.sync")
 local csrf = require("lib.csrf")
+local json = require("lib.json")
 local dbcount = require("lib.dbcount")
 local migrations = require("lib.migrations")
 local presence = require("lib.presence")
@@ -147,12 +148,24 @@ local function live_response(req, res)
 	return res
 end
 
+-- After a player's POST, their other pages (other tabs, other devices) are told to fetch
+-- themselves again (live.js, the live client): `stale` on user:<id> with the sending tab's
+-- id (X-DK-Tab), which that tab ignores. Routes whose change reaches the pages by other
+-- events (the chat) set req.quiet.
+local function publish_stale(req, res)
+	if req.method ~= "POST" or req.quiet or not req.user or (res.status or 200) >= 400 then return end
+	local tab = req.headers["x-dk-tab"]
+	if type(tab) ~= "string" or #tab > 32 or not tab:find("^[%w%-]+$") then tab = "" end
+	dk.publish("user:" .. req.user.id, "stale", json.encode({ tab = tab }))
+end
+
 return function(req)
 	req.out_headers = {}
 	req.live = live_of(req)
 	dbcount.install()
 	local ok, res = xpcall(function()
 		local res = normalize(dispatch(req))
+		publish_stale(req, res)
 		if req.live then res = live_response(req, res) end
 		return res
 	end, debug.traceback)

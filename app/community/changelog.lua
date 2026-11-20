@@ -15,6 +15,7 @@ changelog.RELEASES = {
 			"After a death the fight page still shows how the fight ended, until you set out again.",
 			"The game no longer loads whole pages as you play: links and buttons bring only the parts of the page that changed, so the page stays put, the chat keeps what you were typing, and the live chat stays connected; Back and Forward work as before. Without JavaScript everything works as it always did.",
 			"A thin bar at the top of the page shows when the server takes more than a moment to answer.",
+			"Pages you have open in other tabs or on another device keep up: what you do in one shows in the others within a moment, without reloading them.",
 		},
 	},
 	{

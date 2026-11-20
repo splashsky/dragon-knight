@@ -389,7 +389,7 @@ t_post /babble "csrf=$BC&babble=$long&submit=Babble"
 t_sql "INSERT INTO babble (posttime, author, author_id, babble) WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 52)
 	SELECT 1000 + i, 'Townie', NULL, 'msg' || i FROM n"
 t_get /babble
-[ "$(grep -c 'class="babble-post"' "$BODY")" = 50 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post"' "$BODY") posts"
+[ "$(grep -c 'class="babble-post" data-id=' "$BODY")" = 50 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post" data-id=' "$BODY") posts"
 expect_no_body '] msg2<'; expect_body '] msg3<'
 [ "$(grep -o '] msg[0-9]*<' "$BODY" | head -n1)" = '] msg3<' ] && [ "$(grep -o '] msg[0-9]*<' "$BODY" | tail -n1)" = '] msg52<' ] \
 	&& t_ok || t_fail "babble order (oldest first)"

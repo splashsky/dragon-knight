@@ -312,7 +312,24 @@ The design as approved:
 	`fight_api.sh` keeps its seeded form-vs-live comparisons over the wire; `dkbench` sends
 	live requests where it sent JSON (`make bench` compares form and live fights).
 
-## L4: live sync
+## L4: live sync — ✅ done
+
+**As implemented** (`docs/APP.md` "Live pages", "Events"): resync, a reconnect, the
+bfcache, and logout go through `DK.refresh()` (L2); `stale` on `user:<id>` after every
+successful POST of a player (`main.lua` `publish_stale`; `req.quiet` for the chat's and the
+banner dismissal), the sending page's `X-DK-Tab` ignored by it, debounced 250 ms, hidden
+pages on showing again (and after a minute hidden); markup prototypes (`chat-post`,
+`online-name`, `banner`, `toast`) filled by live.js's `proto()`, the events carrying what
+the markup needs (`when`, `delete` for chat messages, `url` for presence). One change from
+the design: **`GET /live/state` stays**: live.js uses it to ask, before reopening a
+stream after an error status, whether the player is still logged in, and as the resync
+for pages without the live client (a browser with EventSource but without the client's
+needs). Prototypes leave out the page's address (`back`), since it would change their
+region with every page. Tests: `live_wire.sh` ("the player's other pages"), `browser.sh` (a
+second tab following a move without a page load; a chat post from the prototype equal to
+the server's markup), `chat.sh`, `presence.sh`, `notices.sh`.
+
+The design as approved:
 
 - **Resync** (the stream's `resync`, a reconnect, a page back from the bfcache, a tab
 	visible again after more than a minute) is `DK.refresh()`: a live GET of the current

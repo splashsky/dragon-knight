@@ -1,5 +1,6 @@
-{#- The Babble Box's messages, oldest first (live.js builds the same markup for new ones).
-		ctx: posts, is_admin, back. -#}
+{#- The Babble Box's messages, oldest first (new ones: live.js fills the chat-post
+		prototype in layout/chat.html, the same markup: keep the two alike). ctx: posts,
+		is_admin, back. -#}
 {%- for _, p in ipairs(posts) do %}
 <li class="babble-post" data-id="{{ p.id }}" title="{{ datetime(p.posttime) }}">[<b>{{ p.author }}</b>] {{ p.babble }}
 {%- if is_admin then %} <form class="inline chat-delete" method="post" action="/babble/{{ p.id }}/delete">{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}"><button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end -%}

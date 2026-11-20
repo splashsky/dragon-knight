@@ -420,15 +420,16 @@ the browser sees only the name):
 
 | Channel | Event | Data | Published by |
 |---|---|---|---|
-| `babble` | `babble` | `{ id, author, text, time }` (a new chat message; `time`: unix seconds) | `POST /babble` (`chat.post`) |
+| `babble` | `babble` | `{ id, author, text, time, when, delete }` (a new chat message; `time`: unix seconds, `when`: as the page shows it, `delete`: the address administrators delete it with) | `POST /babble` (`chat.post`) |
 | `babble` | `delete` | `{ id }` | `POST /babble/#id/delete` (administrators) |
-| `presence` | `join` | `{ id, name, online }` (`online`: how many are online now) | a player's first request while not online (`session.load`) |
-| `presence` | `leave` | `{ id, name, online }` | the presence sweep |
+| `presence` | `join` | `{ id, name, url, online }` (`url`: the character page; `online`: how many are online now) | a player's first request while not online (`session.load`) |
+| `presence` | `leave` | `{ id, name, url, online }` | the presence sweep |
 | `notices` | `news` | `{ id, title, author, url }` | a news post (`/admin/news`) |
 | `notices` | `banner` | `{ id, text, expires, ttl }` (`expires`, `ttl`: unix time and seconds left, absent without an expiry) | `/admin/broadcast` (set) |
 | `notices` | `clear` | `{ id }` | `/admin/broadcast` (clear) |
 | `user:<id>` | `reply` | `{ thread, title, author, url }` | a reply in a forum thread the player started or posted in (not to the one replying; at most 200 players) |
 | `user:<id>` | `logout` | `{ session }` (one session's pages) or `{ all = true }` | logout; password change, lost password, a new password set in the user editor |
+| `user:<id>` | `stale` | `{ tab }` (the sending page's `X-DK-Tab`, or `""`) | every successful POST of the player (`main.lua`), but those that set `req.quiet` (the chat's, the banner's dismissal): their other pages ask for themselves again |
 | (server) | `resync`, `bye` | empty | the hub: missed events are gone / shutdown |
 
 The `admin` channel exists for administrators' streams; nothing uses it yet.
@@ -443,6 +444,23 @@ appears and stops when it goes (on `DK.on("applied")`), and it stays open across
 navigation. What it changes in the page itself (a chat message, a name joining) it reports
 with `DK.touched`. Everything it does is also there without it: forms post and pages
 reload. No toasts in popup windows (`window.opener`).
+
+- **Markup comes from the server.** What live.js adds to a page (a chat message, a name in
+	Who's Online, the banner, a toast) is a copy of a `<template data-proto="…">` the page
+	carries (`chat-post` in `layout/chat.html`, `online-name` in `layout/online.html`,
+	`banner` and `toast` in `layout/protos.html`, rendered with the page: an administrator's
+	chat posts have the delete button, with the session's CSRF token). live.js fills it from
+	the event: `data-slot="key"` elements get the value as text (`data-unwrap`: the text
+	alone), `data-slot-attr="attr:key ..."` attributes; then the result is the server's
+	own markup for it (a prototype says so next to the template it copies: keep the two
+	alike). Prototypes leave out the page's address (`back`), which would change their
+	region with every page; live.js sends those forms itself.
+- **Other pages of the player.** After every successful POST of a player (but the chat's
+	and a banner dismissal: `req.quiet`), `main.lua` publishes `stale` on `user:<id>` with
+	the sending page's id (`X-DK-Tab`, `DK.tab`). Every other page of the player, in this
+	browser or another, asks for itself again (`DK.refresh()`, 250 ms later: several
+	changes, one request; only what changed comes); a hidden page does it when it shows
+	again (also after more than a minute hidden, whatever happened).
 
 - **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
 	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
@@ -548,7 +566,10 @@ new banner shows again.
 3. Render the same thing server-side so a page load (and no JS) shows it, with a
 	`data-...` hook live.js can find; if it can go stale, add it to `GET /live/state`.
 4. In live.js add the event to `EVENTS` and a handler to `handlers` that updates the
-	page with `textContent`/DOM methods (idempotent: an event may come twice).
+	page (idempotent: an event may come twice): markup from a `<template data-proto>` the
+	page carries (`proto(name, values)`), text with `textContent`; then `touched(el)`, so the
+	live client's next answer brings that region as the server has it. Often the simplest
+	handler is `DK.refresh()`: the page as the server has it, only what changed.
 5. Test with two jars and `live_open` streams (`tests/e2e/chat.sh` is the model).
 
 ## Templates

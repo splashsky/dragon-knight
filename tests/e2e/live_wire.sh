@@ -97,6 +97,22 @@ t_req HEAD / -H 'X-DK-Live: 1' -I; expect_header '^content-type: text/html'     
 t_get /; t_live_page; sed -i 's/head=[0-9a-f]*/head=000000000000/' "$JAR.have"
 t_live GET /inn; [ "$(w_ops)" = "go 4" ] && [ "$(w_payload go)" = /inn ] && t_ok || t_fail "changed head: $(w_ops)"
 
+t_section "live wire: the player's other pages (stale)"
+# a POST that changed something tells the player's other pages (user:<id>, the sending
+# page's X-DK-Tab); the chat's and the banner's don't (their own events do), nor refusals
+t_get /; LW_CS=$(t_csrf)
+live_open lwother
+sleep 0.3
+t_post /inn "csrf=$LW_CS&cancel=No" -H 'X-DK-Tab: tab-one'
+live_has lwother $'event: stale\ndata: {"tab":"tab-one"}'
+t_post /babble "csrf=$LW_CS&babble=hello+stale" -H 'X-DK-Tab: tab-two'
+t_post /banner/dismiss "csrf=$LW_CS&id=1" -H 'X-DK-Tab: tab-three'
+t_post /inn "csrf=nope&submit=Yes" -H 'X-DK-Tab: tab-four'
+t_post /inn "csrf=$LW_CS&cancel=No" -H 'X-DK-Tab: bad tab!'
+live_has lwother $'event: stale\ndata: {"tab":""}'
+live_lacks lwother 'tab-two'; live_lacks lwother 'tab-three'; live_lacks lwother 'tab-four'
+live_close lwother
+
 t_section "live wire: logging in and out"
 t_jar livewire2; t_reset_jar
 t_get /login; t_live_page

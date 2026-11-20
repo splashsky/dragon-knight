@@ -32,7 +32,7 @@ live_has a "\"id\":$PRESB_ID,\"name\":\"PresB\",\"online\":"
 expect_body "<a data-id=\"$PRESB_ID\" href=\"/character/$PRESB_ID\">PresB</a>"
 COUNT=$(t_sql "SELECT count(*) FROM users WHERE online = 1")
 expect_body "There are <b data-online-count>$COUNT</b> user(s) online:"
-grep -qF "\"online\":$COUNT}" "$T/live.a" && t_ok || t_fail "join: online count $COUNT"
+grep -qF "\"online\":$COUNT,\"url\":\"/character/$PRESB_ID\"}" "$T/live.a" && t_ok || t_fail "join: online count $COUNT"
 t_get /inn;   expect_body "Online: <span data-online-count>$COUNT</span>"
 t_get /;      t_get /inn
 pres_expect a join PresB 1

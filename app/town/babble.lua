@@ -23,6 +23,7 @@ end
 -- POST /babble (babble, back): blank messages are ignored, longer ones cut to
 -- chat.MAX_CHARS; at most one message per chat.INTERVAL seconds (429).
 function babble.post(req)
+	req.quiet = true   -- the chat's own events tell the pages (main.lua publish_stale)
 	local row, wait = chat.post(req.user, req.form.babble)
 	if wait then return too_fast(req, wait) end
 	if view.wants_json(req) then
@@ -33,6 +34,7 @@ end
 
 -- POST /babble/#id/delete (administrators): the message goes, on every open page too.
 function babble.delete(req, params)
+	req.quiet = true
 	if req.user.authlevel ~= 1 then
 		local msg = "Only administrators can delete messages."
 		if view.wants_json(req) then return view.json({ error = msg }, 403) end

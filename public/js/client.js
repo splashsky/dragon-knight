@@ -86,6 +86,8 @@
 	var queued = null;         // the visit to start once a POST is answered
 	var lastButton = null;     // the submit button last clicked (browsers without ev.submitter)
 	var slowTimer = 0, progress = null, announcer = null;
+	// this page's id: the server's `stale` events say which page sent the change (live.js)
+	var tab = Math.random().toString(36).slice(2, 14);
 
 	function here() { return location.pathname + location.search; }
 	function on(name, fn) { (hooks[name] = hooks[name] || []).push(fn); }
@@ -283,7 +285,7 @@
 		var answered = false;
 		fetch(url, {
 			method: o.method, body: o.body, credentials: "same-origin", signal: controller.signal,
-			headers: { "X-DK-Live": "1", "X-DK-Have": formatHashes(have) },
+			headers: { "X-DK-Live": "1", "X-DK-Have": formatHashes(have), "X-DK-Tab": tab },
 		}).then(function (res) {
 			answered = true;
 			var type = res.headers.get("Content-Type") || "";
@@ -474,6 +476,7 @@
 		on: on,
 		view: function () { return { url: view.url, post: view.post }; },
 		busy: function () { return !!inflight; },
+		tab: tab,
 		// another script changed el's region in the page: its hash no longer says what is
 		// on screen, so the next answer sends that region
 		touched: function (el) {

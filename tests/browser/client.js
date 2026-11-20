@@ -40,7 +40,7 @@ async function main() {
 			try { info = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) { await sleep(100); }
 		}
 		var pageTarget = info.filter(function (t) { return t.type === "page"; })[0];
-		await run(pageTarget.webSocketDebuggerUrl);
+		await run(pageTarget.webSocketDebuggerUrl, port);
 	} finally {
 		proc.kill();
 		await sleep(300);
@@ -48,38 +48,46 @@ async function main() {
 	}
 }
 
-async function run(wsUrl) {
-	var ws = new WebSocket(wsUrl), id = 0, waiting = {}, loads = 0;
+// A DevTools session with one tab: send(method, params), js(expr) (its value; promises
+// awaited), until(expr, ms), nav(path) (a normal page load), loads (page loads so far).
+async function session(wsUrl) {
+	var ws = new WebSocket(wsUrl), id = 0, waiting = {}, t = { loads: 0, ws: ws };
 	await new Promise(function (r, j) { ws.onopen = r; ws.onerror = j; });
 	ws.onmessage = function (m) {
 		var d = JSON.parse(m.data);
 		if (d.id && waiting[d.id]) { waiting[d.id](d); delete waiting[d.id]; }
-		if (d.method === "Page.loadEventFired") loads++;
+		if (d.method === "Page.loadEventFired") t.loads++;
 	};
-	function send(method, params) {
+	t.send = function (method, params) {
 		return new Promise(function (r) { var n = ++id; waiting[n] = r; ws.send(JSON.stringify({ id: n, method: method, params: params || {} })); });
-	}
-	async function js(expr) {
-		var r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
+	};
+	t.js = async function (expr) {
+		var r = await t.send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
 		if (r.result && r.result.exceptionDetails) throw new Error(expr + ": " + JSON.stringify(r.result.exceptionDetails));
 		return r.result && r.result.result ? r.result.result.value : undefined;
-	}
-	async function until(expr, ms) {
+	};
+	t.until = async function (expr, ms) {
 		var end = Date.now() + (ms || 5000);
 		while (Date.now() < end) {
-			try { if (await js(expr)) return true; } catch (e) { /* page navigating */ }
+			try { if (await t.js(expr)) return true; } catch (e) { /* page navigating */ }
 			await sleep(50);
 		}
 		return false;
-	}
-	async function nav(url) {
-		var before = loads;
-		await send("Page.navigate", { url: BASE + url });
-		await until("document.readyState === 'complete'");
-		for (var i = 0; i < 100 && loads === before; i++) await sleep(50);
-	}
-	await send("Page.enable");
-	await send("Runtime.enable");
+	};
+	t.nav = async function (url) {
+		var before = t.loads;
+		await t.send("Page.navigate", { url: BASE + url });
+		await t.until("document.readyState === 'complete'");
+		for (var i = 0; i < 100 && t.loads === before; i++) await sleep(50);
+	};
+	await t.send("Page.enable");
+	await t.send("Runtime.enable");
+	return t;
+}
+
+async function run(wsUrl, port) {
+	var tab = await session(wsUrl);
+	var send = tab.send, js = tab.js, until = tab.until, nav = tab.nav, ws = tab.ws;
 
 	section = "login";
 	await nav("/login");
@@ -94,10 +102,10 @@ async function run(wsUrl) {
 	check("the event stream starts", await until("!!localStorage.getItem('dk-live-leader')"));
 
 	section = "navigation";
-	var loadsBefore = loads;
+	var loadsBefore = tab.loads;
 	await js("document.querySelector('a[href=\"/inventory\"]').click()");
 	check("inventory page", await until("location.pathname === '/inventory' && document.title === 'Inventory'"), await js("document.title"));
-	check("no reload", await js("window.__dk === 1") && loads === loadsBefore);
+	check("no reload", await js("window.__dk === 1") && tab.loads === loadsBefore);
 	check("the middle column", await js("!!document.querySelector('[data-r=main]').textContent.match(/bag/i)"));
 	check("one region of each", await js("[...document.querySelectorAll('[data-r]')].map(e => e.dataset.r).every((n, i, a) => a.indexOf(n) === i)"));
 	await js("history.back()");
@@ -121,6 +129,15 @@ async function run(wsUrl) {
 	await js("var f = document.querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'hello from the browser'; f.requestSubmit()");
 	check("my message in the panel", await until("/hello from the browser/.test(document.querySelector('[data-r=chat-posts]').textContent)"));
 	check("the input cleared", await until("document.querySelector('[data-chat-form] [name=babble]').value === ''"));
+	// the message came from the page's chat-post prototype: the server's own markup for it
+	// (a player's; an administrator's has the page's address in its delete form)
+	if (await js("!document.body.hasAttribute('data-live-admin')")) {
+		var mine = await js("[...document.querySelectorAll('[data-r=chat-posts] li')].pop().outerHTML");
+		await js("DK.refresh()");
+		await until("!DK.busy()");
+		var theirs = await js("[...document.querySelectorAll('[data-r=chat-posts] li')].pop().outerHTML");
+		check("the prototype's markup is the server's", mine === theirs, [mine, theirs]);
+	}
 	await js("document.querySelector('details[data-chat]').open = false");
 	await js("document.querySelector('a[href=\"/inventory\"]').click()");
 	check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
@@ -148,6 +165,30 @@ async function run(wsUrl) {
 			check("marked as a POST's page", await js("history.state.post === true && DK.view().post === true"));
 		}
 	}
+
+	section = "another tab";
+	// a second tab of the same player: a change in one shows in the other (the server's
+	// `stale` event over the shared stream, then a live refresh), without a page load
+	var info2 = await (await fetch("http://127.0.0.1:" + port + "/json/new?" + encodeURIComponent(BASE + "/inventory"), { method: "PUT" })).json();
+	var other = await session(info2.webSocketDebuggerUrl);
+	await other.until("document.readyState === 'complete' && !!window.DK");
+	await other.js("window.__dk2 = 1");
+	await until("!DK.busy()");
+	var lat = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
+	var where = await js("location.pathname");
+	if (where === "/" && await js("!!document.querySelector('form.compass')")) {
+		await js("document.querySelector('form.compass input[name=north]').click()");
+		await until("!DK.busy()");
+		var lat2 = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
+		check("moved here", lat2 !== lat, [lat, lat2]);
+		check("the other tab follows", await other.until("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1] === " + JSON.stringify(lat2), 6000),
+			await other.js("document.querySelector('[data-r=loc]').textContent"));
+		check("the other tab: no page load", await other.js("window.__dk2 === 1 && location.pathname === '/inventory'"));
+	}
+	await other.send("Page.close").catch(function () {});
+	other.ws.close();
+	await js("DK.visit('/')");
+	await until("!DK.busy()");
 
 	section = "a fight";
 	await js("fetch('/__test/encounter', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': document.body.dataset.csrf } })" +

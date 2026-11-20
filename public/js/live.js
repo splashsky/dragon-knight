@@ -20,7 +20,7 @@
 	function isAdmin() { return body.hasAttribute("data-live-admin"); }
 	function touched(el) { if (window.DK && window.DK.touched) window.DK.touched(el); }
 	var HISTORY = 50;               // messages kept in a chat panel (lib/chat.lua HISTORY)
-	var EVENTS = ["babble", "delete", "join", "leave", "news", "reply", "banner", "clear", "logout", "resync"];
+	var EVENTS = ["babble", "delete", "join", "leave", "news", "reply", "banner", "clear", "logout", "stale", "resync"];
 	// the leader's claim is renewed every BEAT; a visible tab takes over a claim older than
 	// STALE, a hidden one (its timers may be throttled to once a minute) one older than
 	// HIDDEN_STALE
@@ -33,8 +33,32 @@
 	function txt(s) { return document.createTextNode(s); }
 	function here() { return location.pathname + location.search; }
 	function safeUrl(u) { return typeof u === "string" && /^\/(?![\/\\])/.test(u) ? u : null; }
-	function hidden(name, value) {
-		var i = el("input"); i.type = "hidden"; i.name = name; i.value = value; return i;
+	// A copy of the page's <template data-proto="name"> (the server renders them with the
+	// page: the same markup as its own, with this page's CSRF token and address) with
+	// values filled in: data-slot="key" gets the value as text (data-unwrap: the text alone,
+	// no element), data-slot-attr="attr:key ..." the values as attributes (left out when a
+	// value is missing). null when the page has no such prototype.
+	function proto(name, values) {
+		var t = document.querySelector('template[data-proto="' + name + '"]');
+		if (!t || !t.content) return null;
+		var frag = t.content.cloneNode(true);
+		Array.prototype.forEach.call(frag.querySelectorAll("[data-slot-attr]"), function (e) {
+			e.getAttribute("data-slot-attr").split(" ").forEach(function (pair) {
+				var i = pair.indexOf(":"), v = values[pair.slice(i + 1)];
+				if (i > 0 && v != null) e.setAttribute(pair.slice(0, i), String(v));
+			});
+			e.removeAttribute("data-slot-attr");
+		});
+		Array.prototype.forEach.call(frag.querySelectorAll("[data-slot]"), function (e) {
+			var v = values[e.getAttribute("data-slot")];
+			v = v == null ? "" : String(v);
+			if (e.hasAttribute("data-unwrap")) { e.parentNode.replaceChild(txt(v), e); return; }
+			e.textContent = v;
+			e.removeAttribute("data-slot");
+		});
+		var root = frag.firstElementChild;
+		if (root) root.normalize();
+		return root;
 	}
 	function post(url, fields) {
 		var data = new URLSearchParams(fields);
@@ -46,26 +70,14 @@
 
 	// ---- the Babble Box
 
-	function deleteForm(id) {
-		var f = el("form", "inline chat-delete");
-		f.method = "post"; f.action = "/babble/" + id + "/delete";
-		f.appendChild(hidden("csrf", csrf())); f.appendChild(hidden("back", here()));
-		var b = el("button", "link"); b.type = "submit"; b.title = "Delete"; b.setAttribute("aria-label", "Delete");
-		b.textContent = "\u00d7";
-		f.appendChild(b);
-		return f;
-	}
 	function addPost(m) {
 		var id = Number(m.id);
 		if (!id) return;
 		$$("[data-chat-posts]").forEach(function (list) {
 			if (list.querySelector('[data-id="' + id + '"]')) return;
-			var li = el("li", "babble-post");
-			li.setAttribute("data-id", id);
-			if (m.time) li.title = new Date(m.time * 1000).toLocaleString();
-			var b = el("b"); b.textContent = String(m.author);
-			li.appendChild(txt("[")); li.appendChild(b); li.appendChild(txt("] " + String(m.text)));
-			if (isAdmin()) { li.appendChild(txt(" ")); li.appendChild(deleteForm(id)); }
+			var li = proto("chat-post", { id: id, when: m.when, author: m.author, text: m.text,
+				delete: safeUrl(m.delete) });
+			if (!li) return;
 			var next = null;
 			Array.prototype.forEach.call(list.children, function (c) {
 				if (!next && Number(c.getAttribute("data-id")) > id) next = c;
@@ -142,7 +154,8 @@
 			var links = onlineLinks(list), limit = Number(list.getAttribute("data-online-limit")) || 0;
 			if (!links.some(function (a) { return Number(a.getAttribute("data-id")) === id; }) &&
 				(!limit || links.length < limit)) {
-				var a = el("a"); a.href = "/character/" + id; a.setAttribute("data-id", id); a.textContent = String(p.name);
+				var a = proto("online-name", { id: id, url: safeUrl(p.url), name: p.name });
+				if (!a) return;
 				links.push(a);
 				relist(list, links);
 			}
@@ -168,16 +181,10 @@
 			box.setAttribute("role", "status"); box.setAttribute("aria-live", "polite");
 			body.appendChild(box);
 		}
-		var t = el("div", "dk-toast");
-		t.appendChild(txt(before));
-		var link = safeUrl(url), a = el(link ? "a" : "b");
-		if (link) a.href = link;
-		a.textContent = String(title);
-		t.appendChild(a);
-		if (after) t.appendChild(txt(after));
-		var x = el("button", "link dk-toast-close"); x.type = "button"; x.textContent = "\u00d7"; x.setAttribute("aria-label", "Close");
-		x.addEventListener("click", function () { t.remove(); });
-		t.appendChild(x);
+		var t = proto("toast", { before: before, title: title, url: safeUrl(url), after: after || "" });
+		if (!t) return;
+		var x = t.querySelector(".dk-toast-close");
+		if (x) x.addEventListener("click", function () { t.remove(); });
 		box.appendChild(t);
 		setTimeout(function () { t.remove(); }, 12000);
 	}
@@ -192,14 +199,10 @@
 		var id = Number(b.id);
 		if (!id || dismissed() === id) return;
 		$$("[data-banner-slot]").forEach(function (slot) {
+			var div = proto("banner", { id: id, text: b.text });
+			if (!div) return;
 			slot.textContent = "";
-			var div = el("div", "dk-banner"); div.setAttribute("role", "status"); div.setAttribute("data-banner", id);
-			var span = el("span", "dk-banner-text"); span.textContent = String(b.text);
-			var f = el("form", "inline dk-banner-dismiss"); f.method = "post"; f.action = "/banner/dismiss";
-			f.appendChild(hidden("csrf", csrf())); f.appendChild(hidden("id", id)); f.appendChild(hidden("back", here()));
-			var x = el("button", "link"); x.type = "submit"; x.title = "Dismiss"; x.setAttribute("aria-label", "Dismiss");
-			x.textContent = "\u00d7";
-			f.appendChild(x); div.appendChild(span); div.appendChild(f); slot.appendChild(div);
+			slot.appendChild(div);
 			touched(slot);
 			expire(div, Number(b.ttl));
 		});
@@ -241,6 +244,24 @@
 		});
 	}
 
+	// ---- the player changed something on another page (another tab, another device): this
+	// page asks the live client for itself again (only what changed comes), a moment later
+	// (several changes, one request); a hidden page when it shows again, as one that was
+	// hidden for over a minute anyway
+
+	var staleTimer = 0, missed = false, hiddenAt = 0;
+	function stale(d) {
+		if (!window.DK || d.tab === window.DK.tab) return;
+		if (document.visibilityState === "hidden") { missed = true; return; }
+		clearTimeout(staleTimer);
+		staleTimer = setTimeout(function () { window.DK.refresh(); }, 250);
+	}
+	document.addEventListener("visibilitychange", function () {
+		if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+		if (running && window.DK && (missed || (hiddenAt && Date.now() - hiddenAt > 60000))) window.DK.refresh();
+		missed = false;
+	});
+
 	// ---- events (every tab)
 
 	var seen = [];
@@ -260,6 +281,7 @@
 			end();
 			if (window.DK) window.DK.refresh(); else location.reload();
 		},
+		stale: stale,
 		resync: refresh,
 	};
 	function handle(name, raw, id) {
