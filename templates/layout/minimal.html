@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{{{ hashes() }}}>
 <head>
 <title>{{ title }}</title>
-{{{ include("layout/head") }}}
+{{{ region("head") }}}{{{ include("layout/head") }}}{{{ endregion() }}}
 </head>
-<body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
-<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
-<div class="dk-content">
+{{{ region("root") }}}<body class="minimal theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}">
+{{{ region("banner") }}}<div class="dk-banner-slot" data-r="banner" data-banner-slot>{{{ include("layout/banner") }}}</div>{{{ endregion() }}}
+{{{ region("main") }}}<div class="dk-content" data-r="main">
 {{{ content }}}
-</div>
-</body>
+</div>{{{ endregion() }}}
+</body>{{{ endregion() }}}
 </html>

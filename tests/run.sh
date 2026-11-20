@@ -378,6 +378,32 @@ t_fetch() {
 	t_req POST "$1" --data "${2:-}" -H 'Accept: application/json' -H "X-CSRF-Token: $token" "${@:3}"
 }
 
+# Live requests (docs/APP.md "Live client"; needs python3): like public/js/client.js, the
+# jar's live state is the hash map of the regions "on screen" ($JAR.have). t_live_page:
+# take it from the last full page (<html data-h>); t_live_forget: nothing on screen.
+# t_live GET|POST PATH ['a=1'] [curl args]: a live request with X-DK-Live and X-DK-Have
+# (and the CSRF token of the page in X-CSRF-Token), $BODY the wire answer; the hashes
+# frame is merged into the map, as the client does. w_ops: the answer's frames, one
+# "op args length" line each; w_payload OP [ARG]: the first such frame's payload (raw
+# bytes); w_has OP [ARG] / w_lacks: assertions.
+t_live_page() { grep -o 'data-h="[^"]*"' "$BODY" | head -n1 | cut -d'"' -f2 > "$JAR.have"; }
+t_live_forget() { : > "$JAR.have"; }
+t_live() {
+	local method=$1 path=$2 data=${3:-} token
+	token=$(grep -o 'name="csrf" value="[0-9a-f]*"' "$BODY" | head -n1 | cut -d'"' -f4)
+	[ -n "$token" ] && echo "$token" > "$JAR.livecsrf" || token=$(cat "$JAR.livecsrf" 2>/dev/null)
+	local args=(-H 'X-DK-Live: 1' -H "X-DK-Have: $(cat "$JAR.have" 2>/dev/null)" -H "X-CSRF-Token: $token")
+	if [ "$method" = POST ]; then t_req POST "$path" --data "$data" "${args[@]}" "${@:4}"
+	else t_req GET "$path" "${args[@]}" "${@:4}"; fi
+	if grep -qi '^content-type: application/x-dk-live' "$HEADERS"; then
+		python3 "$ROOT/tests/wire.py" merge "$BODY" "$JAR.have"
+	fi
+}
+w_ops() { python3 "$ROOT/tests/wire.py" ops "$BODY"; }
+w_payload() { python3 "$ROOT/tests/wire.py" payload "$BODY" "$@"; }
+w_has() { if w_ops | grep -qE "^$1${2:+ $2} [0-9]+$"; then t_ok; else t_fail "no frame $1 $2 in: $(w_ops | tr '\n' ';')"; fi; }
+w_lacks() { if w_ops | grep -qE "^$1${2:+ $2} [0-9]+$"; then t_fail "unexpected frame $1 $2"; else t_ok; fi; }
+
 # ---------------------------------------------------------------------------------
 # install + serve
 

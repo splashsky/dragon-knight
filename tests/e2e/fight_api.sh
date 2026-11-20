@@ -3,7 +3,7 @@
 # same dice (X-Test-Seed, test_routes) must leave the same database and say the same lines;
 # the events' shape (spells, items, statuses, summons, monster spells and items); stale
 # rounds (a second click, an older tab) in both paths; CSRF; the victory, death and drop
-# pages as fragments; the no-JS page (the round field, fight.js only on fight pages).
+# pages as fragments; the no-JS page (the round field).
 # Sourced by tests/run.sh.
 if ! command -v python3 >/dev/null; then
 	t_section "fight api (skipped: needs python3)"
@@ -180,7 +180,7 @@ expect_body "Monster's HP: 50"; expect_no_body 'fight-stale'
 expect_body '<div class="dk-nav-right" data-nav-right>'; expect_body 'data-bar="hp"'
 t_get /;   expect_redirect /fight
 t_sql "UPDATE users SET currentaction = 'In Town' $FAQ"
-t_get /;   expect_status 200; expect_no_body 'fight.js'
+t_get /;   expect_status 200; expect_body 'fight.js'   # every page loads every script (one head for all)
 t_sql "UPDATE users SET currentaction = 'Fighting' $FAQ"
 t_get /static/js/fight.js; expect_status 200; expect_body 'data-fight'
 if command -v node >/dev/null; then

@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{{{ hashes() }}}>
 <head>
 <title>{{ title }}</title>
-{{{ include("layout/head") }}}
+{{{ region("head") }}}{{{ include("layout/head") }}}{{{ endregion() }}}
 </head>
-<body class="admin theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
-<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
+{{{ region("root") }}}<body class="admin theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
+{{{ region("banner") }}}<div class="dk-banner-slot" data-r="banner" data-banner-slot>{{{ include("layout/banner") }}}</div>{{{ endregion() }}}
 <div class="admin-page">
 	<nav class="admin-menu">
 		{{{ logo() }}}
@@ -28,20 +28,20 @@
 		<a href="/admin/statuses">Statuses</a><br>
 		<a href="/admin/summons">Summons</a><br>
 	</nav>
-	<main class="admin-content">
+	{{{ region("main") }}}<main class="admin-content" data-r="main">
 {%- if content_error then %}
 <div class="admin-errors"><b>Content files have errors</b> (the game keeps the last good content; see <a href="/admin/classes">Classes</a>, <a href="/admin/spells">Spells</a> or <a href="/admin/items">Items</a>):
 <pre class="error">{{ content_error }}</pre></div>
 {%- end %}
 {{{ content }}}
-	</main>
+	</main>{{{ endregion() }}}
 </div>
-<footer class="dk-footer copyright admin-footer">
+{{{ region("foot") }}}<footer class="dk-footer copyright admin-footer" data-r="foot">
 	<div>Powered by <a href="http://dragon.se7enet.com/dev.php" target="_blank" rel="noopener">Dragon Knight</a></div>
 	<div>&copy; 2003-2006 by renderse7en</div>
 	<div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
 	<div><a href="/changelog">Version {{ version }}</a> {{ build }}</div>
-</footer>
-<div class="dk-themes small">{{{ theme_picker() }}}</div>
-</body>
+</footer>{{{ endregion() }}}
+{{{ region("themes") }}}<div class="dk-themes small" data-r="themes">{{{ theme_picker() }}}</div>{{{ endregion() }}}
+</body>{{{ endregion() }}}
 </html>

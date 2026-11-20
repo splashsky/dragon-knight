@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{{{ hashes() }}}>
 <head>
 <title>{{ title }}</title>
-{{{ include("layout/head") }}}
+{{{ region("head") }}}{{{ include("layout/head") }}}{{{ endregion() }}}
 </head>
-<body class="theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
-<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>
+{{{ region("root") }}}<body class="theme-{{ theme.key }}{% if body_class then %} {{ body_class }}{% end %}"{{{ include("layout/live_attrs") }}}>
+{{{ region("banner") }}}<div class="dk-banner-slot" data-r="banner" data-banner-slot>{{{ include("layout/banner") }}}</div>{{{ endregion() }}}
 <div class="dk-page">
 <header class="dk-top">
 	{{{ logo() }}}
@@ -21,15 +21,15 @@
 	</nav>
 </header>
 <div class="dk-cols">
-	<aside class="dk-left" data-nav-left>
+	{{{ region("left") }}}<aside class="dk-left" data-r="left" data-nav-left>
 {%- if nav then %}
 {{{ include("layout/nav_left", nav) }}}
 {%- end %}
-	</aside>
-	<main class="dk-middle" data-main>
+	</aside>{{{ endregion() }}}
+	{{{ region("main") }}}<main class="dk-middle" data-r="main" data-main>
 {{{ content }}}
-	</main>
-	<aside class="dk-right">
+	</main>{{{ endregion() }}}
+	{{{ region("right") }}}<aside class="dk-right" data-r="right">
 {%- if nav then %}
 <div class="dk-nav-right" data-nav-right>
 {{{ include("layout/nav_right", nav) }}}
@@ -38,15 +38,17 @@
 {%- if side then %}
 {{{ include("layout/side_live", side) }}}
 {%- end %}
-	</aside>
+	</aside>{{{ endregion() }}}
 </div>
 </div>
-<footer class="dk-footer copyright">
+{{{ region("foot") }}}<footer class="dk-footer copyright" data-r="foot">
 	<div>Powered by <a href="http://dragon.se7enet.com/dev.php" target="_blank" rel="noopener">Dragon Knight</a></div>
 	<div>&copy; 2003-2006 by renderse7en</div>
 	<div>{{ elapsed() }} Seconds, {{ queries() }} Queries</div>
 	<div><a href="/changelog">Version {{ version }}</a> {{ build }}</div>
-</footer>
-<div class="dk-themes small">{{{ theme_picker() }}}</div>
-</body>
+</footer>{{{ endregion() }}}
+{{{ region("themes") }}}<div class="dk-themes small" data-r="themes">{{{ theme_picker() }}}</div>{{{ endregion() }}}
+</body>{{{ endregion() }}}
 </html>
+{# Regions (region()/endregion(), data-r; docs/APP.md "Live client"): the parts of the page a
+		live request sends on their own when they change. #}

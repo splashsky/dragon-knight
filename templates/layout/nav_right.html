@@ -1,8 +1,8 @@
 {#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). Fast Spells: an icon
 		button per town spell (spells.buttons), each its own POST form to /spell/<id>, which
 		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's, and its
-		picture when it has one (else the slot's icon). -#}
-<section class="box">
+		picture when it has one (else the slot's icon). Each box is a region. -#}
+{{{ region("charpanel") }}}<section class="box" data-r="charpanel">
 <div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
 <div class="box-body charpanel" data-player-stats>
 <div class="charpanel-head"><b>{{ user.charname }}</b> <span class="charpanel-level">Level {{ user.level }}</span></div>
@@ -19,9 +19,9 @@
 {%- end %}
 <a class="charpanel-more" href="/character" target="_blank" data-popup="250x600">Extended Stats</a>
 </div>
-</section>
+</section>{{{ endregion() }}}
 
-<section class="box">
+{{{ region("invpanel") }}}<section class="box" data-r="invpanel">
 <div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
 <div class="box-body invpanel">
 <a class="invpanel-bag{% if bag_used >= bag_size then %} full{% end %}" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>{{ bag_used }}</b>/{{ bag_size }}</span></a>
@@ -33,9 +33,9 @@
 {%- end %}
 </ul>
 </div>
-</section>
+</section>{{{ endregion() }}}
 
-<section class="box">
+{{{ region("spellpanel") }}}<section class="box" data-r="spellpanel">
 <div class="title"><img src="/static/images/button_fastspells.gif" alt="Fast Spells" title="Fast Spells"></div>
 <div class="box-body spellpanel">
 {%- if #spells == 0 then %}
@@ -48,4 +48,4 @@
 </div>
 {%- end %}
 </div>
-</section>
+</section>{{{ endregion() }}}

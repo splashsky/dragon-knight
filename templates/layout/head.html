@@ -9,11 +9,10 @@
 {%- if theme then %}
 <link rel="stylesheet" href="{{ theme.stylesheet }}">
 {%- end %}
+{#- Every page loads the same scripts (each does nothing where it has nothing to do: live.js
+		without <body data-live>), so the head is the same on every page and the live client
+		never has to load a page again for its scripts (docs/APP.md "Live client"). -#}
 <script src="/static/js/dk.js" defer></script>
 <script src="/static/js/tooltip.js" defer></script>
-{%- if live then %}
 <script src="/static/js/live.js" defer></script>
-{%- end %}
-{%- for _, name in ipairs(scripts or {}) do %}
-<script src="/static/js/{{ name }}.js" defer></script>
-{%- end %}
+<script src="/static/js/fight.js" defer></script>

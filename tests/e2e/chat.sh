@@ -12,11 +12,11 @@ t_register chata chatapw1 chata@example.com ChatA; t_login chata chatapw1
 CHATA_ID=$(t_sql "SELECT id FROM users WHERE username = 'chata'")
 t_get /;      expect_status 200
 [ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "town page: one chat panel"
-expect_body '<details class="chat chat-large" data-chat open>'
+expect_body '<details class="chat chat-large" data-r="chat" data-chat open>'
 expect_body '<script src="/static/js/live.js" defer></script>'
 expect_body 'data-live data-csrf="'; expect_no_body 'data-live-admin'
 t_get /inn;   expect_status 200
-expect_body '<details class="chat" data-chat open>'; expect_body 'name="back" value="/inn"'
+expect_body '<details class="chat" data-r="chat" data-chat open>'; expect_body 'name="back" value="/inn"'
 expect_body 'Online: <span data-online-count>'
 t_get /babble; expect_status 200; expect_body 'chat-large'; expect_body "Who's Online"
 [ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "/babble: one chat panel"
@@ -24,9 +24,9 @@ t_sql "UPDATE control SET showbabble = 0"
 t_get /inn;   expect_no_body 'data-chat-form'
 t_get /;      expect_no_body 'data-chat-form'
 t_sql "UPDATE control SET showbabble = 1"
-t_get /help;  expect_no_body 'live.js'                       # minimal layout: no live updates
+t_get /help;  expect_no_body 'data-live'                     # minimal layout: no live updates
 t_jar chatanon; t_reset_jar
-t_get /login; expect_no_body 'live.js'; expect_no_body 'data-live'
+t_get /login; expect_no_body 'data-live'
 if command -v node >/dev/null; then
 	node --check "$ROOT/public/js/live.js" && t_ok || t_fail "live.js: syntax"
 else

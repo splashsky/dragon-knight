@@ -9,6 +9,7 @@ local router = require("lib.router")
 local routes = require("routes")
 local session = require("lib.session")
 local view = require("lib.view")
+local wire = require("lib.wire")
 
 -- 503 unless the database has the schema this code expects (one PRAGMA per request).
 local function schema_check(req)
@@ -44,7 +45,7 @@ local function dispatch(req)
 		return view.csrf_failed(req)
 	end
 	-- end-to-end tests replay the same dice through two paths (tests/e2e/fight_api.sh)
-	if dk.config.test_routes == true then
+	if dk.config.test_routes == true and not req.internal then
 		local seed = req.headers["x-test-seed"]
 		if type(seed) == "string" and seed:match("^%d+$") and #seed <= 15 then math.randomseed(math.tointeger(tonumber(seed))) end
 	end
@@ -60,10 +61,99 @@ local function normalize(res)
 	return res
 end
 
+---------------------------------------------------------------------------------------
+-- Live requests (docs/APP.md "Live client"): the live client (public/js/client.js) sends
+-- X-DK-Live: 1 and X-DK-Have (the hashes of the regions it has) on its GETs and POSTs. The
+-- same routes run; a page comes back as the regions the client lacks (lib/wire.lua), a
+-- redirect to one of the game's pages is followed here (one round trip for a POST and the
+-- page it lands on), any other HTML page (500, 503) as a whole document.
+
+local function live_of(req)
+	if req.headers["x-dk-live"] ~= "1" or (req.method ~= "GET" and req.method ~= "POST") then return nil end
+	return { have = wire.parse_have(req.headers["x-dk-have"]), url = req.target or req.path }
+end
+
+local function header(res, name)
+	for _, hd in ipairs(res.headers) do
+		if hd[1]:lower() == name then return hd[2] end
+	end
+	return nil
+end
+
+local function redirect_of(res)
+	local s = res.status
+	if s == 301 or s == 302 or s == 303 or s == 307 then return header(res, "location") end
+	return nil
+end
+
+local function is_html(res)
+	return (header(res, "content-type") or ""):find("^text/html") ~= nil
+end
+
+local function wire_response(status, frames, headers)
+	local hs = { { "Content-Type", wire.CONTENT_TYPE }, { "Cache-Control", "private, no-cache" } }
+	for _, hd in ipairs(headers or {}) do
+		local n = hd[1]:lower()
+		if n ~= "content-type" and n ~= "cache-control" then hs[#hs + 1] = hd end
+	end
+	return { status = status, headers = hs, body = wire.encode(frames) }
+end
+
+-- The answer to a live request, from the route's (or the redirect target's) response.
+local function live_response(req, res)
+	local events, url = {}, req.live.url
+	local function take(r)
+		for _, e in ipairs(r.events or {}) do events[#events + 1] = e end
+		for _, e in ipairs(r.live and r.live.events or {}) do events[#events + 1] = e end
+	end
+	take(res)
+	for _ = 1, wire.MAX_HOPS do
+		local loc = redirect_of(res)
+		local path, qs = (loc or ""):match("^(/[^?#]*)%??([^#]*)")
+		if not path or loc:sub(1, 2) == "//" or not routes:match("GET", path) then break end
+		local target = path .. (qs ~= "" and "?" .. qs or "")
+		local sub = { method = "GET", path = path, target = target, query = wire.parse_query(qs), form = {},
+			cookies = wire.cookies_after(req.cookies, req.out_headers), headers = req.headers, remote = req.remote,
+			body = "", out_headers = req.out_headers, internal = true, live = { have = req.live.have, url = target } }
+		res = normalize(dispatch(sub))
+		url = target
+		take(res)
+	end
+	local loc = redirect_of(res)
+	if loc then return wire_response(200, { { "go", "", loc } }) end
+	if res.live then
+		local ok, doc = pcall(wire.split, res.live.html)
+		if not ok then
+			dk.log("error", "regions: " .. doc)
+			return wire_response(res.status, { { "doc", "", wire.strip(res.live.html) } }, res.headers)
+		end
+		local have, regions = req.live.have, doc.regions
+		if regions.head and have.head and have.head ~= regions.head.hash then
+			-- other stylesheets or scripts (a theme, a deploy): a normal page load
+			return wire_response(200, { { "go", "", url } })
+		end
+		if not regions.root then
+			return wire_response(res.status, { { "doc", "", wire.page(res.live.html) } }, res.headers)
+		end
+		local frames = { { "title", "", res.live.title or "" }, { "url", "", url } }
+		for _, e in ipairs(events) do frames[#frames + 1] = { "events", e.kind, e.json } end
+		for _, node in ipairs(wire.changed(doc, have)) do frames[#frames + 1] = { "region", node.name, wire.html(node) } end
+		frames[#frames + 1] = { "hashes", "", wire.hashes(doc, have) }
+		return wire_response(res.status, frames, res.headers)
+	end
+	if is_html(res) then return wire_response(res.status, { { "doc", "", res.body or "" } }, res.headers) end
+	return res
+end
+
 return function(req)
 	req.out_headers = {}
+	req.live = live_of(req)
 	dbcount.install()
-	local ok, res = xpcall(function() return normalize(dispatch(req)) end, debug.traceback)
+	local ok, res = xpcall(function()
+		local res = normalize(dispatch(req))
+		if req.live then res = live_response(req, res) end
+		return res
+	end, debug.traceback)
 	if ok and req.method == "HEAD" then
 		-- HEAD runs the GET handler for accurate headers, but must not change state
 		-- (GET /fight and /victory advance the game): discard the request's writes.
@@ -78,7 +168,11 @@ return function(req)
 		dk.log("error", req.method .. " " .. req.target .. " -> 500\n" .. tostring(res))
 		req.out_headers = {}
 		res = view.server_error(req, tostring(res))
+		if req.live then res = wire_response(500, { { "doc", "", res.body } }) end
 	end
 	for _, hd in ipairs(req.out_headers) do table.insert(res.headers, hd) end
+	-- pages and live answers differ by X-DK-Live
+	local ct = header(res, "content-type") or ""
+	if ct:find("^text/html") or ct:find("^application/x%-dk%-live") then table.insert(res.headers, { "Vary", "X-DK-Live" }) end
 	return res
 end

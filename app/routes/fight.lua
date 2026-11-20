@@ -40,9 +40,6 @@ local view = require("lib.view")
 
 local rand = php.rand
 
--- The fight pages load fight.js.
-local PAGE = { scripts = { "fight" } }
-
 -- An error: the page (html: trusted HTML, by default the text escaped), or { error = text }.
 local function error_page(req, text, html)
 	if view.wants_json(req) then return view.json({ error = text }) end
@@ -56,7 +53,7 @@ local function show(req, title, template, ctx, t)
 		t.events = t.events or json.array()
 		return view.fragment_page(req, title, template, ctx, t)
 	end
-	return view.page(req, title, template, ctx, PAGE)
+	return view.page(req, title, template, ctx)
 end
 
 -- A redirect, or { redirect = url } with the fields of t.

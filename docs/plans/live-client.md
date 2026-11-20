@@ -104,7 +104,25 @@ are byte-identical before and after. The fight scripts (`fight.sh`, `fight_api.s
 form-vs-API comparisons keep their meaning. `migrate.sh`: v14 → v15 with a pending
 encounter and a won unpaid fight.
 
-## L1: regions and the wire protocol (server)
+## L1: regions and the wire protocol (server) — ✅ done
+
+**As implemented** (`docs/APP.md` "Live client"): `app/lib/wire.lua` (markers, split,
+skeleton hashes, `changed`, `hashes`, encode/decode, the have header, internal-redirect
+helpers), `view.layout` returning `res.live` for live requests and `wire.page` (markers
+stripped, `<html data-h>`) otherwise, `main.lua`'s `live_response` (redirects followed on
+the server with the cookies set so far, `go`, `doc`, `Vary`). The regions are as below
+(the left and right columns' boxes each a region; the chat split into `chat-posts` and
+`chat-form`). Changes from the design: the `hashes` frame carries only the hashes that
+changed (and `name=-` for regions gone), since sending all of them every time cost more
+than a typical answer's regions; `layout/head.html` now loads every script on every page
+(`live.js` and `fight.js` too; the `scripts` layout option is gone), so `head` is the same
+everywhere and a move into a fight doesn't fall back to `go`. Measured on a dev install: an
+unchanged page costs the footer's timing line (~0.4 KiB), a map move ~1.1 KiB (`loc`,
+`foot`), a fight round ~4.8 KiB (`main`, `charpanel`, `foot`) against a 10.7 KiB page.
+Tests: `tests/lua/test_wire.lua`, `tests/e2e/live_wire.sh` with the `t_live` helpers of
+`tests/run.sh` and `tests/wire.py`.
+
+The design as approved:
 
 **Regions.** A layout or template marks the parts of a page that change on their own:
 

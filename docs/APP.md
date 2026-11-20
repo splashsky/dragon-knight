@@ -27,6 +27,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Realtime (event streams) | `app/routes/live.lua`, `app/lib/json.lua` | | `tests/e2e/live.sh`, `tests/lua/test_json.lua`, `tests/c/test_hub.c` |
+| Live client (regions, the wire format) | `app/lib/wire.lua`, `app/main.lua`, `app/lib/view.lua` (`region`, `view.layout`) | `templates/layout/*.html` (regions), `templates/layout/chat.html` | `tests/e2e/live_wire.sh` (`tests/wire.py`), `tests/lua/test_wire.lua` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
 | Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v*}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
@@ -186,8 +187,6 @@ Form and query values are raw strings. Validate them, and convert them with
 	page (`body.minimal.help` in `community.css`).
 - `chat_inline`: the page shows the Babble Box itself (town page, `/babble`), so the
 	right column doesn't.
-- `scripts`: more scripts for the page, names of `public/js/<name>.js` (`{ "fight" }` on
-	the fight pages); `layout/head.html` adds them after `live.js`.
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -200,8 +199,9 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
 live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
-`layout/side_live.html`) and `scripts` (opts). `layout/head.html` also loads
-`tooltip.js` on every page (see [Tooltips](#tooltips)). The main layout marks the parts a script may
+`layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
+`tooltip.js`, see [Tooltips](#tooltips), `live.js`, `fight.js`): the head is the same
+everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
 `<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
 column: the chat below it keeps its scroll position and typed text). Include `{{{ include("layout/head") }}}` in `<head>` to get the
@@ -210,6 +210,72 @@ CSS links (`dk.css` + the four feature stylesheets + the theme's), `dk.js` and, 
 `{{{ include("layout/live_attrs") }}}`, start the body with
 `<div class="dk-banner-slot" data-banner-slot>{{{ include("layout/banner") }}}</div>`, and
 use `{{{ logo() }}}` and `{{{ theme_picker() }}}`.
+
+## Live client
+
+(3.0, `docs/plans/live-client.md`.) Pages are plain HTML that works without JavaScript;
+with it, the live client (`public/js/client.js`) sends links and forms with `fetch` and
+the server answers with only the parts of the page that changed. Routes, guards, handlers
+and templates don't change for it: the same code answers both ways.
+
+**Regions.** A layout or template marks the parts of a page that change on their own:
+
+```html
+{{{ region("loc") }}}<section class="box" data-r="loc">...</section>{{{ endregion() }}}
+```
+
+`region(name)`/`endregion()` leave invisible markers around the element (`<\1loc>`,
+`</\1>`; escaped text never contains `<`, so user data can't make one), and the element
+carries the same name in `data-r` for the client to find it. Regions nest, names
+(`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
+`head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
+`banner`, `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
+`spellpanel`, `online-count`, `chat` with `chat-posts` and `chat-form`), `foot`, `themes`;
+`minimal` and `admin` have `banner`, `main` (and `foot`, `themes`). `lib/wire.lua` splits a
+rendered page at the markers in one pass and hashes each region's **skeleton** (its HTML
+with each child region replaced by a placeholder; 12 hex digits of SHA-256), so a hash
+changes only when that region's own markup does. A full page loses the markers and carries
+every hash on `<html data-h="head=… root=… loc=…">` (`{{{ hashes() }}}` in the layouts'
+`<html>` tag). Every layout must load the same head (`layout/head.html` loads every script
+on every page): a page whose head differs is loaded normally.
+
+**Live requests.** A GET or POST with `X-DK-Live: 1`, and `X-DK-Have: name=hash ...` (the
+regions the client shows). `main.lua` runs the route as always, then:
+
+- a page from `view.layout` is answered with the regions whose hash differs from the
+	client's (walking down from `root`: a region the client has is skipped and its children
+	compared; one it lacks or has differently goes whole, children included);
+- a redirect to one of the game's pages (a same-site path with a GET route) is **followed
+	on the server**, up to 5 hops, each a fresh dispatch with the cookies set so far (login
+	and logout work): a POST and the page it lands on are one round trip. A redirect
+	elsewhere becomes `go`;
+- a `head` that differs from the client's becomes `go` (load the page normally: a theme
+	changed, or a deploy brought new scripts or stylesheets);
+- an HTML page outside the layouts (the 500 and 503 pages) becomes `doc`; anything else
+	(JSON, text, the event stream) is answered as it is. HEAD is never live.
+- pages and live answers carry `Vary: X-DK-Live`.
+
+**The wire format** (`application/x-dk-live`; `wire.encode`/`wire.decode`, `tests/wire.py`):
+the line `DK1`, then frames `<op> [<arg> ...] <length>\n<payload>\n`. Lengths are in bytes
+and payloads raw (HTML goes as HTML, nothing is escaped); clients skip ops they don't know.
+
+| Op | Payload |
+|---|---|
+| `title <n>` | the document title |
+| `url <n>` | the page's address: where the redirects landed, else the request's (a POST that answers with a page keeps its own, as a browser shows it) |
+| `events <kind> <n>` | data for a player of that kind (JSON), played before the regions apply; from `opts.events = { { kind, json }, ... }` of `view.layout`/`view.page`, or `res.events` on a redirect |
+| `region <name> <n>` | the region's element (outerHTML, children included; `root`: the `<body>`) |
+| `hashes <n>` | the regions whose hash the client lacks or has differently (`name=hash`, space-separated), and `name=-` for those the page no longer has |
+| `go <n>` | load this URL normally instead |
+| `doc <n>` | a whole HTML document to show instead |
+
+The HTTP status is the page's (a 404 page comes as a 404 with its regions).
+
+**Adding a region.** Wrap the element in `region()`/`endregion()` and give it the same
+`data-r`. Worth it for a part that changes often while the rest of its parent doesn't (a
+box in a column). Markers must balance: a page that doesn't is an error with `dev = true`
+(and loses its hashes otherwise). Partials rendered on their own for JSON (`/live/state`,
+`view.fragments`) must not leave markers in their output (`wire.strip`).
 
 ## Realtime (event streams)
 
@@ -1296,8 +1362,8 @@ and messages per server. Unit tests can run statuses and summons without files:
 
 ### Fight API (smooth fights)
 
-With JavaScript the fight pages play a round in place: `public/js/fight.js` (loaded only on
-the fight pages: `scripts = { "fight" }`) sends the fight forms with `fetch` and plays the
+With JavaScript the fight pages play a round in place: `public/js/fight.js` (loaded on every page;
+it acts on the fight pages' forms) sends the fight forms with `fetch` and plays the
 answer's events one by one. The server side is the same routes (`routes/fight.lua`) asked
 with `Accept: application/json` (`view.wants_json`): the same handlers, the same round
 code, the same templates.
@@ -1864,6 +1930,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_mail_latest`, `t_mail_count` | outbox |
 | `t_wait_for path text` | poll up to 5 s (hot reload) |
 | `t_fetch path 'a=1' [curl args]` | POST like live.js and fight.js: `Accept: application/json`, the CSRF token (from the page's `data-csrf`) in `X-CSRF-Token` |
+| `t_live GET\|POST path ['a=1'] [curl args]`, `t_live_page`, `t_live_forget`, `w_ops`, `w_payload op [arg]`, `w_has op [arg]`, `w_lacks op [arg]` | a live request like the live client's (python3; `X-DK-Live`, `X-DK-Have` from the jar's hash map, which the answer's `hashes` frame updates); take the map from the last full page / start empty; the answer's frames (`op args length` lines), a frame's payload, assertions |
 | `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
 | `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |
 | `live_publish channel event data`, `live_frames_ok name` | `POST /__test/publish`; the stream is well-formed (retry, id/event/data blocks, comments) |

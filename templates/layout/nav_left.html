@@ -1,5 +1,5 @@
-{#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). -#}
-<section class="box">
+{#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). Each box is a region. -#}
+{{{ region("loc") }}}<section class="box" data-r="loc">
 <div class="title"><img src="/static/images/button_location.gif" alt="Location" title="Location"></div>
 <div class="box-body">
 Currently: {{ user.currentaction }}<br>
@@ -15,9 +15,9 @@ Longitude: {{ longitude }}<br>
 </form>
 {%- end %}
 </div>
-</section>
+</section>{{{ endregion() }}}
 
-<section class="box">
+{{{ region("towns") }}}<section class="box" data-r="towns">
 <div class="title"><img src="/static/images/button_towns.gif" alt="Towns" title="Towns"></div>
 <div class="box-body">
 {%- if town then %}
@@ -28,9 +28,9 @@ Travel To:<br>
 <form class="inline" method="post" action="/travel/{{ t.id }}">{{{ csrf_field() }}}<button class="link" type="submit">{{ t.name }}</button></form><br>
 {%- end %}
 </div>
-</section>
+</section>{{{ endregion() }}}
 
-<section class="box">
+{{{ region("functions") }}}<section class="box" data-r="functions">
 <div class="title"><img src="/static/images/button_functions.gif" alt="Functions" title="Functions"></div>
 <div class="box-body">
 <a href="/inventory">Inventory</a><br>
@@ -45,4 +45,4 @@ Travel To:<br>
 <form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<button class="link" type="submit">Log Out</button></form><br>
 <a href="/help">Help</a>
 </div>
-</section>
+</section>{{{ endregion() }}}

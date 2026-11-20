@@ -10,6 +10,7 @@ local presence = require("lib.presence")
 local session = require("lib.session")
 local themes = require("lib.themes")
 local tips = require("lib.tips")
+local wire = require("lib.wire")
 
 local view = {}
 
@@ -28,6 +29,12 @@ local base = {
 	date = php.prettydate,
 	datetime = php.datetime,
 }
+
+-- Regions (lib/wire.lua, docs/APP.md "Live client"): {{{ region("left") }}}<aside
+-- data-r="left">...</aside>{{{ endregion() }}}; {{{ hashes() }}} in the <html> tag.
+function base.region(name) return wire.open(name) end
+function base.endregion() return wire.CLOSE end
+function base.hashes() return wire.HASHES end
 
 function base.nl2br(s)
 	return php.nl2br(dk.html(s))
@@ -186,8 +193,12 @@ end
 --       body_class (extra class(es) on <body>, for page-specific CSS; the layouts add
 --       "theme-<key>"),
 --       chat_inline (the page shows the chat itself: not in the right column),
---       scripts (more scripts for the page: names of public/js/<name>.js, e.g. { "fight" }),
---       status, headers (extra {name, value} pairs), vars (extra layout ctx values).
+--       status, headers (extra {name, value} pairs), vars (extra layout ctx values),
+--       events ({ kind, json } list: played by the live client before the page's regions
+--       apply, docs/APP.md "Live client").
+-- A live request (req.live, main.lua) gets the rendered page with its region markers in
+-- res.live, for main.lua to answer with the regions the client lacks; any other request
+-- gets the page (markers gone, region hashes on <html data-h>).
 function view.layout(req, title, content, opts)
 	opts = opts or {}
 	local user = req.user
@@ -215,10 +226,15 @@ function view.layout(req, title, content, opts)
 		back = view.back_path(req),
 	}
 	live_ctx(req, ctx, layout, nav and user ~= nil, opts)
-	ctx.scripts = opts.scripts
 	for k, v in pairs(opts.vars or {}) do ctx[k] = v end
 	local body = view.render("layout/" .. layout, ctx, req)
-	return html_response(body, opts.status, opts.headers)
+	if req.live then
+		local headers = {}
+		for _, hd in ipairs(opts.headers or {}) do headers[#headers + 1] = hd end
+		return { status = opts.status or 200, headers = headers,
+			live = { title = title, html = body, events = opts.events } }
+	end
+	return html_response(wire.page(body), opts.status, opts.headers)
 end
 
 -- The usual page: render templates/<template>.html with ctx, then the layout.
@@ -231,13 +247,13 @@ end
 -- (the side columns' boxes, from the user row as it is now, like the layout). Same
 -- templates as the page, so the two can't drift.
 function view.fragments(req, template, ctx)
-	local out = { main = view.render(template, ctx, req) }
+	local out = { main = wire.strip(view.render(template, ctx, req)) }
 	local user = req.user and game.user(req.user.id)
 	if user then
 		req.user = user
 		local nav = game.nav(user)
-		out.nav_left = view.render("layout/nav_left", nav, req)
-		out.nav_right = view.render("layout/nav_right", nav, req)
+		out.nav_left = wire.strip(view.render("layout/nav_left", nav, req))
+		out.nav_right = wire.strip(view.render("layout/nav_right", nav, req))
 	end
 	return out
 end
