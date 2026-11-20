@@ -1,4 +1,5 @@
-{#- Discard confirmation (town/inventory.lua). ctx: entry (bag entry), error. -#}
+{#- Discard confirmation (town/inventory.lua). ctx: entry (bag entry), error. The item's
+		name carries its tooltip. -#}
 <div class="town-message">
 {%- if error then %}
 <span class="error">{{ error }}</span><br><br>
@@ -6,10 +7,10 @@
 <form action="/inventory/discard/{{ entry.id }}" method="post">
 {{{ csrf_field() }}}
 {%- if entry.qty > 1 then %}
-You have {{ entry.qty }} x {{ entry.item.name }}. How many do you want to throw away?
+You have {{ entry.qty }} x <span class="tip-term" data-tip tabindex="0">{{ entry.item.name }}{{{ tip("item", entry.item) }}}</span>. How many do you want to throw away?
 <input type="text" name="qty" size="4" value="{{ entry.qty }}" aria-label="Quantity"><br><br>
 {%- else %}
-Do you really want to throw away the {{ entry.item.name }}? It will be gone for good.<br><br>
+Do you really want to throw away the <span class="tip-term" data-tip tabindex="0">{{ entry.item.name }}{{{ tip("item", entry.item) }}}</span>? It will be gone for good.<br><br>
 {%- end %}
 <input type="submit" name="submit" value="Discard"> <input type="submit" name="cancel" value="Cancel">
 </form>

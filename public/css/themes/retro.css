@@ -7,8 +7,8 @@ body {
 }
 
 /* spell buttons: the original grey title boxes */
-.spell-btn { background-color: #eeeeee; border-color: black; }
-.spell-btn:hover { border-color: #663300; }
+.spell-btn, .action-btn { background-color: #eeeeee; border-color: black; }
+.spell-btn:hover, .action-btn:hover { border-color: #663300; }
 
 /* tooltips: the original grey boxes with black borders */
 .dk-tip, .dk-tip-arrow { border-color: black; }

@@ -544,7 +544,8 @@ live.js chat, a resync) needs no set-up, and nothing runs while nothing is hover
 	parts (no lore, no description) are left out. For anything else,
 	`{{{ include("tip/tip", { title = ..., meta = { ... }, lines = { ... }, body = text, lore = text }) }}}`.
 - **Disabled controls** get no pointer events in some browsers: put `data-tip` on a wrapper
-	(the spell buttons' `<span class="spell-tip">`; `.spell-btn:disabled` has
+	(the spell buttons' `<span class="spell-tip">`, the fight actions' `<span
+	class="action-tip">`; `.spell-btn:disabled` and `.action-btn:disabled` have
 	`pointer-events: none` so the wrapper gets the hover).
 - **No JavaScript**: keep a short `title` (and `aria-label` for icon buttons) in the markup;
 	it is the browser's own tooltip then. With the script, `title` moves to `data-tip-title`
@@ -577,10 +578,15 @@ so keyboards reach it) with a `<template class="tip">` child (`tip(...)` or
 `include("tip/tip", ...)`) or a `data-tip="text"`, and keep a `title` for no-JS. That's all.
 
 **Where.** The fight menu's spell buttons and Fast Spells (name, MP, where usable,
-description, lore), the gear rows of the Inventory panel (item name, kind, stats or power,
-description, lore; an empty slot's label), the monster's name on the fight page (name,
+description, lore), the fight menu's Attack (the player's attack power and weapon) and Run
+buttons (`tips.attack`, `tips.run`; see [Fight engine](#fight-engine)), the gear rows of
+the Inventory panel (item name, kind, stats or power, description, lore; an empty slot's
+label), item names wherever a page lists items (`tip("item", row)`: on `/inventory` the
+equipped slots and every bag entry, quest items saying "Quest item"; on `/shop` the items
+for sale, a link carrying `data-tip` itself, and the Sell list; the purchase page's item and
+the one it replaces; the discard confirmation), the monster's name on the fight page (name,
 level, description, lore) and the class names on the registration page (starting HP/MP, the
-description's points, lore).
+description's points, lore). Names that aren't links get `class="tip-term" tabindex="0"`.
 
 ## Lore
 
@@ -818,7 +824,8 @@ return {
 	[Tooltips](#tooltips)): its name, MP cost, where it can be cast, description and lore; the
 	trigger is the fight button's wrapper `<span class="spell-tip" data-tip>` and the Fast
 	Spells form (`data-tip-side="left"`), since a disabled button gets no pointer events. Both lists come from `spells.buttons`; the
-	styles are `.spell-grid`, `.spell-btn` and `.spell-mp` in `dk.css` (hover, active,
+	styles are `.spell-grid`, `.spell-btn` (shared with the fight menu's Attack and Run,
+	`.action-btn`) and `.spell-mp` in `dk.css` (hover, active,
 	`:focus-visible` outline, disabled = desaturated and faded; theme colours in
 	`themes/*.css`) and `.fight-spells` in `fight.css`. Items keep their select.
 - The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
@@ -1022,6 +1029,20 @@ is `fight/engine.lua`. Monsters choose by weight (`fight/ai.lua`). The dice and 
 the original game stay in `fight/combat.lua`; `routes/fight.lua` picks the monster, checks
 the player's choice (known spell, MP, item in the bag) and saves.
 
+**The fight menu** (`templates/fight/fight.html`, one form posting to `/fight`): an
+"Actions" group of icon buttons (`.action-btn`, styled with the spell buttons in `dk.css`
+and the themes; `.fight-actions`, `.action-row` in `fight.css`): **Attack**
+`<button type="submit" name="fight" value="Fight" aria-label="Attack">` with
+`images/skills/attack.png`, then **Run** `<button type="submit" name="run" value="Run"
+aria-label="Run">` with `images/skills/run.png`, set apart by a gap and a dotted rule
+(`.action-run`) so it isn't pressed instead of Attack; then the Spells row (see
+[Spells](#spells)); then the item select and "Use Item". The route only checks that the
+field is there (`form.fight`, `form.run`), so `fight=Fight` and `run=Run` (the text buttons
+before 2.4, old forms, tests) and whatever value a button sends play the same. Each action
+sits in a `<span class="action-tip" data-tip>` carrying its tooltip (`tips.attack(power,
+weapon)`: "Attack", the player's attack power and weapon, what it does; `tips.run()`), as
+fight.js disables the buttons while a round plays. A turn a status blocks shows only the
+"Continue" text button (`continue=Continue`; any command is a Continue then).
 **The model** (`fight/state.lua`; tables `fights`, `fight_combatants`, `fight_statuses`):
 
 | | |
@@ -1299,8 +1320,8 @@ stopped at 255), so long fights are protected too.
 in the middle column to the four fight pages (the victory page's drop link) go through
 fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the form's
 `csrf` field or `<body data-csrf>`; `FormData` leaves submit buttons out, so the pressed
-one's `name=value` is appended, as a native submit sends it: `fight=Fight`, `run=Run`,
-`spell=<id>` for a spell's icon button). Meanwhile the forms' controls are disabled and
+one's `name=value` is appended, as a native submit sends it: `fight=Fight` for Attack's icon
+button, `run=Run` for Run's, `spell=<id>` for a spell's icon button). Meanwhile the forms' controls are disabled and
 `data-main` is `aria-busy`. Then it:
 
 1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
@@ -1320,7 +1341,7 @@ one's `name=value` is appended, as a native submit sends it: `fight=Fight`, `run
 4. shows an `error` as a note above the form (the form stays; nothing was played).
 
 When the keyboard was in the middle column, the button that sent the round gets the focus
-back in the new form (the same spell's button, unless it is now disabled; else Fight).
+back in the new form (the same spell's button, unless it is now disabled; else Attack).
 
 Any network error, non-JSON answer (a 403 for CSRF, a redirect to `/login`) or failure
 before the answer posts the form (or follows the link) as without JavaScript; a stale
@@ -1748,6 +1769,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_csrf` | CSRF token from the last body |
 | `t_enc value` | urlencode |
 | `expect_status N`, `expect_body text`, `expect_no_body text`, `expect_header regex`, `expect_redirect /path` | assertions; `expect_body` matches raw HTML, so write `'` as `&#39;` |
+| `expect_text text`, `t_text` | the body's text without tags and tooltip templates (a sentence with an item name that has a tooltip); entities stay |
 | `t_ok` / `t_fail msg` | custom assertions |
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |

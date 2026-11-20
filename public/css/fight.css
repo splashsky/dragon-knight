@@ -3,9 +3,12 @@
 .fight-command p { margin: 0 0 1em; }
 .fight-command input[type="submit"] { min-width: 4.5em; }
 .fight-stale { font-style: italic; }
-/* the spells: a row of icon buttons (dk.css .spell-btn) under a small label */
-.fight-spells { margin: 0 0 1em; }
-.fight-spells-label { display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold; }
+/* the actions (Attack, Run: dk.css .action-btn), then the spells: rows of icon buttons
+	under a small label; Run is set apart from Attack (a gap and a rule) */
+.fight-actions, .fight-spells { margin: 0 0 1em; }
+.fight-actions-label, .fight-spells-label { display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold; }
+.action-row { display: flex; gap: 7px; }
+.action-run { margin-left: 18px; padding-left: 18px; border-left: dotted 1px rgba(0, 0, 0, 0.35); }
 .fight-spells .spell-grid { gap: 7px; }
 
 /* fight.js (docs/APP.md "Fight API"): the bars it adds, the round played line by line,

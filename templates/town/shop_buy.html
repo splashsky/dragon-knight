@@ -1,11 +1,12 @@
 {#- Purchase confirmation (legacy towns.php buy2()). ctx: the offer of town/shop.lua's
 		check(): item, slot (gear that is equipped when bought), old (the entry in that slot),
-		sellback, can_keep, keep_full, can_sell; max (bag items: how many). -#}
+		sellback, can_keep, keep_full, can_sell; max (bag items: how many). The items' names in
+		the text carry their tooltips. -#}
 <div class="town-message">
 <form action="/shop/buy/{{ item.id }}" method="post">
 {{{ csrf_field() }}}
 {%- if slot and old then %}
-You are buying the {{ item.name }} for {{ item.price }} gold. What should I do with your {{ old.item.name }}?<br><br>
+You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item) }}}</span>?<br><br>
 {%- if can_keep then %}
 <input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)"><br>
 {%- elseif keep_full then %}
@@ -18,10 +19,10 @@ You are buying the {{ item.name }} for {{ item.price }} gold. What should I do w
 {%- end %}
 <br><input type="submit" name="cancel" value="No">
 {%- elseif slot then %}
-You are buying the {{ item.name }}, is that ok?<br><br>
+You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span>, is that ok?<br><br>
 <input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No">
 {%- else %}
-You are buying the {{ item.name }} for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.<br><br>
+You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.<br><br>
 {%- if max > 1 then %}
 How many? <input type="text" name="qty" size="3" value="1" aria-label="Quantity"> (1 to {{ max }})<br><br>
 {%- end %}

@@ -234,10 +234,11 @@ input[type="image"] { vertical-align: middle; }
 }
 .invpanel-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- spell icon buttons (fight menu: fight.css; Fast Spells: .spell-grid-small) ---- */
+/* ---- icon buttons: spells (fight menu: fight.css; Fast Spells: .spell-grid-small) and the
+	fight menu's actions (.action-btn: Attack, Run) ---- */
 .spell-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .spell-grid form { margin: 0; }
-.spell-btn {
+.spell-btn, .action-btn {
 	position: relative;
 	display: block;
 	box-sizing: content-box;
@@ -251,11 +252,11 @@ input[type="image"] { vertical-align: middle; }
 	cursor: pointer;
 	transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, border-color 0.08s;
 }
-.spell-btn img { display: block; width: 100%; height: 100%; border-radius: 3px; }
-.spell-btn:hover { border-color: rgba(0, 0, 0, 0.8); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35); transform: translateY(-1px); }
-.spell-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
-.spell-btn:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
-.spell-btn:disabled, .spell-btn:disabled:hover {
+.spell-btn img, .action-btn img { display: block; width: 100%; height: 100%; border-radius: 3px; }
+.spell-btn:hover, .action-btn:hover { border-color: rgba(0, 0, 0, 0.8); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35); transform: translateY(-1px); }
+.spell-btn:active, .action-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
+.spell-btn:focus-visible, .action-btn:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
+.spell-btn:disabled, .spell-btn:disabled:hover, .action-btn:disabled, .action-btn:disabled:hover {
 	cursor: not-allowed;
 	opacity: 0.45;
 	filter: grayscale(1);
@@ -281,17 +282,17 @@ input[type="image"] { vertical-align: middle; }
 	text-align: center;
 	text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
-/* the trigger of a spell's tooltip (dk.css .dk-tip): a disabled button gets no pointer
+/* the trigger of a spell's (or action's) tooltip (dk.css .dk-tip): a disabled button gets no pointer
 	 events in some browsers, so it lets them through to its wrapper */
-.spell-tip { display: block; margin: 0; }
+.spell-tip, .action-tip { display: block; margin: 0; }
 .spell-tip-short { cursor: not-allowed; }
-.spell-btn:disabled { pointer-events: none; }
+.spell-btn:disabled, .action-btn:disabled { pointer-events: none; }
 .spell-grid-small { gap: 5px; }
 .spell-grid-small .spell-btn { width: 34px; height: 34px; padding: 1px; }
 .spell-grid-small .spell-mp { font-size: 10px; line-height: 12px; padding: 0 2px; }
 @media (prefers-reduced-motion: reduce) {
-	.spell-btn { transition: none; }
-	.spell-btn:hover, .spell-btn:active { transform: none; }
+	.spell-btn, .action-btn { transition: none; }
+	.spell-btn:hover, .spell-btn:active, .action-btn:hover, .action-btn:active { transform: none; }
 }
 
 /* ---- forms on account pages ---- */

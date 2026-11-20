@@ -92,10 +92,10 @@ TC=$(t_csrf)
 pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"
 t_get /inn;      expect_body 'Resting at the inn'
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed and ready for action.'
-t_get /shop;     expect_body 'href="/shop/buy/1">Stick</a>'
-t_get /shop/buy/1; expect_body 'You are buying the Stick, is that ok?'
+t_get /shop;     expect_body 'href="/shop/buy/1" data-tip>Stick<template class="tip">'
+t_get /shop/buy/1; expect_text 'You are buying the Stick, is that ok?'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
-t_get /shop/buy/66; expect_body 'You are buying the Herb for 15 gold each.'
+t_get /shop/buy/66; expect_text 'You are buying the Herb for 15 gold each.'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Thank you for purchasing this item.'
 t_get /maps;     expect_body 'href="/maps/buy/2">Roma</a>'
 t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
@@ -133,7 +133,7 @@ t_post /drop "csrf=$TC&take=Take+it"; expect_body 'is in your bag.'
 	&& t_ok || t_fail "drop not in the bag"
 
 t_section "playthrough: inventory"
-t_get /inventory; expect_status 200; expect_body 'Bag (2 / 12)'; expect_body '<b>Herb</b> x2'
+t_get /inventory; expect_status 200; expect_body 'Bag (2 / 12)'; expect_text 'Herb x2'
 DROP_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'pthero' AND ui.item_id = $DROP")
 t_post "/inventory/equip/$DROP_E" "csrf=$TC&slot=0"; expect_body 'You equipped the'
 [ "$(pq "(SELECT equipped FROM user_items WHERE id = $DROP_E)")" = accessory1 ] && t_ok || t_fail "drop not equipped in slot 1"

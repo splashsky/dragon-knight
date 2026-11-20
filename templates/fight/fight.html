@@ -3,10 +3,12 @@
 		hooks (docs/APP.md "Fight API"): data-fighter (a combatant's id), data-stat/-value/-max
 		(the numbers it animates), data-fight-log (the round's lines), data-fight (forms it
 		sends with fetch). Every form carries the round it was shown at (stale forms play
-		nothing). A spell is an icon button, spell=<id> (spells.buttons: greyed out and
+		nothing). Attack and Run are icon buttons too (fight=Fight, run=Run, as the text buttons
+		before 2.4 sent: routes/fight.lua reads the name), Run set apart from Attack. A
+		spell is an icon button, spell=<id> (spells.buttons: greyed out and
 		disabled when the MP don't cover it; the server checks again), in a span that carries
 		its tooltip (a disabled button gets no pointer events; docs/APP.md "Tooltips"); the
-		monster's name has one too. -#}
+		actions' spans and the monster's name have one too. -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
@@ -50,7 +52,12 @@
 <p>Command?</p>
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
-<p><input type="submit" name="fight" value="Fight"></p>
+<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>
+<div class="action-row">
+<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", attack_tip) }}}</span>
+<span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", run_tip) }}}</span>
+</div>
+</div>
 <div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>
 {%- if #spells == 0 then %} <span class="light">None</span>{% end %}
 {%- if #spells > 0 then %}
@@ -67,7 +74,6 @@
 <option value="{{ it.id }}">{{ it.name }} (x{{ it.qty }})</option>
 {%- end %}
 </select> <input type="submit" name="item" value="Use Item"></p>
-<p><input type="submit" name="run" value="Run"></p>
 </form>
 {%- end %}
 </div>

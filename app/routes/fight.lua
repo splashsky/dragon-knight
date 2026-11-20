@@ -1,7 +1,9 @@
 -- routes/fight.lua :: fighting, victory, item drops, death (port of legacy fight.php).
 --   GET/POST /fight   fight() -- POST buttons: fight | spell=<id> (a spell's icon button; the
 --                     form before 2.3.1 sent spell=Spell + userspell=<id>, still accepted) |
---                     item (+ useritem) | run | continue (a turn a status blocks)
+--                     item (+ useritem) | run | continue (a turn a status blocks); fight
+--                     and run are the Attack and Run icon buttons (fight=Fight, run=Run:
+--                     only the name counts)
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
@@ -29,6 +31,7 @@ local php = require("lib.php")
 local round = require("fight.round")
 local spells = require("lib.spells")
 local state = require("fight.state")
+local tips = require("lib.tips")
 local view = require("lib.view")
 
 local rand = php.rand
@@ -268,6 +271,9 @@ local function fight(req)
 	page.monster = first.row   -- its tooltip
 	if not page.dead then
 		page.locked = round.locked(f)
+		local weapon = inventory.equipped(user.id).weapon
+		page.attack_tip = tips.attack(f.st.attackpower, weapon and weapon.item.name)
+		page.run_tip = tips.run()
 		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)
 		page.items = usable_items(user)
 		f.round = f.round + 1

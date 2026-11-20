@@ -1,5 +1,6 @@
 {#- Item list (legacy towns.php buy()) and the Sell section. ctx: items { item, icon, line,
-		owned, special }, sell { entry (bag entry), price (each) }. -#}
+		owned, special }, sell { entry (bag entry), price (each) }. Item names carry the item's
+		tooltip (the links: on the link itself). -#}
 <div class="town-message">
 Buying weapons will increase your Attack Power. Buying armor and shields will increase your Defense Power. Other items go into your bag.<br><br>Click an item name to purchase it.<br><br>The following items are available at this town:<br><br>
 <table class="shop-list">
@@ -8,9 +9,9 @@ Buying weapons will increase your Attack Power. Buying armor and shields will in
 <tr><td class="shop-icon">
 {%- if e.icon then %}<img src="/static/images/icon_{{ e.icon }}.gif" alt="{{ e.icon }}">{% end %}</td>
 {%- if e.owned then %}
-<td><span class="light">{{ it.name }}</span></td><td><span class="light">{{ e.line }}</span></td><td><span class="light">Already purchased</span></td></tr>
+<td><span class="light tip-term" data-tip tabindex="0">{{ it.name }}{{{ tip("item", it) }}}</span></td><td><span class="light">{{ e.line }}</span></td><td><span class="light">Already purchased</span></td></tr>
 {%- else %}
-<td><b><a href="/shop/buy/{{ it.id }}">{{ it.name }}</a>{% if e.special then %}<span class="highlight">*</span>{% end %}</b></td><td>{{ e.line }}</td><td>Price: <b>{{ it.price }} gold</b></td></tr>
+<td><b><a href="/shop/buy/{{ it.id }}" data-tip>{{ it.name }}{{{ tip("item", it) }}}</a>{% if e.special then %}<span class="highlight">*</span>{% end %}</b></td><td>{{ e.line }}</td><td>Price: <b>{{ it.price }} gold</b></td></tr>
 {%- end %}
 {%- end %}
 </table><br>
@@ -18,7 +19,7 @@ Buying weapons will increase your Attack Power. Buying armor and shields will in
 <b>Sell</b> &mdash; I will buy these from your bag:<br><br>
 <table class="shop-sell">
 {%- for _, s in ipairs(sell) do %}
-<tr><td>{{ s.entry.item.name }}{% if s.entry.qty > 1 then %} x{{ s.entry.qty }}{% end %}</td><td>{{ s.price }} gold{% if s.entry.qty > 1 then %} each{% end %}</td>
+<tr><td><span class="tip-term" data-tip tabindex="0">{{ s.entry.item.name }}{{{ tip("item", s.entry.item) }}}</span>{% if s.entry.qty > 1 then %} x{{ s.entry.qty }}{% end %}</td><td>{{ s.price }} gold{% if s.entry.qty > 1 then %} each{% end %}</td>
 <td><form class="inline" method="post" action="/shop/sell/{{ s.entry.id }}">{{{ csrf_field() }}}
 {%- if s.entry.qty > 1 then %}<input type="text" name="qty" size="3" value="1" aria-label="Quantity"> {% end -%}
 <input type="submit" name="submit" value="Sell"></form></td></tr>

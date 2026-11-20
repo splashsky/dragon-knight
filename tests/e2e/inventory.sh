@@ -65,8 +65,8 @@ iv_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"
 
 t_section "inventory: equip and unequip"
 t_give invhero stick 1 weapon; t_give invhero branch; t_give invhero herb 3
-t_get /inventory;                 expect_body 'Bag (2 / 12)'; expect_body '<b>Herb</b> x3'
-expect_body '<b>Stick</b> <span class="small">(Attack Power +2)</span>'
+t_get /inventory;                 expect_body 'Bag (2 / 12)'; expect_text 'Herb x3'
+expect_text 'Stick (Attack Power +2)'
 BRANCH=$(iv_entry branch); HERB=$(iv_entry herb)
 t_post "/inventory/equip/$BRANCH" "";  expect_status 403
 t_post "/inventory/equip/$BRANCH" "csrf=$TC"; expect_body 'You equipped the Branch. The Stick is in your bag now.'
@@ -141,13 +141,13 @@ iv_is "($T_MONSTER_HP <= 0) || '|' || (SELECT qty FROM user_items WHERE id = $BO
 t_get /victory;                   expect_body 'You have defeated the Red Slime.'
 
 t_section "inventory: discard"
-t_get "/inventory/discard/$HERB"; expect_body 'You have 2 x Herb. How many do you want to throw away?'
+t_get "/inventory/discard/$HERB"; expect_text 'You have 2 x Herb. How many do you want to throw away?'
 t_post "/inventory/discard/$HERB" "csrf=$TC&cancel=Cancel"; expect_redirect /inventory
 t_post "/inventory/discard/$HERB" "qty=1"; expect_status 403
 t_post "/inventory/discard/$HERB" "csrf=$TC&submit=Discard&qty=3"; expect_body 'Please enter a number from 1 to 2.'
 t_post "/inventory/discard/$HERB" "csrf=$TC&submit=Discard&qty=1"; expect_body 'You discarded the Herb.'
 iv_is "(SELECT qty FROM user_items WHERE id = $HERB)" "1"
-t_get "/inventory/discard/$(iv_entry stick)"; expect_body 'Do you really want to throw away the Stick?'
+t_get "/inventory/discard/$(iv_entry stick)"; expect_text 'Do you really want to throw away the Stick?'
 t_post "/inventory/discard/$(iv_entry stick)" "csrf=$TC&submit=Discard"; expect_body 'You discarded the Stick.'
 iv_is "(SELECT count(*) FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE ui.user_id = users.id AND i.key = 'stick')" "0"
 t_post "/inventory/discard/$BRANCH" "csrf=$TC&submit=Discard"; expect_body 'Cheat attempt detected.'   # equipped
@@ -160,6 +160,8 @@ t_give invhero dragons_wing 1 accessory1          # equipped: doesn't count
 t_give invhero test_key                           # quest: doesn't count
 t_get /inventory;                 expect_body 'Bag (12 / 12)'; expect_no_body 'inv-free'
 expect_body "Quest item (doesn't take a slot)"
+# its tooltip says what it is (docs/APP.md "Tooltips")
+expect_body '<b class="tip-term" data-tip tabindex="0">Old Key<template class="tip"><div class="tip-title">Old Key</div><div class="tip-meta">Quest item</div><div class="tip-body"><p>Opens something, somewhere.</p></div></template></b>'
 KEY=$(iv_entry test_key)
 expect_no_body "/inventory/discard/$KEY\""
 t_get "/inventory/discard/$KEY";  expect_body 'Quest items can&#39;t be discarded.'
@@ -167,7 +169,7 @@ t_post "/inventory/discard/$KEY" "csrf=$TC&submit=Discard"; expect_body 'Quest i
 t_post /inventory/unequip/accessory1 "csrf=$TC"; expect_body 'Your bag is full. Make room in it before you take off the Dragon&#39;s Wing.'
 iv_is "(SELECT equipped FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE ui.user_id = users.id AND i.key = 'dragons_wing')" "accessory1"
 # topping up a stack works in a full bag (a Herb from the shop), a new stack doesn't
-t_get /shop/buy/66;               expect_body 'You are buying the Herb for 15 gold. It goes into your bag.'
+t_get /shop/buy/66;               expect_text 'You are buying the Herb for 15 gold. It goes into your bag.'
 grep -qF 'name="qty"' "$BODY" && t_fail "a stack with room for 1 offers a quantity" || t_ok
 t_post /shop/buy/66 "csrf=$TC&submit=Buy"; expect_body 'Thank you for purchasing this item.'
 t_get /shop/buy/66;               expect_body 'Your bag is full.'

@@ -1,6 +1,7 @@
 {#- Inventory (town/inventory.lua). ctx: slots { slot, label, entry, attributes }, cells (bag
 		entries: entry, item, gear, accessory, quest, usable, lines), used, size, empty (free
-		slots to draw), u (fresh users row), s (effective stats), notice (lines) or nil. -#}
+		slots to draw), u (fresh users row), s (effective stats), notice (lines) or nil. Item
+		names carry the item's tooltip (docs/APP.md "Tooltips"). -#}
 <section class="box inv">
 <div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
 <div class="box-body">
@@ -14,7 +15,7 @@ HP: {{ u.currenthp }} / {{ s.maxhp }} &middot; MP: {{ u.currentmp }} / {{ s.maxm
 {%- for _, r in ipairs(slots) do %}
 <tr><td class="inv-slot">{{ r.label }}:</td>
 {%- if r.entry then %}
-<td><b>{{ r.entry.item.name }}</b>{% if #r.attributes > 0 then %} <span class="small">({{ table.concat(r.attributes, ", ") }})</span>{% end %}</td>
+<td><b class="tip-term" data-tip tabindex="0">{{ r.entry.item.name }}{{{ tip("item", r.entry.item) }}}</b>{% if #r.attributes > 0 then %} <span class="small">({{ table.concat(r.attributes, ", ") }})</span>{% end %}</td>
 <td><form class="inline" method="post" action="/inventory/unequip/{{ r.slot }}">{{{ csrf_field() }}}<button class="link" type="submit">Unequip</button></form></td>
 {%- else %}
 <td><span class="light">None</span></td><td></td>
@@ -26,7 +27,7 @@ HP: {{ u.currenthp }} / {{ s.maxhp }} &middot; MP: {{ u.currentmp }} / {{ s.maxm
 <div class="inv-bag">
 {%- for _, c in ipairs(cells) do %}
 <div class="inv-cell{% if c.quest then %} inv-quest{% end %}">
-<b>{{ c.item.name }}</b>{% if c.entry.qty > 1 then %} x{{ c.entry.qty }}{% end %}
+<b class="tip-term" data-tip tabindex="0">{{ c.item.name }}{{{ tip("item", c.item) }}}</b>{% if c.entry.qty > 1 then %} x{{ c.entry.qty }}{% end %}
 {%- if c.quest then %}<br><span class="small light">Quest item (doesn't take a slot)</span>{% end %}
 {%- if #c.lines > 0 then %}<br><span class="small">{{ table.concat(c.lines, ", ") }}</span>{% end %}
 <div class="inv-actions">

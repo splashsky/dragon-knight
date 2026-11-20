@@ -363,7 +363,8 @@ one bag slot (`max_stack`). A consumable is scripted like a spell: `power`, mess
 items"). Give it a
 `drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
 in the admin town editor. `./dk check` validates it; the next page load picks it up. Its `description` and `lore` show
-in the tooltip of its Inventory panel row (with its stats) and on `/help/items`.
+in its tooltip (with its stats) wherever the item is listed: the Inventory panel, the
+Inventory page, the shops and the purchase page; and on `/help/items`.
 
 ### Adding a status or a summon
 
@@ -481,7 +482,8 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	server (`/admin/classes`). All classes share the Mage's experience curve, scaled by
 	their own first step (Warrior and Paladin need up to about 10% more experience than in
 	the original from level 45 and 18 on); a class can define its own curve.
-- Tooltips (2.4) on the spell buttons, the Inventory panel's gear, the monster you fight and
+- Tooltips (2.4) on the spell buttons, the fight menu's Attack and Run icon buttons, items
+	in the Inventory panel, on the Inventory page and in the shops, the monster you fight and
 	the classes at registration, and lore for classes, spells, items, monsters, statuses and
 	summons (in the tooltips and on the help pages).
 - Spells are content files too (`app/content/spells/`), scripted in Lua instead of a type

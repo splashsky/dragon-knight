@@ -227,6 +227,27 @@ fa_escape() { fa_player; t_fight fapi 2 50; fa_sql "UPDATE users SET dexterity =
 fa_both escape 5 fa_escape "run=Run&round=2"
 fa_expect 'd["redirect"] == "/" and [e["type"] for e in d["events"]] == ["escape"]'
 
+t_section "fight api: the Attack and Run buttons, form and fetch alike"
+# Attack and Run are icon buttons (2.4) sending what the text buttons sent: fight.js
+# appends the pressed button's name and value, as a native submit does. The fields come
+# from the page's buttons; each plays the same round both ways.
+fa_button() {  # fa_button NAME: the name=value the page's action button NAME sends
+	grep -o "<button class=\"action-btn\" type=\"submit\" name=\"$1\" value=\"[^\"]*\"" "$BODY" | sed 's/.* name="\([^"]*\)" value="\([^"]*\)"$/\1=\2/'
+}
+fa_slime; t_get /fight
+FA_ATTACK=$(fa_button fight); FA_RUN=$(fa_button run)
+[ "$FA_ATTACK" = "fight=Fight" ] && t_ok || t_fail "Attack sends '$FA_ATTACK'"
+[ "$FA_RUN" = "run=Run" ] && t_ok || t_fail "Run sends '$FA_RUN'"
+for seed in 1 2; do fa_both "attack button" "$seed" fa_slime "$FA_ATTACK&round=2"; done
+fa_expect 'any(e["type"] == "attack" and e["actor"] == "player" for e in d["events"])' "Attack button: an attack"
+fa_expect "'name=\"fight\" value=\"Fight\" title=\"Attack\" aria-label=\"Attack\"><img src=\"/static/images/skills/attack.png\"' in d['fragments']['main'] and 'name=\"run\" value=\"Run\" title=\"Run\" aria-label=\"Run\"><img src=\"/static/images/skills/run.png\"' in d['fragments']['main']" "the fragment's action buttons"
+fa_both "attack button, victory" 7 fa_win "$FA_ATTACK&round=2"
+fa_expect 'd["redirect"] == "/victory"'
+fa_both "run button, blocked" 4 fa_blocked "$FA_RUN&round=2"
+fa_expect 'd["events"][0]["type"] == "run"'
+fa_both "run button, escape" 5 fa_escape "$FA_RUN&round=2"
+fa_expect 'd["redirect"] == "/" and [e["type"] for e in d["events"]] == ["escape"]'
+
 t_section "fight api: spells and items"
 fa_hurt() { fa_player; fa_sql "UPDATE users SET currenthp = 150"; t_fight fapi 2 50; }
 for seed in 1 2; do fa_both heal "$seed" fa_hurt "spell=Spell&userspell=$(sp heal)&round=2"; done

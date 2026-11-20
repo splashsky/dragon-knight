@@ -1,6 +1,7 @@
 -- tips.lua :: what the tooltips of game things say (public/js/tooltip.js, docs/APP.md
 -- "Tooltips"). Each function takes a row (a spell, an item, a monster, a class: the
--- tables' columns, lore included) and returns the ctx of templates/tip/tip.html:
+-- tables' columns, lore included; the fight menu's actions take their own arguments) and
+-- returns the ctx of templates/tip/tip.html:
 -- { title, meta = { short facts }, lines = { stat lines }, body = text, lore = text }.
 -- Templates render them with the `tip(kind, row)` helper (lib/view.lua), which escapes
 -- everything. Plain data: no HTML here.
@@ -42,6 +43,19 @@ end
 -- A monster: name; level; its description; its lore.
 function tips.monster(m)
 	return { title = m.name, meta = { "Level " .. m.level }, body = m.description, lore = m.lore }
+end
+
+-- The fight menu's Attack button: the player's attack power (and the weapon's name, when
+-- one is equipped).
+function tips.attack(power, weapon)
+	local meta = { "Attack Power " .. power }
+	if weapon then meta[#meta + 1] = weapon end
+	return { title = "Attack", meta = meta, body = "Strike the monster with your weapon." }
+end
+
+-- The fight menu's Run button.
+function tips.run()
+	return { title = "Run", body = "Try to escape. The monster may block your way and strike." }
 end
 
 -- A class: name; starting HP and MP; its description's points (one per line); its lore.

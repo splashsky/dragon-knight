@@ -50,9 +50,9 @@ TOWN_BASE="base_maxhp=15, currenthp=15, base_maxmp=0, currentmp=0, base_maxtp=10
 t_items_clear townie
 tu "$TOWN_HOME, gold=1000, $TOWN_BASE"
 t_get /shop;                      expect_status 200
-expect_body 'href="/shop/buy/1">Stick</a>'; expect_body 'Price: <b>10 gold</b>'; expect_body 'Attack Power: 2'
-expect_body 'Skivvies</a><span class="highlight">*</span>'; expect_no_body 'Dagger'
-expect_body 'href="/shop/buy/66">Herb</a>'; expect_no_body '>Potion<'
+expect_body 'href="/shop/buy/1" data-tip>Stick<template class="tip">'; expect_body 'Price: <b>10 gold</b>'; expect_body 'Attack Power: 2'
+expect_body '</template></a><span class="highlight">*</span>'; expect_text 'Skivvies*'; expect_no_body 'Dagger'
+expect_body 'href="/shop/buy/66" data-tip>Herb<template class="tip">'; expect_no_body '>Potion<'
 expect_no_body 'I will buy these from your bag'
 t_get /shop/buy/4;                expect_body 'Cheat attempt detected.'
 t_post /shop/buy/4 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
@@ -61,7 +61,7 @@ t_post /shop/buy/67 "csrf=$TC&submit=Buy"; expect_body 'Cheat attempt detected.'
 expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "cheat buy"
 
 t_section "town: shop weapon, keep or sell the old one"
-t_get /shop/buy/1;                expect_body 'You are buying the Stick, is that ok?'; expect_body 'action="/shop/buy/1"'
+t_get /shop/buy/1;                expect_text 'You are buying the Stick, is that ok?'; expect_body 'action="/shop/buy/1"'
 t_post /shop/buy/1 "submit=Yes";  expect_status 403
 t_post /shop/buy/1 "csrf=$TC&cancel=No"; expect_redirect /
 expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "shop cancel"
@@ -72,7 +72,7 @@ t_get /shop;                      expect_body 'Already purchased'
 t_get /;                          expect_body 'Weapon: Stick'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 t_get /shop/buy/2
-expect_body 'You are buying the Branch for 30 gold. What should I do with your Stick?'
+expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'
 expect_body 'name="keep" value="Buy (keep my Stick in the bag)"'; expect_body 'name="sell" value="Buy and sell my Stick for 5 gold"'
 t_post /shop/buy/2 "csrf=$TC&keep=x"
 expect_db "gold,$T_ITEMS" "960|stick,branch@weapon" "branch, stick kept"
@@ -88,7 +88,7 @@ t_section "town: shop sell section"
 STICK_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.item_id = 1")
 WEAPON_E=$(t_sql "SELECT ui.id FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.equipped = 'weapon'")
 t_get /shop;                      expect_body 'I will buy these from your bag'; expect_body "action=\"/shop/sell/$STICK_E\""
-expect_body '<td>Stick</td><td>5 gold</td>'; expect_no_body "action=\"/shop/sell/$WEAPON_E\""
+expect_text 'Stick5 gold'; expect_no_body "action=\"/shop/sell/$WEAPON_E\""
 t_post "/shop/sell/$STICK_E" "qty=1"; expect_status 403
 t_post "/shop/sell/$STICK_E" "csrf=$TC&submit=Sell"; expect_body 'You sold the Stick for 5 gold.'
 expect_db "gold,$T_ITEMS" "930|branch@weapon" "stick sold"
@@ -154,7 +154,7 @@ expect_db "gold" "0" "sell-back alone too little"
 t_section "town: shop at Endworld + Bris"
 t_sql "DELETE FROM user_items WHERE equipped = 'shield' AND user_id = (SELECT id FROM users WHERE username = 'townie')"
 tu "currentaction='In Town', latitude=-250, longitude=-250, gold=30000, base_maxhp=20, currenthp=20"
-t_get /shop;                      expect_body 'Destiny Aegis'; expect_body '>Potion</a>'; expect_body '>Ether</a>'
+t_get /shop;                      expect_body 'Destiny Aegis'; expect_body 'data-tip>Potion<template'; expect_body 'data-tip>Ether<template'
 t_post /shop/buy/33 "csrf=$TC&submit=Yes"
 expect_db "gold,currenthp" "5000|20" "buy aegis"
 expect_stats "70 10 10 5 5 10 110" "aegis"
@@ -173,7 +173,7 @@ t_post "/shop/sell/$HERB_E" "csrf=$TC&submit=Sell"; expect_body 'Cheat attempt d
 t_section "town: consumables in the shop"
 t_items_clear townie
 tu "currentaction='In Town', latitude=30, longitude=30, gold=1000"     # Roma
-t_get /shop/buy/67;               expect_body 'You are buying the Potion for 60 gold each. It goes into your bag.'
+t_get /shop/buy/67;               expect_text 'You are buying the Potion for 60 gold each. It goes into your bag.'
 expect_body 'name="qty"'; expect_body '(1 to 10)'
 for q in 0 11 abc -1; do
 	t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=$q"; expect_body 'Please enter a quantity from 1 to 10.'
@@ -189,7 +189,7 @@ t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=2"
 expect_db "gold,$T_ITEMS" "280|potionx10,potionx2" "a second stack"
 # the gold limit
 tu "gold=100"
-t_get /shop/buy/68;               expect_body 'You are buying the Ether for 80 gold.'; expect_no_body 'name="qty"'
+t_get /shop/buy/68;               expect_text 'You are buying the Ether for 80 gold.'; expect_no_body 'name="qty"'
 t_post /shop/buy/68 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Please enter a quantity from 1 to 1.'
 t_post /shop/buy/68 "csrf=$TC&submit=Buy"
 expect_db "gold,$T_ITEMS" "20|potionx10,potionx2,ether" "one ether"
@@ -206,7 +206,7 @@ expect_db "gold" "520" "topped up a stack in a full bag"
 t_get /shop/buy/67;               expect_body 'Your bag is full.'
 # selling part of a stack
 POTION_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'townie' AND ui.item_id = 67")
-t_get /shop;                      expect_body '<td>Potion x10</td><td>30 gold each</td>'
+t_get /shop;                      expect_text 'Potion x1030 gold each'
 t_post "/shop/sell/$POTION_E" "csrf=$TC&submit=Sell&qty=11"; expect_body 'Please enter a quantity from 1 to 10.'
 t_post "/shop/sell/$POTION_E" "csrf=$TC&submit=Sell&qty=3"; expect_body 'You sold 3 x Potion for 90 gold.'
 expect_db "gold" "610" "sold 3 potions"

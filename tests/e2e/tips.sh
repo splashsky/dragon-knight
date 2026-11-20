@@ -1,7 +1,10 @@
 # tests/e2e/tips.sh :: tooltips and lore (docs/APP.md "Tooltips", "Lore"): tooltip.js on
 # every layout; the tooltip templates of the fight menu's spell buttons (name, MP, where it
 # can be cast, description, lore; disabled buttons too), of the monster fought, of Fast
-# Spells, of the registration page's classes and in the JSON fight fragments; lore on the
+# Spells, of the fight menu's Attack and Run buttons (attack power, weapon; the locked
+# "Continue" turn unchanged), of the registration page's classes and in the JSON fight
+# fragments; item tooltips on the Inventory page, in the shop (list, purchase page, Sell
+# list) and on the discard page (escaped admin overrides, lore); lore on the
 # help pages; admin lore overrides (escaped everywhere, reset to the file, too long
 # refused); and content files with invalid lore failing `dk check`.
 # Sourced by tests/run.sh.
@@ -68,8 +71,33 @@ assert '<span class="spell-tip" data-tip><button class="spell-btn" type="submit"
 assert '<div class="tip-lore"><p>' + sys.argv[2] + '</p></div></template></span>' in main
 assert '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div>' in main
 assert 'data-tip data-tip-side="left"><input type="hidden" name="csrf"' in right and '<div class="tip-title">Heal</div>' in right
+assert '<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight"' in main
+assert '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power ' in main and '<div class="tip-title">Run</div>' in main
 PY
 fi
+
+t_section "tips: the fight menu's actions"
+# Attack and Run are icon buttons (fight=Fight, run=Run, as the old text buttons sent) in
+# spans that carry their tooltips; Attack's says the attack power (strength + base attack +
+# the weapon's) and the weapon. The order: Attack, Run, the spells, the items.
+t_sql "UPDATE users SET strength = 10, base_attack = 3 WHERE username = 'tipper'"
+t_get /fight
+expect_body '<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>'
+expect_body '<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Attack</div><div class="tip-meta">Attack Power 13</div><div class="tip-body"><p>Strike the monster with your weapon.</p></div></template></span>'
+expect_body '<span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Run</div><div class="tip-body"><p>Try to escape. The monster may block your way and strike.</p></div></template></span>'
+expect_no_body '<input type="submit" name="fight"'; expect_no_body '<input type="submit" name="run"'
+TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="useritem"' "$BODY" | uniq | tr '\n' ' ')
+[ "$TP_ORDER" = 'name="fight" name="run" name="spell" name="useritem" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
+t_give tipper stick 1 weapon
+t_get /fight; expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Stick</div>'
+t_get /static/images/skills/attack.png; expect_status 200; expect_header '^content-type: image/png'
+t_get /static/images/skills/run.png;    expect_status 200; expect_header '^content-type: image/png'
+# a turn a status blocks: only the "Continue" text button, as before
+t_fight_status tipper 1 recharging '' 1
+t_get /fight
+expect_body '<p><input type="submit" name="continue" value="Continue"></p>'
+expect_no_body 'class="action-btn"'; expect_no_body 'fight-actions'; expect_no_body 'name="run"'
+t_items_clear tipper
 t_fight_clear tipper
 
 t_section "tips: the inventory panel's gear"
@@ -79,6 +107,58 @@ t_get /inventory
 expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
 expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
 t_items_clear tipper
+
+t_section "tips: items on the Inventory page, in the shop and when discarding"
+# The Branch gets an XSS description and lore (admin overrides; reset below): escaped
+# wherever its tooltip shows. The Herb shows its starter lore.
+t_jar tipadmin; t_reset_jar; t_login "$ADMIN_USER" "$ADMIN_PASS"
+t_get /admin/items/2
+t_form_submit /admin/items/2 "description=<img src=x onerror=alert(3)>" "lore=$(printf '<script>alert(4)</script> & "q"')"
+expect_redirect '/admin/items/2\?saved=1'
+TP_BRANCH='>Branch<template class="tip"><div class="tip-title">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
+TP_HERB='>Herb<template class="tip"><div class="tip-title">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
+TP_STICK='>Stick<template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
+tp_no_xss() { expect_no_body '<script>alert(4)'; expect_no_body '<img src=x'; }
+t_jar tips
+t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, gold = 1000 WHERE username = 'tipper'"
+t_give tipper stick 1 weapon && t_give tipper herb 3 && t_give tipper branch 1
+TP_HERB_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'tipper' AND ui.item_id = 66")
+TP_BRANCH_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'tipper' AND ui.item_id = 2")
+# /inventory: the equipped slots and every bag entry (focusable names), the actions as before
+t_get /inventory; expect_status 200
+expect_body '<td><b class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</b> <span class="small">(Attack Power +2)</span></td>'
+expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></b> x3'
+expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</b>'; tp_no_xss
+expect_body "action=\"/inventory/equip/$TP_BRANCH_E\""; expect_body "action=\"/inventory/use/$TP_HERB_E\""
+expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'action="/inventory/unequip/weapon"'
+# the shop: the links carry their tooltip (no tabindex: a link is focusable), the owned
+# item and the Sell list's names are focusable terms
+t_get /shop; expect_status 200
+expect_body 'href="/shop/buy/2" data-tip'"$TP_BRANCH"'</a>'; tp_no_xss
+expect_body 'href="/shop/buy/66" data-tip'"$TP_HERB"
+expect_body '<td><span class="light tip-term" data-tip tabindex="0"'"$TP_STICK"'</span></td>'
+expect_body '<tr><td><span class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></span> x3</td><td>8 gold each</td>'
+expect_body '<tr><td><span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span></td><td>15 gold</td>'
+# the purchase page: the item bought and the one it replaces
+t_get /shop/buy/2; expect_status 200
+expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span> for 30 gold. What should I do with your <span class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</span>?'
+expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'; tp_no_xss
+t_get /shop/buy/66
+expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"
+expect_text 'You are buying the Herb for 15 gold each. It goes into your bag.'
+# the discard confirmation
+t_get "/inventory/discard/$TP_HERB_E"
+expect_body 'You have 3 x <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"
+expect_text 'You have 3 x Herb. How many do you want to throw away?'
+t_get "/inventory/discard/$TP_BRANCH_E"
+expect_body 'Do you really want to throw away the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span>? It will be gone for good.'; tp_no_xss
+t_items_clear tipper
+t_jar tipadmin
+t_get /admin/items/2
+t_post /admin/items/2/reset "csrf=$(t_csrf)&field=*"
+tp_eq "SELECT count(*) FROM content_overrides WHERE kind = 'items' AND key = 'branch'" "0" "branch overrides reset"
+tp_eq "SELECT coalesce(description, '') || '|' || coalesce(lore, '') FROM items WHERE id = 2" "|" "branch description and lore reset"
+t_jar tips
 
 t_section "tips: lore on the help pages"
 t_jar tipsout

@@ -14,6 +14,8 @@ changelog.RELEASES = {
 			"The gear in the Inventory panel, the monster you are fighting and the classes on the registration page have tooltips too; tooltips stay inside the window, flipping to the other side near an edge.",
 			"Classes, spells, items, monsters, statuses and summons can have lore, a little story shown in their tooltips and on the help pages; the Mage, Warrior and Paladin, Heal, the Herb and the Blue Slime have some to begin with (schema version 13, run dk migrate).",
 			"Administrators can write or change an entry's lore on its admin page.",
+			"Attack and Run are now icon buttons in the fight menu, with tooltips: Attack shows your attack power and weapon; Run sits apart from Attack so it isn't pressed by accident.",
+			"Items show their tooltip on the Inventory page, in the shops (the items for sale, the purchase page and the Sell list) and when discarding.",
 		},
 	},
 	{

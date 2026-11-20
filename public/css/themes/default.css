@@ -24,9 +24,9 @@ a:hover, button.link:hover { color: #d0161e; }
 .dk-top .dk-logo img { filter: drop-shadow(0 2px 3px rgba(22, 24, 29, 0.25)); }
 
 /* spell buttons: the links' red for keyboard focus */
-.spell-btn { background-color: rgba(255, 255, 255, 0.8); border-color: rgba(22, 24, 29, 0.45); }
-.spell-btn:hover { border-color: #6b1510; }
-.spell-btn:focus-visible { outline-color: #d0161e; }
+.spell-btn, .action-btn { background-color: rgba(255, 255, 255, 0.8); border-color: rgba(22, 24, 29, 0.45); }
+.spell-btn:hover, .action-btn:hover { border-color: #6b1510; }
+.spell-btn:focus-visible, .action-btn:focus-visible { outline-color: #d0161e; }
 
 /* tooltips: near-black border, a touch of the snow's blue in the shadow */
 .dk-tip, .dk-tip-arrow { border-color: #16181d; }
