@@ -79,7 +79,8 @@ fi
 t_section "tips: the fight menu's actions"
 # Attack and Run are icon buttons (fight=Fight, run=Run, as the old text buttons sent) in
 # spans that carry their tooltips; Attack's says the attack power (strength + base attack +
-# the weapon's) and the weapon. The order: Attack, Run, the spells, the gear, the items.
+# the weapon's) and the weapon. The order: Attack, the equipped gear's abilities, Run, the
+# spells, the items.
 t_sql "UPDATE users SET strength = 10, base_attack = 3 WHERE username = 'tipper'"
 t_get /fight
 expect_body '<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>'
@@ -91,7 +92,7 @@ t_get /fight; expect_body '<div class="tip-title">Attack</div><div class="tip-me
 t_items_clear tipper; t_give tipper wand 1 weapon; t_give tipper herb 1
 t_get /fight
 TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="use_gear"\|name="item"' "$BODY" | uniq | tr '\n' ' ')
-[ "$TP_ORDER" = 'name="fight" name="run" name="spell" name="use_gear" name="item" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
+[ "$TP_ORDER" = 'name="fight" name="use_gear" name="run" name="spell" name="item" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
 # the wand's button: its picture, the charges as a badge, a tooltip with the spell
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="use_gear" value="'
 expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · Charges 5/5 · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'

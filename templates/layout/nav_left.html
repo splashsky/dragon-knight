@@ -6,12 +6,14 @@ Currently: {{ user.currentaction }}<br>
 Latitude: {{ latitude }}<br>
 Longitude: {{ longitude }}<br>
 <a href="/map" target="_blank" data-popup="520x520">View Map</a><br>
+{%- if user.currentaction ~= "Fighting" then %}
 <form class="compass" method="post" action="/move">
 {{{ csrf_field() }}}
 <input name="north" type="submit" value="North"><br>
 <input name="west" type="submit" value="West"><input name="east" type="submit" value="East"><br>
 <input name="south" type="submit" value="South">
 </form>
+{%- end %}
 </div>
 </section>
 

@@ -200,7 +200,7 @@ for seed in 1 2 3 4 5 6; do
 done
 [ -n "$FA_HIT" ] && t_ok || t_fail "no attack's damage in the events"
 fa_expect 'd["round"] == 3 and d["url"] == "/fight" and d["title"] == "Fighting"'
-fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "action=\"/move\"" in d["fragments"]["nav_left"]'
+fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "Latitude:" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
 fa_expect '"name=\"round\" value=\"3\"" in d["fragments"]["main"] and "<html" not in d["fragments"]["main"]'
 fa_expect 'not any("data" in e or "step" in e for e in d["events"])' "no internal state"
 # the winning blow: the same redirect, and with fetch its lines too

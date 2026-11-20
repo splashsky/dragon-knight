@@ -99,7 +99,9 @@ t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 0, currenthp = 100, base_maxhp = 100"
 WAND=$(wd_wand)
 t_get /fight; CS=$(t_csrf)
-expect_body '<div class="fight-gear" role="group" aria-labelledby="fight-gear-label"><span class="fight-gear-label" id="fight-gear-label">Gear</span>'
+# the wand's button sits in the Actions row, between Attack and Run (before the spells)
+ORDER=$(grep -o 'name="fight"\|name="use_gear"\|name="run"\|id="fight-spells-label"' "$BODY" | tr '\n' ' ')
+[ "$ORDER" = 'name="fight" name="use_gear" name="run" id="fight-spells-label" ' ] && t_ok || t_fail "fight menu order: $ORDER"
 expect_body "<span class=\"spell-tip\" data-tip><button class=\"spell-btn\" type=\"submit\" name=\"use_gear\" value=\"$WAND\" title=\"Wand (5/5 charges)\" aria-label=\"Wand (5/5 charges)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">5/5</span></button>"
 ROUND=$(t_sql "SELECT $T_ROUND FROM users $WQ")
 t_post /fight "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '

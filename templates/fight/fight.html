@@ -58,40 +58,30 @@
 <div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>
 <div class="action-row">
 <span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", attack_tip) }}}</span>
+{%- for _, g in ipairs(gear) do %}
+<span class="spell-tip{% if g.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="use_gear" value="{{ g.id }}" title="{{ g.label }}" aria-label="{{ g.label }}"{% if g.short then %} disabled{% end %}><img src="{{ g.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-charges{% if g.charges < 1 then %} item-badge-empty{% end %}" aria-hidden="true">{{ g.charges }}/{{ g.max }}</span></button>{{{ include("tip/tip", g.tip) }}}</span>
+{%- end %}
 <span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", run_tip) }}}</span>
 </div>
 </div>
-<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>
-{%- if #spells == 0 then %} <span class="light">None</span>{% end %}
 {%- if #spells > 0 then %}
+<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>
 <div class="spell-grid">
 {%- for _, s in ipairs(spells) do %}
 <span class="spell-tip{% if s.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="spell" value="{{ s.id }}" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>{{{ tip("spell", s.spell) }}}</span>
 {%- end %}
 </div>
-{%- end %}
-</div>
-<div class="fight-bag">
-{%- if #gear > 0 then %}
-<div class="fight-gear" role="group" aria-labelledby="fight-gear-label"><span class="fight-gear-label" id="fight-gear-label">Gear</span>
-<div class="spell-grid">
-{%- for _, g in ipairs(gear) do %}
-<span class="spell-tip{% if g.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="use_gear" value="{{ g.id }}" title="{{ g.label }}" aria-label="{{ g.label }}"{% if g.short then %} disabled{% end %}><img src="{{ g.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-charges{% if g.charges < 1 then %} item-badge-empty{% end %}" aria-hidden="true">{{ g.charges }}/{{ g.max }}</span></button>{{{ include("tip/tip", g.tip) }}}</span>
-{%- end %}
-</div>
 </div>
 {%- end %}
-<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>
-{%- if #items == 0 then %} <span class="light">None</span>{% end %}
 {%- if #items > 0 then %}
+<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>
 <div class="spell-grid">
 {%- for _, it in ipairs(items) do %}
 <span class="spell-tip{% if it.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="item" value="{{ it.id }}" title="{{ it.label }}" aria-label="{{ it.label }}"{% if it.short then %} disabled{% end %}><img src="{{ it.icon }}" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">{{ it.qty }}</span></button>{{{ include("tip/tip", it.tip) }}}</span>
 {%- end %}
 </div>
+</div>
 {%- end %}
-</div>
-</div>
 </form>
 {%- end %}
 </div>

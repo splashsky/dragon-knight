@@ -28,6 +28,7 @@ t_fight_new fighter
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
 t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
+expect_no_body 'action="/move"'                       # no compass while fighting
 f_is "$T_ROUND" 2
 lvl=$(t_sql "SELECT m.level FROM users JOIN monsters m ON m.id = $T_MONSTER $FQ")
 [ -n "$lvl" ] && [ "$lvl" -ge 9 ] && [ "$lvl" -le 11 ] && t_ok || t_fail "monster level $lvl not in 9..11"
@@ -190,9 +191,9 @@ expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit 
 f_is currentmp 1
 # after the round the page shows the new MP: both buttons greyed out
 expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
-# no spells: "None"
+# no spells: no Spells section at all
 t_spells fighter ""
-t_get /fight; expect_body 'id="fight-spells-label">Spells</span> <span class="light">None</span>'; expect_no_body 'class="spell-btn"'
+t_get /fight; expect_no_body 'id="fight-spells-label"'; expect_no_body 'class="spell-btn"'
 t_spells fighter 1,6,11
 t_fight_clear fighter
 
@@ -272,7 +273,7 @@ expect_no_body 'title="Ether'
 t_post /fight "csrf=$CS&item=0";  expect_body 'You must select an item first.'
 t_post /fight "csrf=$CS&item=68"; expect_body 'You do not have this item.'
 t_items_clear fighter
-t_get /fight; expect_body '<span class="fight-items-label" id="fight-items-label">Items</span> <span class="light">None</span>'
+t_get /fight; expect_no_body 'id="fight-items-label"'   # no usable items: no Items section
 t_items_clear fighter
 
 t_section "fight: item drop"

@@ -23,6 +23,7 @@ changelog.RELEASES = {
 			"Items in the fight menu are icon buttons too, with how many you have on a badge; ones you can't use right now (a Herb at full HP) are greyed out.",
 			"Items have pictures: the Herb, Potion, Ether and Wand show theirs in the bag, the Inventory panel, the shops, the fight menu and their tooltips (icon in the item file; dk check fails if the file is missing).",
 			"Shops no longer say \"Already purchased\": you can buy any item the town sells as often as your gold and your bag allow, even a copy of the weapon you are wearing.",
+			"The fight menu puts your gear's abilities next to Attack, hides Spells and Items when you have none, and the compass is hidden while you fight.",
 		},
 	},
 	{
