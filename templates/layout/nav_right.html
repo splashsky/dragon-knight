@@ -20,16 +20,15 @@
 
 <section class="box">
 <div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
-<div class="box-body">
-<table style="width: 100%">
-<tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td style="width: 100%">Weapon: {{ equipment.weapon }}</td></tr>
-<tr><td><img src="/static/images/icon_armor.gif" alt="Armor" title="Armor"></td><td style="width: 100%">Armor: {{ equipment.armor }}</td></tr>
-<tr><td><img src="/static/images/icon_shield.gif" alt="Shield" title="Shield"></td><td style="width: 100%">Shield: {{ equipment.shield }}</td></tr>
-</table>
-Slot 1: {{ equipment.accessory1 }}<br>
-Slot 2: {{ equipment.accessory2 }}<br>
-Slot 3: {{ equipment.accessory3 }}<br>
-<a href="/inventory">Bag: {{ bag_used }} / {{ bag_size }}</a>
+<div class="box-body invpanel">
+<a class="invpanel-bag{% if bag_used >= bag_size then %} full{% end %}" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>{{ bag_used }}</b>/{{ bag_size }}</span></a>
+<ul class="invpanel-gear">
+{%- for _, g in ipairs(gear) do %}
+<li{% if g.badge == "1" then %} class="invpanel-first-slot"{% end %} title="{{ g.label }}: {{ g.name }}">
+{%- if g.icon then %}<img src="/static/images/icon_{{ g.icon }}.gif" width="15" height="15" alt="{{ g.label }}">{% else %}<span class="invpanel-badge" aria-label="{{ g.label }}">{{ g.badge }}</span>{% end -%}
+<span class="invpanel-name{% if g.empty then %} light{% end %}">{{ g.name }}</span></li>
+{%- end %}
+</ul>
 </div>
 </section>
 

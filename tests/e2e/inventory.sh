@@ -53,7 +53,7 @@ t_section "inventory: the page"
 t_jar invhero; t_reset_jar
 t_register invhero invpw1 invhero@example.com InvHero 1
 t_login invhero invpw1
-t_get /;                          expect_body 'href="/inventory">Inventory</a>'; expect_body 'Bag: 0 / 12</a>'
+t_get /;                          expect_body 'href="/inventory">Inventory</a>'; expect_body '<span class="invpanel-count"><b>0</b>/12</span></a>'
 TC=$(t_csrf)
 t_get /inventory;                 expect_status 200; expect_body 'Bag (0 / 12)'; expect_body 'Attack Power: <b>5</b>'
 [ "$(grep -c 'inv-cell inv-free' "$BODY")" = 12 ] && t_ok || t_fail "12 free slots expected"

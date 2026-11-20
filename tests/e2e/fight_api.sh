@@ -379,7 +379,7 @@ t_fight_clear fapi; fa_player; fa_sql "UPDATE users SET currentaction = 'Explori
 t_get /drop -H 'Accept: application/json'; expect_status 200; fa_check
 fa_expect '"<b>Life Pebble</b>" in d["fragments"]["main"] and "data-fight" in d["fragments"]["main"] and d["url"] == "/drop" and d["title"] == "Item Drop"'
 t_fetch /drop "take=Take+it"; expect_status 200; fa_check
-fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "Bag: 1 / 12" in d["fragments"]["nav_right"]'
+fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "<b>1</b>/12</span>" in d["fragments"]["nav_right"]'
 fa_is dropcode 0; fa_is "$T_ITEMS" life_pebble
 t_get /drop -H 'Accept: application/json'; fa_check; fa_expect 'd["redirect"] == "/"'
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"

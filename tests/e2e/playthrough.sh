@@ -101,7 +101,7 @@ t_get /maps;     expect_body 'href="/maps/buy/2">Roma</a>'
 t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
 pt_is "gold,$T_ITEMS,towns" "30|stick@weapon,herbx2|0,2" "after shopping"
-t_get /;         expect_body 'Weapon: Stick'; expect_body 'Bag: 1 / 12</a>'
+t_get /;         expect_body 'Weapon: Stick'; expect_body '<span class="invpanel-count"><b>1</b>/12</span></a>'
 expect_stats "15 0 10 5 5 7 5" "a stick adds 2 attack power"
 
 t_section "playthrough: explore, fight, level up"

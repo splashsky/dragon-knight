@@ -521,6 +521,7 @@ browser; to use SemiBold or Black, add the file and its `@font-face`.
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, width, level}`: width 0..100 (%), level `high`/`mid`/`low` (66/33); the Character panel's bars (`game.nav(user).bars`) and the fight bars share the CSS gradients `--bar-high/mid/low/mp/tp` in dk.css |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
+| `game.gear_rows(names)` | the Inventory panel's rows from `inventory.names()`: `{label, icon|badge, name, empty}` (weapon, armor, shield, accessory slots 1–3) |
 | `game.forum_link()` | `/forum`, the external address, or nil |
 | `game.online_users()` | the players online (`id, charname`; `lib/presence.lua`) |
 | `game.nav(user)` | the table the side columns render |

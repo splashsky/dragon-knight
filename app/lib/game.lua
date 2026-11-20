@@ -111,6 +111,25 @@ function game.online_users()
 	return presence.list()
 end
 
+-- The Inventory panel's equipment rows (layout/nav_right.html), from inventory.names():
+-- { label, icon (weapon/armor/shield) or badge (accessory slot number), name, empty }.
+local GEAR_ROWS = {
+	{ slot = "weapon", label = "Weapon", icon = "weapon" },
+	{ slot = "armor", label = "Armor", icon = "armor" },
+	{ slot = "shield", label = "Shield", icon = "shield" },
+	{ slot = "accessory1", label = "Slot 1", badge = "1" },
+	{ slot = "accessory2", label = "Slot 2", badge = "2" },
+	{ slot = "accessory3", label = "Slot 3", badge = "3" },
+}
+function game.gear_rows(names)
+	local rows = {}
+	for i, r in ipairs(GEAR_ROWS) do
+		local name = names[r.slot] or "None"
+		rows[i] = { label = r.label, icon = r.icon, badge = r.badge, name = name, empty = name == "None" }
+	end
+	return rows
+end
+
 -- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
@@ -141,6 +160,7 @@ function game.nav(user)
 		bars = bars,   -- { key = "hp"|"mp"|"tp", label, value, max, width, tone, low } (fight.js updates them)
 		spells = spells.known(user, "town"),
 		equipment = inventory.names(user.id),
+		gear = game.gear_rows(inventory.names(user.id)),
 		bag_used = inventory.used(inventory.bag(user.id)),
 		bag_size = inventory.size(),
 	}

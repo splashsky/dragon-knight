@@ -383,6 +383,21 @@ tu "currenthp=7"
 t_get /inventory;                 expect_body '<span class="meter-fill bar-mid" data-bar="hp" style="width: 47%"></span>'
 t_get /static/images/bars_green.gif; expect_status 404
 
+t_section "town: inventory panel (right column)"
+# bag first, then the gear: icons for weapon/armor/shield, numbered badges for the slots,
+# "None" greyed; the full label in each row's title
+t_get /inventory
+expect_body '<a class="invpanel-bag" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>0</b>/12</span></a>'
+expect_body '<li title="Weapon: None"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name light">None</span></li>'
+expect_body '<li class="invpanel-first-slot" title="Slot 1: None"><span class="invpanel-badge" aria-label="Slot 1">1</span>'
+t_give townie stick 1 weapon; t_give townie life_pebble 1 accessory2
+for k in herb potion ether antidote branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
+t_get /inventory
+expect_body '<li title="Weapon: Stick"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span></li>'
+expect_body '<li title="Slot 2: Life Pebble"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span></li>'
+expect_body '<a class="invpanel-bag full" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>12</b>/12</span></a>'
+t_items_clear townie
+
 tu "$TOWN_HOME"
 t_jar default
 fi

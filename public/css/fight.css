@@ -6,30 +6,15 @@
 
 /* fight.js (docs/APP.md "Fight API"): the bars it adds, the round played line by line,
 	statuses and allies coming and going. Without JavaScript none of this shows. */
-.fight-bar {
+/* the monster/ally HP and MP bars reuse the Character panel's bar (dk.css .meter-track,
+	.meter-fill and the .bar-* gradients); only their size and place on the line are here */
+.fight-meter {
 	display: inline-block;
 	vertical-align: middle;
+	flex: none;
 	width: 80px;
-	height: 8px;
 	margin-left: 8px;
-	border: solid 1px rgba(0, 0, 0, 0.75);
-	border-radius: 2px;
-	background-color: rgba(255, 255, 255, 0.55);
-	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
-	overflow: hidden;
 }
-.fight-bar-fill {
-	display: block;
-	height: 100%;
-	width: 0;
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-	transition: width 0.35s ease-out;
-}
-/* the gradients are dk.css's --bar-* (shared with the Character panel); MP after the levels */
-.fight-bar-high .fight-bar-fill { background-image: var(--bar-high); }
-.fight-bar-mid .fight-bar-fill { background-image: var(--bar-mid); }
-.fight-bar-low .fight-bar-fill { background-image: var(--bar-low); }
-.fight-bar-mp .fight-bar-fill { background-image: var(--bar-mp); }
 .fight-js .meter-fill { transition: width 0.35s ease-out; }
 .fight-line { animation: fight-in 0.3s ease-out; }
 .fight-hurt { animation: fight-shake 0.35s ease-out; }
@@ -52,6 +37,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.fight-bar-fill, .fight-js .meter-fill, .fight-gone { transition: none; }
+	.fight-js .meter-fill, .fight-gone { transition: none; }
 	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone { animation: none; }
 }

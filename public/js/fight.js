@@ -115,15 +115,16 @@
 	function bar(node) {
 		var max = Number(node.getAttribute("data-max")), v = Number(node.getAttribute("data-value"));
 		if (!(max > 0) || isNaN(v)) return;
-		var b = $(".fight-bar", node);
+		var b = $(".fight-meter", node);
 		if (!b) {
-			b = el("span", "fight-bar");
+			// the same bar as the Character panel's (dk.css .meter-track/.meter-fill/.bar-*)
+			b = el("span", "meter-track fight-meter");
 			b.setAttribute("aria-hidden", "true");
-			b.appendChild(el("span", "fight-bar-fill"));
+			b.appendChild(el("span", "meter-fill"));
 			node.appendChild(b);
 		}
 		var p = pct(v, max);
-		b.className = "fight-bar fight-bar-" + node.getAttribute("data-stat") + " fight-bar-" + level(p);
+		b.firstChild.className = "meter-fill bar-" + (node.getAttribute("data-stat") === "mp" ? "mp" : level(p));
 		b.firstChild.style.width = p + "%";
 	}
 
@@ -216,7 +217,7 @@
 		if (old) {
 			node.replaceChild(span, old);
 		} else {
-			var at = $(".fight-bar", node);
+			var at = $(".fight-meter", node);
 			node.insertBefore(txt(" "), at);
 			node.insertBefore(span, at);
 		}

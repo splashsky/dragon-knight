@@ -12,7 +12,8 @@ changelog.RELEASES = {
 		changes = {
 			"Fixed the monster's HP bar not starting full: the HP a monster is rolled with is now its full health for the fight.",
 			"Redesigned the Character panel to be more compact: name and level on one line, and HP, MP and TP as slim bars with their values.",
-			"HP, MP and TP bars are drawn with CSS gradients instead of images, in the Character panel and in fights.",
+			"HP, MP and TP bars are drawn with CSS gradients instead of images, and the monster and ally bars in fights are the same bars as the Character panel's.",
+			"Condensed the Inventory panel: your bag comes first, then your gear and accessory slots in one tight list.",
 		},
 	},
 	{
