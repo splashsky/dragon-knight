@@ -480,7 +480,7 @@ static void schedule_next(client *c, int64_t now)
 }
 
 /* live: like client.js (X-DK-Live: 1; no X-DK-Have, so the answers carry the whole page:
-   the most a live answer costs) */
+ * the most a live answer costs) */
 static void build_request_ex(client *c, const char *method, const char *path, const char *body, int kind,
 							 int live)
 {
