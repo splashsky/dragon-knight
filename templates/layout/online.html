@@ -1,3 +1,4 @@
-{#- Who's online (lib/presence.lua); live.js keeps it up to date. ctx: online. -#}
+{#- Who's online (lib/presence.lua); live.js keeps it up to date. ctx: online (the names
+	listed), online_count (everyone online), online_limit (nil on the full /online page). -#}
 <div class="title">Who's Online</div>
-<div class="box-body">There are <b data-online-count>{{ #online }}</b> user(s) online:<span data-online-list>{{{ include("layout/online_list") }}}</span></div>
+<div class="box-body">There are <b data-online-count>{{ online_count }}</b> user(s) online:<span data-online-list{% if online_limit then %} data-online-limit="{{ online_limit }}"{% end %}>{{{ include("layout/online_list") }}}</span><span data-online-more{% if online_count <= #online then %} hidden{% end %}> and <a href="/online"><span data-online-more-count>{{ online_count - #online }}</span> more</a></span></div>

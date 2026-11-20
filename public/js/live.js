@@ -115,21 +115,35 @@
 		links.forEach(function (a, i) { list.appendChild(txt(i ? ", " : " ")); list.appendChild(a); });
 	}
 	function onlineLinks(list) { return Array.prototype.slice.call(list.querySelectorAll("a[data-id]")); }
+	// The box lists at most data-online-limit names; "and N more" covers the rest (a name
+	// that leaves is not replaced by a hidden one until the next page load).
+	function setMore(list, count) {
+		var box = list.parentNode, more = box && box.querySelector("[data-online-more]");
+		if (!more || typeof count !== "number") return;
+		var n = Math.max(0, count - onlineLinks(list).length);
+		var c = more.querySelector("[data-online-more-count]");
+		if (c) c.textContent = n;
+		more.hidden = n === 0;
+	}
 	function join(p) {
 		setCount(p.online);
 		var id = Number(p.id);
 		$$("[data-online-list]").forEach(function (list) {
-			var links = onlineLinks(list);
-			if (links.some(function (a) { return Number(a.getAttribute("data-id")) === id; })) return;
-			var a = el("a"); a.href = "/character/" + id; a.setAttribute("data-id", id); a.textContent = String(p.name);
-			links.push(a);
-			relist(list, links);
+			var links = onlineLinks(list), limit = Number(list.getAttribute("data-online-limit")) || 0;
+			if (!links.some(function (a) { return Number(a.getAttribute("data-id")) === id; }) &&
+				(!limit || links.length < limit)) {
+				var a = el("a"); a.href = "/character/" + id; a.setAttribute("data-id", id); a.textContent = String(p.name);
+				links.push(a);
+				relist(list, links);
+			}
+			setMore(list, p.online);
 		});
 	}
 	function leave(p) {
 		setCount(p.online);
 		$$("[data-online-list]").forEach(function (list) {
 			relist(list, onlineLinks(list).filter(function (a) { return Number(a.getAttribute("data-id")) !== Number(p.id); }));
+			setMore(list, p.online);
 		});
 	}
 
@@ -194,7 +208,9 @@
 				if (typeof s.chat === "string") $$("[data-chat-posts]").forEach(function (e) { e.innerHTML = s.chat; });
 				if (s.online) {
 					setCount(s.online.count);
-					$$("[data-online-list]").forEach(function (e) { e.innerHTML = s.online.html; });
+					// /live/state renders the capped box; the full /online list keeps its names
+					$$("[data-online-list][data-online-limit]").forEach(function (e) { e.innerHTML = s.online.html; });
+					$$("[data-online-list]").forEach(function (e) { setMore(e, s.online.count); });
 				}
 				if (typeof s.banner === "string") $$("[data-banner-slot]").forEach(function (e) { e.innerHTML = s.banner; });
 				initBanners();

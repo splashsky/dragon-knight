@@ -27,6 +27,14 @@ local function home(req)
 	return view.page(req, "Exploring", "home/explore", {})
 end
 
+-- GET /online: everyone online (the town box lists the first presence.SHOWN names).
+local function online_page(req)
+	local online = view.online(true)
+	if not online then return view.message(req, "Who's Online", "The who's online list is turned off.") end
+	return view.page(req, "Who's Online", "home/online", { online = online })
+end
+
 return function(r)
 	r:get("/", auth.game, home)
+	r:get("/online", auth.game, online_page)
 end

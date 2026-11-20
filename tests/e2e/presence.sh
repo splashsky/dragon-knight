@@ -84,3 +84,29 @@ pres_expect a leave PresC 1
 sed -i 's/^\([[:space:]]*\)online_seconds = 2,$/\1online_seconds = 600,/; s/^\([[:space:]]*\)presence_sweep_seconds = 1,$/\1presence_sweep_seconds = 60,/' "$CONFIG"
 live_stop
 t_jar default
+
+t_section "presence: the town box lists at most 50 names"
+# 60 more players online; the town box shows 50 names, "and N more" and the exact count;
+# /online lists everyone
+t_sql "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 60)
+	INSERT INTO users (username, email, charname, online, onlinetime)
+	SELECT 'presmany' || i, 'presmany' || i || '@example.com', 'PresMany' || printf('%02d', i), 1, strftime('%s', 'now') FROM n"
+COUNT=$(t_sql "SELECT count(*) FROM users WHERE online = 1")
+t_jar presa
+t_get /
+expect_body "There are <b data-online-count>$COUNT</b> user(s) online:"
+SHOWN=$(grep -o '<a data-id="[0-9]*" href="/character/[0-9]*">' "$BODY" | wc -l)
+[ "$SHOWN" = 50 ] && t_ok || t_fail "town box lists $SHOWN names, not 50"
+expect_body 'data-online-limit="50"'
+expect_body "<span data-online-more> and <a href=\"/online\"><span data-online-more-count>$((COUNT - 50))</span> more</a></span>"
+t_get /online;  expect_status 200
+expect_body "There are <b data-online-count>$COUNT</b> user(s) online:"
+SHOWN=$(grep -o '<a data-id="[0-9]*" href="/character/[0-9]*">' "$BODY" | wc -l)
+[ "$SHOWN" = "$COUNT" ] && t_ok || t_fail "/online lists $SHOWN names, not $COUNT"
+expect_no_body 'data-online-limit'
+expect_body '<span data-online-more hidden>'
+t_sql "DELETE FROM users WHERE username LIKE 'presmany%'"
+t_get /
+expect_body '<span data-online-more hidden>'
+t_jar default
+t_get /online;  expect_redirect /login

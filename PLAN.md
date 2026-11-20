@@ -291,6 +291,7 @@ queued cookies), so HEAD never changes state.
 | `do=spell:id` | `POST /spell/:id` (heal spells out of combat) |
 | `do=showchar` | `GET /character` (minimal layout, popup-friendly) |
 | `do=onlinechar:id` | `GET /character/:id` |
+| (new) | `GET /online` — everyone online (the town box lists the first 50) |
 | `do=showmap` | `GET /map` |
 | `do=babblebox` | the Babble Box panel on every game page; `GET /babble` (the chat on its own page), `POST /babble` (fetch with JSON or a form), `POST /babble/:id/delete` (admins) |
 | (new) | `GET /live` (event stream), `GET /live/state` (the live parts of a page, JSON), `POST /banner/dismiss` |

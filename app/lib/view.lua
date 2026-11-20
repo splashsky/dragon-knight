@@ -132,10 +132,13 @@ function view.chat(req, large)
 	}
 end
 
--- The who's-online list's ctx (layout/online.html); nil when it is turned off.
-function view.online()
+-- The who's-online box's ctx (layout/online.html); nil when it is turned off. The box lists
+-- at most presence.SHOWN names (`all` lists everyone, for the /online page); the count is
+-- always exact.
+function view.online(all)
 	if game.control().showonline ~= 1 then return nil end
-	return { online = presence.list() }
+	local limit = not all and presence.SHOWN or nil
+	return { online = presence.list(limit), online_count = presence.count(), online_limit = limit }
 end
 
 -- The live parts of the layout (docs/APP.md "Live pages"): `live` (the page loads live.js:

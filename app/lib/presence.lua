@@ -42,13 +42,15 @@ end
 -- checks the query plans): every game page shows the count.
 presence.COUNT_SQL = "SELECT count(*) FROM users WHERE online = 1"
 presence.LIST_SQL = "SELECT id, charname FROM users WHERE online = 1 ORDER BY charname, id"
+presence.SHOWN = 50       -- names listed in the who's-online box; /online lists everyone
 
 function presence.count()
 	return dk.db:value(presence.COUNT_SQL)
 end
 
--- The players online (id, charname), by name.
-function presence.list()
+-- The players online (id, charname), by name; at most `limit` of them when given.
+function presence.list(limit)
+	if limit then return dk.db:query(presence.LIST_SQL .. " LIMIT ?", limit) end
 	return dk.db:query(presence.LIST_SQL)
 end
 

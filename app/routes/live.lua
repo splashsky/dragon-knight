@@ -46,7 +46,7 @@ function live.state(req)
 	end
 	local online = view.online()
 	if online then
-		out.online = { count = #online.online, html = view.render("layout/online_list", online, req) }
+		out.online = { count = online.online_count, html = view.render("layout/online_list", online, req) }
 	end
 	out.banner = view.render("layout/banner", { banner = banner.current(req), back = back }, req)
 	return view.json(out)

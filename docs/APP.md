@@ -366,6 +366,10 @@ announced as online; the Who's Online list (town page, `/babble`) and the count 
 right column ("Online: N", when `control.showonline` is on) are those players, so they
 always match the events. Both read the partial index `users_online` (schema version 11:
 only the players online), so their cost follows the players online, not the accounts.
+The Who's Online box lists at most `presence.SHOWN` (50) names, by name, then "and N
+more" linking to `GET /online`, which lists everyone; the count is always exact. live.js
+adds joining players only while the box has room (`data-online-limit`) and keeps "and N
+more" in step with the count.
 
 - **Join**: `session.load` → `presence.touch`: a request by a player with `online = 0`
 	sets it and publishes `join`. Any number of requests, tabs or streams make one join.
