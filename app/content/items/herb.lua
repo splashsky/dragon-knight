@@ -13,6 +13,7 @@ terrible and works every time.]],
 	category = "consumable",
 	price = 15,
 	max_stack = 10,
+	icon = "herb",                  -- public/images/items/herb.png
 	usable_in = "both",
 	target = "self",
 	power = 30,                     -- the most HP it restores

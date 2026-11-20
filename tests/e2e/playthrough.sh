@@ -90,6 +90,7 @@ t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_bo
 expect_body '>Wanderer</a>'
 TC=$(t_csrf)
 pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"
+pt_is "currentmp,base_maxmp,$T_KNOWN" "5|5|25" "a new Mage: 5 MP and Magic Bolt"
 t_get /inn;      expect_body 'Resting at the inn'
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed and ready for action.'
 t_get /shop;     expect_body 'href="/shop/buy/1" data-tip>Stick<template class="tip">'
@@ -102,14 +103,14 @@ t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
 pt_is "gold,$T_ITEMS,towns" "30|stick@weapon,herbx2|0,2" "after shopping"
 t_get /;         expect_body 'Weapon: Stick'; expect_body '<span class="invpanel-count"><b>1</b>/12</span></a>'
-expect_stats "15 0 10 5 5 7 5" "a stick adds 2 attack power"
+expect_stats "15 5 10 5 5 7 5" "a stick adds 2 attack power"
 
 t_section "playthrough: explore, fight, level up"
 pu "experience = 14"   # one kill short of level 2
 pt_explore
 pt_fight
 expect_body 'You have gained a level!'; expect_body 'You have learned a new spell.'
-pt_is "level,base_maxmp,$T_KNOWN" "2|5|1" "level up"
+pt_is "level,base_maxmp,$T_KNOWN" "2|10|1,25" "level up (+5 MP, Heal)"
 t_get /victory;  expect_redirect /
 pt_walk_home
 
@@ -122,7 +123,7 @@ pt_is "currentaction,latitude,longitude,currenttp" "In Town|0|0|5" "back in Midw
 
 t_section "playthrough: second fight + item drop"
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed'
-pt_is "currentmp" "5" "inn restores mp"
+pt_is "currentmp" "10" "inn restores mp"
 pt_explore
 pt_fight
 if grep -qF 'This monster has dropped an item' "$BODY"; then t_ok; else pu "dropcode = 34"; fi
@@ -147,7 +148,7 @@ t_section "playthrough: heal spell"
 [ "$(pq "currenthp < base_maxhp")" = 1 ] || pu "currenthp = 1"
 t_get /;         expect_body 'action="/spell/1"'
 t_post /spell/1 "csrf=$TC"; expect_body 'You have cast the Heal spell'
-pt_is "currentmp" "0" "heal costs 5 mp"
+pt_is "currentmp" "5" "heal costs 5 mp"
 
 t_section "playthrough: babble + forum"
 t_get /babble;   expect_status 200

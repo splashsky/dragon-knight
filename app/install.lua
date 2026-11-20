@@ -174,6 +174,7 @@ local function run(...)
 		o.username, auth.hash_password(o.password), o.email, o.charname, class.id, now, now,
 		st.currenthp, st.base_maxhp, st.currentmp, st.base_maxmp, st.currenttp, st.base_maxtp, st.strength,
 		st.dexterity)
+	classes.teach_start_spells(id, class)
 	news.adopt({ id = id })
 
 	print(string.format("Database %s created (%s setup).", dk.config.db_path or "data/dk.db",

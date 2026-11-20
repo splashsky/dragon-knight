@@ -1,12 +1,15 @@
 {#- Purchase confirmation (legacy towns.php buy2()). ctx: the offer of town/shop.lua's
 		check(): item, slot (gear that is equipped when bought), old (the entry in that slot),
-		sellback, can_keep, keep_full, can_sell; max (bag items: how many). The items' names in
-		the text carry their tooltips. -#}
-<div class="town-message">
+		sellback, can_keep, keep_full, can_sell; max (bag items: how many); icon (the item's
+		picture, or nil). The items' names in the text carry their tooltips. -#}
+<div class="town-message shop-buy">
+{%- if icon then %}
+<img class="shop-buy-icon" src="{{ icon }}" width="44" height="44" alt="">
+{%- end %}
 <form action="/shop/buy/{{ item.id }}" method="post">
 {{{ csrf_field() }}}
 {%- if slot and old then %}
-You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item) }}}</span>?<br><br>
+You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item, old) }}}</span>?<br><br>
 {%- if can_keep then %}
 <input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)"><br>
 {%- elseif keep_full then %}

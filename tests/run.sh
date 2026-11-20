@@ -207,11 +207,13 @@ t_spells() {
 		WHERE u.username = '$1' AND s.id IN (${2:-0})"
 }
 # t_give USERNAME ITEM_KEY [QTY [SLOT]]: add a user_items row (SLOT: weapon, armor, shield,
-# accessory1-3; none: the bag). t_items_clear USERNAME: take all of a user's items away.
+# accessory1-3; none: the bag), with full charges for an item that casts.
+# t_items_clear USERNAME: take all of a user's items away.
 t_give() {
 	local slot=NULL
 	[ -n "${4:-}" ] && slot="'$4'"
-	t_sql "INSERT INTO user_items (user_id, item_id, qty, equipped) SELECT u.id, i.id, ${3:-1}, $slot
+	t_sql "INSERT INTO user_items (user_id, item_id, qty, equipped, charges)
+		SELECT u.id, i.id, ${3:-1}, $slot, CASE WHEN i.casts <> '' THEN i.charges ELSE 0 END
 		FROM users u, items i WHERE u.username = '$1' AND i.key = '$2'"
 }
 t_items_clear() { t_sql "DELETE FROM user_items WHERE user_id = (SELECT id FROM users WHERE username = '$1')"; }

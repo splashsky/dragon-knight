@@ -11,7 +11,7 @@ local schema = require("lib.content.schema")
 local load = {}
 
 -- Bumped when the flat form or the sync changes meaning, to force a resync.
-load.FORMAT = "dk-content-7"
+load.FORMAT = "dk-content-8"
 
 function load.path(kind, key)
 	return (dk.config.app_dir or "app") .. "/" .. kind.dir:gsub("%.", "/") .. "/" .. key .. ".lua"
@@ -74,8 +74,8 @@ function load.kind(name)
 	return out
 end
 
--- References between kinds: every key in a "keys" field with `refs` (a class's
--- levels.N.spells) must be a file of that kind; then the kind's own validate_refs (a
+-- References between kinds: every key in a "keys" or "key" field with `refs` (a class's
+-- levels.N.spells, an item's casts) must be a file of that kind; then the kind's own validate_refs (a
 -- monster's equipment must be gear of the slot's category, ...). Checked against the
 -- files, not the database, so a reference to a deleted (retired) entity is an error too.
 -- Skipped while the referenced kind has errors of its own (those are reported instead).
@@ -86,7 +86,7 @@ local function check_refs(all, k)
 		table.sort(fields)
 		for _, f in ipairs(fields) do
 			local spec = k.kind.field(f)
-			local target = spec and spec.type == "keys" and spec.refs and all.kinds[spec.refs]
+			local target = spec and (spec.type == "keys" or spec.type == "key") and spec.refs and all.kinds[spec.refs]
 			if target and #target.errors == 0 then
 				for key in tostring(e.flat[f]):gmatch("[^,]+") do
 					if not target.by_key[key] then

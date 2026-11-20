@@ -7,7 +7,9 @@
 --                            price); otherwise "submit" (bag items: qty)
 --   POST /shop/sell/#id      a bag entry (qty for stacks), for items.sell_price each
 -- Weapons, armor and shields are equipped when bought; everything else (consumables,
--- accessories, ...) goes into the bag, stacking.
+-- accessories, ...) goes into the bag, stacking. Any item the town sells can be bought
+-- again and again, as far as the gold and the bag allow (2.4: a copy of the weapon you
+-- wear too; the old one is kept in the bag or sold, as always).
 local common = require("town.common")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
@@ -29,10 +31,10 @@ local function check(req, id)
 	local o = { item = item }
 	local bag = inventory.bag(user.id)
 	local size = inventory.size()
+	o.icon = items.icon(item)
 	if item.slot and item.slot ~= "accessory" then
+		-- a copy of what you are wearing is fine too (2.4: no more "Already purchased")
 		local old = inventory.equipped(user.id)[item.slot]
-		-- the list never links what you are wearing (legacy let a crafted URL buy it again)
-		if old and old.item.id == item.id then return nil, common.cheat(req) end
 		o.slot, o.old = item.slot, old
 		o.can_sell = old ~= nil and items.can_sell(old.item)
 		o.sellback = o.can_sell and items.sell_price(old.item) or 0
@@ -61,7 +63,6 @@ function shop.list(req)
 	local user = req.user
 	local town = common.town_here(req)
 	if not town then return common.cheat(req) end
-	local eq = inventory.equipped(user.id)
 	local list = {}
 	for _, it in ipairs(items.town(town.id)) do
 		local line
@@ -73,14 +74,15 @@ function shop.list(req)
 			line = table.concat(items.is_gear(it) and items.special_lines(it) or items.use_lines(it), ", ")
 		end
 		list[#list + 1] = {
-			item = it, icon = ICONS[it.slot], line = line,
-			owned = it.slot ~= nil and eq[it.slot] ~= nil and eq[it.slot].item.id == it.id,
+			item = it, image = items.icon(it), icon = ICONS[it.slot], line = line,
 			special = #it.modifiers > 0 and it.slot ~= "accessory",
 		}
 	end
 	local sell = {}
 	for _, e in ipairs(inventory.bag(user.id)) do
-		if items.can_sell(e.item) then sell[#sell + 1] = { entry = e, price = items.sell_price(e.item) } end
+		if items.can_sell(e.item) then
+			sell[#sell + 1] = { entry = e, price = items.sell_price(e.item), image = items.icon(e.item) }
+		end
 	end
 	return view.page(req, "Buy Items", "town/shop", { items = list, sell = sell })
 end

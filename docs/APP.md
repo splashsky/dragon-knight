@@ -17,7 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
-| Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html` | `tests/e2e/{inventory,town,fight}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
+| Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Smooth fights (the JSON fight API) | `app/fight/events.lua`, `app/routes/fight.lua`, `app/lib/view.lua` (`view.fragments`) | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
@@ -535,11 +535,13 @@ live.js chat, a resync) needs no set-up, and nothing runs while nothing is hover
 	is not rendered, read by screen readers or submitted.
 - `data-tip-side`: `top` (default), `bottom`, `left` or `right`, the preferred side.
 - Content classes (`dk.css`, coloured by the themes): `.tip-title` (bold name), `.tip-meta`
-	(short facts, muted: "5 MP · In fights"), `.tip-lines` (a list of stat lines),
+	(short facts, muted: "5 MP · In fights"), `.tip-icon` (an item's picture, 20px, before
+	its name in `.tip-title`: the template's `icon`), `.tip-lines` (a list of stat lines),
 	`.tip-body` (the description, paragraphs) and `.tip-lore` (italic, muted, set apart by a
 	dotted rule). `.tip-term` underlines a word that has a tooltip (dotted, `cursor: help`).
-- **Game things**: `{{{ tip("spell", row) }}}` (also `"item"`, `"monster"`, `"class"`)
-	renders the template from a row: `lib/tips.lua` picks what to say (title, meta, lines,
+- **Game things**: `{{{ tip("spell", row) }}}` (also `"item"`, `"monster"`, `"class"`;
+	`tip("item", row, entry)` with a `user_items` entry says that item's charges, "Charges
+	3/5") renders the template from a row: `lib/tips.lua` picks what to say (title, meta, lines,
 	description, lore), `templates/tip/tip.html` renders it, escaping everything; empty
 	parts (no lore, no description) are left out. For anything else,
 	`{{{ include("tip/tip", { title = ..., meta = { ... }, lines = { ... }, body = text, lore = text }) }}}`.
@@ -581,7 +583,8 @@ so keyboards reach it) with a `<template class="tip">` child (`tip(...)` or
 description, lore), the fight menu's Attack (the player's attack power and weapon) and Run
 buttons (`tips.attack`, `tips.run`; see [Fight engine](#fight-engine)), the gear rows of
 the Inventory panel (item name, kind, stats or power, description, lore; an empty slot's
-label), item names wherever a page lists items (`tip("item", row)`: on `/inventory` the
+label), the fight menu's Gear and Items buttons (`tips.gear(entry)`: the item, the spell it
+casts, its charges, "No MP"; `tips.consumable(row, qty)`), item names wherever a page lists items (`tip("item", row)`: on `/inventory` the
 equipped slots and every bag entry, quest items saying "Quest item"; on `/shop` the items
 for sale, a link carrying `data-tip` itself, and the Sell list; the purchase page's item and
 the one it replaces; the discard confirmation), the monster's name on the fight page (name,
@@ -598,7 +601,7 @@ panel (a textarea on every content admin page), escaped wherever it shows
 (`paragraphs(text)`): in the tooltips (`.tip-lore`) and on the help pages under each entry
 (`.help-lore`: classes on `/help`, spells, statuses and allies on `/help/spells`, items on
 `/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. The Mage, Warrior,
-Paladin, Heal, the Herb and the Blue Slime have some to begin with:
+Paladin, Heal, Magic Bolt, the Herb, the Wand and the Blue Slime have some to begin with:
 
 ```lua
 -- app/content/spells/heal.lua (excerpt)
@@ -639,6 +642,7 @@ Rows of the `classes` table (synced from `app/content/classes/*.lua`, see
 | `classes.all()` | every class, retired ones too (admin) |
 | `classes.get(id)`, `classes.find(id_or_key)`, `classes.name(id)` | a class row / its name, or nil |
 | `classes.start_stats(c)` | the `users` columns of a new character of class `c` |
+| `classes.start_spells(c)`, `classes.teach_start_spells(user_id, c)` | the spells rows of the class's `start_spells` (existing, not retired) / teach them to a new character, learned at level 1 (registration, `dk install`) |
 | `classes.levels(c)` | `{ [level] = { hp, mp, strength, dexterity, spells = { spell id, ... } } }` for levels 2-100 |
 | `classes.reload()` | forget the cache (after a sync in the same request) |
 
@@ -667,6 +671,10 @@ per class, in the class content files; the admin panel shows them read-only per 
 - **HP**: the class's gain plus `hp_bonus(level)`: +10 at levels 10/20/30, +15 at
 	40/50/60, +20 at 70/80/90, +50 at 99 (the class files hold 0 there). Exactly the
 	original. The same for every class.
+
+The starting stats are the class file's (`start_hp`, `start_mp`, ...; the Mage starts with
+5 MP since 2.4, the gains per level unchanged, so a Mage's MP is 5 + the gains + equipment;
+`tests/lua/test_leveling.lua` pins the gains, 370 MP over levels 2-99).
 
 The global rules are plain data at the top of the module (`leveling.GLOBAL_STAGES`,
 `leveling.TP`, `leveling.HP_MILESTONES`); edit them and the next request uses them (hot reload): victory
@@ -697,6 +705,7 @@ High hit points]],                       -- one line per point on the help page
 	sort = 4,                                -- registration/help order (default 0)
 	playable = true,                         -- offered when registering (default true)
 	start_hp = 20, start_mp = 0, start_tp = 10, start_strength = 6, start_dexterity = 4,
+	start_spells = { "hurt" },               -- spells a new character knows (level 1; optional)
 	exp_base = 22,                           -- the first experience step; exp_stages (optional,
 	                                         -- "factor x steps,...") replaces the global curve
 	levels = levels,                         -- every level 2-100: hp, mp, strength, dexterity
@@ -705,6 +714,12 @@ High hit points]],                       -- one line per point on the help page
 
 - **Lore**: every kind has the optional field `lore` (schema version 13; see
 	[Lore](#lore)).
+- **Starting spells** (schema version 14): a class's `start_spells` lists spell keys a new
+	character knows from the start (`classes.start_spells`, column `classes.start_spells`,
+	overridable in the admin panel): registration and `dk install --class` teach them with
+	`learned_level` 1. The Mage starts with Magic Bolt (and 5 MP); the Warrior and Paladin
+	with none. Changing the list later doesn't teach existing characters (the step-14
+	migration taught the Mages Magic Bolt once).
 - **Files** `app/content/<kind>/<key>.lua` return a table. The key (file name) is
 	`[a-z0-9_]+` and never changes once players may reference it: renaming means a new
 	entity plus retiring the old one. A file runs in a restricted environment
@@ -760,8 +775,8 @@ load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` m
 (`fields` with types, `field(name)`, `admin_fields(flat)`, optional
 `validate_extra`/`write_children`), its table (`id`, `key` UNIQUE, the field columns,
 `retired`) and an entry in `schema.KINDS` (in sync order: kinds others reference first).
-A field of type `keys` with `refs = "<kind>"` lists keys of another kind (checked by
-`load.all`); `write_children` maps them to ids; an optional `validate_refs(flat, all,
+A field of type `keys` with `refs = "<kind>"` lists keys of another kind (type `key`: one
+key or `""`, an item's `casts`; both checked by `load.all`); `write_children` maps them to ids; an optional `validate_refs(flat, all,
 err)` checks more against the other kinds' files (a monster's weapon must be a weapon). A kind with code uses
 `lib/content/scripted.lua` (function fields, messages, data; `load.module(kind, key)`
 gives the runtime the loaded file). Bump `load.FORMAT` when the flat form changes meaning.
@@ -806,7 +821,7 @@ return {
 	`dk check` (and the sync) fail naming the spell file otherwise (`dk.static_exists`, a
 	stat per check); an icon deleted after the sync shows `default.png` (`spells.icon_url`
 	checks the file on every call). Synced into `spells.icon` (schema version 12) and
-	overridable in the admin panel, which shows the current icon. Only Heal has one so far.
+	overridable in the admin panel, which shows the current icon. Heal and Magic Bolt have one so far.
 	**Adding an icon**: put `<name>.png` in `public/images/skills/` (square; shown at 44px in
 	fights and 34px in Fast Spells, scaled by CSS), set `icon = "<name>"` in the spell file
 	and run `./dk check`. The two current PNGs are 256×256 (120–165 KB); smaller files
@@ -827,7 +842,10 @@ return {
 	styles are `.spell-grid`, `.spell-btn` (shared with the fight menu's Attack and Run,
 	`.action-btn`) and `.spell-mp` in `dk.css` (hover, active,
 	`:focus-visible` outline, disabled = desaturated and faded; theme colours in
-	`themes/*.css`) and `.fight-spells` in `fight.css`. Items keep their select.
+	`themes/*.css`) and `.fight-spells` in `fight.css`. Items are icon buttons too (2.4, see
+	[Fight engine](#fight-engine)).
+- Magic Bolt (`magic_bolt`, 2.4, id 25): the Mage's starting spell, 1 MP, Hurt's formula
+	with power 4 (3-4 damage), none to monsters immune to hurt spells; the Wand casts it.
 - The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
 	`chaos`: damage `rand(power * 5/6, power)`, none if the monster is immune), sleeps
 	(`sleep`, `dream`, `nightmare`: the monster stays asleep while `rand(1, 15) <= power`;
@@ -1036,7 +1054,23 @@ and the themes; `.fight-actions`, `.action-row` in `fight.css`): **Attack**
 `images/skills/attack.png`, then **Run** `<button type="submit" name="run" value="Run"
 aria-label="Run">` with `images/skills/run.png`, set apart by a gap and a dotted rule
 (`.action-run`) so it isn't pressed instead of Attack; then the Spells row (see
-[Spells](#spells)); then the item select and "Use Item". The route only checks that the
+[Spells](#spells)); then, side by side, **Gear** (only when the player wears an item that
+casts a spell: `<button type="submit" name="use_gear" value="<user_items id>">` with the
+item's picture and its charges on a badge, `.item-badge-charges` "3/5", red and disabled at 0;
+tooltip `tips.gear`) and **Items** (each consumable in the bag usable in fights, one button
+per item: `<button type="submit" name="item" value="<items id>">` with its picture and how
+many on a badge, `.item-badge`; disabled when its `can_use` refuses now, checked by
+`act.can_use` with no dice; tooltip `tips.consumable`; "None" without any), all
+`.spell-btn`s in `.spell-tip` wrappers (`.fight-bag`, `.fight-gear`, `.fight-items` in
+`fight.css`). `POST /fight` reads a consumable from `item=<id>`; the form before 2.4
+(`item=Use Item&useritem=<id>`) still works (`useritem` wins), and a missing or `0` id is
+"You must select an item first". `use_gear=<id>` must be an entry of the player's that is
+equipped and casts a spell ("You do not have this item equipped.") with a charge left ("The
+Wand has no charges left. Rest at an inn to recharge it."; nothing happens, the turn isn't
+spent); the round then casts the spell through the spell's code with the player as caster
+and no MP cost (`act.run` with `{ kind = "gear", item, spell }`, an `item` step in the
+trace), and the route spends one charge (`inventory.spend_charge`), also when the player
+dies that turn. The route only checks that the
 field is there (`form.fight`, `form.run`), so `fight=Fight` and `run=Run` (the text buttons
 before 2.4, old forms, tests) and whatever value a button sends play the same. Each action
 sits in a `<span class="action-tip" data-tip>` carrying its tooltip (`tips.attack(power,
@@ -1066,7 +1100,7 @@ level). The player's actions aim at "the current target" (`engine.target`: the f
 living enemy of the wave, `s.target` in spells), so a target picker can come later without
 changing spell files.
 
-**The round** (`round.play(f, a)`; `a.kind`: `attack`, `spell`, `item`, `run`, `continue`,
+**The round** (`round.play(f, a)`; `a.kind`: `attack`, `spell`, `item`, `gear`, `run`, `continue`,
 or `ambush`: the monster swung first):
 
 1. the player's turn starts: statuses with `tick_on = "turn_start"` tick; a status that
@@ -1321,7 +1355,8 @@ in the middle column to the four fight pages (the victory page's drop link) go t
 fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the form's
 `csrf` field or `<body data-csrf>`; `FormData` leaves submit buttons out, so the pressed
 one's `name=value` is appended, as a native submit sends it: `fight=Fight` for Attack's icon
-button, `run=Run` for Run's, `spell=<id>` for a spell's icon button). Meanwhile the forms' controls are disabled and
+button, `run=Run` for Run's, `spell=<id>` for a spell's icon button, `item=<items id>` and
+`use_gear=<user_items id>` for the Items and Gear buttons). Meanwhile the forms' controls are disabled and
 `data-main` is `aria-busy`. Then it:
 
 1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
@@ -1397,8 +1432,9 @@ return {
 	1, `attack_weight` >= 0, `stock` >= 1 or absent); item and spell keys must be files;
 	equipment must fit its slot (a weapon in `weapon`, an accessory in `accessory1`-`3`);
 	items must be consumables and spells usable in fights; `when` must be a function.
-- **MP**: every original monster has `maxmp` = the Mage's total MP at its level (start +
-	gains in `classes/mage.lua`, at least 5), written into its file. A monster's MP is full
+- **MP**: every original monster has `maxmp` = the Mage's total MP at its level (the 2.2
+	start of 0 + the gains in `classes/mage.lua`, at least 5), written into its file (the
+	Mage's start of 5 since 2.4 left them as they were). A monster's MP is full
 	at the start of each encounter (`fight_combatants.mp`/`maxmp`; a fight from before
 	version 9 loads it full) and its spells cost `mp` like the player's (none affordable:
 	not eligible). With `uses_mp = false` spells are free (MP is still shown and readable
@@ -1522,12 +1558,42 @@ return {
 
 - Other fields: `description`, `slot` (optional; it is the category for gear and absent
 	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
-	(default true; with a `drop_level`).
-- Validation (`dk check`): gear has `max_stack` 1; only gear has attack, defense and
-	modifiers; only consumables have `use`/`can_use`, `power`, `messages`, `data`,
+	(default true; with a `drop_level`), `icon`, `casts` and `charges` (below).
+- **Icons** (schema version 14): `icon = "herb"` names `public/images/items/herb.png`
+	(`[a-z0-9_]+`, square; the Herb, Potion, Ether and Wand have one). Absent or `""`: pages
+	keep what they showed before (the slot's icon in the shop and the Inventory panel) and
+	icon buttons and the bag grid show `/static/images/skills/default.png` (the spells'
+	default). `dk check` fails, naming the item file, when the PNG is missing; an icon deleted
+	after the sync falls back at once (`items.icon` checks the file). Overridable in the admin
+	panel. Shown in the bag grid on `/inventory` (32px) and before the equipped items' names,
+	in the Inventory panel instead of the slot icon, in the shop's list, Sell list and
+	purchase page, in the fight menu's Gear and Items buttons and in item tooltips (`.tip-icon`).
+- **Items that cast** (2.4): gear with `casts = "<spell key>"` (a spell usable in fights)
+	and `charges = <max>` (1-1000) casts that spell in fights while equipped, a charge
+	instead of MP (see [Fight engine](#fight-engine) for the button and its contract). Each
+	`user_items` row has its own `charges`: full when obtained (shop, drop, `t_give`; any
+	`inventory.add` / `inventory.equip_new`), one spent per cast, 0 refuses. Resting at an inn
+	refills the equipped ones (`inventory.recharge`; the inn page lists them, "Your Wand is
+	fully charged again."); bag items keep theirs. Lines: "Casts Magic Bolt", "Charges 3/5"
+	(`items.charge_lines`, on `/inventory`, in tooltips and on `/help/items`).
+
+```lua
+-- app/content/items/wand.lua
+return {
+	name = "Wand",
+	description = "A short rod of polished ash. ...",
+	category = "weapon", price = 75, attack = 2,
+	casts = "magic_bolt",           -- the spell it casts (app/content/spells/magic_bolt.lua)
+	charges = 5,                    -- charges when full
+	icon = "wand",                  -- public/images/items/wand.png
+}
+```
+- Validation (`dk check`): gear has `max_stack` 1; only gear has attack, defense,
+	modifiers and `casts`; `casts` needs `charges` >= 1 and `charges` needs `casts`; the spell
+	must exist and be castable in fights; only consumables have `use`/`can_use`, `power`, `messages`, `data`,
 	`usable_in` and `target`, and a consumable needs `use`; quest items can't be sellable;
 	`sellable = true` needs a price.
-- Admins override name, description, price, attack, defense, drop level, sellable,
+- Admins override name, description, price, attack, defense, icon, charges, drop level, sellable,
 	droppable, the modifiers' stats and amounts (an override can add a modifier: both its
 	`modifiers.N.stat` and `.amount`) and a consumable's power, numbers and message strings
 	at `/admin/items`.
@@ -1538,10 +1604,13 @@ return {
 	caster. Refusals (already full, ...) and errors cost nothing; the item is taken from
 	the bag only when it was used.
 - Shops: `town_items(town_id, item_id)` is what a town sells (the admin town editor takes
-	item keys). Weapons, armor and shields are equipped when bought: with an old item in the
-	slot the player either keeps it in the bag (needs a free slot) or sells it back (its
-	value counts toward the price). Everything else goes into the bag (`qty`, up to the room
-	on a stack or a new one, and the gold). The Sell section buys any sellable bag item.
+	item keys; Midworld sells the Wand). Any item a town sells can be bought as often as the
+	gold and the bag allow (2.4: no more "Already purchased", a copy of the item worn
+	included); the server checks that the town sells it, the gold and the bag's room.
+	Weapons, armor and shields are equipped when bought: with an old item in the slot the
+	player either keeps it in the bag (needs a free slot) or sells it back (its value counts
+	toward the price). Everything else goes into the bag (`qty`, up to the room on a stack or
+	a new one, and the gold). The Sell section buys any sellable bag item.
 - Drops: a victory without a level-up drops an item 1 in 30 times, picked uniformly among
 	the non-retired droppable items with `drop_level` at or below the monster's level (the
 	original drops' odds). `users.dropcode` holds it until the player takes it into the bag
@@ -1561,6 +1630,8 @@ and `messages` and `data` into tables.
 | `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
 | `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
+| `items.icon(item)`, `items.icon_url(item)` | its picture's URL, or nil / the default icon |
+| `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "Charges 3/5" }` |
 
 Adding an item: copy a file in `app/content/items/` to `<key>.lua`, edit it, run
 `./dk check`. The next page load syncs it: give it a `drop_level` for monsters to drop it,
@@ -1568,7 +1639,8 @@ or add its key to a town's shop in the admin town editor. It shows up on `/help/
 
 ## Inventory
 
-`user_items(id, user_id, item_id, qty, equipped)`: a stack of one item, equipped in a slot
+`user_items(id, user_id, item_id, qty, equipped, charges)`: a stack of one item (`charges`:
+an item that casts, see [Items](#items)), equipped in a slot
 (`weapon`, `armor`, `shield`, `accessory1`-`accessory3`; one per slot) or in the bag
 (`equipped` NULL). `lib/inventory.lua` holds the rules; the pure ones are unit-tested in
 `tests/lua/test_inventory.lua`:
@@ -1591,6 +1663,7 @@ or add its key to a town's shop in the admin town editor. It shows up on `/help/
 | `inventory.entries(uid)`, `inventory.bag(uid)`, `inventory.equipped(uid)` (slot -> entry, cached per request), `inventory.entry(uid, id)`, `inventory.find(uid, item_id)` | entries `{ id, user_id, qty, equipped, item }` |
 | `inventory.size()`, `inventory.used(bag)`, `inventory.free(bag, size)`, `inventory.room(item, bag, size)` | the cap |
 | `inventory.add(uid, item, qty)`, `inventory.take(entry [, qty])` | into / out of the bag |
+| `inventory.full_charges(item)`, `inventory.spend_charge(entry)`, `inventory.recharge(uid)` | an item's charges when obtained; one charge used; the inn: refill the equipped items (returns them) |
 | `inventory.equip(uid, entry, slot)`, `inventory.equip_new(uid, item, slot)`, `inventory.unequip(uid, slot)`, `inventory.free_accessory_slot(uid)` | equipment (they clamp) |
 | `inventory.stats(user)`, `inventory.names(uid)` | effective stats, equipped names per slot |
 
@@ -1716,8 +1789,8 @@ To change the schema:
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
 	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9),
-	 `schema_v11.sql` and `schema_v12.sql` with the game data of that time (`seed_v3.sql` to
-	 `seed_v9.sql`, `seed_v11.sql`, `seed_v12.sql`), migrates them, checks the data and compares
+	 `schema_v11.sql`, `schema_v12.sql` and `schema_v13.sql` with the game data of that time
+	 (`seed_v3.sql` to `seed_v9.sql`, `seed_v11.sql` to `seed_v13.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -1774,7 +1847,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
-| `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
+| `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`; an item that casts with full charges); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
 | `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_clear username`, `t_fight_status username who key [data [turns]]` | a fight in progress against a monster (round 2 by default); an encounter that just began; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
 | `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight (0 when there is none) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |

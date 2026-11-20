@@ -1,6 +1,7 @@
-{#- Inn confirmation (legacy towns.php inn()). -#}
+{#- Inn confirmation (legacy towns.php inn()). ctx: town, charged (equipped items that cast:
+		name, charges, max). -#}
 <div class="town-message">
-Resting at the inn will refill your current HP, MP, and TP to their maximum levels.<br><br>
+Resting at the inn will refill your current HP, MP, and TP to their maximum levels{% if #charged > 0 then %}, and recharge your equipped {% for i, c in ipairs(charged) do %}{% if i > 1 then %}{{ i == #charged and " and " or ", " }}{% end %}{{ c.name }} ({{ c.charges }}/{{ c.max }} charges){% end %}{% end %}.<br><br>
 A night's sleep at this Inn will cost you <b>{{ town.innprice }} gold</b>. Is that ok?<br><br>
 <form action="/inn" method="post">
 {{{ csrf_field() }}}

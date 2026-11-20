@@ -28,13 +28,14 @@
 -- Field specs: type = "string" (one line; max), "text" (multi-line), "int" (min, max),
 -- "bool" (stored 0/1), "choice" (one of `values`, a list of strings), "stages"
 -- (leveling.parse_stages), "keys" (list of content keys, stored sorted "heal,hurt", ""
--- for none; refs = "spells": each must be a file of that kind, checked by load.all),
+-- for none; refs = "spells": each must be a file of that kind, checked by load.all), "key"
+-- (one content key, or "" for none; refs like "keys"),
 -- "message" (a one-line text a spell or item shows, formatted with string.format: only
 -- the placeholders %s, %d and %% are allowed; an override must keep the file's
 -- placeholders, see schema.placeholders), "icon" (the name of a PNG in public/<dir>/, `dir`
 -- like "images/skills": [a-z0-9_]+ and the file must exist (dk.static_exists); "" for
--- none, which shows <dir>/default.png; see schema.icon_url). required = true, or default
--- = value.
+-- none, which shows `fallback` (a path below public/, default <dir>/default.png); see
+-- schema.icon_url). required = true, or default = value.
 -- admin = true: editable as an override in the admin panel. label: shown there.
 local leveling = require("lib.leveling")
 
@@ -77,6 +78,7 @@ local function describe(spec)
 	elseif t == "text" then return "a string" .. (spec.max and (" of at most " .. spec.max .. " characters") or "")
 	elseif t == "stages" then return 'stages like "2x2,1.5x8" (factor x steps)'
 	elseif t == "keys" then return 'a list of keys, like { "heal", "hurt" }'
+	elseif t == "key" then return 'a key, like "heal", or "" for none'
 	elseif t == "choice" then return "one of " .. table.concat(spec.values, ", ")
 	elseif t == "message" then return "a one-line message of at most " .. (spec.max or 500) ..
 		" characters (placeholders: %s, %d; %% for a percent sign)"
@@ -130,6 +132,9 @@ function schema.check(spec, v)
 		end
 		table.sort(keys)
 		return table.concat(keys, ",")
+	elseif t == "key" then
+		if type(v) ~= "string" or (v ~= "" and not schema.valid_key(v)) then return nil, "must be " .. describe(spec) end
+		return v
 	elseif t == "choice" then
 		for _, c in ipairs(spec.values) do
 			if v == c then return v end
@@ -163,14 +168,18 @@ function schema.icon_path(spec, name)
 	return spec.dir .. "/" .. name .. ".png"
 end
 
--- The URL of icon `name` of an "icon" field: /static/<dir>/<name>.png, or
--- /static/<dir>/default.png when the name is empty or invalid or its file is missing
--- (deleted after the content was synced).
+-- Whether icon `name` of an "icon" field names a PNG that exists (its file may have been
+-- deleted after the content was synced).
+function schema.has_icon(spec, name)
+	return type(name) == "string" and schema.valid_key(name) and dk.static_exists(schema.icon_path(spec, name))
+end
+
+-- The URL of icon `name` of an "icon" field: /static/<dir>/<name>.png, or the fallback
+-- (/static/<spec.fallback>, by default /static/<dir>/default.png) when the name is empty
+-- or invalid or its file is missing.
 function schema.icon_url(spec, name)
-	if type(name) == "string" and schema.valid_key(name) and dk.static_exists(schema.icon_path(spec, name)) then
-		return "/static/" .. schema.icon_path(spec, name)
-	end
-	return "/static/" .. schema.icon_path(spec, "default")
+	if schema.has_icon(spec, name) then return "/static/" .. schema.icon_path(spec, name) end
+	return "/static/" .. (spec.fallback or schema.icon_path(spec, "default"))
 end
 
 -- Parses an override/admin form value (text) for a field. Returns the flat value, or nil

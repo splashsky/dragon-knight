@@ -8,7 +8,10 @@
 		spell is an icon button, spell=<id> (spells.buttons: greyed out and
 		disabled when the MP don't cover it; the server checks again), in a span that carries
 		its tooltip (a disabled button gets no pointer events; docs/APP.md "Tooltips"); the
-		actions' spans and the monster's name have one too. -#}
+		actions' spans and the monster's name have one too. Then the Gear (equipped items that
+		cast a spell: use_gear=<user_items id>, a charges badge, disabled at 0) and the Items
+		(consumables: item=<items id>, a quantity badge, disabled when their can_use refuses
+		now), icon buttons like the spells. -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
@@ -68,12 +71,27 @@
 </div>
 {%- end %}
 </div>
-<p><select name="useritem" aria-label="Item"><option value="0">Choose One</option>
-{%- if #items == 0 then %}<option value="0">None</option>{% end %}
-{%- for _, it in ipairs(items) do %}
-<option value="{{ it.id }}">{{ it.name }} (x{{ it.qty }})</option>
+<div class="fight-bag">
+{%- if #gear > 0 then %}
+<div class="fight-gear" role="group" aria-labelledby="fight-gear-label"><span class="fight-gear-label" id="fight-gear-label">Gear</span>
+<div class="spell-grid">
+{%- for _, g in ipairs(gear) do %}
+<span class="spell-tip{% if g.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="use_gear" value="{{ g.id }}" title="{{ g.label }}" aria-label="{{ g.label }}"{% if g.short then %} disabled{% end %}><img src="{{ g.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-charges{% if g.charges < 1 then %} item-badge-empty{% end %}" aria-hidden="true">{{ g.charges }}/{{ g.max }}</span></button>{{{ include("tip/tip", g.tip) }}}</span>
 {%- end %}
-</select> <input type="submit" name="item" value="Use Item"></p>
+</div>
+</div>
+{%- end %}
+<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>
+{%- if #items == 0 then %} <span class="light">None</span>{% end %}
+{%- if #items > 0 then %}
+<div class="spell-grid">
+{%- for _, it in ipairs(items) do %}
+<span class="spell-tip{% if it.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="item" value="{{ it.id }}" title="{{ it.label }}" aria-label="{{ it.label }}"{% if it.short then %} disabled{% end %}><img src="{{ it.icon }}" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">{{ it.qty }}</span></button>{{{ include("tip/tip", it.tip) }}}</span>
+{%- end %}
+</div>
+{%- end %}
+</div>
+</div>
 </form>
 {%- end %}
 </div>

@@ -1,9 +1,11 @@
 -- routes/fight.lua :: fighting, victory, item drops, death (port of legacy fight.php).
 --   GET/POST /fight   fight() -- POST buttons: fight | spell=<id> (a spell's icon button; the
 --                     form before 2.3.1 sent spell=Spell + userspell=<id>, still accepted) |
---                     item (+ useritem) | run | continue (a turn a status blocks); fight
---                     and run are the Attack and Run icon buttons (fight=Fight, run=Run:
---                     only the name counts)
+--                     item=<items id> (a consumable's icon button; the form before 2.4 sent
+--                     item=Use Item + useritem=<id>, still accepted) | use_gear=<user_items
+--                     id> (an equipped item that casts a spell: a charge instead of MP) |
+--                     run | continue (a turn a status blocks); fight and run are the Attack
+--                     and Run icon buttons (fight=Fight, run=Run: only the name counts)
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
@@ -18,6 +20,7 @@
 -- fetch would follow it and lose the round's events), or { error } instead of an error
 -- page. Every fight form carries the round it was shown at: a POST /fight with another
 -- round (a second click, an older tab) plays nothing and shows the fight as it is now.
+local act = require("fight.act")
 local auth = require("lib.auth")
 local classes = require("lib.classes")
 local combat = require("fight.combat")
@@ -85,19 +88,44 @@ local function save_death(user, st)
 		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
 end
 
--- The fight's "Use item" list: consumables in the bag usable in fights, one line per item
--- with the quantity over all its stacks.
-local function usable_items(user)
+-- The fight menu's item buttons: consumables in the bag usable in fights, one per item with
+-- the quantity over all its stacks: { id, name, qty, label, icon (URL), short (its can_use
+-- refuses now: greyed out; the server checks again), item (the row), tip (its tooltip) }.
+local function usable_items(user, f)
 	local out, by_id = {}, {}
 	for _, e in ipairs(inventory.bag(user.id)) do
 		if items.usable(e.item, "fight") then
 			local line = by_id[e.item.id]
 			if not line then
-				line = { id = e.item.id, name = e.item.name, qty = 0 }
+				line = { id = e.item.id, name = e.item.name, qty = 0, icon = items.icon_url(e.item), item = e.item,
+					short = not act.can_use(f, e.item) }
 				by_id[e.item.id] = line
 				out[#out + 1] = line
 			end
 			line.qty = line.qty + e.qty
+		end
+	end
+	for _, line in ipairs(out) do
+		line.label = line.name .. " (x" .. line.qty .. ")"
+		line.tip = tips.consumable(line.item, line.qty)
+	end
+	return out
+end
+
+-- The fight menu's gear buttons: equipped items that cast a spell, in slot order: { id
+-- (the user_items id), name, charges, max, label ("Wand (3/5 charges)"), icon (URL), short
+-- (no charge left, or the spell can't be cast: greyed out), tip (its tooltip) }.
+local function gear_buttons(user)
+	local out = {}
+	local eq = inventory.equipped(user.id)
+	for _, slot in ipairs(inventory.SLOTS) do
+		local e = eq[slot]
+		if e and items.casts(e.item) then
+			local spell = items.spell(e.item)
+			local charges = math.min(e.charges, e.item.charges)
+			out[#out + 1] = { id = e.id, name = e.item.name, charges = charges, max = e.item.charges,
+				label = e.item.name .. " (" .. charges .. "/" .. e.item.charges .. " charges)", icon = items.icon_url(e.item),
+				short = charges < 1 or not (spell and spells.usable(spell, "fight")), tip = tips.gear(e) }
 		end
 	end
 	return out
@@ -189,8 +217,8 @@ local function fight(req)
 	-- The player's choice: a status that blocks the action (asleep, recharging, ...) leaves
 	-- only "Continue".
 	local locked = round.locked(f)
-	local a, entry
-	if locked and (form.run or form.fight or form.spell or form.item or form.continue) ~= nil then
+	local a, entry, gear
+	if locked and (form.run or form.fight or form.spell or form.item or form.use_gear or form.continue) ~= nil then
 		a = { kind = "continue" }
 	elseif form.run ~= nil then
 		a = { kind = "run" }
@@ -213,10 +241,25 @@ local function fight(req)
 			return error_page(req, "You do not have enough Magic Points to cast this spell. Please go back and try again.")
 		end
 		a = { kind = "spell", spell = spell }
+	elseif form.use_gear ~= nil then
+		-- an equipped item that casts a spell: a charge instead of MP, the turn like an item
+		local entry_id = math.tointeger(tonumber(form.use_gear))
+		gear = entry_id and inventory.entry(user.id, entry_id)
+		if not gear or not gear.equipped or not items.casts(gear.item) then
+			return error_page(req, "You do not have this item equipped. Please go back and try again.")
+		end
+		local spell = items.spell(gear.item)
+		if not spell then return error_page(req, act.CANNOT.item) end
+		if gear.charges < 1 then
+			return error_page(req, "The " .. gear.item.name .. " has no charges left. Rest at an inn to recharge it.")
+		end
+		a = { kind = "gear", item = gear.item, spell = spell }
 	elseif form.item ~= nil then
-		-- a consumable from the bag: costs the turn like a spell (refusals cost nothing)
+		-- a consumable from the bag: costs the turn like a spell (refusals cost nothing); the
+		-- icon button's value, or the old select's (item=Use Item&useritem=<id>)
 		local picked = form.useritem
-		if picked == nil or php.intval(picked) == 0 then
+		if picked == nil then picked = form.item end
+		if php.intval(picked) == 0 then
 			return error_page(req, "You must select an item first. Please go back and try again.")
 		end
 		-- validated server-side: an integer item id with a stack in the user's bag
@@ -239,6 +282,7 @@ local function fight(req)
 		-- refusal texts may come from content files and admin overrides: escaped
 		if r.refused then return error_page(req, r.refused) end
 		if entry then inventory.take(entry, 1) end
+		if gear then inventory.spend_charge(gear) end
 		f = r.f
 		if f.trace then evs = round_events(r) end
 		page.yourturn, page.allyturn, page.monsterturn, page.roundend = r.player, r.allies, r.enemies, r.ending
@@ -275,7 +319,8 @@ local function fight(req)
 		page.attack_tip = tips.attack(f.st.attackpower, weapon and weapon.item.name)
 		page.run_tip = tips.run()
 		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)
-		page.items = usable_items(user)
+		page.items = usable_items(user, f)
+		page.gear = gear_buttons(user)
 		f.round = f.round + 1
 		page.round = f.round
 		state.save(f)

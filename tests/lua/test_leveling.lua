@@ -131,4 +131,31 @@ function T.class_hp_plus_bonus_is_original()
 	end
 end
 
+-- The Mage starts with 5 MP and knows Magic Bolt (2.4); the Warrior and Paladin start
+-- with neither. The level gains are unchanged (the MP of 2.3: 370 over levels 2-99), so a
+-- Mage's MP is 5 + the gains at every level.
+function T.starting_mp_and_spells()
+	local classes = require("lib.classes")
+	local combat = require("fight.combat")
+	eq(CLASS[1].start_mp, 5); eq(CLASS[2].start_mp, 0); eq(CLASS[3].start_mp, 0)
+	eq(CLASS[1].start_spells, "magic_bolt"); eq(CLASS[2].start_spells, ""); eq(CLASS[3].start_spells, "")
+	local mage = classes.find("mage")
+	eq(mage.start_mp, 5); eq(classes.start_stats(mage).base_maxmp, 5); eq(classes.start_stats(mage).currentmp, 5)
+	local names = {}
+	for _, s in ipairs(classes.start_spells(mage)) do names[#names + 1] = s.key end
+	eq(table.concat(names, ","), "magic_bolt")
+	eq(#classes.start_spells(classes.find("warrior")), 0); eq(#classes.start_spells(classes.find("paladin")), 0)
+	local total, first = 0, {}
+	for level = 2, MAX do
+		total = total + CLASS[1]["levels." .. level .. ".mp"]
+		if level <= 5 then first[#first + 1] = CLASS[1]["levels." .. level .. ".mp"] end
+	end
+	eq(total, 370, "the Mage's MP gains"); eq(table.concat(first, ","), "5,4,3,5")
+	-- a level-up adds the same gains as before: level 1 -> 5 adds 5+4+3+5 MP
+	local levels = classes.levels(mage)
+	local up = combat.level_up({ level = 1 }, mage, leveling.exp_for(mage, 5), function(level) return levels[level] end)
+	eq(up.level, 5); eq(up.mp, 17)
+	eq(classes.start_stats(mage).base_maxmp + up.mp, 22, "a level 5 Mage's MP")
+end
+
 return T

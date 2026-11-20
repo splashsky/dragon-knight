@@ -1,5 +1,7 @@
 -- classes.lua :: character classes as the game uses them (rows of the classes table,
 -- synced from app/content/classes/*.lua; see lib/content/). Cached per request.
+local spells = require("lib.spells")
+
 local classes = {}
 
 local cache = {}
@@ -71,6 +73,24 @@ function classes.start_stats(c)
 		currenttp = c.start_tp, base_maxtp = c.start_tp,
 		strength = c.start_strength, dexterity = c.start_dexterity,
 	}
+end
+
+-- The spells a new character of class `c` knows (its start_spells): spells rows that exist
+-- and aren't retired, by id.
+function classes.start_spells(c)
+	local out = {}
+	for key in tostring(c.start_spells or ""):gmatch("[^,]+") do
+		local s = spells.by_key(key)
+		if s and s.retired == 0 then out[#out + 1] = s end
+	end
+	table.sort(out, function(a, b) return a.id < b.id end)
+	return out
+end
+
+-- Teaches a new character (user `user_id`, class `c`) its class's starting spells, as
+-- learned at level 1 (registration, dk install).
+function classes.teach_start_spells(user_id, c)
+	for _, s in ipairs(classes.start_spells(c)) do spells.learn(user_id, s.id, 1) end
 end
 
 -- Gains of class `c` per level: { [level] = { hp, mp, strength, dexterity, spells = { id, ... } } }

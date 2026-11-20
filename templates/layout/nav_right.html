@@ -1,6 +1,7 @@
 {#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). Fast Spells: an icon
 		button per town spell (spells.buttons), each its own POST form to /spell/<id>, which
-		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's. -#}
+		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's, and its
+		picture when it has one (else the slot's icon). -#}
 <section class="box">
 <div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
 <div class="box-body charpanel" data-player-stats>
@@ -27,8 +28,8 @@
 <ul class="invpanel-gear">
 {%- for _, g in ipairs(gear) do %}
 <li{% if g.badge == "1" then %} class="invpanel-first-slot"{% end %} title="{{ g.label }}: {{ g.name }}" data-tip data-tip-side="left"{% if g.item then %} tabindex="0"{% end %}>
-{%- if g.icon then %}<img src="/static/images/icon_{{ g.icon }}.gif" width="15" height="15" alt="{{ g.label }}">{% else %}<span class="invpanel-badge" aria-label="{{ g.label }}">{{ g.badge }}</span>{% end -%}
-<span class="invpanel-name{% if g.empty then %} light{% end %}">{{ g.name }}</span>{{{ tip("item", g.item) }}}</li>
+{%- if g.image then %}<img class="invpanel-image" src="{{ g.image }}" width="17" height="17" alt="{{ g.label }}">{% elseif g.icon then %}<img src="/static/images/icon_{{ g.icon }}.gif" width="15" height="15" alt="{{ g.label }}">{% else %}<span class="invpanel-badge" aria-label="{{ g.label }}">{{ g.badge }}</span>{% end -%}
+<span class="invpanel-name{% if g.empty then %} light{% end %}">{{ g.name }}</span>{{{ tip("item", g.item, g.entry) }}}</li>
 {%- end %}
 </ul>
 </div>

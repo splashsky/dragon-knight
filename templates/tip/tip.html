@@ -1,10 +1,10 @@
 {#- A tooltip's content (public/js/tooltip.js; docs/APP.md "Tooltips"): an inert
 		<template class="tip"> to put inside its trigger (an element with data-tip). ctx (all
-		optional, all escaped): title, meta (short facts, joined by " · "), lines (one per
+		optional, all escaped): title, icon (a URL: a small picture before the title), meta (short facts, joined by " · "), lines (one per
 		line), body and lore (text: paragraphs). Game things: the tip(kind, row) helper
 		(lib/tips.lua) renders this. -#}
 <template class="tip">
-{%- if title and title ~= "" then %}<div class="tip-title">{{ title }}</div>{% end %}
+{%- if title and title ~= "" then %}<div class="tip-title">{% if icon then %}<img class="tip-icon" src="{{ icon }}" width="20" height="20" alt="">{% end %}{{ title }}</div>{% end %}
 {%- if meta and #meta > 0 then %}<div class="tip-meta">{{ table.concat(meta, " · ") }}</div>{% end %}
 {%- if lines and #lines > 0 then %}<ul class="tip-lines">{% for _, l in ipairs(lines) do %}<li>{{ l }}</li>{% end %}</ul>{% end %}
 {%- if body and body ~= "" then %}<div class="tip-body">{{{ paragraphs(body) }}}</div>{% end %}

@@ -11,6 +11,10 @@
 -- row and the equipped items; the equipped items are cached for the request and forgotten
 -- by every change made here. After an equipment change, current HP/MP/TP are clamped to
 -- the new maxima (inventory.changed).
+--
+-- Items that cast a spell (lib/items.lua items.casts) have charges per row
+-- (user_items.charges): full (items.charges) when obtained, one spent per cast, refilled
+-- for the equipped ones at an inn (inventory.recharge).
 local items = require("lib.items")
 local stats = require("lib.stats")
 
@@ -74,16 +78,17 @@ end
 local cache = {}   -- user id -> equipped entries (this request only)
 
 local function entry_of(r)
-	local e = { id = r.entry_id, user_id = r.entry_user, qty = r.entry_qty, equipped = r.entry_equipped }
-	r.entry_id, r.entry_user, r.entry_qty, r.entry_equipped = nil, nil, nil, nil
+	local e = { id = r.entry_id, user_id = r.entry_user, qty = r.entry_qty, equipped = r.entry_equipped,
+		charges = r.entry_charges }
+	r.entry_id, r.entry_user, r.entry_qty, r.entry_equipped, r.entry_charges = nil, nil, nil, nil, nil
 	e.item = items.decode(r)
 	return e
 end
 
 local SELECT = "SELECT ui.id AS entry_id, ui.user_id AS entry_user, ui.qty AS entry_qty, " ..
-							 "ui.equipped AS entry_equipped, i.* FROM user_items ui JOIN items i ON i.id = ui.item_id "
+							 "ui.equipped AS entry_equipped, ui.charges AS entry_charges, i.* FROM user_items ui JOIN items i ON i.id = ui.item_id "
 
--- Every entry of a user: { id, user_id, qty, equipped, item }, by entry id.
+-- Every entry of a user: { id, user_id, qty, equipped, charges, item }, by entry id.
 function inventory.entries(user_id)
 	local out = {}
 	for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? ORDER BY ui.id", user_id)) do
@@ -168,7 +173,8 @@ function inventory.add(user_id, item, qty)
 	if stack then
 		dk.db:exec("UPDATE user_items SET qty = qty + ? WHERE id = ?", qty, stack.id)
 	else
-		dk.db:exec("INSERT INTO user_items (user_id, item_id, qty) VALUES (?, ?, ?)", user_id, item.id, qty)
+		dk.db:exec("INSERT INTO user_items (user_id, item_id, qty, charges) VALUES (?, ?, ?, ?)", user_id, item.id, qty,
+							 inventory.full_charges(item))
 	end
 	return true
 end
@@ -192,8 +198,8 @@ function inventory.equip(user_id, entry, slot)
 	dk.db:exec("UPDATE user_items SET equipped = NULL WHERE user_id = ? AND equipped = ?", user_id, slot)
 	if entry.qty > 1 then
 		dk.db:exec("UPDATE user_items SET qty = qty - 1 WHERE id = ?", entry.id)
-		dk.db:exec("INSERT INTO user_items (user_id, item_id, qty, equipped) VALUES (?, ?, 1, ?)",
-							 user_id, entry.item.id, slot)
+		dk.db:exec("INSERT INTO user_items (user_id, item_id, qty, equipped, charges) VALUES (?, ?, 1, ?, ?)",
+							 user_id, entry.item.id, slot, entry.charges)
 	else
 		dk.db:exec("UPDATE user_items SET equipped = ? WHERE id = ?", slot, entry.id)
 	end
@@ -205,7 +211,8 @@ end
 -- One clamp of current HP/MP/TP at the end (like the original shop's single update).
 function inventory.equip_new(user_id, item, slot)
 	dk.db:exec("UPDATE user_items SET equipped = NULL WHERE user_id = ? AND equipped = ?", user_id, slot)
-	dk.db:exec("INSERT INTO user_items (user_id, item_id, qty, equipped) VALUES (?, ?, 1, ?)", user_id, item.id, slot)
+	dk.db:exec("INSERT INTO user_items (user_id, item_id, qty, equipped, charges) VALUES (?, ?, 1, ?, ?)", user_id,
+						 item.id, slot, inventory.full_charges(item))
 	inventory.changed(user_id)
 end
 
@@ -216,6 +223,32 @@ function inventory.unequip(user_id, slot)
 	dk.db:exec("UPDATE user_items SET equipped = NULL WHERE id = ?", e.id)
 	inventory.changed(user_id)
 	return e
+end
+
+-- The charges a newly obtained `item` has: all of them for an item that casts, else 0.
+function inventory.full_charges(item)
+	return items.casts(item) and item.charges or 0
+end
+
+-- Spends one charge of `entry` (an item that casts; the caller checked it has one).
+function inventory.spend_charge(entry)
+	dk.db:exec("UPDATE user_items SET charges = charges - 1 WHERE id = ? AND charges > 0", entry.id)
+	cache[entry.user_id] = nil
+end
+
+-- Refills the charges of the user's equipped items that cast (the inn); bag items keep
+-- theirs. Returns the entries that were recharged, in slot order.
+function inventory.recharge(user_id)
+	local out = {}
+	for _, slot in ipairs(inventory.SLOTS) do
+		local e = inventory.equipped(user_id)[slot]
+		if e and items.casts(e.item) and e.charges < e.item.charges then
+			dk.db:exec("UPDATE user_items SET charges = ? WHERE id = ?", e.item.charges, e.id)
+			out[#out + 1] = e
+		end
+	end
+	cache[user_id] = nil
+	return out
 end
 
 -- The first empty accessory slot, or nil.

@@ -34,9 +34,9 @@ t_get /static/css/dk.css; expect_body '.dk-tip-arrow'; expect_body '.tip-lore'
 
 t_section "tips: the classes on the registration page"
 t_get /register
-expect_body 'The classes: <span class="tip-term" data-tip data-tip-side="bottom" tabindex="0">Mage<template class="tip"><div class="tip-title">Mage</div><div class="tip-meta">Starts with 15 HP, 0 MP</div><ul class="tip-lines"><li>Fast level-ups</li><li>High hit points</li>'
+expect_body 'The classes: <span class="tip-term" data-tip data-tip-side="bottom" tabindex="0">Mage<template class="tip"><div class="tip-title">Mage</div><div class="tip-meta">Starts with 15 HP, 5 MP · Knows Magic Bolt</div><ul class="tip-lines"><li>Fast level-ups</li><li>High hit points</li>'
 expect_body '<li>0 +attack spells</li></ul><div class="tip-lore"><p>In the towers of Midworld the old masters still teach the words that bend the world: a whisper that closes wounds, a cry that calls down fire. Mages are frail in a brawl, and every adventurer they have saved will tell you so. Few of them mind.</p></div></template></span>'
-expect_body '>Warrior<template class="tip"><div class="tip-title">Warrior</div>'
+expect_body '>Warrior<template class="tip"><div class="tip-title">Warrior</div><div class="tip-meta">Starts with 15 HP, 0 MP</div>'
 expect_body '>Paladin<template class="tip"><div class="tip-title">Paladin</div>'
 expect_body 'name="charclass"'
 
@@ -79,17 +79,23 @@ fi
 t_section "tips: the fight menu's actions"
 # Attack and Run are icon buttons (fight=Fight, run=Run, as the old text buttons sent) in
 # spans that carry their tooltips; Attack's says the attack power (strength + base attack +
-# the weapon's) and the weapon. The order: Attack, Run, the spells, the items.
+# the weapon's) and the weapon. The order: Attack, Run, the spells, the gear, the items.
 t_sql "UPDATE users SET strength = 10, base_attack = 3 WHERE username = 'tipper'"
 t_get /fight
 expect_body '<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>'
 expect_body '<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Attack</div><div class="tip-meta">Attack Power 13</div><div class="tip-body"><p>Strike the monster with your weapon.</p></div></template></span>'
 expect_body '<span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Run</div><div class="tip-body"><p>Try to escape. The monster may block your way and strike.</p></div></template></span>'
 expect_no_body '<input type="submit" name="fight"'; expect_no_body '<input type="submit" name="run"'
-TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="useritem"' "$BODY" | uniq | tr '\n' ' ')
-[ "$TP_ORDER" = 'name="fight" name="run" name="spell" name="useritem" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
 t_give tipper stick 1 weapon
 t_get /fight; expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Stick</div>'
+t_items_clear tipper; t_give tipper wand 1 weapon; t_give tipper herb 1
+t_get /fight
+TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="use_gear"\|name="item"' "$BODY" | uniq | tr '\n' ' ')
+[ "$TP_ORDER" = 'name="fight" name="run" name="spell" name="use_gear" name="item" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
+# the wand's button: its picture, the charges as a badge, a tooltip with the spell
+expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="use_gear" value="'
+expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · Charges 5/5 · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'
+expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Wand</div>'
 t_get /static/images/skills/attack.png; expect_status 200; expect_header '^content-type: image/png'
 t_get /static/images/skills/run.png;    expect_status 200; expect_header '^content-type: image/png'
 # a turn a status blocks: only the "Continue" text button, as before
@@ -106,6 +112,11 @@ t_give tipper herb 1 && t_give tipper stick 1 weapon
 t_get /inventory
 expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
 expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
+# an item with a picture shows it instead of the slot's icon; its tooltip says its charges
+t_items_clear tipper; t_give tipper wand 1 weapon
+t_sql "UPDATE user_items SET charges = 2 WHERE user_id = (SELECT id FROM users WHERE username = 'tipper')"
+t_get /inventory
+expect_body '<li title="Weapon: Wand" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/wand.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Wand</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li><li>Casts Magic Bolt</li><li>Charges 2/5</li></ul>'
 t_items_clear tipper
 
 t_section "tips: items on the Inventory page, in the shop and when discarding"
@@ -116,7 +127,7 @@ t_get /admin/items/2
 t_form_submit /admin/items/2 "description=<img src=x onerror=alert(3)>" "lore=$(printf '<script>alert(4)</script> & "q"')"
 expect_redirect '/admin/items/2\?saved=1'
 TP_BRANCH='>Branch<template class="tip"><div class="tip-title">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
-TP_HERB='>Herb<template class="tip"><div class="tip-title">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
+TP_HERB='>Herb<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
 TP_STICK='>Stick<template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
 tp_no_xss() { expect_no_body '<script>alert(4)'; expect_no_body '<img src=x'; }
 t_jar tips
@@ -127,23 +138,29 @@ TP_BRANCH_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id =
 # /inventory: the equipped slots and every bag entry (focusable names), the actions as before
 t_get /inventory; expect_status 200
 expect_body '<td><b class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</b> <span class="small">(Attack Power +2)</span></td>'
+expect_body '<img class="inv-icon" src="/static/images/items/herb.png" width="32" height="32" alt="">'
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></b> x3'
+expect_body '<img class="inv-icon" src="/static/images/skills/default.png" width="32" height="32" alt="">'   # the Branch
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</b>'; tp_no_xss
 expect_body "action=\"/inventory/equip/$TP_BRANCH_E\""; expect_body "action=\"/inventory/use/$TP_HERB_E\""
 expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'action="/inventory/unequip/weapon"'
-# the shop: the links carry their tooltip (no tabindex: a link is focusable), the owned
-# item and the Sell list's names are focusable terms
+# the shop: the links carry their tooltip (no tabindex: a link is focusable), the item
+# worn is for sale too (2.4), and the Sell list's names are focusable terms
 t_get /shop; expect_status 200
 expect_body 'href="/shop/buy/2" data-tip'"$TP_BRANCH"'</a>'; tp_no_xss
 expect_body 'href="/shop/buy/66" data-tip'"$TP_HERB"
-expect_body '<td><span class="light tip-term" data-tip tabindex="0"'"$TP_STICK"'</span></td>'
-expect_body '<tr><td><span class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></span> x3</td><td>8 gold each</td>'
+expect_body 'href="/shop/buy/1" data-tip'"$TP_STICK"'</a>'; expect_no_body 'Already purchased'
+expect_body '<td class="shop-icon"><img class="item-icon" src="/static/images/items/herb.png" width="22" height="22" alt=""></td>'
+expect_body '<td class="shop-icon"><img src="/static/images/icon_weapon.gif" alt="weapon"></td>'
+expect_body '<tr><td><img class="item-icon" src="/static/images/items/herb.png" width="22" height="22" alt=""> <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></span> x3</td><td>8 gold each</td>'
 expect_body '<tr><td><span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span></td><td>15 gold</td>'
 # the purchase page: the item bought and the one it replaces
 t_get /shop/buy/2; expect_status 200
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span> for 30 gold. What should I do with your <span class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</span>?'
 expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'; tp_no_xss
+expect_no_body 'shop-buy-icon'
 t_get /shop/buy/66
+expect_body '<img class="shop-buy-icon" src="/static/images/items/herb.png" width="44" height="44" alt="">'
 expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"
 expect_text 'You are buying the Herb for 15 gold each. It goes into your bag.'
 # the discard confirmation
@@ -170,10 +187,10 @@ expect_body '<div class="help-lore help-lore-class"><p>Warriors learn their trad
 expect_body '<div class="help-lore help-lore-class"><p>The Paladins keep an oath sworn before the first dragon fell'
 t_get /help/spells
 expect_body '<div class="help-lore"><p>'"$TP_HEAL_LORE"'</p></div></td>'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 1 ] && t_ok || t_fail "only Heal has lore on /help/spells"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "only Heal and Magic Bolt have lore on /help/spells"
 t_get /help/items
 expect_body '>Herb<br><span class="small">Restores 30 hit points, in a fight or out of it.</span><div class="help-lore"><p>A bitter green leaf'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 1 ] && t_ok || t_fail "only the Herb has lore on /help/items"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "only the Herb and the Wand have lore on /help/items"
 t_get /help/monsters
 expect_body '<tr class="help-lore-row"><td colspan="9"><div class="help-lore"><p>'"$TP_SLIME_LORE"'</p></div></td></tr>'
 [ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 1 ] && t_ok || t_fail "only the Blue Slime has lore on /help/monsters"

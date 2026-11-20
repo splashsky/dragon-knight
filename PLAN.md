@@ -399,6 +399,14 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	`items`, `monsters`, `statuses`, `summons`) ends with `lore TEXT NOT NULL DEFAULT ''`, the
 	optional story text of the content files' `lore` field (or its admin override), shown in
 	tooltips and on the help pages.
+- Charged items (schema version 14, `docs/APP.md` "Items", "Classes"): `classes.start_spells`
+	(spell keys a new character knows, learned at level 1), `items.casts` (a spell key: gear
+	that casts it in fights while equipped), `items.charges` (when full), `items.icon` (a PNG
+	in `public/images/items/`, '' = none) and `user_items.charges` (each item's charges left;
+	full when obtained, refilled for equipped items at an inn). The step gave existing Mages
+	+5 base and current MP (the Mage's start_mp is 5 since 2.4) and Magic Bolt, filled the
+	charges of items that cast, added the Wand to Midworld's shop and pinned the spells
+	after the original 19 to a fresh install's ids (20-25) where those were free.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.
@@ -458,6 +466,10 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 		are derived from base stats + equipment since schema version 6).
 	- Inventory (version 6): a 12-slot bag, keep-or-sell when buying gear, selling bag
 		items, drops into the bag, consumables (usable in fights, costing the turn).
+	- Shops sell any item as often as gold and bag room allow (2.4; the original's
+		"Already purchased" is gone).
+	- The Mage starts with 5 MP and Magic Bolt (2.4); its MP gains per level are the
+		original's.
 - Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
 	forum is only reachable when `control.forumtype = 1`.
 

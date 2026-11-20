@@ -1088,6 +1088,58 @@ local function v13_lore()
 	end
 end
 
+-- 14: the first item with an effect (2.4): classes.start_spells (spells a new character
+-- knows), items.casts/charges/icon (gear that casts a spell with charges; item icons) and
+-- user_items.charges (each item's own). The Mage now starts with 5 MP (its level gains are
+-- the same): existing Mages get +5 base max MP and +5 current MP (not above the maximum),
+-- so every Mage has 5 + their level gains + equipment. After the sync: everyone learns
+-- their class's starting spells (the Mage: Magic Bolt, at level 1), items that cast are
+-- full, and Midworld sells the Wand.
+local MAGE_START_MP = 5
+
+local function v14_charged_items()
+	dk.db:exec_script([[
+ALTER TABLE classes ADD COLUMN start_spells TEXT NOT NULL DEFAULT '';
+ALTER TABLE items ADD COLUMN casts TEXT NOT NULL DEFAULT '';
+ALTER TABLE items ADD COLUMN charges INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE items ADD COLUMN icon TEXT NOT NULL DEFAULT '';
+ALTER TABLE user_items ADD COLUMN charges INTEGER NOT NULL DEFAULT 0;
+]])
+	-- the spells after the original 19 get the ids a fresh install gives them (seed.sql),
+	-- unless the database has spells of its own there (from before 2.2, when the sync numbers
+	-- them after those, by key)
+	local LATER = { { 20, "call_wolf" }, { 21, "hyper_beam" }, { 22, "poison" }, { 23, "regen" },
+		{ 24, "solar_beam" }, { 25, "magic_bolt" } }
+	local own = dk.db:value("SELECT count(*) FROM spells WHERE id >= 20 AND key NOT IN " ..
+		"('call_wolf', 'hyper_beam', 'poison', 'regen', 'solar_beam', 'magic_bolt')")
+	if own == 0 then
+		for _, s in ipairs(LATER) do dk.db:exec("INSERT OR IGNORE INTO spells (id, key) VALUES (?, ?)", s[1], s[2]) end
+	end
+end
+
+local function v14_after_sync()
+	local db = dk.db
+	local inventory = require("lib.inventory")
+	-- after the sync (and step 6's, which keeps older characters' stats as they were): base
+	-- max MP +5, current MP +5 up to the new maximum (never lowering MP already above it)
+	for _, u in ipairs(db:query("SELECT * FROM users WHERE charclass IN (SELECT id FROM classes WHERE key = 'mage')")) do
+		u.base_maxmp = u.base_maxmp + MAGE_START_MP
+		local max = inventory.stats(u).maxmp
+		local mp = math.max(u.currentmp, math.min(u.currentmp + MAGE_START_MP, max))
+		db:exec("UPDATE users SET base_maxmp = ?, currentmp = ? WHERE id = ?", u.base_maxmp, mp, u.id)
+	end
+	for _, c in ipairs(db:query("SELECT id, start_spells FROM classes WHERE start_spells <> ''")) do
+		for key in c.start_spells:gmatch("[^,]+") do
+			db:exec("INSERT OR IGNORE INTO user_spells (user_id, spell_id, learned_level) " ..
+				"SELECT u.id, s.id, 1 FROM users u, spells s WHERE u.charclass = ? AND s.key = ?", c.id, key)
+		end
+	end
+	db:exec("UPDATE user_items SET charges = (SELECT i.charges FROM items i WHERE i.id = user_items.item_id) " ..
+		"WHERE item_id IN (SELECT id FROM items WHERE charges > 0)")
+	db:exec("INSERT OR IGNORE INTO town_items (town_id, item_id) SELECT t.id, i.id FROM towns t, items i " ..
+		"WHERE t.id = 1 AND i.key = 'wand' AND i.retired = 0")
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1110,6 +1162,9 @@ migrations.STEPS = {
 	{ name = "who's online is read from an index of the players online", up = v11_online_index },
 	{ name = "spells have icons (the fight and Fast Spells buttons)", up = v12_spell_icons },
 	{ name = "classes, spells, items, monsters, statuses and summons have lore", up = v13_lore },
+	{ name = "starting spells, items that cast spells with charges, item icons; Mages start with 5 MP " ..
+		"(existing Mages get +5 MP and learn Magic Bolt), Midworld sells the Wand",
+		up = v14_charged_items, after_sync = v14_after_sync },
 }
 
 migrations.VERSION = #migrations.STEPS

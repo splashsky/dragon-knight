@@ -1,7 +1,7 @@
 -- admin/items.lua :: /admin/items -- the items (content files app/content/items/<key>.lua,
 -- synced into the items table). Admins override name, description, price, attack/defense,
--- the drop settings, sellable, the modifiers' stats and amounts and the consumables'
--- power, numbers and message strings per server (lib/content/kinds/items.lua
+-- the drop settings, sellable, the icon, the charges of items that cast, the modifiers'
+-- stats and amounts and the consumables' power, numbers and message strings per server (lib/content/kinds/items.lua
 -- admin_fields); "reset to file" deletes an override. Category, slot, stack size and what
 -- a consumable does (its code) are edited in the file. Replaces the legacy items and
 -- drops editors.
@@ -25,7 +25,9 @@ function admin_items.index(req)
 	local overrides = content.override_counts(kind)
 	local rows = {}
 	for _, it in ipairs(items.all()) do
-		rows[#rows + 1] = { it = it, attributes = table.concat(items.attributes(it), ", "),
+		local attributes = items.attributes(it)
+		for _, l in ipairs(items.charge_lines(it)) do attributes[#attributes + 1] = l end
+		rows[#rows + 1] = { it = it, icon = items.icon_url(it), attributes = table.concat(attributes, ", "),
 												use = table.concat(items.use_lines(it), ", "), users = counts[it.id] or 0,
 												overrides = overrides[it.key] or 0 }
 	end

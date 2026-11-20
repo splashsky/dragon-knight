@@ -13,6 +13,7 @@ return {
 	category = "consumable",
 	price = 60,
 	max_stack = 10,
+	icon = "potion",                -- public/images/items/potion.png
 	usable_in = "both",
 	target = "self",
 	power = 100,                    -- the most HP it restores

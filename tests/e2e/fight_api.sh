@@ -282,6 +282,45 @@ fa_low() { fa_slime; fa_sql "UPDATE users SET currentmp = 7"; }
 fa_both "last MP" 5 fa_low "spell=$(sp hurt)&round=2"
 fa_expect "'value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\" disabled>' in d['fragments']['main']" "disabled after the round"
 
+t_section "fight api: item and gear buttons, form and fetch alike"
+# A consumable's icon button is <button name="item" value="<items id>"> (2.4), an equipped
+# item that casts <button name="use_gear" value="<user_items id>">: the same round both
+# ways, and the item button the same as the old select's item=Use Item&useritem=<id>.
+fa_icon_button() {  # fa_icon_button NAME: the name=value the page's first icon button NAME sends
+	grep -o "<button class=\"spell-btn\" type=\"submit\" name=\"$1\" value=\"[^\"]*\"" "$BODY" | head -n1 | sed 's/.* name="\([^"]*\)" value="\([^"]*\)"$/\1=\2/'
+}
+fa_herb; t_get /fight; FA_ITEM=$(fa_icon_button item)
+[ "$FA_ITEM" = "item=$(it herb)" ] && t_ok || t_fail "the Herb's button sends '$FA_ITEM'"
+for seed in 1 2; do
+	fa_both "herb button" "$seed" fa_herb "$FA_ITEM&round=2"
+	fa_expect 'any(e["type"] == "item" and e["text"] == "You have used the Herb, and gained 30 Hit Points." for e in d["events"] if "text" in e)' "Herb button: used"
+	fa_expect "'name=\"item\" value=\"$(it herb)\" title=\"Herb (x1)\" aria-label=\"Herb (x1)\"><img src=\"/static/images/items/herb.png\"' in d['fragments']['main']" "the fragment's item buttons"
+	FA_BUTTON=$(fa_state)
+	fa_herb; t_post /fight "csrf=$FA_CS&item=Use+Item&useritem=$(it herb)&round=2" -H "X-Test-Seed: $seed"
+	[ "$(fa_state)" = "$FA_BUTTON" ] && t_ok || t_fail "the item button and the old select differ (seed $seed)"
+done
+# the Wand (a fixed user_items id, so both runs send the same button), no MP left
+FA_WAND=900001
+fa_wand() {
+	fa_slime; fa_sql "UPDATE users SET currentmp = 0"
+	t_sql "INSERT INTO user_items (id, user_id, item_id, qty, equipped, charges) SELECT $FA_WAND, u.id, i.id, 1, 'weapon', 5
+		FROM users u, items i WHERE u.username = 'fapi' AND i.key = 'wand'"
+}
+fa_wand; t_get /fight; FA_GEAR=$(fa_icon_button use_gear)
+[ "$FA_GEAR" = "use_gear=$FA_WAND" ] && t_ok || t_fail "the Wand's button sends '$FA_GEAR'"
+for seed in 1 2 3; do
+	fa_both "wand button" "$seed" fa_wand "$FA_GEAR&round=2"
+	[ "$(t_sql "SELECT charges FROM user_items WHERE id = $FA_WAND")" = 4 ] && t_ok || t_fail "the wand's charge (seed $seed)"
+done
+fa_expect 'any(e["type"] == "item" and e["actor"] == "player" and e["text"].startswith("You have cast the Magic Bolt spell for ") and e["hp"][0]["who"] == "enemy" and e["hp"][0]["from"] - e["hp"][0]["to"] in (3, 4) and "mp" not in e for e in d["events"] if "text" in e and "hp" in e)' "Wand: Magic Bolt, no MP"
+fa_expect "'name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (4/5 charges)\" aria-label=\"Wand (4/5 charges)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">4/5</span>' in d['fragments']['main']" "the fragment's gear button: 4/5"
+fa_is currentmp 0
+# no charge left: refused both ways, nothing spent (no turn)
+fa_empty() { fa_wand; t_sql "UPDATE user_items SET charges = 0 WHERE id = $FA_WAND"; }
+fa_empty; t_get /fight
+expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" disabled><img"
+expect_body '<span class="item-badge item-badge-charges item-badge-empty" aria-hidden="true">0/5</span>'
+
 t_section "fight api: statuses, summons, locked turns"
 fa_titan() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 149 30000; }
 fa_both poison 1 fa_titan "spell=Spell&userspell=$(sp poison)&round=2"
@@ -329,6 +368,14 @@ fa_check_refusal fa_full "spell=0&round=2" "You must select a spell first. Pleas
 fa_check_refusal fa_full "spell=$(sp fury)&round=2" "You have not yet learned this spell. Please go back and try again."
 fa_short() { fa_full; fa_sql "UPDATE users SET currentmp = 2"; }
 fa_check_refusal fa_short "spell=$(sp hurt)&round=2" "You do not have enough Magic Points to cast this spell. Please go back and try again."
+# an item button's value; the Wand with no charge left, one in the bag, one not yours
+fa_check_refusal fa_full "item=$(it herb)&round=2" "Your Hit Points are already full. Please go back and try again."
+fa_check_refusal fa_full "item=$(it potion)&round=2" "You do not have this item. Please go back and try again."
+fa_check_refusal fa_empty "use_gear=$FA_WAND&round=2" "The Wand has no charges left. Rest at an inn to recharge it."
+fa_bagged() { fa_wand; t_sql "UPDATE user_items SET equipped = NULL WHERE id = $FA_WAND"; }
+fa_check_refusal fa_bagged "use_gear=$FA_WAND&round=2" "You do not have this item equipped. Please go back and try again."
+fa_check_refusal fa_full "use_gear=1&round=2" "You do not have this item equipped. Please go back and try again."
+fa_check_refusal fa_full "use_gear=x&round=2" "You do not have this item equipped. Please go back and try again."
 
 t_section "fight api: monster spells and items"
 # fa_find LABEL SETUP 'fields' 'python condition on d' : the first seed (of 40) whose fetch

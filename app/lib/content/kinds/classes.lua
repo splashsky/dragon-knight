@@ -25,6 +25,8 @@ classes.fields = {
 		label = "Starting Strength" },
 	{ name = "start_dexterity", type = "int", required = true, min = 0, max = 100000, admin = true,
 		label = "Starting Dexterity" },
+	{ name = "start_spells", type = "keys", refs = "spells", default = "", admin = true, label = "Starting spells",
+		help = "Keys of the spells a new character knows, comma-separated (learned at level 1)." },
 	{ name = "exp_base", type = "int", required = true, min = 1, max = 1000000, label = "Experience base" },
 	{ name = "exp_stages", type = "stages", default = "", label = "Experience stages",
 		help = "Empty: the global curve (leveling.GLOBAL_STAGES)." },

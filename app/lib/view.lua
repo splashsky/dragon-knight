@@ -119,12 +119,13 @@ function view.render(name, ctx, req)
 	function h.csrf_token() return csrf.token(req) end
 	function h.theme_picker() return theme_picker(req) end
 	function h.logo() return logo(req) end
-	-- tip("spell", row): the tooltip content of a spell, item, monster or class
-	-- (lib/tips.lua, templates/tip/tip.html; docs/APP.md "Tooltips") -> HTML
-	function h.tip(kind, row)
+	-- tip("spell", row [, extra]): the tooltip content of a spell, item, monster or class
+	-- (lib/tips.lua, templates/tip/tip.html; docs/APP.md "Tooltips"; extra: an item's
+	-- { charges = n }) -> HTML
+	function h.tip(kind, row, extra)
 		if row == nil then return "" end
 		local build = assert(tips[kind], "tip: unknown kind")
-		return view.render("tip/tip", build(row), req)
+		return view.render("tip/tip", build(row, extra), req)
 	end
 	return dk.render(name, ctx, h)
 end

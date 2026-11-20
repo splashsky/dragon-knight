@@ -420,4 +420,111 @@ function T.load_module_by_key()
 	eq(type(content_load.module("spells", "solar_beam").stages.release), "function")
 end
 
+-- A rand that answers from a list and records the ranges asked.
+local function scripted_rand(answers)
+	local r = { calls = {} }
+	r.rand = function(min, max)
+		local a, b = php.intval(min), php.intval(max)
+		if a > b then a, b = b, a end
+		r.calls[#r.calls + 1] = a .. "," .. b
+		return table.remove(answers, 1) or a
+	end
+	return r
+end
+
+-- Magic Bolt (2.4): 1 MP, Hurt's formula with power 4 (rand(3, 4)), none to immune monsters.
+function T.magic_bolt()
+	local bolt = assert(spells.by_key("magic_bolt"))
+	eq(bolt.mp, 1); eq(bolt.power, 4); eq(bolt.usable_in, "fight"); eq(bolt.target, "enemy"); eq(bolt.icon, "magic_bolt")
+	for _, roll in ipairs({ 3, 4 }) do
+		local st, r = fight_state(), scripted_rand({ roll })
+		local out = run(st, { kind = "spell", spell = bolt }, r.rand)
+		eq(table.concat(r.calls, " "), "3,4", "Hurt's range: rand(power * 5/6, power)")
+		eq(table.concat(out.lines, "|"), "You have cast the Magic Bolt spell for " .. roll .. " damage.")
+		eq(st.currentmonsterhp, 30 - roll); eq(st.currentmp, 9, "1 MP")
+	end
+	local st, r = fight_state(), scripted_rand({})
+	st.currentmonsterimmune = 1
+	local out = run(st, { kind = "spell", spell = bolt }, r.rand)
+	eq(#r.calls, 0, "no roll"); eq(st.currentmonsterhp, 30); eq(st.currentmp, 9, "MP spent all the same, like Hurt")
+	eq(table.concat(out.lines, "|"), "You have cast the Magic Bolt spell, but the monster is immune to it.")
+	-- the same rolls and numbers as Hurt with power 4
+	local hurt = assert(spells.by_key("hurt"))
+	hurt.power, hurt.mp = 4, 1
+	for n = 1, 30 do
+		local a, b = fight_state(), fight_state()
+		local ra, rb = recorder(n), recorder(n)
+		run(a, { kind = "spell", spell = bolt }, ra.rand)
+		run(b, { kind = "spell", spell = hurt }, rb.rand)
+		eq(table.concat(ra.calls, " "), table.concat(rb.calls, " ")); eq(a.currentmonsterhp, b.currentmonsterhp)
+		assert(a.currentmonsterhp >= 26 and a.currentmonsterhp <= 27, "3-4 damage")
+	end
+end
+
+-- An equipped item that casts (the Wand): the spell's code with the player as caster, no MP
+-- spent, an item's turn; a spell that refuses or can't be cast changes nothing.
+function T.gear_casts_without_mp()
+	local wand = assert(items.by_key("wand"))
+	local bolt = assert(spells.by_key("magic_bolt"))
+	eq(wand.casts, "magic_bolt"); eq(wand.charges, 5); eq(wand.category, "weapon"); eq(wand.attack, 2); eq(wand.price, 75)
+	eq(items.spell(wand).id, bolt.id); eq(items.casts(wand), true); eq(items.casts(items.by_key("stick")), false)
+	eq(table.concat(items.charge_lines(wand, 3), ","), "Casts Magic Bolt,Charges 3/5")
+	eq(table.concat(items.charge_lines(wand), ","), "Casts Magic Bolt,Charges 5")
+	local st, r = fight_state(), scripted_rand({ 4 })
+	st.currentmp = 0
+	local f = fm.model(st, MONSTER, r.rand)
+	f.out, f.trace = {}, {}
+	local x = act.run(f, { kind = "gear", item = wand, spell = bolt })
+	eq(x.refused, nil)
+	eq(table.concat(f.out, "|"), "You have cast the Magic Bolt spell for 4 damage.")
+	local flat = fm.flat(f)
+	eq(flat.currentmonsterhp, 26); eq(flat.currentmp, 0, "no MP spent (or needed)")
+	local doing
+	for _, t in ipairs(f.trace) do if t.line then doing = t.doing end end
+	eq(doing and doing.type, "item", "an item's step (the fight API's event type)")
+	-- a refusal (Heal at full HP) and a retired spell: nothing happens
+	local heal = assert(spells.by_key("heal"))
+	st = fight_state()
+	st.currenthp = st.maxhp
+	x = run(st, { kind = "gear", item = wand, spell = heal })
+	has(x.refused, "already full")
+	local gone = assert(spells.by_key("magic_bolt"))
+	gone.retired = 1
+	x = run(fight_state(), { kind = "gear", item = wand, spell = gone })
+	eq(x.refused, act.CANNOT.item)
+end
+
+-- Item validation: casts and charges go together, only on gear, with a spell usable in fights.
+function T.casting_items_validate()
+	local schema = require("lib.content.schema")
+	local kind = schema.kind("items")
+	local function check(t)
+		local flat, errs = schema.validate(kind, t)
+		return flat, table.concat(errs or {}, "; ")
+	end
+	local flat = check({ name = "W", category = "weapon", casts = "hurt", charges = 3 })
+	eq(flat.casts, "hurt"); eq(flat.charges, 3); eq(flat.icon, "")
+	local _, err = check({ name = "W", category = "weapon", casts = "hurt" })
+	has(err, "casts needs charges")
+	_, err = check({ name = "W", category = "weapon", charges = 3 })
+	has(err, "charges are for items that cast a spell")
+	_, err = check({ name = "W", category = "misc", casts = "hurt", charges = 3 })
+	has(err, "casts is for gear")
+	_, err = check({ name = "W", category = "weapon", casts = "Not A Key", charges = 3 })
+	has(err, "field 'casts' must be a key")
+	_, err = check({ name = "W", category = "weapon", icon = "no_such_icon" })
+	has(err, "names a missing file: "); has(err, "/images/items/no_such_icon.png")
+	eq(check({ name = "W", category = "weapon", icon = "wand" }).icon, "wand")
+	local refs = {}
+	kind.validate_refs({ casts = "heal" }, { kinds = { spells = { by_key = { heal = { usable_in = "town" } } } } },
+		function(m) refs[#refs + 1] = m end)
+	has(table.concat(refs), "can't be cast in fights")
+	-- icons: the item's own, or none (pages keep their old pictures) / the default
+	eq(items.icon(items.by_key("herb")), "/static/images/items/herb.png")
+	eq(items.icon(items.by_key("stick")), nil)
+	eq(items.icon_url(items.by_key("stick")), "/static/images/skills/default.png")
+	eq(items.icon({ icon = "deleted_later" }), nil)
+	eq(items.icon_url({ icon = "deleted_later" }), "/static/images/skills/default.png")
+end
+
 return T

@@ -8,7 +8,10 @@
 -- max_stack in the bag and are scripted like spells (docs/APP.md "Scripting spells and
 -- items"): power, data and message strings are data, their use function (and the
 -- optional can_use) stays in the file (lib/content/scripted.lua). Quest items can't be
--- sold or discarded and don't count against the bag size.
+-- sold or discarded and don't count against the bag size. Gear may cast a spell (casts: a
+-- spell key usable in fights) with charges instead of MP (charges: when full; each
+-- user_items row has its own). icon: a PNG in public/images/items/ (default: the spells'
+-- default icon).
 local scripted = require("lib.content.scripted")
 local schema = require("lib.content.schema")
 local stats = require("lib.stats")
@@ -44,6 +47,14 @@ items.fields = {
 	{ name = "target", type = "choice", values = { "enemy", "self" }, default = "enemy", label = "Target" },
 	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",
 		help = "What the item's code makes of it: the HP it heals, ..." },
+	-- gear that casts a spell
+	{ name = "casts", type = "key", refs = "spells", default = "", label = "Casts",
+		help = "The spell it casts in a fight while equipped (with charges instead of MP)." },
+	{ name = "charges", type = "int", default = 0, min = 0, max = 1000, admin = true, label = "Charges",
+		help = "Charges when full: one per cast; resting at an inn refills those of equipped items." },
+	{ name = "icon", type = "icon", dir = "images/items", fallback = "images/skills/default.png", default = "",
+		admin = true, label = "Icon",
+		help = "A PNG in public/images/items/, without \".png\" (herb: herb.png); empty: the default icon." },
 }
 
 items.FUNCTIONS = { { "use", true }, { "can_use", false } }
@@ -126,6 +137,12 @@ function items.validate_extra(data, flat, err)
 			err("modifiers are for gear (weapon, armor, shield, accessory), not " .. flat.category)
 		end
 	end
+	local casts, charges = flat.casts or "", flat.charges or 0
+	if casts ~= "" and not slot then
+		err("casts is for gear (weapon, armor, shield, accessory), not " .. flat.category)
+	end
+	if casts ~= "" and charges < 1 then err("casts needs charges (1 or more)") end
+	if casts == "" and charges ~= 0 then err("charges are for items that cast a spell (casts = \"<spell key>\")") end
 	if flat.category == "quest" and flat.sellable == 1 then err("quest items can't be sellable") end
 	if flat.sellable == 1 and flat.price == 0 then err("sellable = true needs a price") end
 end
@@ -154,6 +171,13 @@ function items.modifiers(flat)
 	return list
 end
 
+-- The spell it casts must be castable in fights (load.all, after the key was found to exist).
+function items.validate_refs(flat, all, err)
+	local spells = all.kinds.spells and all.kinds.spells.by_key or {}
+	local spell = (flat.casts or "") ~= "" and spells[flat.casts]
+	if spell and spell.usable_in == "town" then err(("casts: the spell '%s' can't be cast in fights"):format(flat.casts)) end
+end
+
 function items.write_children(id, flat)
 	dk.db:exec("UPDATE items SET modifiers = ? WHERE id = ?", stats.encode_modifiers(items.modifiers(flat)), id)
 	scripted.write("items", id, flat)
@@ -171,6 +195,7 @@ function items.admin_fields(flat)
 		if f.name == "attack" or f.name == "defense" then show = gear end
 		if f.name == "drop_level" or f.name == "droppable" then show = flat.drop_level ~= nil end
 		if f.name == "power" then show = consumable end
+		if f.name == "charges" then show = (flat.casts or "") ~= "" end
 		if show then out[#out + 1] = f end
 	end
 	for _, i in ipairs(modifier_indices(flat)) do

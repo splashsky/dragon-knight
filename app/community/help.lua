@@ -58,9 +58,11 @@ function help.items(req)
 		elseif it.slot == "armor" or it.slot == "shield" or it.defense ~= 0 then
 			power = it.defense .. " Defense Power"
 		end
+		local special = items.special_lines(it)
+		for _, l in ipairs(items.charge_lines(it)) do special[#special + 1] = l end
 		g.rows[#g.rows + 1] = {
 			item = it, image = ({ weapon = "weapon", armor = "armor", shield = "shield" })[it.slot],
-			power = power, special = items.special_lines(it),
+			power = power, special = special,
 		}
 	end
 	local out = {}
@@ -107,15 +109,17 @@ function help.monsters(req)
 end
 
 -- Columns per class: HP (gain + milestone bonus), MP, TP (formula), Strength, Dexterity.
--- Level 1 shows the starting values (TP: the original table's, see leveling.TP).
+-- Level 1 shows the starting values (TP: the original table's, see leveling.TP) and spells.
 function help.levels(req)
 	local spell_names = {}
 	for _, s in ipairs(dk.db:query("SELECT id, name FROM spells")) do spell_names[s.id] = s.name end
 	local list = {}
 	for _, c in ipairs(classes.active()) do
 		local gains = classes.levels(c)
+		local start = {}
+		for _, s in ipairs(classes.start_spells(c)) do start[#start + 1] = s.name end
 		local rows = {
-			{ level = 1, exp = php.number_format(0), spells = {},
+			{ level = 1, exp = php.number_format(0), spells = start,
 				stats = { c.start_hp, c.start_mp, leveling.tp_gain(1), c.start_strength, c.start_dexterity } },
 		}
 		-- legacy hides level 100 (the level cap: exp 16777215, no stat gains)

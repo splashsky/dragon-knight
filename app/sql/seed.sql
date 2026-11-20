@@ -16,7 +16,7 @@ INSERT INTO classes (id, key, name) VALUES (3, 'paladin', 'Paladin');
 INSERT INTO control (id, gamename, gamesize, gameopen, gameurl, adminemail, forumtype, forumaddress, compression, verifyemail, shownews, showbabble, showonline) VALUES (1, 'Dragon Knight', 250, 1, '', '', 1, '', 1, 0, 1, 1, 1);
 
 -- items: the original items keep ids 1-33, the original drops are 34-65, then the
--- consumables; the content sync (end of dk install) fills in the rest from
+-- consumables and the Wand (sold in Midworld); the content sync (end of dk install) fills in the rest from
 -- app/content/items/*.lua. Loaded by partial setups too.
 INSERT INTO items (id, key, name) VALUES (1, 'stick', 'Stick');
 INSERT INTO items (id, key, name) VALUES (2, 'branch', 'Branch');
@@ -86,6 +86,9 @@ INSERT INTO items (id, key, name) VALUES (65, 'fortune_drop', 'Fortune Drop');
 INSERT INTO items (id, key, name) VALUES (66, 'herb', 'Herb');
 INSERT INTO items (id, key, name) VALUES (67, 'potion', 'Potion');
 INSERT INTO items (id, key, name) VALUES (68, 'ether', 'Ether');
+INSERT INTO items (id, key, name) VALUES (69, 'antidote', 'Antidote');
+INSERT INTO items (id, key, name) VALUES (70, 'regen_potion', 'Regen Potion');
+INSERT INTO items (id, key, name) VALUES (71, 'wand', 'Wand');
 
 -- monsters: the original monsters keep ids 1-151; the content sync (end of dk install) fills
 -- in the rest from app/content/monsters/*.lua. Loaded by partial setups too.
@@ -255,7 +258,8 @@ INSERT INTO statuses (id, key, name) VALUES (1, 'sleep', 'Asleep');
 INSERT INTO statuses (id, key, name) VALUES (2, 'uber_damage', 'Damage Up');
 INSERT INTO statuses (id, key, name) VALUES (3, 'uber_defense', 'Defense Up');
 
--- spells: the original spells keep their ids; the content sync (end of dk install) fills
+-- spells: the original spells keep their ids, then the later ones in the order they came
+-- (Magic Bolt, 2.4, is 25 on every server); the content sync (end of dk install) fills
 -- in the rest from app/content/spells/*.lua. Loaded by partial setups too.
 INSERT INTO spells (id, key, name) VALUES (1, 'heal', 'Heal');
 INSERT INTO spells (id, key, name) VALUES (2, 'revive', 'Revive');
@@ -276,6 +280,12 @@ INSERT INTO spells (id, key, name) VALUES (16, 'fury', 'Fury');
 INSERT INTO spells (id, key, name) VALUES (17, 'ward', 'Ward');
 INSERT INTO spells (id, key, name) VALUES (18, 'fend', 'Fend');
 INSERT INTO spells (id, key, name) VALUES (19, 'barrier', 'Barrier');
+INSERT INTO spells (id, key, name) VALUES (20, 'call_wolf', 'Call Wolf');
+INSERT INTO spells (id, key, name) VALUES (21, 'hyper_beam', 'Hyper Beam');
+INSERT INTO spells (id, key, name) VALUES (22, 'poison', 'Poison');
+INSERT INTO spells (id, key, name) VALUES (23, 'regen', 'Regen');
+INSERT INTO spells (id, key, name) VALUES (24, 'solar_beam', 'Solar Beam');
+INSERT INTO spells (id, key, name) VALUES (25, 'magic_bolt', 'Magic Bolt');
 
 -- towns (the items their shops sell: town_items)
 INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoints) VALUES (1, 'Midworld', 0, 0, 5, 0, 0);
@@ -288,7 +298,7 @@ INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoin
 INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoints) VALUES (8, 'Endworld', -250, -250, 125, 9000, 160);
 
 -- town_items: the original items lists (Bris: its full list, fixed), plus Herbs everywhere
--- and Potions and Ethers from Roma on (new in 2.1)
+-- and Potions and Ethers from Roma on (new in 2.1), and the Wand in Midworld (new in 2.4)
 INSERT INTO town_items (town_id, item_id) VALUES (1, 1);
 INSERT INTO town_items (town_id, item_id) VALUES (1, 2);
 INSERT INTO town_items (town_id, item_id) VALUES (1, 3);
@@ -298,6 +308,7 @@ INSERT INTO town_items (town_id, item_id) VALUES (1, 19);
 INSERT INTO town_items (town_id, item_id) VALUES (1, 28);
 INSERT INTO town_items (town_id, item_id) VALUES (1, 29);
 INSERT INTO town_items (town_id, item_id) VALUES (1, 66);
+INSERT INTO town_items (town_id, item_id) VALUES (1, 71);
 INSERT INTO town_items (town_id, item_id) VALUES (2, 2);
 INSERT INTO town_items (town_id, item_id) VALUES (2, 3);
 INSERT INTO town_items (town_id, item_id) VALUES (2, 4);

@@ -68,9 +68,17 @@ expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "shop cancel"
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
 expect_db "gold,$T_ITEMS" "990|stick@weapon" "buy stick"
 expect_stats "15 0 10 5 5 7 5" "stick"
-t_get /shop;                      expect_body 'Already purchased'
 t_get /;                          expect_body 'Weapon: Stick'
-t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
+# a copy of the weapon you wear can be bought too (2.4: no more "Already purchased"): the
+# old one is kept in the bag or sold, as with any other
+t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" data-tip>Stick<template'
+t_get /shop/buy/1;                expect_text 'You are buying the Stick for 10 gold. What should I do with your Stick?'
+t_post /shop/buy/1 "csrf=$TC&keep=x"; expect_body 'Thank you for purchasing this item.'
+expect_db "gold,$T_ITEMS" "980|stick,stick@weapon" "a second stick, the first kept"
+t_post /shop/buy/1 "csrf=$TC&sell=x"  # 980 - 10 + 5
+expect_db "gold,$T_ITEMS" "975|stick,stick@weapon" "a third stick, the second sold"
+t_sql "DELETE FROM user_items WHERE equipped IS NULL AND user_id = (SELECT id FROM users WHERE username = 'townie')"
+tu "gold=990"
 t_get /shop/buy/2
 expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'
 expect_body 'name="keep" value="Buy (keep my Stick in the bag)"'; expect_body 'name="sell" value="Buy and sell my Stick for 5 gold"'
@@ -136,7 +144,7 @@ t_post /shop/buy/3 "csrf=$TC&sell=x"      # Club 40/5; sells the Destiny Blade (
 expect_db "gold" "25060" "club sells destiny blade"
 expect_stats "20 10 10 5 5 10 14" "club"
 tu "gold=5"
-t_get /shop/buy/18;               expect_body 'Cheat attempt detected.'      # already wearing clothes
+t_get /shop/buy/18;               expect_body 'You do not have enough gold to buy this item.'   # Clothes again: 5 + 25 < 50
 t_get /shop/buy/19;               expect_body 'You do not have enough gold to buy this item.'
 t_post /shop/buy/19 "csrf=$TC&sell=x"; expect_body 'You do not have enough gold to buy this item.'
 expect_db "gold" "5" "shop too poor"

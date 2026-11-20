@@ -54,9 +54,15 @@ table.inv-equipped td { padding: 1px 6px 1px 0; vertical-align: top; }
 table.inv-equipped td.inv-slot { white-space: nowrap; }
 .inv-bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .inv-cell { border: 1px solid #999; padding: 4px; min-height: 4em; }
+.inv-icon { float: left; margin: 0 6px 2px 0; border-radius: 3px; }
 .inv-cell.inv-free { border-style: dashed; text-align: center; }
 .inv-cell.inv-quest { border-color: #c00; }
-.inv-actions { margin-top: 3px; }
+.inv-actions { clear: left; margin-top: 3px; }
+
+/* item pictures in lists (shop, sell list, equipped slots) and the purchase page */
+img.item-icon { vertical-align: middle; border-radius: 3px; }
+.shop-buy { display: flex; align-items: flex-start; gap: 12px; }
+.shop-buy-icon { flex: none; border-radius: 4px; }
 
 /* shop: sell section */
 table.shop-sell td { padding: 1px 8px 1px 0; }

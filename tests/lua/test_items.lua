@@ -85,7 +85,7 @@ end
 function T.item_files_are_the_original_items_and_drops()
 	local k = load.kind("items")
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
-	eq(#k.entities, 70, "the originals, the 2.1 consumables and the 2.2 examples")
+	eq(#k.entities, 71, "the originals, the 2.1 consumables, the 2.2 examples and the Wand")
 	for id, o in ipairs(ITEMS) do
 		local f = assert(k.by_key[o[1]], "no item file " .. o[1])
 		eq(f.name, o[3], o[1]); eq(f.category, CATEGORY[o[2]], o[1]); eq(f.slot, CATEGORY[o[2]], o[1])
@@ -192,11 +192,14 @@ function T.item_fields_and_overrides()
 	eq(#kind.modifiers(f), 1)
 	local names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.demons_sin)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,drop_level,sellable,droppable," ..
+	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,drop_level,sellable,droppable,icon," ..
 		"modifiers.1.stat,modifiers.1.amount,modifiers.2.stat,modifiers.2.amount")
 	names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.herb)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,lore,price,sellable,power,messages.full,messages.full_town,messages.used")
+	eq(table.concat(names, ","), "name,description,lore,price,sellable,power,icon,messages.full,messages.full_town,messages.used")
+	names = {}
+	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.wand)) do names[#names + 1] = spec.name end
+	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,sellable,charges,icon")
 end
 
 function T.display()

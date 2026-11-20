@@ -5,7 +5,9 @@
 -- its file's use (lib/action.lua).
 local kind = require("lib.content.kinds.items")
 local php = require("lib.php")
+local schema = require("lib.content.schema")
 local scripted = require("lib.content.scripted")
+local spells = require("lib.spells")
 local stats = require("lib.stats")
 
 local items = {}
@@ -106,6 +108,47 @@ end
 function items.usable(item, place)
 	if item.category ~= "consumable" or (item.retired or 0) ~= 0 then return false end
 	return item.usable_in == "both" or item.usable_in == place
+end
+
+-- The URL of the item's icon (its `icon` column: public/images/items/<icon>.png), or nil
+-- when it has none or the file is missing (pages then draw what they did before icons).
+function items.icon(item)
+	local spec = kind.field("icon")
+	if schema.has_icon(spec, item.icon) then return schema.icon_url(spec, item.icon) end
+	return nil
+end
+
+-- The URL of the item's icon, or of the default icon (images/skills/default.png): icon
+-- buttons and the bag grid.
+function items.icon_url(item)
+	return schema.icon_url(kind.field("icon"), item.icon)
+end
+
+-- Gear that casts a spell (casts, with charges instead of MP).
+function items.casts(item)
+	return (item.casts or "") ~= "" and (item.charges or 0) > 0
+end
+
+local cast_spells = {}   -- spell key -> spells row (this request)
+
+-- The spell a casting item casts (a spells row, retired or not), or nil.
+function items.spell(item)
+	if not items.casts(item) then return nil end
+	local key = item.casts
+	if cast_spells[key] == nil then cast_spells[key] = spells.by_key(key) or false end
+	return cast_spells[key] or nil
+end
+
+-- A casting item's lines: { "Casts Magic Bolt", "Charges 3/5" } (with `charges`, one
+-- item's charges left; without, the full count: "Charges 5").
+function items.charge_lines(item, charges)
+	if not items.casts(item) then return {} end
+	local spell = items.spell(item)
+	local max = item.charges
+	return {
+		"Casts " .. (spell and spell.name or item.casts),
+		"Charges " .. (charges and (math.min(charges, max) .. "/" .. max) or max),
+	}
 end
 
 -- "Max HP +10", "Gold Bonus +10%", "Strength -5".

@@ -5,6 +5,7 @@ return {
 	category = "consumable",
 	price = 80,
 	max_stack = 10,
+	icon = "ether",                 -- public/images/items/ether.png
 	usable_in = "both",
 	target = "self",
 	power = 30,                     -- the most MP it restores

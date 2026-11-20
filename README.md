@@ -113,8 +113,8 @@ with status 3 when it doesn't exist.
 next request. Game settings (game name, map size, forum, email verification, …) live in
 the database and are edited in the admin panel at `/admin`. Character classes, spells and
 items are content files (see [Adding a class, a spell or an item](#adding-a-class-a-spell-or-an-item));
-the admin panel can override their names, descriptions, starting stats, MP costs, spell
-icons, prices, power and messages per server.
+the admin panel can override their names, descriptions, starting stats and spells, MP costs,
+spell and item icons, prices, charges, power and messages per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -301,7 +301,8 @@ Character classes are data files, `app/content/classes/<key>.lua` (Mage, Warrior
 Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (the file
 name is the class's permanent key: lowercase letters, digits and `_`), change the name,
 description, starting stats, first experience step (`exp_base`; the rest of the curve is
-global unless the class sets its own `exp_stages`) and per-level gains, and run
+global unless the class sets its own `exp_stages`), the spells a new character knows
+(`start_spells = { "magic_bolt" }`, like the Mage) and per-level gains, and run
 `./dk check`. Every kind of content file may also have `lore`: a few lines of story (a
 blank line between paragraphs, at most 2,000 characters) shown in the entry's tooltip and on
 the help pages, which administrators can override. The running game picks the file up on the
@@ -341,7 +342,8 @@ return {
 ```
 
 A class learns it when a class file lists its key in `levels[N].spells`. `heal.lua` shows
-a self-targeted spell usable in town with a refusal (`can_cast`, "already full"). In fights
+a self-targeted spell usable in town with a refusal (`can_cast`, "already full"), and
+`magic_bolt.lua` a small attack every Mage knows from the start. In fights
 and in the Fast Spells box a spell is an icon button: give it `icon = "firebolt"` and put
 `firebolt.png` (square) in `public/images/skills/`, or leave it out for `default.png`;
 `./dk check` fails, naming the spell file, if the PNG doesn't exist. Its buttons get a
@@ -364,7 +366,31 @@ items"). Give it a
 `drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
 in the admin town editor. `./dk check` validates it; the next page load picks it up. Its `description` and `lore` show
 in its tooltip (with its stats) wherever the item is listed: the Inventory panel, the
-Inventory page, the shops and the purchase page; and on `/help/items`.
+Inventory page, the shops, the purchase page and the fight menu; and on `/help/items`.
+Give it a picture with `icon = "<name>"` and a square `public/images/items/<name>.png`
+(`./dk check` fails if the file is missing; without one it keeps the slot's icon, or the
+default icon on buttons).
+
+Gear can cast a spell, with charges instead of MP: the Wand casts Magic Bolt five times,
+then needs a night at an inn (which recharges the items you wear):
+
+```lua
+-- app/content/items/wand.lua
+return {
+	name = "Wand",
+	description = "A short rod of polished ash. Equipped, it casts Magic Bolt in a fight without costing MP, " ..
+		"one charge at a time. Rest at an inn to recharge it.",
+	category = "weapon",
+	price = 75,
+	attack = 2,
+	casts = "magic_bolt",           -- a spell key (castable in fights)
+	charges = 5,                    -- charges when full; each wand keeps its own
+	icon = "wand",                  -- public/images/items/wand.png
+}
+```
+
+Equipped, it gets a button in the fight menu's Gear group with its charges on a badge; it is
+sold in Midworld because the town's shop lists its key (`town_items`, the admin town editor).
 
 ### Adding a status or a summon
 
@@ -486,6 +512,11 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	in the Inventory panel, on the Inventory page and in the shops, the monster you fight and
 	the classes at registration, and lore for classes, spells, items, monsters, statuses and
 	summons (in the tooltips and on the help pages).
+- Magic Bolt and the Wand (2.4): every Mage knows Magic Bolt (1 MP, 3-4 damage) from the
+	start and starts with 5 MP; the Wand, sold in Midworld, casts it with charges instead of
+	MP, and inns recharge the items you wear. Items have pictures, and the fight menu's items
+	are icon buttons like the spells. Shops sell an item as often as you have the gold and
+	bag room for: there is no "Already purchased".
 - Spells are content files too (`app/content/spells/`), scripted in Lua instead of a type
 	and an attribute (the original 19 behave exactly as before); administrators override
 	names, descriptions, MP costs, power, icons and messages per server (`/admin/spells`). The

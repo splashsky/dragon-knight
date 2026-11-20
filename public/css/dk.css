@@ -219,6 +219,7 @@ input[type="image"] { vertical-align: middle; }
 	line-height: 1.3;
 }
 .invpanel-gear img { display: block; }
+.invpanel-gear .invpanel-image { border-radius: 2px; }
 .invpanel-gear .invpanel-first-slot { margin-top: 3px; padding-top: 4px; border-top: dotted 1px rgba(0, 0, 0, 0.3); }
 .invpanel-badge {
 	display: flex;
@@ -282,6 +283,28 @@ input[type="image"] { vertical-align: middle; }
 	text-align: center;
 	text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
+/* an item button's badge (fight menu): the quantity of a consumable, the charges of gear
+	that casts ("3/5"; red at 0) */
+.item-badge {
+	position: absolute;
+	right: -3px;
+	bottom: -3px;
+	min-width: 12px;
+	padding: 0 3px;
+	border: solid 1px rgba(0, 0, 0, 0.6);
+	border-radius: 3px;
+	background-image: linear-gradient(to bottom, #8a8070 0%, #5a5244 45%, #38322a 100%);
+	color: white;
+	font-size: 11px;
+	font-weight: bold;
+	line-height: 14px;
+	font-variant-numeric: lining-nums tabular-nums;
+	text-align: center;
+	text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+	white-space: nowrap;
+}
+.item-badge-charges { background-image: linear-gradient(to bottom, #d3aef7 0%, #8b4fd6 45%, #55238f 100%); }
+.item-badge-empty { background-image: var(--bar-low); }
 /* the trigger of a spell's (or action's) tooltip (dk.css .dk-tip): a disabled button gets no pointer
 	 events in some browsers, so it lets them through to its wrapper */
 .spell-tip, .action-tip { display: block; margin: 0; }
@@ -383,6 +406,7 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 .dk-tip[data-side="left"] .dk-tip-arrow { right: -6px; margin-top: -5px; border-width: 1px 1px 0 0; }
 .dk-tip[data-side="right"] .dk-tip-arrow { left: -6px; margin-top: -5px; border-width: 0 0 1px 1px; }
 .tip-title { font-weight: bold; font-size: 15px; }
+.tip-icon { width: 20px; height: 20px; margin-right: 6px; vertical-align: -4px; border-radius: 3px; }
 .tip-meta { font-size: 13px; color: #5f5a50; }
 .tip-lines { list-style: none; margin: 3px 0 0; padding: 0; font-size: 13px; }
 .tip-body { margin-top: 4px; }

@@ -16,6 +16,13 @@ changelog.RELEASES = {
 			"Administrators can write or change an entry's lore on its admin page.",
 			"Attack and Run are now icon buttons in the fight menu, with tooltips: Attack shows your attack power and weapon; Run sits apart from Attack so it isn't pressed by accident.",
 			"Items show their tooltip on the Inventory page, in the shops (the items for sale, the purchase page and the Sell list) and when discarding.",
+			"Added Magic Bolt, a 1 MP spell for 3 to 4 damage: every Mage knows it from the start, and Mages now start with 5 MP (their gains per level are the same). Existing Mages get the 5 MP and learn Magic Bolt when the server is migrated (schema version 14, run dk migrate).",
+			"Classes can give new characters spells from the start (start_spells in the class file).",
+			"Added the Wand, the first item with an effect: a weapon sold in Midworld for 75 gold that casts Magic Bolt in a fight without costing MP, five charges at a time. Its button sits in the new Gear group of the fight menu, with its charges on a badge.",
+			"Items can cast a spell with charges (casts and charges in the item file); each item keeps its own charges, full when bought or found, and resting at an inn recharges the items you wear.",
+			"Items in the fight menu are icon buttons too, with how many you have on a badge; ones you can't use right now (a Herb at full HP) are greyed out.",
+			"Items have pictures: the Herb, Potion, Ether and Wand show theirs in the bag, the Inventory panel, the shops, the fight menu and their tooltips (icon in the item file; dk check fails if the file is missing).",
+			"Shops no longer say \"Already purchased\": you can buy any item the town sells as often as your gold and your bag allow, even a copy of the weapon you are wearing.",
 		},
 	},
 	{

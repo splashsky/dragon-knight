@@ -2,6 +2,7 @@
 -- Module state lives for one request only (fresh VM per request).
 local classes = require("lib.classes")
 local inventory = require("lib.inventory")
+local items = require("lib.items")
 local php = require("lib.php")
 local presence = require("lib.presence")
 local spells = require("lib.spells")
@@ -113,7 +114,8 @@ end
 
 -- The Inventory panel's equipment rows (layout/nav_right.html), from
 -- inventory.equipped(): { label, icon (weapon/armor/shield) or badge (accessory slot
--- number), name, empty, item (the items row, for its tooltip; nil when empty) }.
+-- number), image (the equipped item's own picture, shown instead, or nil), name, empty,
+-- item (the items row, for its tooltip; nil when empty), entry (its user_items entry) }.
 local GEAR_ROWS = {
 	{ slot = "weapon", label = "Weapon", icon = "weapon" },
 	{ slot = "armor", label = "Armor", icon = "armor" },
@@ -125,9 +127,11 @@ local GEAR_ROWS = {
 function game.gear_rows(equipped)
 	local rows = {}
 	for i, r in ipairs(GEAR_ROWS) do
-		local item = equipped[r.slot] and equipped[r.slot].item
+		local entry = equipped[r.slot]
+		local item = entry and entry.item
 		local name = item and item.name or "None"
-		rows[i] = { label = r.label, icon = r.icon, badge = r.badge, name = name, empty = item == nil, item = item }
+		rows[i] = { label = r.label, icon = r.icon, badge = r.badge, image = item and items.icon(item), name = name,
+			empty = item == nil, item = item, entry = entry }
 	end
 	return rows
 end

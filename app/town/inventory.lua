@@ -27,16 +27,23 @@ local function page(req, notice)
 	local slots = {}
 	for _, slot in ipairs(inventory.SLOTS) do
 		local e = eq[slot]
-		slots[#slots + 1] = { slot = slot, label = inventory.LABELS[slot], entry = e,
-													attributes = e and items.attributes(e.item) or nil }
+		local attributes
+		if e then
+			attributes = items.attributes(e.item)
+			for _, l in ipairs(items.charge_lines(e.item, e.charges)) do attributes[#attributes + 1] = l end
+		end
+		slots[#slots + 1] = { slot = slot, label = inventory.LABELS[slot], entry = e, attributes = attributes,
+													icon = e and items.icon(e.item) or nil }
 	end
 	local cells = {}
 	for _, e in ipairs(bag) do
 		local it = e.item
+		local lines = items.is_gear(it) and items.attributes(it) or items.use_lines(it)
+		for _, l in ipairs(items.charge_lines(it, e.charges)) do lines[#lines + 1] = l end
 		cells[#cells + 1] = {
 			entry = e, item = it, gear = items.is_gear(it), accessory = it.slot == "accessory",
-			quest = it.category == "quest", usable = items.usable(it, "town"),
-			lines = items.is_gear(it) and items.attributes(it) or items.use_lines(it),
+			quest = it.category == "quest", usable = items.usable(it, "town"), lines = lines,
+			icon = items.icon_url(it),
 		}
 	end
 	return view.page(req, "Inventory", "town/inventory", {

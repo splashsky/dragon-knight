@@ -5,7 +5,7 @@ Cheat attempt detected.<br><br>Get a life, loser.
 {%- elseif key == "inn_poor" then %}
 You do not have enough gold to stay at this Inn tonight.<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "inn_done" then %}
-You wake up feeling refreshed and ready for action.<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
+You wake up feeling refreshed and ready for action.{% if recharged and #recharged > 0 then %} Your {% for i, n in ipairs(recharged) do %}{% if i > 1 then %}{{ i == #recharged and " and " or ", " }}{% end %}{{ n }}{% end %} {{ #recharged > 1 and "are" or "is" }} fully charged again.{% end %}<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "shop_poor" then %}
 You do not have enough gold to buy this item.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "shop_done" then %}

@@ -71,12 +71,12 @@ BRANCH=$(iv_entry branch); HERB=$(iv_entry herb)
 t_post "/inventory/equip/$BRANCH" "";  expect_status 403
 t_post "/inventory/equip/$BRANCH" "csrf=$TC"; expect_body 'You equipped the Branch. The Stick is in your bag now.'
 iv_is "$T_ITEMS" "stick,branch@weapon,herbx3"
-expect_stats "15 0 10 5 5 9 5" "branch"
+expect_stats "15 5 10 5 5 9 5" "branch"   # a Mage: 5 MP
 t_post "/inventory/equip/$HERB" "csrf=$TC"; expect_body 'Cheat attempt detected.'          # not gear
 t_post "/inventory/equip/99999" "csrf=$TC"; expect_body 'Cheat attempt detected.'
 t_post "/inventory/unequip/weapon" "csrf=$TC"; expect_body 'You took off the Branch. It is in your bag now.'
 iv_is "$T_ITEMS" "stick,branch,herbx3"
-expect_stats "15 0 10 5 5 5 5" "no weapon"
+expect_stats "15 5 10 5 5 5 5" "no weapon"
 t_post "/inventory/unequip/weapon" "csrf=$TC"; expect_body 'There is nothing to take off there.'
 t_post "/inventory/unequip/weaponid" "csrf=$TC"; expect_body 'Cheat attempt detected.'
 t_post "/inventory/equip/$BRANCH" "csrf=$TC"; expect_body 'You equipped the Branch.'
@@ -91,7 +91,7 @@ iv_is "(SELECT group_concat(e) FROM (SELECT ui.equipped || '=' || i.key AS e FRO
 	WHERE ui.user_id = users.id AND ui.equipped LIKE 'accessory%' ORDER BY ui.equipped))" \
 	"accessory1=life_pebble,accessory2=magic_pebble,accessory3=dragons_claw"
 # max HP +10, max MP +10, attack +25 (branch 4 + strength 5)
-expect_stats "25 10 10 5 5 34 5" "three accessories"
+expect_stats "25 15 10 5 5 34 5" "three accessories"
 t_get /;                          expect_body 'Slot 1: Life Pebble'; expect_body 'Slot 3: Dragon&#39;s Claw'
 TEAR=$(iv_entry dragons_tear)
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=0"; expect_body 'All three accessory slots are in use.'
@@ -99,7 +99,7 @@ t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=4"; expect_body 'Cheat attempt de
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=2"
 expect_body 'You equipped the Dragon&#39;s Tear. The Magic Pebble is in your bag now.'
 # strength +50 counts toward attack: 5 + 50 + 4 + 25
-expect_stats "25 0 10 55 5 84 5" "tear in slot 2"
+expect_stats "25 5 10 55 5 84 5" "tear in slot 2"
 t_get /character;                 expect_body 'Slot 2: Dragon&#39;s Tear'
 
 t_section "inventory: current HP/MP/TP follow the maxima"
@@ -109,7 +109,7 @@ iv_is currenthp 15                                        # clamped to the new m
 t_give invhero demons_sin
 iv_sql "UPDATE users SET base_maxhp = 60, currenthp = 60"
 t_post "/inventory/equip/$(iv_entry demons_sin)" "csrf=$TC&slot=1"
-iv_is currenthp 10; expect_stats "10 0 10 105 5 134 5" "demon's sin"
+iv_is currenthp 10; expect_stats "10 5 10 105 5 134 5" "demon's sin"
 t_get /;                          expect_body 'data-meter="hp" data-max="10"><b>10</b>/10</span>'
 t_post /inventory/unequip/accessory1 "csrf=$TC"
 iv_is currenthp 10                                        # never raised
@@ -134,7 +134,7 @@ iv_is "(SELECT qty FROM user_items WHERE id = $BOMB)" "2"
 
 t_section "inventory: a fight-only item in a fight"
 t_fight invhero 2 1
-t_get /fight;                     expect_body '<option value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'">Bomb (x2)</option>'
+t_get /fight;                     expect_body 'name="item" value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'" title="Bomb (x2)" aria-label="Bomb (x2)"><img src="/static/images/skills/default.png"'
 t_post /fight "csrf=$TC&item=Use+Item&useritem=$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"
 expect_redirect /victory
 iv_is "($T_MONSTER_HP <= 0) || '|' || (SELECT qty FROM user_items WHERE id = $BOMB)" "1|1"

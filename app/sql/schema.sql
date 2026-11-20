@@ -18,8 +18,9 @@ CREATE INDEX babble_author ON babble (author_id, posttime);
 -- Character classes: content files app/content/classes/<key>.lua synced into these tables
 -- (app/lib/content/sync.lua). Rows are never deleted: a class whose file is gone is
 -- retired (existing characters keep it). users.charclass holds classes.id. Every content
--- table (classes, items, monsters, spells, statuses, summons) ends with `lore` (schema
+-- table (classes, items, monsters, spells, statuses, summons) has `lore` (schema
 -- version 13): optional story text for tooltips and the help pages ('' = none).
+-- start_spells (schema version 14): keys of the spells a new character knows ("a,b").
 CREATE TABLE classes (
 	id               INTEGER PRIMARY KEY,
 	key              TEXT    NOT NULL UNIQUE,
@@ -35,7 +36,8 @@ CREATE TABLE classes (
 	exp_base         INTEGER NOT NULL DEFAULT 15,
 	exp_stages       TEXT    NOT NULL DEFAULT '',
 	retired          INTEGER NOT NULL DEFAULT 0,
-	lore             TEXT    NOT NULL DEFAULT ''
+	lore             TEXT    NOT NULL DEFAULT '',
+	start_spells     TEXT    NOT NULL DEFAULT ''
 );
 
 -- Gains on reaching a level (2 .. 100) per class; hp is without the milestone bonus, and
@@ -140,7 +142,10 @@ CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 -- scripted (app/lib/action.lua; their code stays in the file): usable_in ('town', 'fight',
 -- 'both'), target ('enemy', 'self'), power, messages and data ("key=value" lines,
 -- app/lib/content/scripted.lua). drop_level: monsters of that level and up drop it (NULL:
--- never). The original items keep ids 1-33 and the original drops are 34-65.
+-- never). The original items keep ids 1-33 and the original drops are 34-65. Schema
+-- version 14: casts (a spell key: gear that casts it in fights; '' = none) and charges
+-- (when full; user_items.charges holds each one's), icon (a PNG in public/images/items/,
+-- '' = the default icon).
 CREATE TABLE items (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -162,7 +167,10 @@ CREATE TABLE items (
 	power        INTEGER NOT NULL DEFAULT 0,
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
-	lore         TEXT    NOT NULL DEFAULT ''
+	lore         TEXT    NOT NULL DEFAULT '',
+	casts        TEXT    NOT NULL DEFAULT '',
+	charges      INTEGER NOT NULL DEFAULT 0,
+	icon         TEXT    NOT NULL DEFAULT ''
 );
 
 -- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a
@@ -370,12 +378,15 @@ CREATE TABLE user_spells (
 -- Items characters have: equipped (weapon, armor, shield, accessory1-3; one item per
 -- slot) or in the bag (equipped NULL; qty up to the item's max_stack per row). The bag
 -- holds control.inventory_size rows, quest items not counted (app/lib/inventory.lua).
+-- charges (schema version 14): the charges left of an item that casts a spell (full,
+-- items.charges, when obtained; 0 for other items).
 CREATE TABLE user_items (
 	id        INTEGER PRIMARY KEY,
 	user_id   INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	item_id   INTEGER NOT NULL REFERENCES items (id),
 	qty       INTEGER NOT NULL DEFAULT 1,
-	equipped  TEXT
+	equipped  TEXT,
+	charges   INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX user_items_equipped ON user_items (user_id, equipped);
 

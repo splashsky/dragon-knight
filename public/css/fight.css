@@ -5,8 +5,14 @@
 .fight-stale { font-style: italic; }
 /* the actions (Attack, Run: dk.css .action-btn), then the spells: rows of icon buttons
 	under a small label; Run is set apart from Attack (a gap and a rule) */
-.fight-actions, .fight-spells { margin: 0 0 1em; }
-.fight-actions-label, .fight-spells-label { display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold; }
+.fight-actions, .fight-spells, .fight-bag { margin: 0 0 1em; }
+.fight-actions-label, .fight-spells-label, .fight-gear-label, .fight-items-label {
+	display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold;
+}
+/* Gear (equipped items that cast) and Items (consumables) side by side, Gear set apart */
+.fight-bag { display: flex; flex-wrap: wrap; gap: 7px 0; }
+.fight-gear { margin-right: 18px; padding-right: 18px; border-right: dotted 1px rgba(0, 0, 0, 0.35); }
+.fight-bag .spell-grid { gap: 7px; }
 .action-row { display: flex; gap: 7px; }
 .action-run { margin-left: 18px; padding-left: 18px; border-left: dotted 1px rgba(0, 0, 0, 0.35); }
 .fight-spells .spell-grid { gap: 7px; }

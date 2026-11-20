@@ -148,7 +148,7 @@ t_section "admin: spells"
 t_get /admin/spells;       expect_status 200; expect_body '<a href="/admin/spells/1">Heal</a>'
 expect_body '<td>heal</td><td>5</td><td>10</td><td>both</td><td>self</td>'
 expect_body '<td>hurt</td><td>5</td><td>15</td><td>fight</td><td>enemy</td>'
-expect_body 'spells: 24 files, 24 in the database (0 retired), 0 overrides.'
+expect_body 'spells: 25 files, 25 in the database (0 retired), 0 overrides.'
 t_get /admin/spells/6;     expect_status 200; expect_body 'Edit Spell: Hurt'; expect_body 'app/content/spells/hurt.lua'
 expect_body 'name="power" size="6" value="15"'; expect_body 'name="mp" size="6" value="5"'
 expect_body 'Message hit:'; expect_body 'name="messages.hit" size="70" value="You have cast the %s spell for %d damage."'
@@ -221,7 +221,13 @@ t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items
 expect_body '<td>stick</td><td>weapon</td><td>10</td><td>Attack Power +2</td>'
 expect_body '<td>demons_sin</td><td>accessory</td><td>0</td><td>Max HP -50, Strength +50</td><td></td>'
 expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Power 30</td>'
-expect_body 'items: 70 files, 70 in the database (0 retired), 0 overrides.'
+expect_body 'items: 71 files, 71 in the database (0 retired), 0 overrides.'
+expect_body '<td class="admin-icon-cell"><img src="/static/images/items/herb.png" width="20" height="20" alt=""></td><td><a href="/admin/items/66">Herb</a>'
+expect_body '<td class="admin-icon-cell"><img src="/static/images/skills/default.png" width="20" height="20" alt=""></td><td><a href="/admin/items/1">Stick</a>'
+expect_body '<td>wand</td><td>weapon</td><td>75</td><td>Attack Power +2, Casts Magic Bolt, Charges 5</td>'
+t_get /admin/items/71;     expect_status 200; expect_body 'Edit Item: Wand'
+expect_body 'name="charges" size="6" value="5"'
+expect_body '<img src="/static/images/items/wand.png" width="44" height="44" alt="Current icon"> <input type="text" name="icon" size="20" value="wand">'
 t_get /admin/drops;        expect_redirect /admin/items
 t_get /admin/items/46;     expect_status 200; expect_body 'Edit Item: Demon&#39;s Sin'; expect_body 'app/content/items/demons_sin.lua'
 expect_body 'name="modifiers.1.amount" size="6" value="-50"'; expect_body '<option value="maxhp" selected>maxhp</option>'
@@ -329,7 +335,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 24, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 0 new, 0 retired; monsters: 154, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 0 new, 0 retired; monsters: 154, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"

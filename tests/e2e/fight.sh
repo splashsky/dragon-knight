@@ -163,7 +163,7 @@ expect_body '<div class="fight-spells" role="group" aria-labelledby="fight-spell
 expect_body '<button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
 expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
 expect_no_body 'name="userspell"'; expect_no_body 'value="Spell"'
-expect_body '<select name="useritem" aria-label="Item">'      # items keep their select
+expect_no_body 'name="useritem"'; expect_no_body 'value="Use Item"'      # items are icon buttons too (2.4)
 t_get /static/images/skills/heal.png;    expect_status 200; expect_header '^content-type: image/png'
 t_get /static/images/skills/default.png; expect_status 200
 # MP short: greyed out (disabled), and the server refuses a direct POST anyway
@@ -231,15 +231,20 @@ f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0; f_is currentmp 7
 t_get /; expect_status 200; expect_body 'Town Options'
 
 t_section "fight: use an item"
-# Herbs (heal_hp 30) and an Ether (heal_mp 30) in the bag; Red Slime awake, no immunity
+# Herbs (heal_hp 30) and an Ether (heal_mp 30) in the bag; Red Slime awake, no immunity. Each
+# consumable is an icon button (item=<items id>) with its quantity as a badge, greyed out
+# when its can_use refuses now; the form before 2.4 (item=Use Item&useritem=<id>) still works
 t_items_clear fighter
 t_give fighter herb 3; t_give fighter ether 1; t_give fighter stick 1
 t_fight fighter 2 50
 f_sql "UPDATE users SET currenthp = 10, base_maxhp = 100, currentmp = 0,
 	base_maxmp = 50, base_attack = 0, base_defense = 0"
 t_get /fight; CS=$(t_csrf)
-expect_body '<option value="66">Herb (x3)</option>'; expect_body '<option value="68">Ether (x1)</option>'
-expect_no_body '>Stick ('; expect_body 'name="item" value="Use Item"'
+expect_body '<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>'
+expect_body '<button class="spell-btn" type="submit" name="item" value="66" title="Herb (x3)" aria-label="Herb (x3)"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">3</span></button>'
+expect_body '<button class="spell-btn" type="submit" name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)"><img src="/static/images/items/ether.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">1</span></button>'
+expect_body '<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · x3 · In fights and in town</div>'
+expect_no_body 'title="Stick'; expect_no_body 'name="use_gear"'; expect_no_body 'class="fight-gear"'
 FIGHT=$(f_col "$T_ROUND")
 t_post /fight "csrf=$CS&item=Use+Item&useritem=0";  expect_body 'You must select an item first.'
 t_post /fight "csrf=$CS&item=Use+Item&useritem=67"; expect_body 'You do not have this item.'
@@ -251,15 +256,23 @@ t_post /fight "csrf=$CS&item=Use+Item&useritem=66"
 expect_status 200; expect_body 'You have used the Herb, and gained 30 Hit Points.'; expect_body 'The monster attacks you for'
 f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" $((FIGHT + 1))
 [ "$(f_col currenthp)" -le 40 ] && [ "$(f_col currenthp)" -ge 30 ] && t_ok || t_fail "herb in a fight: hp $(f_col currenthp)"
-expect_body '<option value="66">Herb (x2)</option>'
-# at full HP: refused, nothing used, the monster doesn't act
+expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)"><img'
+# at full HP: greyed out; a POST is refused, nothing used, the monster doesn't act
 f_sql "UPDATE users SET currenthp = 100"
+t_get /fight; expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)" disabled><img'
+expect_body 'name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)"><img'
+FIGHT=$(f_col "$T_ROUND")
 t_post /fight "csrf=$CS&item=Use+Item&useritem=66"; expect_body 'Your Hit Points are already full.'
-expect_no_body 'The monster attacks'; f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" $((FIGHT + 1))
-# the last one of a stack: the row goes
-t_post /fight "csrf=$CS&item=Use+Item&useritem=68"; expect_body 'You have used the Ether, and gained 30 Magic Points.'
+expect_no_body 'The monster attacks'; f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" "$FIGHT"
+t_post /fight "csrf=$CS&item=66"; expect_body 'Your Hit Points are already full.'; f_is "$T_ROUND" "$FIGHT"
+# the icon button's contract: item=<id>; the last one of a stack: the row goes
+t_post /fight "csrf=$CS&item=68"; expect_body 'You have used the Ether, and gained 30 Magic Points.'
 f_is currentmp 30; f_is "$T_ITEMS" "herbx2,stick"
-expect_no_body '>Ether ('
+expect_no_body 'title="Ether'
+t_post /fight "csrf=$CS&item=0";  expect_body 'You must select an item first.'
+t_post /fight "csrf=$CS&item=68"; expect_body 'You do not have this item.'
+t_items_clear fighter
+t_get /fight; expect_body '<span class="fight-items-label" id="fight-items-label">Items</span> <span class="light">None</span>'
 t_items_clear fighter
 
 t_section "fight: item drop"

@@ -113,10 +113,11 @@ function T.original_monsters_are_the_seed()
 	eq(slime.name, "Blue Slime"); eq(slime.maxhp, 4); eq(slime.maxdam, 3); eq(slime.armor, 1); eq(slime.level, 1)
 	eq(slime.maxexp, 1); eq(slime.maxgold, 1); eq(slime.immune, 0); eq(slime.maxmp, 5, "at least 5")
 	eq(slime.uses_mp, 1); eq(slime.attack_weight, 1); eq(slime.roams, 1)
-	-- the Mage's MP at the monster's level (start + gains, at least 5), for every original
+	-- the Mage's MP at the monster's level (start + gains, at least 5), for every original;
+	-- the start is the Mage's of 2.2 (0; 5 since 2.4): monsters kept their MP
 	local mage = load.kind("classes").by_key.mage
 	local function mage_mp(level)
-		local n = mage.start_mp
+		local n = 0
 		for l = 2, level do n = n + mage["levels." .. l .. ".mp"] end
 		return math.max(5, n)
 	end

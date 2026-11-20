@@ -13,7 +13,7 @@ High magic points
 Low strength
 Low dexterity
 5 heal spells
-5 hurt spells
+6 hurt spells (Magic Bolt from the start)
 3 sleep spells
 3 +defense spells
 0 +attack spells]],
@@ -26,7 +26,9 @@ every adventurer they have saved will tell you so. Few of them mind.]],
 	playable = true,
 
 	-- a new character's stats (attack and defense power start at strength and dexterity)
-	start_hp = 15, start_mp = 0, start_tp = 10, start_strength = 5, start_dexterity = 5,
+	start_hp = 15, start_mp = 5, start_tp = 10, start_strength = 5, start_dexterity = 5,
+	-- keys of the spells a new character knows (learned at level 1)
+	start_spells = { "magic_bolt" },
 
 	-- experience from level 1 to 2; later steps follow the global curve (app/lib/leveling.lua;
 	-- a class can set its own with exp_stages = "factor x steps,...")

@@ -5,8 +5,9 @@
 --   1. the player's turn starts: statuses with tick_on = "turn_start" tick; a status that
 --      blocks the action (asleep, recharging, charging) makes the player's action a skip
 --      (the page only offered "Continue");
---   2. the player's action: attack, spell, item, run, or nothing (continue; "ambush": the
---      monster swung first at the start of the encounter);
+--   2. the player's action: attack, spell, item, gear (an equipped item casting its spell),
+--      run, or nothing (continue; "ambush": the monster swung first at the start of the
+--      encounter);
 --   3. each ally (summon), in the order summoned: turn-start ticks, then its act unless
 --      blocked (target chosen by fight/ai.lua);
 --   4. each enemy of the current wave, in order: turn-start ticks (sleep is a status: the
@@ -87,7 +88,7 @@ local function turn(f, r, c)
 end
 
 -- Plays a round of fight model f0 with the player's action a: { kind = "attack" | "spell"
--- | "item" | "run" | "continue" | "ambush", spell, item }. Returns r = { f (the model
+-- | "item" | "gear" | "run" | "continue" | "ambush", spell, item }. Returns r = { f (the model
 -- after the round), player, allies, enemies, ending (the lines of each part), and one of
 -- refused (nothing happened: f0 is unchanged and r.f is nil), escaped, victory, died }.
 -- With f0.trace = {} the round also records what happened, in order, in r.f.trace (see
@@ -116,7 +117,7 @@ function round.play(f0, a)
 		local prev = engine.doing(f, p, "run")
 		engine.say(f, "You tried to run away, but were blocked in front!")
 		engine.done(f, prev)
-	elseif a.kind == "attack" or a.kind == "spell" or a.kind == "item" then
+	elseif a.kind == "attack" or a.kind == "spell" or a.kind == "item" or a.kind == "gear" then
 		local x = act.run(f, a)
 		if x.refused then return { refused = x.refused } end
 		f.hp_changed = true   -- the original checked the monster's HP after every attack and spell
