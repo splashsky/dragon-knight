@@ -276,6 +276,16 @@ async function run(wsUrl, port) {
 	check("logged in again", await until("/^\\/(fight)?$/.test(location.pathname) && !DK.busy() && document.body.hasAttribute('data-live')"),
 		await js("location.pathname"));
 
+	section = "a theme";
+	// another theme is another stylesheet in the head: that page loads normally (go)
+	var before = tab.loads;
+	await js("document.querySelector('form.theme-picker button[name=theme]').click()");
+	check("a normal page load with the new theme", await until("document.readyState === 'complete' && window.__dk === undefined"), tab.loads - before);
+	var theme = await js("(document.body.className.match(/theme-(\\w+)/) || [])[1]");
+	await js("window.__dk = 1; document.querySelector('form.theme-picker button[name=theme]').click()");
+	check("and back", await until("document.readyState === 'complete' && window.__dk === undefined && !document.body.classList.contains('theme-' + " + JSON.stringify(theme) + ")"));
+	await js("window.__dk = 1");
+
 	section = "bad answers";
 	// a region the page doesn't have: the client loads the page natively
 	await js("window.__dk = 2; document.querySelector('[data-r=main]').removeAttribute('data-r');" +

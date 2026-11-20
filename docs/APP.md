@@ -228,8 +228,11 @@ carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
 `banner`, `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
-`spellpanel`, `online-count`, `chat` with `chat-posts` and `chat-form`), `foot`, `themes`;
-`minimal` and `admin` have `banner`, `main` (and `foot`, `themes`). `lib/wire.lua` splits a
+`spellpanel`, `online-count`, `chat` with `chat-posts` and `chat-form` with `chat-back`),
+`foot` (with `foot-time`, the timing line), `themes` (with `theme-back`); `minimal` and
+`admin` have `banner`, `main` (and `foot`, `themes`). The `back` fields (the page's
+address, different on every page) and the timing line (different on every request) are
+regions of their own so that their parents stay the same. `lib/wire.lua` splits a
 rendered page at the markers in one pass and hashes each region's **skeleton** (its HTML
 with each child region replaced by a placeholder; 12 hex digits of SHA-256), so a hash
 changes only when that region's own markup does. A full page loses the markers and carries
@@ -242,7 +245,9 @@ regions the client shows). `main.lua` runs the route as always, then:
 
 - a page from `view.layout` is answered with the regions whose hash differs from the
 	client's (walking down from `root`: a region the client has is skipped and its children
-	compared; one it lacks or has differently goes whole, children included);
+	compared; one it lacks or has differently goes whole, but a region inside it that the
+	client has with the same hash goes as a placeholder, `<template data-r-keep="name">`,
+	and its own children are compared in turn: `wire.changed`);
 - a redirect to one of the game's pages (a same-site path with a GET route) is **followed
 	on the server**, up to 5 hops, each a fresh dispatch with the cookies set so far (login
 	and logout work): a POST and the page it lands on are one round trip. A redirect
@@ -262,7 +267,7 @@ and payloads raw (HTML goes as HTML, nothing is escaped); clients skip ops they 
 | `title <n>` | the document title |
 | `url <n>` | the page's address (a GET's, or where a POST's redirects landed); absent for a page a POST answered with itself, which no GET shows (the client keeps its address) |
 | `events <kind> <n>` | data for a player of that kind (JSON), played before the regions apply; from `opts.events = { { kind, json }, ... }` of `view.layout`/`view.page`, or `res.events` on a redirect |
-| `region <name> <n>` | the region's element (outerHTML, children included; `root`: the `<body>`) |
+| `region <name> <n>` | the region's element (outerHTML, children included, those the client has as placeholders; `root`: the `<body>`) |
 | `hashes <n>` | the regions whose hash the client lacks or has differently (`name=hash`, space-separated), and `name=-` for those the page no longer has |
 | `go <n>` | load this URL normally instead (empty: load the current address again) |
 | `doc <n>` | a whole HTML document to show instead |
@@ -304,7 +309,12 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 	with its element goes to the middle column.
 - **The morph** changes only what differs: attributes, text, children matched by key
 	(`data-r`, `id`, `data-k`, `data-id`) or by position and tag; `<template>` contents
-	compared as HTML. It never removes elements marked `data-client` (the tooltip box, the
+	compared as HTML. A placeholder (`<template data-r-keep>`) is the page's own element,
+	moved there untouched; in anything new that goes in, a region the page already shows
+	(by name) is the page's own element, moved and morphed (the chat panel moving from the
+	town page's middle column to the right one keeps its scroll and typed text). Regions
+	taken out while an answer applies are kept aside until it is done, for a later region of
+	the same answer. It never removes elements marked `data-client` (the tooltip box, the
 	toasts, the progress bar, the announcer: give anything a script adds to the page that
 	attribute), never touches the live value of a control (typed text survives; only the
 	form `reset()` above), and leaves `open` on `<details>` and tooltip.js's

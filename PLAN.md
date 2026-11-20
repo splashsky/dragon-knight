@@ -20,6 +20,9 @@ conventions).
 	pre-warmed spare VMs, so the hot path never pays for VM construction.
 - Clean URLs + modern HTML5/CSS, same look & feel (three-column layout, original image
 	assets) and **identical game mechanics** (formulas, odds, data).
+- (3.0) A **live HTML client** on top: no page loads after the first, only the regions of
+	a page that changed travel (a wire format of our own), the server stays the authority
+	on every byte of HTML; without JavaScript the same pages work as plain HTML.
 - Fix the original's security problems: parameterized SQL everywhere, HTML escaping by
 	default, PBKDF2 passwords, server-side sessions, CSRF tokens on every POST.
 
@@ -53,7 +56,8 @@ app/                  Lua application (hot-reloaded)
   main.lua            returns handler(req) -> res (session, routing, CSRF, errors, HEAD)
   routes.lua          route table assembly (requires the route modules listed in it)
   routes/             thin route modules: auth, home, town, fight, community, admin, theme,
-                      live (GET /live, the event stream; /live/state; /banner/dismiss)
+                      live (GET /live, the event stream; /live/state; /banner/dismiss), test
+                      (/__test/* routes for the end-to-end tests, only with test_routes)
   lib/                router, session, cookie, csrf, auth, view, game, php, mail, dbcount, json,
                       news, paging, migrations (schema versions), leveling, classes,
                       spells, items, inventory, stats (derived stats, gear modifiers),
@@ -61,13 +65,16 @@ app/                  Lua application (hot-reloaded)
                       against), statuses, summons, monsters (rows, loadouts, stats with
                       equipment), world (world statuses on map moves), chat (the Babble
                       Box), presence (who's online), notices (live toasts), banner
-                      (the broadcast banner),
+                      (the broadcast banner), wire (regions and the live wire format: the
+                      live client's answers),
                       content/ (content loader, sandbox, schemas, scripted kinds, sync)
   content/            content files: classes/, spells/, items/, statuses/, summons/,
                       monsters/ <key>.lua (synced into the DB)
   town/               inn, shop, inventory, maps, travel, explore, heal, character/map, babble
                       (the chat's routes)
   fight/              combat.lua: the dice and formulas (pure functions, unit-tested);
+                      encounter.lua: how a fight begins (on a map move) and ends (paid in
+                      the winning round; a finished fight kept for its page);
                       state.lua: the fight model and its tables; round.lua: the round
                       pipeline; engine.lua: handles, events, statuses, summons; ai.lua:
                       weighted choices; act.lua: the actions of a turn (attack, spell, item);
@@ -83,10 +90,15 @@ app/                  Lua application (hot-reloaded)
   sql/seed.sql        default game data ported 1:1 from legacy install.php
 templates/            *.html templates (hot-reloaded): layout/ (main, minimal, admin, head,
                       nav), auth/, home/, town/, fight/, community/{forum,help}/, admin/, errors/
-public/               served at /static/ (images/, css/, js/: dk.js popups, live.js live pages)
+public/               served at /static/ (images/, css/, js/: dk.js popups, tooltip.js, client.js
+                      the live client, live.js the event stream, fight.js the fight player)
 tests/c/              C unit tests (one main() per file, built by `make test`)
 tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
-tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
+tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server;
+                      tests/wire.py reads live answers)
+tests/js/             JavaScript unit tests (node, when installed)
+tests/browser/        the live client in headless Chrome/Edge over the DevTools protocol
+                      (tests/e2e/browser.sh, when node and a browser are installed)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
 tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, schema_v11.sql .. schema_v14.sql, seed_v3 .. seed_v9.sql, seed_v11.sql .. seed_v14.sql:
@@ -511,9 +523,9 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 7. **2.3 realtime** (`docs/plans/realtime.md`): ✅ R0 measure, then tune the server
 	 (`docs/PERF.md`); ✅ R1 SSE hub; ✅ R2 chat, presence, notices, broadcast banner
 	 (schema version 10); R3 smooth fights, R4 load and soak tests.
-8. **3.0 live HTML client** (`docs/plans/live-client.md`): L0 pure GETs (schema version
-	 15), L1 regions and the wire protocol, L2 the client, L3 fights on the client, L4 live
-	 sync, L5 measure, document, release.
+8. **3.0 live HTML client** (`docs/plans/live-client.md`): ✅ L0 pure GETs (schema
+	 version 15), ✅ L1 regions and the wire protocol, ✅ L2 the client, ✅ L3 fights on the
+	 client, ✅ L4 live sync, ✅ L5 measure, document, release.
 
 ## Definition of done
 

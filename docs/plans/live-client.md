@@ -1,8 +1,9 @@
 # Plan: 3.0 — the live HTML client
 
-Status: approved design for version **3.0** (starts after 2.4.0 with `view.GAME_VERSION =
+Status: **done** — version **3.0** (started after 2.4.0 with `view.GAME_VERSION =
 "3.0.0-dev"`, `DK_VERSION "3.0.0-dev"` and a new top changelog entry `version = "3.0.0",
-date = "unreleased"`). Implemented in six steps: **L0** pure GETs, **L1** regions and the
+date = "unreleased"`); each step below says how it was implemented ("As implemented"),
+then keeps its design as approved. Implemented in six steps: **L0** pure GETs, **L1** regions and the
 wire protocol (server), **L2** the client, **L3** fights on the client, **L4** live sync,
 **L5** measure, document, release.
 
@@ -346,7 +347,21 @@ The design as approved:
 - The stream stays open across navigation (no reconnect per page). live.js starts it when
 	`<body data-live>` appears (after a live login) and stops it when it goes.
 
-## L5: measure, document, release
+## L5: measure, document, release — ✅ done
+
+**As implemented** (`docs/PERF.md` "3.0: the live client"): measuring bytes per action
+showed the chat panel (in the town page's middle column, elsewhere in the right column)
+resent whole with its 50 messages, and a third of every navigation spent on fields that
+change on every page. Hence placeholders for regions the client has inside a region sent
+whole (`<template data-r-keep>`), regions in new markup adopted by name (moved and
+morphed: the chat keeps its typed text between columns), and `chat-back`, `theme-back`,
+`foot-time` as regions of their own: a move ~0.8 KiB, a fight round ~3.8 KiB, a navigation
+1–6 KiB, against 13–20 KiB pages. Splitting and hashing a page costs ~0.15 ms (a plain
+search for the marker byte instead of a Lua pattern: 0.21 → 0.15 ms). Latency against 2.4
+couldn't be compared on this machine (runs of the same build varied 2–3×); that needs a
+quiet machine with pinned CPUs.
+
+The design as approved:
 
 - `make bench BENCH_SCENARIO=mixed` and `realtime-mixed` with live requests: bytes per
 	action and p99 against the 2.4 numbers (target: no p99 regression; a move or a fight

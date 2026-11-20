@@ -41,35 +41,47 @@ function wire.strip(html)
 	return (html:gsub("</?\1[%w%-]*>", ""):gsub("\1H", ""))
 end
 
-local function build(node, skeleton, out)
+local function build(node, out)
 	for _, p in ipairs(node.parts) do
-		if type(p) == "string" then out[#out + 1] = p
-		elseif skeleton then out[#out + 1] = "<\1" .. p.name .. ">"
-		else build(p, false, out) end
+		if type(p) == "string" then out[#out + 1] = p else build(p, out) end
 	end
 	return out
 end
 
 -- A region's HTML (its children's included, markers gone).
 function wire.html(node)
-	return table.concat(build(node, false, {}))
+	return table.concat(build(node, {}))
 end
 
 -- Splits a page at its markers: the document node { parts, children, regions = { name =
 -- node }, order = { node, ... } }; each region node { name, parts, children, hash }.
 -- Raises on unbalanced markers or a repeated name.
 function wire.split(html)
-	local doc = { parts = {}, children = {}, regions = {}, order = {} }
-	local stack, pos = { doc }, 1
+	local doc = { parts = {}, skel = {}, children = {}, regions = {}, order = {} }
+	local stack, pos, from = { doc }, 1, 1
 	while true do
-		local s, e, close, name = html:find("<(/?)\1([%w%-]*)>", pos)
-		if not s then break end
+		-- the marker byte (a plain search, fast), then what is around it: "<\1name>" or "</\1>"
+		local at = html:find("\1", from, true)
+		if not at then break end
+		from = at + 1
+		local s, close
+		if html:byte(at - 1) == 60 then s, close = at - 1, ""                                  -- "<"
+		elseif html:byte(at - 1) == 47 and html:byte(at - 2) == 60 then s, close = at - 2, "/"  -- "</"
+		end
+		local name, e = html:match("^([%w%-]*)>()", at + 1)
+		if not s or not name then goto continue end
+		e = e - 1
 		local top = stack[#stack]
-		if s > pos then top.parts[#top.parts + 1] = html:sub(pos, s - 1) end
+		if s > pos then
+			local text = html:sub(pos, s - 1)
+			top.parts[#top.parts + 1] = text
+			top.skel[#top.skel + 1] = text
+		end
 		if close == "" then
 			if doc.regions[name] then error("region " .. name .. " appears twice", 0) end
-			local node = { name = name, parts = {}, children = {} }
+			local node = { name = name, parts = {}, skel = {}, children = {} }
 			top.parts[#top.parts + 1] = node
+			top.skel[#top.skel + 1] = "<\1" .. name .. ">"
 			top.children[#top.children + 1] = node
 			doc.regions[name] = node
 			doc.order[#doc.order + 1] = node
@@ -78,12 +90,17 @@ function wire.split(html)
 			if #stack == 1 then error("endregion() without region()", 0) end
 			stack[#stack] = nil
 		end
-		pos = e + 1
+		pos, from = e + 1, e + 1
+		::continue::
 	end
 	if #stack > 1 then error("region " .. stack[#stack].name .. " is not closed", 0) end
 	doc.parts[#doc.parts + 1] = html:sub(pos)
+	-- each region's skeleton (its text, with its child regions as placeholders) was
+	-- collected on the way
+	local hex, sha256, n = dk.crypto.hex, dk.crypto.sha256, wire.HASH_HEX
 	for _, node in ipairs(doc.order) do
-		node.hash = dk.crypto.hex(dk.crypto.sha256(table.concat(build(node, true, {})))):sub(1, wire.HASH_HEX)
+		node.hash = hex(sha256(table.concat(node.skel))):sub(1, n)
+		node.skel = nil
 	end
 	return doc
 end

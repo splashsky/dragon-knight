@@ -13,7 +13,7 @@ On two pinned CPUs of a noisy laptop VM (see "The machine"), against 2.2.0:
 - **1,000 event streams cost ~2 KiB each** and nothing while idle; an event reaches 1,000
 	of them with p99 40–80 ms on loopback (R1).
 - **At the target scale** — 1,050 players with a stream each, 50 of them playing at 10
-	req/s with form and JSON fights, 2 chat messages/s, a reconnect per second —
+	req/s with form and JSON fights (live fights since 3.0), 2 chat messages/s, a reconnect per second —
 	the server uses 0.8 of its 2 cores and 21 MB: chat fan-out p99 ~65 ms (target 100 ms,
 	met), `GET /` p99 ~27 ms and fight `POST` p99 ~27–29 ms, no errors, no 503s, no slow-reader
 	cutoffs. The R0 latency targets (5 / 10 ms p99) are not met at this scale on this
@@ -532,3 +532,46 @@ ThreadSanitizer over every C test (`test_http` runs the server on epoll and on p
 half of them leaving during a fan-out, the slow-reader cutoff and shutdown; `test_vmpool`
 the pool, the arena restore and the code cache watcher); and both builds under two
 minutes of the target-scale load ("R4: the target scale", "Sanitizers under load").
+
+## 3.0: the live client
+
+What the live client (`docs/plans/live-client.md`, `docs/APP.md` "Live client") costs and
+saves. Measured on the scratch dev server (`dev = true`, one player, an otherwise idle
+install with 50 chat messages), on the 12-CPU aarch64 WSL machine while other work ran on
+it; the byte counts are exact, the times medians of 80 requests.
+
+**Bytes per action** (the client's `X-DK-Have` kept up to date as client.js does; a player,
+not an administrator, whose chat posts each carry a delete form with the page's address):
+
+| Action | Live answer | Full page | Regions sent |
+|---|---|---|---|
+| the same page again (a resync, nothing new) | 138 B | 12.9 KB | `foot-time` |
+| a map move | 0.75–0.85 KB | 18.5 KB | `loc` (+ `foot-time`) |
+| a fight round | 3.7–3.8 KB | ~13 KB | `main`, `charpanel`, `foot-time` |
+| town → inventory | 3.2 KB | 20.4 KB | `main`, `right` (the chat kept: a placeholder), the two `back` fields |
+| inventory → inn | 0.9 KB | 18.8 KB | `main`, `chat-back`, `theme-back`, `foot-time` |
+| → the shop (the longest page) | 6.3 KB | ~20 KB | `main`, `right`, ... |
+
+What made the difference along the way: regions already on screen travel as placeholders
+when their parent is sent (the town page's chat moving to the right column: 13 KB → 3.2 KB,
+and the panel keeps its typed text); the `back` fields of the chat and theme forms and the
+footer's timing line are regions of their own (−1.2 KB on every navigation); the `hashes`
+frame carries only what changed (it was 367 B, more than most answers).
+
+**Server cost**: every page (full or live) is split at its region markers and each of its
+~21 regions hashed (`wire.split`): 0.15 ms for a 13 KB page (p50; p90 0.18 ms). Of that,
+about 0.1 ms is SHA-256 and hex over the skeletons (in C), the rest the marker scan (a
+plain search for the marker byte; the first version's Lua pattern over every `<` took
+0.21 ms in all). A live answer then assembles only the regions it sends. Lua allocation per
+`GET /` rose from 184 KB to 298 KB (`make bench BENCH_SCENARIO=pages`, `lua_alloc_bytes /
+handled`): the regions' text pieces and skeletons, all of it dropped with the VM's arena
+after the request. Latency comparisons against 2.4 (`make bench BENCH_SCENARIO=pages,fights`,
+the same build run twice) varied by 2–3× between runs on this machine (other load came and
+went), more than any difference between the versions: they need a quiet machine and pinned
+CPUs (`BENCH_SERVER_CPUS`), as in "The machine" above. The fights scenario is not comparable
+with 2.4 anyway: a map move now picks the monster and plays its first strike, which `GET
+/fight` used to do.
+
+`make bench BENCH_SCENARIO=realtime-mixed`: half of the active players send their fights as
+live requests (without `X-DK-Have`, so each answer is the whole page: the most a live
+answer costs); a short run (10 s, 200 listeners) passed every check, with no stale rounds.
