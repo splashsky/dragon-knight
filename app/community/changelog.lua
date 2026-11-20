@@ -8,7 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "2.3.0", date = "unreleased",
+		version = "2.3.0", date = "11.20.2026",
 		changes = {
 			"Made the server several times faster: each request's Lua VM is restored from a snapshot instead of being built anew, workers write responses themselves, and requests take turns on the database without sleeping.",
 			"Moved the server to epoll with a timer heap; an idle connection no longer holds a buffer, and static files are served from memory (or with sendfile) with ETags and 304s; fonts (ttf, otf, woff) got their proper types.",
