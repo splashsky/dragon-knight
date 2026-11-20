@@ -203,7 +203,8 @@ async function run(wsUrl, port) {
 		check("moved here", lat2 !== lat, [lat, lat2]);
 		check("the other tab follows", await other.until("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1] === " + JSON.stringify(lat2), 6000),
 			await other.js("document.querySelector('[data-r=loc]').textContent"));
-		check("the other tab: no page load", await other.js("window.__dk2 === 1 && location.pathname === '/inventory'"));
+		// (where it is now is the server's call: a move into a fight takes it to the fight too)
+		check("the other tab: no page load", await other.js("window.__dk2 === 1"), await other.js("location.pathname"));
 	}
 	await other.send("Page.close").catch(function () {});
 	other.ws.close();
