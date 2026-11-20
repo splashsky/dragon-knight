@@ -1,6 +1,7 @@
 -- routes/fight.lua :: fighting, victory, item drops, death (port of legacy fight.php).
---   GET/POST /fight   fight() -- POST buttons: fight | spell (+ userspell) | item (+ useritem) | run
---                     | continue (a turn a status blocks)
+--   GET/POST /fight   fight() -- POST buttons: fight | spell=<id> (a spell's icon button; the
+--                     form before 2.3.1 sent spell=Spell + userspell=<id>, still accepted) |
+--                     item (+ useritem) | run | continue (a turn a status blocks)
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
@@ -193,8 +194,10 @@ local function fight(req)
 	elseif form.fight ~= nil then
 		a = { kind = "attack" }
 	elseif form.spell ~= nil then
+		-- the icon button's value, or the old select's (spell=Spell&userspell=<id>)
 		local picked = form.userspell
-		if picked == nil or php.intval(picked) == 0 then
+		if picked == nil then picked = form.spell end
+		if php.intval(picked) == 0 then
 			return error_page(req, "You must select a spell first. Please go back and try again.")
 		end
 		-- Validated server-side: an integer id the user knows that exists in spells.
@@ -264,7 +267,7 @@ local function fight(req)
 	page.monsterid, page.monstermaxhp, page.monstermaxmp = first.id, first.maxhp, first.maxmp
 	if not page.dead then
 		page.locked = round.locked(f)
-		page.spells = spells.known(user, "fight")
+		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)
 		page.items = usable_items(user)
 		f.round = f.round + 1
 		page.round = f.round

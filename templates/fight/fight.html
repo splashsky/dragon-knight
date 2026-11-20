@@ -3,7 +3,8 @@
 		hooks (docs/APP.md "Fight API"): data-fighter (a combatant's id), data-stat/-value/-max
 		(the numbers it animates), data-fight-log (the round's lines), data-fight (forms it
 		sends with fetch). Every form carries the round it was shown at (stale forms play
-		nothing). -#}
+		nothing). A spell is an icon button, spell=<id> (spells.buttons: greyed out and
+		disabled when the MP don't cover it; the server checks again). -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
@@ -48,12 +49,16 @@
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
 <p><input type="submit" name="fight" value="Fight"></p>
-<p><select name="userspell" aria-label="Spell"><option value="0">Choose One</option>
-{%- if #spells == 0 then %}<option value="0">None</option>{% end %}
+<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>
+{%- if #spells == 0 then %} <span class="light">None</span>{% end %}
+{%- if #spells > 0 then %}
+<div class="spell-grid">
 {%- for _, s in ipairs(spells) do %}
-<option value="{{ s.id }}">{{ s.name }}</option>
+<button class="spell-btn" type="submit" name="spell" value="{{ s.id }}" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>
 {%- end %}
-</select> <input type="submit" name="spell" value="Spell"></p>
+</div>
+{%- end %}
+</div>
 <p><select name="useritem" aria-label="Item"><option value="0">Choose One</option>
 {%- if #items == 0 then %}<option value="0">None</option>{% end %}
 {%- for _, it in ipairs(items) do %}

@@ -295,8 +295,27 @@ expect_db "latitude" "3" "move while fighting"
 t_section "town: heal spells"
 tu "$TOWN_HOME, currenthp=5, base_maxhp=20, currentmp=20, base_maxmp=20"; t_spells townie ""
 t_post /spell/1 "csrf=$TC";       expect_body 'You have not yet learned this spell.'
-t_spells townie 1,6
+t_get /
+tr -d '\n' < "$BODY" | grep -qF '<div class="box-body spellpanel"><span class="light">None</span></div>' && t_ok || t_fail "Fast Spells: None"
+t_spells townie 1,2,6
 t_get /;                          expect_body 'action="/spell/1"'
+# Fast Spells: a grid of icon buttons, each its own form (CSRF) to /spell/<id>; town
+# spells only (Hurt is not one), the icon or default.png, the MP cost as a badge
+expect_body '<div class="spell-grid spell-grid-small">'
+expect_body '<form method="post" action="/spell/1"><input type="hidden" name="csrf" value="'"$TC"'"><button class="spell-btn" type="submit" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">5</span></button></form>'
+expect_body '<button class="spell-btn" type="submit" title="Revive (10 MP)" aria-label="Revive (10 MP)"><img src="/static/images/skills/default.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">10</span></button>'
+expect_no_body 'action="/spell/6"'; expect_no_body ' disabled><img'
+# disabled (greyed out) only when the MP don't cover it
+tu "currentmp=7"
+t_get /;                          expect_body 'title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img'
+expect_body 'title="Heal (5 MP)" aria-label="Heal (5 MP)"><img'
+# casting with the panel's button: its form as the page has it (action and CSRF field; the button has no name)
+FS_FORM=$(grep -o '<form method="post" action="/spell/1"><input type="hidden" name="csrf" value="[0-9a-f]*">' "$BODY")
+FS_ACTION=$(printf '%s' "$FS_FORM" | sed 's/.*action="\([^"]*\)".*/\1/'); FS_CSRF=$(printf '%s' "$FS_FORM" | sed 's/.*value="\([0-9a-f]*\)".*/\1/')
+t_post "$FS_ACTION" "csrf=$FS_CSRF"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
+expect_db "currenthp,currentmp" "15|2" "Fast Spells button"
+expect_body 'title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'   # the page after: 2 MP left
+tu "currenthp=5, currentmp=20"; t_spells townie 1,6
 t_post /spell/6 "csrf=$TC";       expect_body 'This is not a healing spell.'
 t_post /spell/2 "csrf=$TC";       expect_body 'You have not yet learned this spell.'
 t_post /spell/1 "";               expect_status 403

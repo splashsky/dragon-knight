@@ -10,6 +10,7 @@ return {
 	power = 10,                 -- the most HP it restores
 	usable_in = "both",
 	target = "self",
+	icon = "heal",               -- public/images/skills/heal.png (default: default.png)
 	messages = {
 		cast = "You have cast the %s spell, and gained %d Hit Points.",
 		full = "Your Hit Points are already full. Please go back and try again.",

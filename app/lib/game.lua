@@ -158,7 +158,7 @@ function game.nav(user)
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),
 		bars = bars,   -- { key = "hp"|"mp"|"tp", label, value, max, width, tone, low } (fight.js updates them)
-		spells = spells.known(user, "town"),
+		spells = spells.buttons(spells.known(user, "town"), user.currentmp),   -- Fast Spells (spells.buttons)
 		equipment = inventory.names(user.id),
 		gear = game.gear_rows(inventory.names(user.id)),
 		bag_used = inventory.used(inventory.bag(user.id)),

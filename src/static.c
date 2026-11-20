@@ -355,3 +355,45 @@ void static_lookup(static_cache *sc, const char *rel, const char *ims, const cha
 	out->fd = fd;
 	out->size = (size_t)st.st_size;
 }
+
+int static_rel_ok(const char *rel, size_t n)
+{
+	if (!rel || n == 0 || n > STATIC_REL_MAX || rel[0] == '/' || strlen(rel) != n)
+		return 0;
+	for (size_t i = 0; i < n; i++) {
+		unsigned char c = (unsigned char)rel[i];
+		int ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+				 c == '_' || c == '.' || c == '/' || c == '-';
+		if (!ok)
+			return 0;
+	}
+	return strstr(rel, "..") == NULL;
+}
+
+int static_file_exists(const char *public_dir, const char *rel)
+{
+	if (!rel || !static_rel_ok(rel, strlen(rel)))
+		return -1;
+	if (!public_dir || !*public_dir)
+		return 0;
+	char *root = realpath(public_dir, NULL);
+	if (!root)
+		return 0;
+	size_t root_len = strlen(root);
+	size_t n = root_len + strlen(rel) + 2;
+	char *full = malloc(n);
+	int found = 0;
+	if (full) {
+		snprintf(full, n, "%s/%s", root, rel);
+		char *real = realpath(full, NULL);
+		struct stat st;
+		/* inside the public dir (a symlink may not lead out of it), a regular file */
+		if (real && (root_len == 1 || (strncmp(real, root, root_len) == 0 && real[root_len] == '/')) &&
+			stat(real, &st) == 0 && S_ISREG(st.st_mode))
+			found = 1;
+		free(real);
+		free(full);
+	}
+	free(root);
+	return found;
+}

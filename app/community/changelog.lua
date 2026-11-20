@@ -14,6 +14,8 @@ changelog.RELEASES = {
 			"Redesigned the Character panel to be more compact: name and level on one line, and HP, MP and TP as slim bars with their values.",
 			"HP, MP and TP bars are drawn with CSS gradients instead of images, and the monster and ally bars in fights are the same bars as the Character panel's.",
 			"Condensed the Inventory panel: your bag comes first, then your gear and accessory slots in one tight list.",
+			"Spells are now icon buttons in the fight menu and the Fast Spells box, with their MP cost on a badge and their name and cost as a tooltip; spells you don't have the MP for are greyed out. Heal has its own icon, the others a default one for now.",
+			"Spell content files can name an icon (public/images/skills/<icon>.png); dk check fails if the file is missing, and administrators can change a spell's icon on its admin page (schema version 12, run dk migrate).",
 		},
 	},
 	{

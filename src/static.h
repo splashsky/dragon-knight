@@ -34,6 +34,15 @@ void          static_free(static_cache *sc);
 void          static_lookup(static_cache *sc, const char *rel, const char *ims, const char *inm,
 							double now, static_result *out);
 
+/* dk.static_exists: rel, a path below the public directory, is safe when it is 1 to
+ * STATIC_REL_MAX bytes of [A-Za-z0-9_./-] (no NUL), not absolute and without "..". */
+#define STATIC_REL_MAX 1024
+int           static_rel_ok(const char *rel, size_t n);
+/* 1: public_dir/rel is a regular file inside public_dir (after resolving symlinks); 0: it
+ * is not (or public_dir doesn't exist); -1: rel is not safe (static_rel_ok). Stats every
+ * call (no cache). */
+int           static_file_exists(const char *public_dir, const char *rel);
+
 /* RFC 7231 IMF-fixdate helpers (shared with http.c). */
 void          http_fmt_date(char *buf, size_t n, long long t);
 long long     http_parse_date(const char *s);        /* -1 if unparsable */

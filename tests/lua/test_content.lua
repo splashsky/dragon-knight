@@ -134,7 +134,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-6\n"), "format line first")
+	assert(c1:find("^dk%-content%-7\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it
@@ -310,7 +310,77 @@ function T.validate_spells()
 	eq(spell_kind.field("usable_in").admin, nil); eq(spell_kind.field("target").admin, nil)
 	local names = {}
 	for _, f in ipairs(spell_kind.admin_fields(load.kind("spells").by_key.hurt)) do names[#names + 1] = f.name end
-	eq(table.concat(names, ","), "name,description,mp,power,messages.hit,messages.immune,messages.enemy.hit,messages.enemy.immune")
+	eq(table.concat(names, ","), "name,description,mp,power,icon,messages.hit,messages.immune,messages.enemy.hit,messages.enemy.immune")
+end
+
+-- Spell icons: an optional PNG name in public/images/skills/ that must exist (dk check
+-- fails otherwise), resolved to a URL with default.png as the fallback at runtime.
+function T.spell_icons()
+	local function spell(over)
+		local d = { name = "Zap", mp = 3, cast = function() end }
+		for k, v in pairs(over or {}) do d[k] = v end
+		return d
+	end
+	eq(assert(schema.validate(spell_kind, spell())).icon, "", "no icon: empty")
+	eq(assert(schema.validate(spell_kind, spell({ icon = "heal" }))).icon, "heal")
+	eq(assert(schema.validate(spell_kind, spell({ icon = "" }))).icon, "")
+	local function errors(over)
+		local ok, errs = schema.validate(spell_kind, spell(over))
+		assert(not ok, "expected errors")
+		return errs
+	end
+	local public = dk.config.public_dir or "public"
+	has(errors({ icon = "nope" }), "field 'icon' names a missing file: " .. public .. "/images/skills/nope.png")
+	has(errors({ icon = "Heal" }), "field 'icon' must be the name of a PNG file in public/images/skills/")
+	has(errors({ icon = "heal.png" }), "field 'icon' must be the name of a PNG file")
+	has(errors({ icon = "../heal" }), "field 'icon' must be the name of a PNG file")
+	has(errors({ icon = 5 }), "field 'icon' must be the name of a PNG file")
+	-- the stock files: only Heal has one
+	local files = load.kind("spells").by_key
+	eq(files.heal.icon, "heal"); eq(files.hurt.icon, "")
+	-- overridable (admin), and checked the same way
+	local spec = spell_kind.field("icon")
+	eq(spec.admin, true); eq(spec.type, "icon")
+	eq(schema.parse(spec, "heal"), "heal"); eq(schema.parse(spec, ""), "")
+	eq(schema.parse(spec, "nope"), nil); eq(schema.parse(spec, "a/b"), nil)
+	local skipped = {}
+	scratch(function()
+		sync.set_override("spells", "hurt", "icon", "nope")
+		eq(sync.effective(spell_kind, "hurt", files.hurt, skipped).icon, "", "a missing icon's override is skipped")
+	end)
+	has(skipped, "spell hurt: override of icon ignored (invalid value)")
+	-- URLs: the file's, or default.png when there is none, the name is bad or the file is gone
+	local spells = require("lib.spells")
+	eq(spells.icon_url({ icon = "heal" }), "/static/images/skills/heal.png")
+	eq(spells.icon_url({ icon = "" }), "/static/images/skills/default.png")
+	eq(spells.icon_url({}), "/static/images/skills/default.png")
+	eq(spells.icon_url({ icon = "deleted_since" }), "/static/images/skills/default.png")
+	eq(spells.icon_url({ icon = "../../config" }), "/static/images/skills/default.png")
+	eq(spells.icon_url(spells.by_key("heal")), "/static/images/skills/heal.png", "synced")
+	eq(spells.icon_url(spells.by_key("hurt")), "/static/images/skills/default.png")
+	local b = spells.buttons({ spells.by_key("heal"), spells.by_key("hurt") }, 5)
+	eq(b[1].label, "Heal (5 MP)"); eq(b[1].short, false); eq(b[1].icon, "/static/images/skills/heal.png")
+	eq(b[2].label, "Hurt (5 MP)"); eq(b[2].short, false)
+	eq(spells.buttons({ spells.by_key("heal") }, 4)[1].short, true, "MP short")
+end
+
+-- dk.static_exists: regular files below public_dir only, plain relative paths only.
+function T.static_exists()
+	eq(dk.static_exists("images/skills/heal.png"), true)
+	eq(dk.static_exists("images/skills/default.png"), true)
+	eq(dk.static_exists("css/dk.css"), true)
+	eq(dk.static_exists("images/skills/nope.png"), false)
+	eq(dk.static_exists("images/skills"), false, "a directory")
+	eq(dk.static_exists("images/skills/"), false)
+	eq(dk.static_exists("../config.lua"), false, "..")
+	eq(dk.static_exists("images/../css/dk.css"), false, "..")
+	eq(dk.static_exists("/etc/passwd"), false, "absolute")
+	eq(dk.static_exists((dk.config.public_dir or "public") .. "/css/dk.css"), false)
+	eq(dk.static_exists("css/dk.css\0"), false)
+	eq(dk.static_exists("css/dk.css\0x"), false, "NUL")
+	eq(dk.static_exists("css/dk css"), false)
+	eq(dk.static_exists(""), false)
+	assert(not pcall(dk.static_exists), "needs a string")
 end
 
 function T.message_placeholders()

@@ -1,5 +1,5 @@
 -- admin/spells.lua :: /admin/spells -- the spells (content files app/content/spells/<key>.lua,
--- synced into the spells table). Admins override name, description, MP, power, the
+-- synced into the spells table). Admins override name, description, MP, power, icon, the
 -- named numbers and the message strings per server (lib/content/kinds/spells.lua
 -- admin_fields); "reset to file" deletes an override. What a spell does (its code), where
 -- it can be cast and its target are edited in the file. Replaces the legacy spells editor.
@@ -22,7 +22,7 @@ function admin_spells.index(req)
 	local overrides = content.override_counts(kind)
 	local rows = {}
 	for _, s in ipairs(spells.all()) do
-		rows[#rows + 1] = { s = s, users = counts[s.id] or 0, overrides = overrides[s.key] or 0 }
+		rows[#rows + 1] = { s = s, icon = spells.icon_url(s), users = counts[s.id] or 0, overrides = overrides[s.key] or 0 }
 	end
 	return common.page(req, "Spells", "admin/spells", { rows = rows, status = sync.status() })
 end

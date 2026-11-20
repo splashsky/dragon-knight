@@ -26,6 +26,7 @@
 	var wake = null;        // ends the current wait
 	var refocus = false;    // the keyboard was in the middle column: focus the new form
 	var lastButton = null;  // the submit button last clicked (browsers without ev.submitter)
+	var pressed = null;     // name and value of the button that sent the round (refocused after)
 
 	// ---- helpers
 
@@ -347,10 +348,15 @@
 		lock(false);
 		var m = middle();
 		if (refocus && m) {
-			var target = $("form[data-fight] [type=submit]", m) || $("a[href]", m);
+			// the same button again (a spell's, say) if the new form has it enabled, else the first
+			var same = pressed && $$("form[data-fight] [type=submit]", m).filter(function (b) {
+				return !b.disabled && b.name === pressed.name && b.value === pressed.value;
+			})[0];
+			var target = same || $("form[data-fight] [type=submit]", m) || $("a[href]", m);
 			if (target) target.focus({ preventScroll: true });
 		}
 		refocus = false;
+		pressed = null;
 	}
 
 	// sends a request and plays its answer; fallback: the same without JavaScript
@@ -389,8 +395,11 @@
 		ev.preventDefault();
 		if (busy) return;
 		var button = ev.submitter || (lastButton && lastButton.form === form ? lastButton : null);
+		// FormData(form) leaves out the submit buttons: the one pressed (Fight, a spell's icon
+		// button with name="spell" value="<id>", ...) is added, as a native submit sends it
 		var data = new URLSearchParams(new FormData(form));
 		if (button && button.name) data.append(button.name, button.value);
+		pressed = button && button.name ? { name: button.name, value: button.value } : null;
 		start(request(form.getAttribute("action") || location.pathname, data, form), function () {
 			submitNative(form, button);
 		});

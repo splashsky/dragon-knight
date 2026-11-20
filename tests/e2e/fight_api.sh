@@ -238,6 +238,29 @@ fa_herb() { fa_hurt; t_give fapi herb 2; }
 for seed in 1 2; do fa_both herb "$seed" fa_herb "item=Use+Item&useritem=$(it herb)&round=2"; done
 fa_expect 'any(e["type"] == "item" and e["text"] == "You have used the Herb, and gained 30 Hit Points." and e["hp"] == [{"who": "player", "id": 1, "name": "Fapi", "from": 150, "to": 180, "max": 300}] for e in d["events"])' "Herb"
 
+t_section "fight api: spell buttons, form and fetch alike"
+# A spell's icon button is <button name="spell" value="<id>">; fight.js sends the form's
+# fields plus the pressed button's name and value (FormData leaves buttons out), as a
+# native submit does: spell=<id>. The same round both ways, and the same as the old
+# select's spell=Spell&userspell=<id>.
+FA_HEAL=$(sp heal)
+fa_both "heal button" 1 fa_hurt "spell=$FA_HEAL&round=2"
+fa_expect 'any(e["type"] == "spell" and e["text"].startswith("You have cast the Heal spell") and e["mp"][0]["from"] - e["mp"][0]["to"] == 5 for e in d["events"] if "mp" in e)' "Heal button: cast"
+fa_expect "'<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\"><img src=\"/static/images/skills/heal.png\"' in d['fragments']['main']" "the fragment's spell buttons"
+fa_expect "'action=\"/spell/$FA_HEAL\"' in d['fragments']['nav_right'] and 'class=\"spell-btn\"' in d['fragments']['nav_right']" "the fragment's Fast Spells"
+for seed in 1 2; do
+	fa_both "heal button" "$seed" fa_hurt "spell=$FA_HEAL&round=2"
+	FA_BUTTON=$(fa_state)
+	fa_hurt; t_post /fight "csrf=$FA_CS&spell=Spell&userspell=$FA_HEAL&round=2" -H "X-Test-Seed: $seed"
+	[ "$(fa_state)" = "$FA_BUTTON" ] && t_ok || t_fail "the button and the old select differ (seed $seed)"
+done
+for seed in 3 4; do fa_both "hurt button" "$seed" fa_slime "spell=$(sp hurt)&round=2"; done
+fa_expect 'any(e["type"] == "spell" and e["text"].startswith("You have cast the Hurt spell") for e in d["events"] if "text" in e)' "Hurt button: cast"
+# the MP left after the round: the buttons it no longer covers come back disabled
+fa_low() { fa_slime; fa_sql "UPDATE users SET currentmp = 7"; }
+fa_both "last MP" 5 fa_low "spell=$(sp hurt)&round=2"
+fa_expect "'value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\" disabled>' in d['fragments']['main']" "disabled after the round"
+
 t_section "fight api: statuses, summons, locked turns"
 fa_titan() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 149 30000; }
 fa_both poison 1 fa_titan "spell=Spell&userspell=$(sp poison)&round=2"
@@ -279,6 +302,12 @@ fa_check_refusal fa_full "item=Use+Item&useritem=$(it herb)&round=2" "Your Hit P
 fa_check_refusal fa_full "spell=Spell&userspell=0&round=2" "You must select a spell first. Please go back and try again."
 fa_check_refusal fa_full "item=Use+Item&useritem=$(it potion)&round=2" "You do not have this item. Please go back and try again."
 fa_check_refusal fa_full "spell=Spell&userspell=$(sp fury)&round=2" "You have not yet learned this spell. Please go back and try again."
+# the same refusals for a spell button's value (a direct POST: the page disables what MP don't cover)
+fa_check_refusal fa_full "spell=$(sp heal)&round=2" "Your Hit Points are already full. Please go back and try again."
+fa_check_refusal fa_full "spell=0&round=2" "You must select a spell first. Please go back and try again."
+fa_check_refusal fa_full "spell=$(sp fury)&round=2" "You have not yet learned this spell. Please go back and try again."
+fa_short() { fa_full; fa_sql "UPDATE users SET currentmp = 2"; }
+fa_check_refusal fa_short "spell=$(sp hurt)&round=2" "You do not have enough Magic Points to cast this spell. Please go back and try again."
 
 t_section "fight api: monster spells and items"
 # fa_find LABEL SETUP 'fields' 'python condition on d' : the first seed (of 40) whose fetch

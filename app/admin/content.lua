@@ -20,7 +20,7 @@ end
 
 -- The form of entity `key`. `current`: its effective flat values (from the database);
 -- `values`: what the admin typed, to show again after an error. Returns { fields = {
--- spec, file, override, value }, others = { field, value, file } (overrides of fields the
+-- spec, file, override, value, preview (icon fields: the effective icon's URL) }, others = { field, value, file } (overrides of fields the
 -- page doesn't edit), has_file, file_path }.
 function content.form(kind, key, current, values)
 	local file = content.file_values(kind, key)
@@ -33,6 +33,8 @@ function content.form(kind, key, current, values)
 			file = file and schema.text(file[spec.name]),
 			override = overrides[spec.name],
 			value = values and values[spec.name] or schema.text(current[spec.name]),
+			-- an icon field shows the effective icon (default.png when none or missing)
+			preview = spec.type == "icon" and schema.icon_url(spec, current[spec.name]) or nil,
 		}
 	end
 	local names, others = {}, {}

@@ -234,6 +234,61 @@ input[type="image"] { vertical-align: middle; }
 }
 .invpanel-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ---- spell icon buttons (fight menu: fight.css; Fast Spells: .spell-grid-small) ---- */
+.spell-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.spell-grid form { margin: 0; }
+.spell-btn {
+	position: relative;
+	display: block;
+	box-sizing: content-box;
+	width: 44px;
+	height: 44px;
+	padding: 2px;
+	border: solid 1px rgba(0, 0, 0, 0.45);
+	border-radius: 4px;
+	background-color: rgba(255, 255, 255, 0.6);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	cursor: pointer;
+	transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, border-color 0.08s;
+}
+.spell-btn img { display: block; width: 100%; height: 100%; border-radius: 3px; }
+.spell-btn:hover { border-color: rgba(0, 0, 0, 0.8); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35); transform: translateY(-1px); }
+.spell-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
+.spell-btn:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
+.spell-btn:disabled, .spell-btn:disabled:hover {
+	cursor: not-allowed;
+	opacity: 0.45;
+	filter: grayscale(1);
+	transform: none;
+	box-shadow: none;
+	border-color: rgba(0, 0, 0, 0.3);
+}
+/* the MP cost, on the icon's bottom-right corner */
+.spell-mp {
+	position: absolute;
+	right: -3px;
+	bottom: -3px;
+	min-width: 12px;
+	padding: 0 3px;
+	border: solid 1px rgba(0, 0, 0, 0.6);
+	border-radius: 3px;
+	background-image: var(--bar-mp);
+	color: white;
+	font-size: 11px;
+	font-weight: bold;
+	line-height: 14px;
+	font-variant-numeric: lining-nums tabular-nums;
+	text-align: center;
+	text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.spell-grid-small { gap: 5px; }
+.spell-grid-small .spell-btn { width: 34px; height: 34px; padding: 1px; }
+.spell-grid-small .spell-mp { font-size: 10px; line-height: 12px; padding: 0 2px; }
+@media (prefers-reduced-motion: reduce) {
+	.spell-btn { transition: none; }
+	.spell-btn:hover, .spell-btn:active { transform: none; }
+}
+
 /* ---- forms on account pages ---- */
 .form-table td:first-child { white-space: nowrap; }
 

@@ -27,7 +27,7 @@ t_get /character; expect_no_body 'Statuses:'
 
 t_section "effects: Poison"
 t_fight effector 149 30000   # a Titan with 30000 HP, no immunity
-t_get /fight; CS=$(t_csrf); expect_body "<option value=\"$(sp poison)\">Poison</option>"
+t_get /fight; CS=$(t_csrf); expect_body "name=\"spell\" value=\"$(sp poison)\" title=\"Poison ("
 t_post /fight "csrf=$CS&spell=Spell&userspell=$(sp poison)"
 expect_body 'You have cast the Poison spell. The monster is poisoned for 3 turns.'
 expect_body 'class="fight-roundend">The Titan takes '

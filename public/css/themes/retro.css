@@ -5,3 +5,7 @@
 body {
 	background: url(/static/images/background.jpg);
 }
+
+/* spell buttons: the original grey title boxes */
+.spell-btn { background-color: #eeeeee; border-color: black; }
+.spell-btn:hover { border-color: #663300; }

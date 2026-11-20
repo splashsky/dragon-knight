@@ -186,6 +186,33 @@ t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=*"
 admin_eq "SELECT name || '|' || mp || '|' || power || '|' || instr(messages, 'Smite') FROM spells WHERE id = 6" "Hurt|5|15|0" "all reset to file"
 admin_eq "SELECT count(*) FROM content_overrides" "0" "no spell overrides left"
 
+t_section "admin: spell icons"
+# the list and the form show the icon (default.png without one); an override must name a
+# PNG that exists in public/images/skills/
+t_get /admin/spells
+expect_body '<td class="admin-icon-cell"><img src="/static/images/skills/heal.png" width="20" height="20" alt=""></td><td><a href="/admin/spells/1">Heal</a>'
+expect_body '<td class="admin-icon-cell"><img src="/static/images/skills/default.png" width="20" height="20" alt=""></td><td><a href="/admin/spells/6">Hurt</a>'
+t_get /admin/spells/1
+expect_body '<span class="admin-icon"><img src="/static/images/skills/heal.png" width="44" height="44" alt="Current icon"> <input type="text" name="icon" size="20" value="heal"></span>'
+t_get /admin/spells/6
+expect_body '<span class="admin-icon"><img src="/static/images/skills/default.png" width="44" height="44" alt="Current icon"> <input type="text" name="icon" size="20" value=""></span>'
+expect_body 'A PNG in public/images/skills/, without &quot;.png&quot;'
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=nope
+expect_status 200; expect_body 'Icon names a missing file: '; expect_body '/images/skills/nope.png.'
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=../heal
+expect_status 200; expect_body 'Icon must be the name of a PNG file in public/images/skills/'
+admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid icons not saved"
+t_get /admin/spells/6
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=heal
+expect_redirect '/admin/spells/6\?saved=1'
+admin_eq "SELECT icon FROM spells WHERE id = 6" "heal" "icon override applied"
+admin_eq "SELECT group_concat(field || '=' || value, ';') FROM content_overrides WHERE kind = 'spells'" "icon=heal" "only the icon is overridden"
+t_get '/admin/spells/6?saved=1'
+expect_body '<img src="/static/images/skills/heal.png" width="44" height="44" alt="Current icon"> <input type="text" name="icon" size="20" value="heal">'
+expect_body 'Overridden.</span> <span class="small">File value: (empty)</span>'
+t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=icon"
+admin_eq "SELECT icon || '|' || (SELECT count(*) FROM content_overrides) FROM spells WHERE id = 6" "|0" "icon reset to file"
+
 t_section "admin: items"
 # item files app/content/items/*.lua; admins override name, description, price, attack and
 # defense, drop settings, modifiers and a consumable's power and messages (the files:

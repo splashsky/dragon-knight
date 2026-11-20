@@ -21,6 +21,8 @@ spells.fields = {
 		help = "Magic points it costs to cast." },
 	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",
 		help = "What the spell's code makes of it: the HP it heals, its maximum damage, ..." },
+	{ name = "icon", type = "icon", dir = "images/skills", default = "", admin = true, label = "Icon",
+		help = "A PNG in public/images/skills/, without \".png\" (heal: heal.png); empty: default.png." },
 	{ name = "usable_in", type = "choice", values = spells.USABLE_IN, default = "fight", label = "Usable in" },
 	{ name = "target", type = "choice", values = spells.TARGETS, default = "enemy", label = "Target" },
 }

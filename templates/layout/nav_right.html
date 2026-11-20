@@ -1,4 +1,5 @@
-{#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). -#}
+{#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). Fast Spells: an icon
+		button per town spell (spells.buttons), each its own POST form to /spell/<id>. -#}
 <section class="box">
 <div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
 <div class="box-body charpanel" data-player-stats>
@@ -34,12 +35,15 @@
 
 <section class="box">
 <div class="title"><img src="/static/images/button_fastspells.gif" alt="Fast Spells" title="Fast Spells"></div>
-<div class="box-body">
+<div class="box-body spellpanel">
 {%- if #spells == 0 then %}
-None
-{%- end %}
+<span class="light">None</span>
+{%- else %}
+<div class="spell-grid spell-grid-small">
 {%- for _, s in ipairs(spells) do %}
-<form class="inline" method="post" action="/spell/{{ s.id }}">{{{ csrf_field() }}}<button class="link" type="submit">{{ s.name }}</button></form><br>
+<form method="post" action="/spell/{{ s.id }}">{{{ csrf_field() }}}<button class="spell-btn" type="submit" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button></form>
+{%- end %}
+</div>
 {%- end %}
 </div>
 </section>

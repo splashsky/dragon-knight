@@ -1073,6 +1073,13 @@ local function v11_online_index()
 	dk.db:exec("CREATE INDEX users_online ON users (charname, id) WHERE online = 1")
 end
 
+-- 12: spell icons (2.3.1): spells.icon, the PNG in public/images/skills/ of the fight and
+-- Fast Spells buttons ('' = default.png). The content sync that ends the migration fills
+-- it in from the spell files.
+local function v12_spell_icons()
+	dk.db:exec("ALTER TABLE spells ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1093,6 +1100,7 @@ migrations.STEPS = {
 	{ name = "realtime: chat messages keep their author's account, who's online is kept live, and " ..
 		"the broadcast banner", up = v10_realtime },
 	{ name = "who's online is read from an index of the players online", up = v11_online_index },
+	{ name = "spells have icons (the fight and Fast Spells buttons)", up = v12_spell_icons },
 }
 
 migrations.VERSION = #migrations.STEPS

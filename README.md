@@ -113,8 +113,8 @@ with status 3 when it doesn't exist.
 next request. Game settings (game name, map size, forum, email verification, …) live in
 the database and are edited in the admin panel at `/admin`. Character classes, spells and
 items are content files (see [Adding a class, a spell or an item](#adding-a-class-a-spell-or-an-item));
-the admin panel can override their names, descriptions, starting stats, MP costs, prices,
-power and messages per server.
+the admin panel can override their names, descriptions, starting stats, MP costs, spell
+icons, prices, power and messages per server.
 
 The config file is plain Lua evaluated in a sandbox (no `io`, `os`, `require` or `load`).
 
@@ -338,7 +338,10 @@ return {
 ```
 
 A class learns it when a class file lists its key in `levels[N].spells`. `heal.lua` shows
-a self-targeted spell usable in town with a refusal (`can_cast`, "already full"). The
+a self-targeted spell usable in town with a refusal (`can_cast`, "already full"). In fights
+and in the Fast Spells box a spell is an icon button: give it `icon = "firebolt"` and put
+`firebolt.png` (square) in `public/images/skills/`, or leave it out for `default.png`;
+`./dk check` fails, naming the spell file, if the PNG doesn't exist. The
 formats, the action API, the sync and the admin overrides are described in `docs/APP.md`
 ("Content", "Scripting spells and items", "Spells", "Items").
 
@@ -469,8 +472,10 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	the original from level 45 and 18 on); a class can define its own curve.
 - Spells are content files too (`app/content/spells/`), scripted in Lua instead of a type
 	and an attribute (the original 19 behave exactly as before); administrators override
-	names, descriptions, MP costs, power and messages per server (`/admin/spells`). The
+	names, descriptions, MP costs, power, icons and messages per server (`/admin/spells`). The
 	spells a character knows are a table (`user_spells`) instead of a list in the users row.
+	Spells are icon buttons (2.3.1) in the fight menu and the Fast Spells box, with their MP
+	cost and greyed out when the MP don't cover them, instead of a drop-down list.
 - Items and drops are content files (`app/content/items/`): the drops are accessories
 	(three accessory slots, as the three inventory slots were), and there are consumables:
 	Herbs, Potions and Ethers, sold in towns and usable in town or in fights (taking the

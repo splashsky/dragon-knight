@@ -49,6 +49,9 @@ table.admin-classes, table.admin-levels { width: 90%; }
 .admin-menu .dk-logo { margin-bottom: 8px; }
 .admin-content pre.error { white-space: pre-wrap; margin: 0.3em 0; }
 .admin-footer { width: 90%; }
+.admin-icon { display: inline-flex; align-items: center; gap: 6px; }
+.admin-icon img, .admin-icon-cell img { display: block; border: solid 1px rgba(0, 0, 0, 0.35); border-radius: 3px; }
+table.admin-list td.admin-icon-cell { width: 22px; padding: 1px 3px; vertical-align: middle; }
 
 @media (max-width: 640px) {
 	.admin-page { flex-direction: column; }

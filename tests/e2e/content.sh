@@ -222,7 +222,7 @@ t_post /spell/25 "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
 # cast in a fight: both lines, MP spent (Red Slime: no immunity)
 t_fight ctknight 2 50
 t_sql "UPDATE users SET currentmp = 10, currenthp = 500, base_maxhp = 500 WHERE username = 'ctknight'"
-t_get /fight;         expect_body '<option value="25">Zap</option>'
+t_get /fight;         expect_body 'name="spell" value="25" title="Zap ('
 t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=25"
 expect_body 'You have cast the Zap spell for 6 damage.<br>You have cast the Zap spell, and will gain 20% defense until the end of this fight.'
 ct_eq "SELECT $T_MONSTER_HP || '|' || $T_UBER_DEFENSE || '|' || currentmp FROM users WHERE username = 'ctknight'" \
@@ -273,6 +273,49 @@ t_get /admin/spells/25
 t_post /admin/spells/25/reset "csrf=$(t_csrf)&field=*"
 ct_eq "SELECT count(*) FROM content_overrides WHERE key = 'zap'" "0" "zap overrides reset"
 
+t_section "content: spell icons"
+# icon = "<name>": public/images/skills/<name>.png must exist (dk check names the spell file);
+# a bad name is refused; without one (or with its file deleted since) the game shows default.png
+CT_SKILLS="$T/public/images/skills"
+ct_zap_icon() {  # ct_zap_icon 'icon = "x",' : zap.lua with that line (none: no icon)
+	sed -i '/^\ticon = /d' "$CT_SPELLS/zap.lua"
+	[ -n "$1" ] && sed -i "s|^\tmp = 3,$|\tmp = 3,\n\t$1|" "$CT_SPELLS/zap.lua"
+	return 0
+}
+ct_zap_icon 'icon = "nope",'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with a missing icon" || t_ok
+grep -qF "zap.lua: field 'icon' names a missing file: $T/public/images/skills/nope.png" "$T/content.log" && t_ok || t_fail "missing icon: $(cat "$T/content.log")"
+ct_zap_icon 'icon = "Zap-Icon",'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with a bad icon name" || t_ok
+grep -qF "zap.lua: field 'icon' must be the name of a PNG file in public/images/skills/" "$T/content.log" && t_ok || t_fail "bad icon name: $(cat "$T/content.log")"
+ct_zap_icon 'icon = "../logo",'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with a path as icon" || t_ok
+# the running game keeps the last good content meanwhile
+ct_eq "SELECT icon FROM spells WHERE key = 'zap'" "" "no icon synced from an invalid file"
+cp "$CT_SKILLS/default.png" "$CT_SKILLS/zap_test.png"
+ct_zap_icon 'icon = "zap_test",'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check with an icon: $(cat "$T/content.log")"
+t_jar ctknight
+for _ in $(seq 1 50); do
+	[ "$(t_sql "SELECT icon FROM spells WHERE key = 'zap'")" = zap_test ] && break
+	t_get /login; sleep 0.1
+done
+ct_eq "SELECT icon FROM spells WHERE key = 'zap'" "zap_test" "icon synced"
+ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
+t_get /fight;         expect_body 'name="spell" value="25" title="Zap (3 MP)" aria-label="Zap (3 MP)"><img src="/static/images/skills/zap_test.png"'
+# the file deleted after the sync: default.png at once (no sync needed), and dk check fails
+rm -f "$CT_SKILLS/zap_test.png"
+t_get /fight;         expect_body 'name="spell" value="25" title="Zap (3 MP)" aria-label="Zap (3 MP)"><img src="/static/images/skills/default.png"'
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed after the icon was deleted" || t_ok
+grep -qF "zap.lua: field 'icon' names a missing file" "$T/content.log" && t_ok || t_fail "deleted icon: $(cat "$T/content.log")"
+ct_zap_icon ''
+for _ in $(seq 1 50); do
+	[ "$(t_sql "SELECT icon FROM spells WHERE key = 'zap'")" = "" ] && break
+	t_get /login; sleep 0.1
+done
+ct_eq "SELECT icon FROM spells WHERE key = 'zap'" "" "no icon again"
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check without the icon: $(cat "$T/content.log")"
+
 t_section "content: a class listing an unknown or deleted spell fails dk check"
 ct_knight Knight 30 'levels[12].spells = { "zap", "nope" }'
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed with an unknown spell" || t_ok
@@ -297,7 +340,7 @@ t_get /help/spells;   expect_no_body '>Zap<'
 t_get /character;     expect_body 'Zap<br>'
 # what it did was its file's code: still known, but no longer castable
 ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
-t_get /fight;         expect_no_body '<option value="25">Zap</option>'
+t_get /fight;         expect_no_body 'name="spell" value="25"'
 t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=25"; expect_body 'This spell cannot be cast.'
 ct_eq "SELECT currentmp || '|' || $T_MONSTER_HP FROM users WHERE username = 'ctknight'" "10|50" "nothing spent"
 t_jar admin

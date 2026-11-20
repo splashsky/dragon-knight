@@ -89,7 +89,7 @@ tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server)
 tests/e2e/            feature scripts sourced by run.sh (admin, community, content, fight,
                       inventory, migrate, news, playthrough, town, ...)
-tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, seed_v3 .. seed_v9.sql:
+tests/fixtures/       schema_v0.sql (pre-versioning) .. schema_v9.sql, schema_v11.sql, seed_v3 .. seed_v9.sql, seed_v11.sql:
                       frozen old schemas and data for the migration test
 data/                 runtime (gitignored): dk.db, outbox/
 ```
@@ -193,6 +193,7 @@ Global `dk` table installed in every VM:
 | `dk.server_stats()` | the server's metrics (`dk stats`) as `{name = number}`, and a second table `{name = description}` |
 | `dk.publish(channel, event, data)` | queue a server-sent event (data: a string, e.g. JSON from `lib/json.lua`) for the streams on `channel`; sent only after the request's transaction commits, dropped on rollback or error. Channel `[a-z0-9:_-]{1,64}`, event `[A-Za-z0-9_.:-]{1,64}`, data up to 64 KiB without NUL bytes, at most 256 per request; invalid arguments raise. In CLI commands (no server in the process): a warning, nothing sent |
 | `dk.subscribers(channel)` | the number of open event streams on the channel now (0 when none or in CLI processes); thread-safe. Presence uses `user:<id>` |
+| `dk.static_exists(relpath)` | whether `relpath` names a regular file inside `public_dir` (symlinks resolved, none leading out); `relpath` must be plain: relative, only `[A-Za-z0-9_./-]`, no `..` (anything else is `false`). Stats on every call. Content validation uses it for spell icons |
 | `dk.list_modules(prefix)` | sorted module names of the `*.lua` files directly under `app/<prefix as path>` (`"content.classes"` → `{"content.classes.mage", ...}`); read live, so new files count at once |
 | `require(name)` | loads `app/<name with . → />.lua` from codecache; `package.path`/`cpath` disabled |
 
@@ -338,7 +339,8 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 - Spells (schema version 5, scripted since version 7; `docs/APP.md` "Spells", "Scripting
 	spells and items"): content files `app/content/spells/<key>.lua` synced into
 	`spells(id, key UNIQUE, name, description, mp, usable_in ('town' | 'fight' | 'both'),
-	retired, power, target ('enemy' | 'self'), messages, data)`; what a spell does is its
+	retired, power, target ('enemy' | 'self'), messages, data, icon)` (`icon`, schema version
+	12: a PNG in `public/images/skills/`, '' = `default.png`); what a spell does is its
 	file's `cast` function (never stored), its numbers and message strings are data
 	(`messages`/`data`: "key=value" lines), replacing the old `type` and `attribute`
 	(version 5 had an `effects` list instead). The original 19 spells keep ids 1-19. Class files list spell

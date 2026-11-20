@@ -639,7 +639,7 @@ High hit points]],                       -- one line per point on the help page
 	`/admin/spells/#id`, `/admin/items/#id`, `/admin/{statuses,summons,monsters}/#id`,
 	shared code in `admin/content.lua` and `templates/admin/content_form.html`) write them
 	for the kind's `admin_fields` (classes: name, description, sort, playable, starting
-	stats; spells: name, description, MP, power, numbers and message strings; items: see
+	stats; spells: name, description, MP, power, icon, numbers and message strings; items: see
 	[Items](#items); monsters: see [Monsters](#monsters); a value equal to the file's
 	deletes the override) and offer "reset to file". Field names are those of the
 	flat form: `name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `power`,
@@ -679,6 +679,7 @@ return {
 	power = 10,                   -- the most HP it restores (what cast makes of it)
 	usable_in = "both",           -- "fight" (default), "town" or "both"
 	target = "self",              -- "enemy" (default) or "self"
+	icon = "heal",                -- public/images/skills/heal.png (default: default.png)
 	messages = {
 		cast = "You have cast the %s spell, and gained %d Hit Points.",
 		full = "Your Hit Points are already full. Please go back and try again.",
@@ -696,6 +697,30 @@ return {
 - `usable_in`: where it can be cast. `"town"` and `"both"` need `target = "self"`; they
 	are the Fast Spells in the right column (`POST /spell/#id`, `town/heal.lua`), and the
 	fight's spell list shows `"fight"` and `"both"` spells.
+- `icon` (optional): the spell's picture on its buttons, the name of a PNG in
+	`public/images/skills/` without `.png` (`[a-z0-9_]+`; served at
+	`/static/images/skills/<icon>.png`). Absent or `""`: `default.png`. The file must exist:
+	`dk check` (and the sync) fail naming the spell file otherwise (`dk.static_exists`, a
+	stat per check); an icon deleted after the sync shows `default.png` (`spells.icon_url`
+	checks the file on every call). Synced into `spells.icon` (schema version 12) and
+	overridable in the admin panel, which shows the current icon. Only Heal has one so far.
+	**Adding an icon**: put `<name>.png` in `public/images/skills/` (square; shown at 44px in
+	fights and 34px in Fast Spells, scaled by CSS), set `icon = "<name>"` in the spell file
+	and run `./dk check`. The two current PNGs are 256×256 (120–165 KB); smaller files
+	(88×88 for 2× screens) would load faster.
+- **Buttons.** The fight menu shows the spells castable in fights as a row of icon buttons
+	(`templates/fight/fight.html`): `<button type="submit" name="spell" value="<id>">` with
+	the icon, the MP cost as a badge (`.spell-mp`) and `title`/`aria-label` "Heal (5 MP)";
+	a spell the player's MP don't cover is `disabled` and greyed out (the server checks
+	again). `POST /fight` reads the spell from `spell=<id>`; the old form's
+	`spell=Spell&userspell=<id>` still works (`userspell` wins when both are sent), and a
+	missing, `0` or non-numeric id is "You must select a spell first". The Fast Spells box
+	(`layout/nav_right.html`) is a grid of smaller (34px) buttons for the town spells, each
+	its own POST form to `/spell/<id>` with the CSRF field, disabled only when MP are short
+	(a full-HP heal is refused by the server). Both lists come from `spells.buttons`; the
+	styles are `.spell-grid`, `.spell-btn` and `.spell-mp` in `dk.css` (hover, active,
+	`:focus-visible` outline, disabled = desaturated and faded; theme colours in
+	`themes/*.css`) and `.fight-spells` in `fight.css`. Items keep their select.
 - The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
 	`chaos`: damage `rand(power * 5/6, power)`, none if the monster is immune), sleeps
 	(`sleep`, `dream`, `nightmare`: the monster stays asleep while `rand(1, 15) <= power`;
@@ -721,10 +746,14 @@ return {
 | `spells.active()`, `spells.all()` | non-retired spells (help) / every spell (admin), by id |
 | `spells.known(user [, place])` | the spells `user` knows, by id; `place` `"town"` or `"fight"` keeps those castable there |
 | `spells.knows(user, id)`, `spells.usable(spell, place)` | booleans (`usable`: per `usable_in`, and not retired) |
+| `spells.icon_url(spell)` | `/static/images/skills/<icon>.png`, or `.../default.png` when it has none or the file is missing |
+| `spells.label(spell)` | `"Heal (5 MP)"` (button tooltips) |
+| `spells.buttons(list, mp)` | the fight menu's and Fast Spells' buttons: `{ id, name, mp, label, icon, short }` (`short`: `mp` doesn't cover it) |
 | `spells.learn(user_id, id, level)`, `spells.set_known(user_id, ids)` | teach one (known ones keep their level) / set the whole list |
 
 Adding a spell: copy a file in `app/content/spells/` to `<key>.lua` (`hurt.lua` for an
-attack, `heal.lua` for a heal, `rage.lua` for a buff), edit its data and code, list the key
+attack, `heal.lua` for a heal, `rage.lua` for a buff), edit its data and code (and give it
+an `icon`, see above, or leave the default), list the key
 in a class file's `levels[N].spells`, run `./dk check`. The next page load syncs both; the
 spell appears on `/help/spells` and characters of that class learn it on reaching level N
 (existing characters already past N don't get it retroactively; give it to them in the
@@ -1169,7 +1198,9 @@ stopped at 255), so long fights are protected too.
 **fight.js.** Forms marked `data-fight` (the fight commands, the drop's Take/Leave) and links
 in the middle column to the four fight pages (the victory page's drop link) go through
 fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the form's
-`csrf` field or `<body data-csrf>`). Meanwhile the forms' controls are disabled and
+`csrf` field or `<body data-csrf>`; `FormData` leaves submit buttons out, so the pressed
+one's `name=value` is appended, as a native submit sends it: `fight=Fight`, `run=Run`,
+`spell=<id>` for a spell's icon button). Meanwhile the forms' controls are disabled and
 `data-main` is `aria-busy`. Then it:
 
 1. clears the round lines (`[data-fight-log]`) and plays the events: each line is added
@@ -1187,6 +1218,9 @@ fetch (POST: the form's fields plus the button pressed, `X-CSRF-Token` from the 
 3. follows a `redirect` after a short pause: another fight page is fetched the same way,
 	anything else (`/`) is a normal navigation;
 4. shows an `error` as a note above the form (the form stays; nothing was played).
+
+When the keyboard was in the middle column, the button that sent the round gets the focus
+back in the new form (the same spell's button, unless it is now disabled; else Fight).
 
 Any network error, non-JSON answer (a 403 for CSRF, a redirect to `/login`) or failure
 before the answer posts the form (or follows the link) as without JavaScript; a stale
@@ -1560,8 +1594,9 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9) with the
-	 game data of that time (`seed_v3.sql` to `seed_v9.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9) and
+	 `schema_v11.sql` with the game data of that time (`seed_v3.sql` to `seed_v9.sql`,
+	 `seed_v11.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.

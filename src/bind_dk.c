@@ -14,6 +14,7 @@
 #include "hub.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include "static.h"
 #include "stats.h"
 #include "util.h"
 #include "vmpool.h"
@@ -237,6 +238,18 @@ static int l_list_modules(lua_State *L)
 		lua_rawseti(L, -2, i + 1);
 	}
 	codecache_free_list(list, n);
+	return 1;
+}
+
+/* dk.static_exists(relpath) -> whether public_dir/relpath is a regular file inside the
+ * public dir (upvalue 1: the config's public_dir). A path that is not plain (absolute,
+ * with "..", or other characters than [A-Za-z0-9_./-]) is false. Stats on every call. */
+static int l_static_exists(lua_State *L)
+{
+	size_t n;
+	const char *rel = luaL_checklstring(L, 1, &n);
+	const char *dir = lua_tostring(L, lua_upvalueindex(1));
+	lua_pushboolean(L, static_rel_ok(rel, n) && static_file_exists(dir, rel) == 1);
 	return 1;
 }
 
@@ -478,6 +491,9 @@ int bind_install(lua_State *L, const dk_config *cfg)
 	luaL_newlib(L, funcs);
 	luaL_newlib(L, crypto_funcs);
 	lua_setfield(L, -2, "crypto");
+	lua_pushstring(L, cfg && cfg->public_dir ? cfg->public_dir : "public");
+	lua_pushcclosure(L, l_static_exists, 1);
+	lua_setfield(L, -2, "static_exists");
 	lua_pushnumber(L, (lua_Number)now_mono());
 	lua_setfield(L, -2, "request_start");
 	lua_setglobal(L, "dk");

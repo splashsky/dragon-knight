@@ -231,7 +231,8 @@ CREATE TABLE news (
 -- Spells: content files app/content/spells/<key>.lua (like classes; never deleted, a spell
 -- whose file is gone is retired). Scripted (app/lib/action.lua): what a spell does is its
 -- file's code; usable_in ('town', 'fight', 'both'), target ('enemy', 'self'), power,
--- messages and data ("key=value" lines, app/lib/content/scripted.lua) are data.
+-- messages and data ("key=value" lines, app/lib/content/scripted.lua) are data; icon: the
+-- PNG of its buttons, public/images/skills/<icon>.png ('' = default.png).
 CREATE TABLE spells (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -243,7 +244,8 @@ CREATE TABLE spells (
 	power        INTEGER NOT NULL DEFAULT 0,
 	target       TEXT    NOT NULL DEFAULT 'enemy',
 	messages     TEXT    NOT NULL DEFAULT '',
-	data         TEXT    NOT NULL DEFAULT ''
+	data         TEXT    NOT NULL DEFAULT '',
+	icon         TEXT    NOT NULL DEFAULT ''
 );
 
 -- Statuses: content files app/content/statuses/<key>.lua (like spells; never deleted, a

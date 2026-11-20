@@ -2,7 +2,9 @@
 -- app/content/spells/*.lua; see lib/content/) and the spells characters know
 -- (user_spells). Rows come back with `messages` and `data` decoded into tables
 -- (lib/content/scripted.lua); what a spell does is its file's cast (lib/action.lua).
+local schema = require("lib.content.schema")
 local scripted = require("lib.content.scripted")
+local spell_kind = require("lib.content.kinds.spells")
 
 local spells = {}
 
@@ -18,6 +20,27 @@ end
 -- retired spell (its file is gone, and with it what it does) can't be cast any more.
 function spells.usable(spell, place)
 	return (spell.retired or 0) == 0 and (spell.usable_in == "both" or spell.usable_in == place)
+end
+
+-- The URL of the spell's icon (its `icon` column: public/images/skills/<icon>.png), or of
+-- images/skills/default.png when it has none or the file is missing.
+function spells.icon_url(spell)
+	return schema.icon_url(spell_kind.field("icon"), spell.icon)
+end
+
+-- The spell's button label: "Heal (5 MP)".
+function spells.label(spell)
+	return spell.name .. " (" .. spell.mp .. " MP)"
+end
+
+-- The icon buttons of a list of spells (the fight menu, Fast Spells): { id, name, mp,
+-- label ("Heal (5 MP)"), icon (URL), short (`mp`, the player's MP, doesn't cover it) }.
+function spells.buttons(list, mp)
+	local out = {}
+	for i, s in ipairs(list) do
+		out[i] = { id = s.id, name = s.name, mp = s.mp, label = spells.label(s), icon = spells.icon_url(s), short = mp < s.mp }
+	end
+	return out
 end
 
 -- The spell with id `id` (retired or not), or nil.

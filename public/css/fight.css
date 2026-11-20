@@ -3,6 +3,10 @@
 .fight-command p { margin: 0 0 1em; }
 .fight-command input[type="submit"] { min-width: 4.5em; }
 .fight-stale { font-style: italic; }
+/* the spells: a row of icon buttons (dk.css .spell-btn) under a small label */
+.fight-spells { margin: 0 0 1em; }
+.fight-spells-label { display: block; margin: 0 0 3px; font-size: 13px; font-weight: bold; }
+.fight-spells .spell-grid { gap: 7px; }
 
 /* fight.js (docs/APP.md "Fight API"): the bars it adds, the round played line by line,
 	statuses and allies coming and going. Without JavaScript none of this shows. */

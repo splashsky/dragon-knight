@@ -31,7 +31,10 @@
 -- for none; refs = "spells": each must be a file of that kind, checked by load.all),
 -- "message" (a one-line text a spell or item shows, formatted with string.format: only
 -- the placeholders %s, %d and %% are allowed; an override must keep the file's
--- placeholders, see schema.placeholders). required = true, or default = value.
+-- placeholders, see schema.placeholders), "icon" (the name of a PNG in public/<dir>/, `dir`
+-- like "images/skills": [a-z0-9_]+ and the file must exist (dk.static_exists); "" for
+-- none, which shows <dir>/default.png; see schema.icon_url). required = true, or default
+-- = value.
 -- admin = true: editable as an override in the admin panel. label: shown there.
 local leveling = require("lib.leveling")
 
@@ -68,6 +71,8 @@ local function describe(spec)
 	elseif t == "choice" then return "one of " .. table.concat(spec.values, ", ")
 	elseif t == "message" then return "a one-line message of at most " .. (spec.max or 500) ..
 		" characters (placeholders: %s, %d; %% for a percent sign)"
+	elseif t == "icon" then return 'the name of a PNG file in public/' .. spec.dir ..
+		'/ without ".png" (lowercase letters, digits and _), or "" for the default icon'
 	end
 	return t
 end
@@ -92,6 +97,12 @@ function schema.check(spec, v)
 	elseif t == "message" then
 		if type(v) ~= "string" or v:find("[\r\n]") or #v > (spec.max or 500) or not schema.placeholders(v) then
 			return nil, "must be " .. describe(spec)
+		end
+		return v
+	elseif t == "icon" then
+		if type(v) ~= "string" or (v ~= "" and not schema.valid_key(v)) then return nil, "must be " .. describe(spec) end
+		if v ~= "" and not dk.static_exists(schema.icon_path(spec, v)) then
+			return nil, "names a missing file: " .. (dk.config.public_dir or "public") .. "/" .. schema.icon_path(spec, v)
 		end
 		return v
 	elseif t == "stages" then
@@ -136,6 +147,21 @@ function schema.placeholders(s)
 		i = at + 2
 	end
 	return table.concat(out, ",")
+end
+
+-- The path below public/ (and /static/) of icon `name` of an "icon" field.
+function schema.icon_path(spec, name)
+	return spec.dir .. "/" .. name .. ".png"
+end
+
+-- The URL of icon `name` of an "icon" field: /static/<dir>/<name>.png, or
+-- /static/<dir>/default.png when the name is empty or invalid or its file is missing
+-- (deleted after the content was synced).
+function schema.icon_url(spec, name)
+	if type(name) == "string" and schema.valid_key(name) and dk.static_exists(schema.icon_path(spec, name)) then
+		return "/static/" .. schema.icon_path(spec, name)
+	end
+	return "/static/" .. schema.icon_path(spec, "default")
 end
 
 -- Parses an override/admin form value (text) for a field. Returns the flat value, or nil

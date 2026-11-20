@@ -109,7 +109,7 @@ t_section "fight: spells"
 t_fight_new fighter
 f_sql "UPDATE users SET currenthp = 100, currentmp = 10, base_maxmp = 50"
 t_get /fight; CS=$(t_csrf)
-expect_body '<option value="1">Heal</option>'
+expect_body 'name="spell" value="1" title="Heal (5 MP)"'
 t_post /fight "csrf=$CS&spell=Spell&userspell=0"; expect_body 'You must select a spell first.'
 t_post /fight "csrf=$CS&spell=Spell";            expect_body 'You must select a spell first.'
 t_post /fight "csrf=$CS&spell=Spell&userspell=6"; expect_body 'You have not yet learned this spell.'
@@ -151,6 +151,50 @@ t_sql "UPDATE fight_combatants SET hp = 1 WHERE side = 'enemy' AND user_id = (SE
 t_post /fight "csrf=$CS&spell=Spell&userspell=6"; expect_redirect /victory
 [ "$(f_col "$T_MONSTER_HP")" -le 0 ] && t_ok || t_fail "the monster is not defeated"; f_is currentmp 35
 t_get /victory; expect_body 'You have defeated the Red Slime.'
+
+t_section "fight: spell buttons"
+# one icon button per spell (spell=<id>), the MP cost as a badge, the spell's icon or
+# default.png, disabled when the MP don't cover it; the old select and "Spell" are gone
+t_spells fighter 1,6
+t_fight fighter 2 50
+f_sql "UPDATE users SET currenthp = 10, currentmp = 6, base_maxmp = 50"
+t_get /fight; CS=$(t_csrf)
+expect_body '<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>'
+expect_body '<button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
+expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
+expect_no_body 'name="userspell"'; expect_no_body 'value="Spell"'
+expect_body '<select name="useritem" aria-label="Item">'      # items keep their select
+t_get /static/images/skills/heal.png;    expect_status 200; expect_header '^content-type: image/png'
+t_get /static/images/skills/default.png; expect_status 200
+# MP short: greyed out (disabled), and the server refuses a direct POST anyway
+f_sql "UPDATE users SET currentmp = 4"
+t_get /fight
+expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
+expect_body 'name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" disabled><img'
+t_post /fight "csrf=$CS&spell=1"; expect_body 'You do not have enough Magic Points'; f_is currentmp 4
+f_sql "UPDATE users SET currentmp = 6"
+t_get /fight; expect_no_body ' disabled><img'
+# the refusals of the old select hold for the button's value too
+FIGHT=$(f_col "$T_ROUND")
+t_post /fight "csrf=$CS&spell=0";   expect_body 'You must select a spell first.'
+t_post /fight "csrf=$CS&spell=";    expect_body 'You must select a spell first.'
+t_post /fight "csrf=$CS&spell=abc"; expect_body 'You must select a spell first.'
+t_post /fight "csrf=$CS&spell=11";  expect_body 'You have not yet learned this spell.'
+t_post /fight "csrf=$CS&spell=999"; expect_body 'You have not yet learned this spell.'
+t_post /fight "csrf=$CS&spell=$(t_enc "1' OR '1'='1")"; expect_body 'You have not yet learned this spell.'
+t_post /fight "csrf=$CS&spell=6&userspell=0"; expect_body 'You must select a spell first.'   # the old form's select wins
+f_is currentmp 6; f_is "$T_ROUND" "$FIGHT"
+# casting with the button: the same as the old select
+t_post /fight "csrf=$CS&spell=1"
+expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
+f_is currentmp 1
+# after the round the page shows the new MP: both buttons greyed out
+expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
+# no spells: "None"
+t_spells fighter ""
+t_get /fight; expect_body 'id="fight-spells-label">Spells</span> <span class="light">None</span>'; expect_no_body 'class="spell-btn"'
+t_spells fighter 1,6,11
+t_fight_clear fighter
 
 t_section "fight: death"
 t_fight fighter 151 30000
