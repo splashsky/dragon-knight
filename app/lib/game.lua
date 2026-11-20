@@ -111,8 +111,9 @@ function game.online_users()
 	return presence.list()
 end
 
--- The Inventory panel's equipment rows (layout/nav_right.html), from inventory.names():
--- { label, icon (weapon/armor/shield) or badge (accessory slot number), name, empty }.
+-- The Inventory panel's equipment rows (layout/nav_right.html), from
+-- inventory.equipped(): { label, icon (weapon/armor/shield) or badge (accessory slot
+-- number), name, empty, item (the items row, for its tooltip; nil when empty) }.
 local GEAR_ROWS = {
 	{ slot = "weapon", label = "Weapon", icon = "weapon" },
 	{ slot = "armor", label = "Armor", icon = "armor" },
@@ -121,11 +122,12 @@ local GEAR_ROWS = {
 	{ slot = "accessory2", label = "Slot 2", badge = "2" },
 	{ slot = "accessory3", label = "Slot 3", badge = "3" },
 }
-function game.gear_rows(names)
+function game.gear_rows(equipped)
 	local rows = {}
 	for i, r in ipairs(GEAR_ROWS) do
-		local name = names[r.slot] or "None"
-		rows[i] = { label = r.label, icon = r.icon, badge = r.badge, name = name, empty = name == "None" }
+		local item = equipped[r.slot] and equipped[r.slot].item
+		local name = item and item.name or "None"
+		rows[i] = { label = r.label, icon = r.icon, badge = r.badge, name = name, empty = item == nil, item = item }
 	end
 	return rows
 end
@@ -160,7 +162,7 @@ function game.nav(user)
 		bars = bars,   -- { key = "hp"|"mp"|"tp", label, value, max, width, tone, low } (fight.js updates them)
 		spells = spells.buttons(spells.known(user, "town"), user.currentmp),   -- Fast Spells (spells.buttons)
 		equipment = inventory.names(user.id),
-		gear = game.gear_rows(inventory.names(user.id)),
+		gear = game.gear_rows(inventory.equipped(user.id)),
 		bag_used = inventory.used(inventory.bag(user.id)),
 		bag_size = inventory.size(),
 	}

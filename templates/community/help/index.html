@@ -52,6 +52,9 @@ for the game. If your administrator has used his/her own class setup, this infor
 <li>{{ p }}</li>
 {%- end %}
 </ul>
+{%- if c.lore ~= "" then %}
+<div class="help-lore help-lore-class">{{{ paragraphs(c.lore) }}}</div>
+{%- end %}
 {%- end %}
 [ <a href="#top">Top</a> ]
 

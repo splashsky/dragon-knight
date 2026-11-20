@@ -47,7 +47,7 @@ pt_walk_home() {
 pt_fight() {
 	local i
 	t_get /;      expect_redirect /fight
-	t_get /fight; expect_status 200; expect_body 'You are fighting a <b>'
+	t_get /fight; expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 	for i in $(seq 1 60); do
 		[ "$(pq currenthp)" -lt 8 ] && pu "currenthp = base_maxhp"   # keep the dice from killing us
 		t_post /fight "csrf=$TC&fight=Fight"

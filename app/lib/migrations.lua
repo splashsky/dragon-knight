@@ -1080,6 +1080,14 @@ local function v12_spell_icons()
 	dk.db:exec("ALTER TABLE spells ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
 end
 
+-- 13: lore (2.4): every content table gets `lore`, the optional story text of tooltips and
+-- the help pages ('' = none). The content sync that ends the migration fills it in.
+local function v13_lore()
+	for _, t in ipairs({ "classes", "items", "monsters", "spells", "statuses", "summons" }) do
+		dk.db:exec("ALTER TABLE " .. t .. " ADD COLUMN lore TEXT NOT NULL DEFAULT ''")
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1101,6 +1109,7 @@ migrations.STEPS = {
 		"the broadcast banner", up = v10_realtime },
 	{ name = "who's online is read from an index of the players online", up = v11_online_index },
 	{ name = "spells have icons (the fight and Fast Spells buttons)", up = v12_spell_icons },
+	{ name = "classes, spells, items, monsters, statuses and summons have lore", up = v13_lore },
 }
 
 migrations.VERSION = #migrations.STEPS

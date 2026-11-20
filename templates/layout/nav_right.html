@@ -1,5 +1,6 @@
 {#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). Fast Spells: an icon
-		button per town spell (spells.buttons), each its own POST form to /spell/<id>. -#}
+		button per town spell (spells.buttons), each its own POST form to /spell/<id>, which
+		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's. -#}
 <section class="box">
 <div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
 <div class="box-body charpanel" data-player-stats>
@@ -25,9 +26,9 @@
 <a class="invpanel-bag{% if bag_used >= bag_size then %} full{% end %}" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>{{ bag_used }}</b>/{{ bag_size }}</span></a>
 <ul class="invpanel-gear">
 {%- for _, g in ipairs(gear) do %}
-<li{% if g.badge == "1" then %} class="invpanel-first-slot"{% end %} title="{{ g.label }}: {{ g.name }}">
+<li{% if g.badge == "1" then %} class="invpanel-first-slot"{% end %} title="{{ g.label }}: {{ g.name }}" data-tip data-tip-side="left"{% if g.item then %} tabindex="0"{% end %}>
 {%- if g.icon then %}<img src="/static/images/icon_{{ g.icon }}.gif" width="15" height="15" alt="{{ g.label }}">{% else %}<span class="invpanel-badge" aria-label="{{ g.label }}">{{ g.badge }}</span>{% end -%}
-<span class="invpanel-name{% if g.empty then %} light{% end %}">{{ g.name }}</span></li>
+<span class="invpanel-name{% if g.empty then %} light{% end %}">{{ g.name }}</span>{{{ tip("item", g.item) }}}</li>
 {%- end %}
 </ul>
 </div>
@@ -41,7 +42,7 @@
 {%- else %}
 <div class="spell-grid spell-grid-small">
 {%- for _, s in ipairs(spells) do %}
-<form method="post" action="/spell/{{ s.id }}">{{{ csrf_field() }}}<button class="spell-btn" type="submit" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button></form>
+<form class="spell-tip{% if s.short then %} spell-tip-short{% end %}" method="post" action="/spell/{{ s.id }}" data-tip data-tip-side="left">{{{ csrf_field() }}}<button class="spell-btn" type="submit" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>{{{ tip("spell", s.spell) }}}</form>
 {%- end %}
 </div>
 {%- end %}

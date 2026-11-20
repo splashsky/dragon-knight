@@ -13,6 +13,7 @@ classes.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
 	{ name = "description", type = "text", default = "", admin = true, label = "Description",
 		help = "One line per point on the help page." },
+	schema.lore_field(),
 	{ name = "sort", type = "int", default = 0, admin = true, label = "Sort",
 		help = "Order on the registration and help pages (lowest first)." },
 	{ name = "playable", type = "bool", default = true, admin = true, label = "Playable",

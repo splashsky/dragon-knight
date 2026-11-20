@@ -4,6 +4,7 @@
 -- overridable; what it does on its turn is its act function (plus the optional
 -- on_summon, on_death, on_expire), which stays in the file. See app/fight/engine.lua.
 local scripted = require("lib.content.scripted")
+local schema = require("lib.content.schema")
 
 local summons = { name = "summons", table = "summons", dir = "content.summons", label = "summon" }
 
@@ -14,6 +15,7 @@ summons.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page." },
+	schema.lore_field(),
 	{ name = "hp", type = "int", required = true, min = 1, max = 1000000, admin = true, label = "Hit points" },
 	{ name = "attack", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Attack" },
 	{ name = "defense", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Defense",

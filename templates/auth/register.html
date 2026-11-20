@@ -22,7 +22,7 @@
 <tr><td>Character Class:</td><td><select name="charclass">
 {%- for _, c in ipairs(classes) do %}<option value="{{ c.id }}"{% if v.charclass == tostring(c.id) then %} selected{% end %}>{{ c.name }}</option>{% end -%}
 </select></td></tr>
-<tr><td colspan="2">See <a href="/help">Help</a> for more information about character classes.<br><br></td></tr>
+<tr><td colspan="2">The classes: {% for i, c in ipairs(classes) do %}{% if i > 1 then %}, {% end %}<span class="tip-term" data-tip data-tip-side="bottom" tabindex="0">{{ c.name }}{{{ tip("class", c) }}}</span>{% end %}. See <a href="/help">Help</a> for more information about character classes.<br><br></td></tr>
 <tr><td colspan="2"><input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset"></td></tr>
 </table>
 </form>

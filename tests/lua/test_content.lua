@@ -303,14 +303,14 @@ function T.validate_spells()
 	local none = spell()
 	none.cast = nil
 	has(select(2, schema.validate(spell_kind, none)), "missing field 'cast' (a function: what it does)")
-	-- overridable: name, description, MP, power, numbers and message strings
+	-- overridable: name, description, lore, MP, power, numbers and message strings
 	eq(spell_kind.field("power").admin, true); eq(spell_kind.field("data.min").type, "int")
 	eq(spell_kind.field("messages.hit").type, "message"); eq(spell_kind.field("messages.enemy.hit").type, "message")
 	eq(spell_kind.field("messages.enemy"), nil); eq(spell_kind.field("cast"), nil)
 	eq(spell_kind.field("usable_in").admin, nil); eq(spell_kind.field("target").admin, nil)
 	local names = {}
 	for _, f in ipairs(spell_kind.admin_fields(load.kind("spells").by_key.hurt)) do names[#names + 1] = f.name end
-	eq(table.concat(names, ","), "name,description,mp,power,icon,messages.hit,messages.immune,messages.enemy.hit,messages.enemy.immune")
+	eq(table.concat(names, ","), "name,description,lore,mp,power,icon,messages.hit,messages.immune,messages.enemy.hit,messages.enemy.immune")
 end
 
 -- Spell icons: an optional PNG name in public/images/skills/ that must exist (dk check
@@ -417,6 +417,56 @@ function T.fingerprint_covers_the_code()
 	assert(before:find("spells\thurt\t#source\t%x+"), "source hash line")
 	all.kinds.spells.entities[1].source = "changed"
 	assert(load.canonical(all) ~= before, "a code-only change changes the canonical text")
+end
+
+-- lore (schema version 13): every kind, optional text up to schema.LORE_MAX, admin-overridable
+function T.lore_field()
+	for _, name in ipairs(schema.KINDS) do
+		local spec = schema.kind(name).field("lore")
+		eq(spec and spec.type, "text", name .. " lore"); eq(spec.admin, true, name .. " lore admin")
+		eq(spec.max, schema.LORE_MAX, name .. " lore max")
+	end
+	local all = load.all()
+	eq(all.kinds.classes.by_key.mage.lore:sub(1, 34), "In the towers of Midworld the old ")
+	eq(all.kinds.spells.by_key.heal.lore:sub(1, 26), "The first word every young")
+	eq(all.kinds.items.by_key.herb.lore:sub(1, 23), "A bitter green leaf tha")
+	eq(all.kinds.monsters.by_key.blue_slime.lore:sub(1, 20), "The humblest monster")
+	eq(all.kinds.spells.by_key.hurt.lore, "", "no lore: empty")
+	eq(all.kinds.summons.by_key.wolf.lore, "")
+	local flat = assert(schema.validate(kind, class_data({ lore = "Line one\n\nLine <two>." })))
+	eq(flat.lore, "Line one\n\nLine <two>.")
+	eq(assert(schema.validate(kind, class_data())).lore, "")
+	has(select(2, schema.validate(kind, class_data({ lore = 7 }))), "field 'lore' must be a string of at most 2000 characters")
+	has(select(2, schema.validate(kind, class_data({ lore = string.rep("x", 2001) }))), "field 'lore' must be a string")
+	assert(schema.validate(kind, class_data({ lore = string.rep("x", 2000) })), "2000 characters are fine")
+	has(select(2, schema.validate(spell_kind, { name = "Zap", mp = 1, lore = {}, cast = function() end })), "field 'lore'")
+	eq(schema.parse(kind.field("lore"), "Overridden\nlore"), "Overridden\nlore")
+	eq(select(2, schema.parse(kind.field("lore"), string.rep("y", 2001))), "must be a string of at most 2000 characters")
+end
+
+-- tooltips' content (lib/tips.lua) and the paragraphs helper (lib/view.lua)
+function T.tips_and_paragraphs()
+	local tips = require("lib.tips")
+	local view = require("lib.view")
+	local t = tips.spell({ name = "Heal", mp = 5, usable_in = "both", description = "Restores HP.", lore = "Old." })
+	eq(t.title, "Heal"); eq(table.concat(t.meta, "|"), "5 MP|In fights and in town"); eq(t.body, "Restores HP."); eq(t.lore, "Old.")
+	eq(tips.spell({ name = "Hurt", mp = 5, usable_in = "fight", description = "", lore = "" }).meta[2], "In fights")
+	eq(tips.spell({ name = "Hurt", mp = 5, usable_in = "town", description = "", lore = "" }).meta[2], "Outside fights")
+	t = tips.item({ name = "Stick", category = "weapon", attack = 2, defense = 0, modifiers = {
+		{ kind = "stat", stat = "strength", amount = 3 } }, description = "", lore = "" })
+	eq(table.concat(t.meta, "|"), "Weapon"); eq(table.concat(t.lines, "|"), "Attack Power +2|Strength +3")
+	t = tips.item({ name = "Herb", category = "consumable", usable_in = "both", power = 30, attack = 0, defense = 0,
+		modifiers = {}, description = "Restores 30 HP.", lore = "" })
+	eq(table.concat(t.meta, "|"), "Consumable|In fights and in town"); eq(table.concat(t.lines, "|"), "Power 30")
+	t = tips.monster({ name = "Blue Slime", level = 1, description = "", lore = "Jelly." })
+	eq(table.concat(t.meta, "|"), "Level 1"); eq(t.lore, "Jelly.")
+	t = tips.class({ name = "Mage", start_hp = 15, start_mp = 0, description = "Fast level-ups\n  High MP  \n\n", lore = "" })
+	eq(table.concat(t.lines, "|"), "Fast level-ups|High MP"); eq(t.meta[1], "Starts with 15 HP, 0 MP")
+	local p = view.helpers.paragraphs
+	eq(p(""), ""); eq(p(nil), ""); eq(p("  \n\n "), "")
+	eq(p("One <b>&</b>"), "<p>One &lt;b&gt;&amp;&lt;/b&gt;</p>")
+	eq(p("wrapped\nline\r\n\r\n\n  second\n\n"), "<p>wrapped line</p><p>second</p>")
+	eq(p("a\n \t\nb"), "<p>a</p><p>b</p>")
 end
 
 return T

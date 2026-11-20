@@ -120,7 +120,7 @@ local function view_of(f)
 	for _, c in ipairs(state.side(f, "enemy", true)) do
 		local mp = shows_mp(c)
 		enemies[#enemies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, mp = mp and c.mp or nil,
-			maxmp = mp and c.maxmp or nil, statuses = status_list(c) }
+			maxmp = mp and c.maxmp or nil, statuses = status_list(c), row = c.row }
 	end
 	for _, c in ipairs(state.allies(f)) do
 		allies[#allies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
@@ -265,6 +265,7 @@ local function fight(req)
 	end
 	page.monstername, page.monsterhp, page.monstermp = first.name, first.hp, first.mp
 	page.monsterid, page.monstermaxhp, page.monstermaxmp = first.id, first.maxhp, first.maxmp
+	page.monster = first.row   -- its tooltip
 	if not page.dead then
 		page.locked = round.locked(f)
 		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)

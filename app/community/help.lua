@@ -26,7 +26,7 @@ end
 
 local NUMBER_WORDS = { "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten" }
 
--- Playable classes with their description lines (one bullet each).
+-- Playable classes with their description lines (one bullet each) and lore.
 function help.index(req)
 	local list = {}
 	for _, c in ipairs(classes.playable()) do
@@ -35,7 +35,7 @@ function help.index(req)
 			local point = php.trim(line)
 			if point ~= "" then points[#points + 1] = point end
 		end
-		list[#list + 1] = { name = c.name, points = points }
+		list[#list + 1] = { name = c.name, points = points, lore = c.lore }
 	end
 	return page(req, nil, "community/help/index", {
 		classes = list, class_count = NUMBER_WORDS[#list] or tostring(#list),

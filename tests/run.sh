@@ -418,6 +418,23 @@ else
 	t_fail "lua unit tests"; cat "$T/unit.log" >&2
 fi
 
+# JavaScript unit tests (tests/js/test_*.js, pure functions of public/js/*.js): with node,
+# or Windows' node.exe under WSL (fed on stdin: it can't open WSL paths); skipped without.
+t_section "js unit tests"
+NODE=${NODE:-$(command -v node || command -v node.exe || true)}
+if [ -n "$NODE" ]; then
+	for js in "$ROOT"/tests/js/test_*.js; do
+		src="$ROOT/public/js/$(basename "$js" | sed 's/^test_//')"
+		if out=$(cat "$src" "$js" | "$NODE" - 2>&1); then
+			t_ok; echo "$(basename "$js"): $out"
+		else
+			t_fail "js unit tests: $(basename "$js")"; echo "$out" >&2
+		fi
+	done
+else
+	echo "(skipped: no node)"
+fi
+
 t_section "public pages, static, errors"
 t_get /login;            expect_status 200; expect_body 'name="username"'; expect_header '^set-cookie: dk_csrf='
 t_get /;                 expect_redirect /login

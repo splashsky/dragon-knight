@@ -59,6 +59,11 @@ table.help-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
 	text-align: center;
 	padding: 3px;
 }
+/* lore (content files' `lore`) under an entry */
+.help-lore { max-width: 46em; margin: 3px 0 0; font-size: 13px; font-style: italic; }
+.help-lore p { margin: 0 0 0.3em; }
+.help-lore p:last-child { margin-bottom: 0; }
+.help-lore-class { margin: -0.4em 0 1.2em; }
 @media (max-width: 700px) {
 	.help-w50, .help-w60, .help-w75 { width: 100%; }
 }

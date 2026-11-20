@@ -119,7 +119,7 @@ expect_body 'Max Hit Points must be an integer from 1 to 1000000.'; expect_body 
 expect_body 'Attack weight must be an integer from 0 to 1000000.'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid monster form not saved"
 t_get /admin/monsters/1
-t_form_submit /admin/monsters/1 name=Slimer maxhp=2 maxdam=9 immune=2 maxmp=12 uses_mp=0 attack_weight=3 roams=0
+t_form_submit /admin/monsters/1 "lore=$(t_sql "SELECT lore FROM monsters WHERE id = 1")" name=Slimer maxhp=2 maxdam=9 immune=2 maxmp=12 uses_mp=0 attack_weight=3 roams=0
 expect_redirect '/admin/monsters/1\?saved=1'
 admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune || '|' || maxmp || '|' || uses_mp || '|' || attack_weight || '|' || roams FROM monsters WHERE id = 1" \
 	"Slimer|2|9|2|12|0|3|0" "monster overrides applied"
@@ -251,7 +251,8 @@ t_get /help/items;         expect_body '>&lt;script&gt;alert(1)&lt;/script&gt;</
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
 admin_eq "SELECT price || '|' || modifiers FROM items WHERE id = 46" "123|stat stat=maxmp amount=-20; stat stat=strength amount=50" "item overrides survive a sync"
 t_get /admin/items/66
-t_form_submit /admin/items/66 "description=$(t_sql "SELECT description FROM items WHERE id = 66")" power=45 sellable=0
+t_form_submit /admin/items/66 "description=$(t_sql "SELECT description FROM items WHERE id = 66")" \
+	"lore=$(t_sql "SELECT lore FROM items WHERE id = 66")" power=45 sellable=0
 admin_eq "SELECT power || '|' || sellable || '|' || (SELECT count(*) FROM content_overrides WHERE key = 'herb') FROM items WHERE id = 66" \
 	"45|0|2" "power override"
 t_get /admin/items/66
@@ -290,7 +291,7 @@ adm_class_post() {  # adm_class_post ID 'field=value&...' (other fields: the cur
 	local id=$1 over=$2 data f v
 	t_get "/admin/classes/$id"
 	data="csrf=$(t_csrf)"
-	for f in name description sort playable start_hp start_mp start_tp start_strength start_dexterity; do
+	for f in name description lore sort playable start_hp start_mp start_tp start_strength start_dexterity; do
 		case "&$over" in *"&$f="*) continue ;; esac
 		v=$(t_sql "SELECT $f FROM classes WHERE id = $id")
 		data+="&$f=$(t_enc "$v")"

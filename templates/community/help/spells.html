@@ -1,4 +1,5 @@
-{#- Spells spoilers (legacy help_spells.php). -#}
+{#- Spells spoilers (legacy help_spells.php); statuses and allies are new, and so is the lore
+		under an entry that has some. -#}
 {{{ include("community/help/header") }}}
 
 <table class="help-table help-w50">
@@ -8,7 +9,7 @@
 </thead>
 <tbody>
 {%- for _, s in ipairs(spells) do %}
-<tr><td style="width: 50%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 25%">{{ s.mp }}</td><td style="width: 25%">{{ s.power }}</td></tr>
+<tr><td style="width: 50%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}{% if (s.lore or "") ~= "" then %}<div class="help-lore">{{{ paragraphs(s.lore) }}}</div>{% end %}</td><td style="width: 25%">{{ s.mp }}</td><td style="width: 25%">{{ s.power }}</td></tr>
 {%- end %}
 </tbody>
 </table>
@@ -28,7 +29,7 @@
 </thead>
 <tbody>
 {%- for _, s in ipairs(statuses) do %}
-<tr><td style="width: 75%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 25%">{% if s.turns > 0 then %}{{ s.turns }} {{ s.turns == 1 and "turn" or "turns" }}{% else %}until it ends{% end %}{% if s.scope ~= "fight" then %}<br><span class="small">also outside fights</span>{% end %}</td></tr>
+<tr><td style="width: 75%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}{% if (s.lore or "") ~= "" then %}<div class="help-lore">{{{ paragraphs(s.lore) }}}</div>{% end %}</td><td style="width: 25%">{% if s.turns > 0 then %}{{ s.turns }} {{ s.turns == 1 and "turn" or "turns" }}{% else %}until it ends{% end %}{% if s.scope ~= "fight" then %}<br><span class="small">also outside fights</span>{% end %}</td></tr>
 {%- end %}
 </tbody>
 </table>
@@ -43,7 +44,7 @@
 </thead>
 <tbody>
 {%- for _, s in ipairs(summons) do %}
-<tr><td style="width: 55%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}</td><td style="width: 15%">{{ s.hp }}</td><td style="width: 15%">{{ s.attack }}</td><td style="width: 15%">{{ s.defense }}</td></tr>
+<tr><td style="width: 55%">{{ s.name }}{% if s.description ~= "" then %}<br><span class="small">{{ s.description }}</span>{% end %}{% if (s.lore or "") ~= "" then %}<div class="help-lore">{{{ paragraphs(s.lore) }}}</div>{% end %}</td><td style="width: 15%">{{ s.hp }}</td><td style="width: 15%">{{ s.attack }}</td><td style="width: 15%">{{ s.defense }}</td></tr>
 {%- end %}
 </tbody>
 </table>

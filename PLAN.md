@@ -395,6 +395,10 @@ game closed → closed page; `verifyemail` on and not verified → `/verify`; ba
 	`users.online` (1: announced as online, `lib/presence.lua`), `control.banner`,
 	`banner_id`, `banner_expires` (the broadcast banner); `meta.presence_sweep` holds the
 	last presence sweep.
+- Lore (schema version 13, `docs/APP.md` "Lore"): every content table (`classes`, `spells`,
+	`items`, `monsters`, `statuses`, `summons`) ends with `lore TEXT NOT NULL DEFAULT ''`, the
+	optional story text of the content files' `lore` field (or its admin override), shown in
+	tooltips and on the help pages.
 - Schema versions: `PRAGMA user_version` = `migrations.VERSION` (`app/lib/migrations.lua`);
 	0 is the original port. `dk install` creates the latest schema, `dk migrate` upgrades
 	older databases, and the app answers 503 while the versions differ.

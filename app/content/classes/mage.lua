@@ -17,6 +17,11 @@ Low dexterity
 3 sleep spells
 3 +defense spells
 0 +attack spells]],
+	-- story text for tooltips and the help page (optional; a blank line starts a paragraph)
+	lore = [[
+In the towers of Midworld the old masters still teach the words that bend the world: a
+whisper that closes wounds, a cry that calls down fire. Mages are frail in a brawl, and
+every adventurer they have saved will tell you so. Few of them mind.]],
 	sort = 1,
 	playable = true,
 

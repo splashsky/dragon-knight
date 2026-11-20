@@ -10,6 +10,7 @@
 -- optional can_use) stays in the file (lib/content/scripted.lua). Quest items can't be
 -- sold or discarded and don't count against the bag size.
 local scripted = require("lib.content.scripted")
+local schema = require("lib.content.schema")
 local stats = require("lib.stats")
 
 local items = { name = "items", table = "items", dir = "content.items", label = "item" }
@@ -22,6 +23,7 @@ items.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page and in the bag." },
+	schema.lore_field(),
 	{ name = "category", type = "choice", values = items.CATEGORIES, required = true, label = "Category" },
 	{ name = "slot", type = "choice", values = { "weapon", "armor", "shield", "accessory" }, label = "Slot" },
 	{ name = "price", type = "int", default = 0, min = 0, max = 10000000, admin = true, label = "Price",

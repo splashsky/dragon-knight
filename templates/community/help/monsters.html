@@ -1,6 +1,6 @@
 {#- Monsters spoilers (legacy help_monsters.php; MP and the loadouts are new in 2.2). ctx:
 		monsters { monster (effective row), immune, loadout { label, text }, special (doesn't
-		roam), free (its spells cost no MP) }. -#}
+		roam), free (its spells cost no MP) }; a monster's lore in a row under it. -#}
 {{{ include("community/help/header") }}}
 
 <table class="help-table help-w75">
@@ -12,6 +12,9 @@
 {%- for _, r in ipairs(monsters) do %}
 {%- local m = r.monster %}
 <tr><td style="width: 26%">{{ m.name }}{% if r.special then %} <span class="light">(not met at random)</span>{% end %}</td><td style="width: 9%">{{ m.maxhp }}</td><td style="width: 9%">{{ m.maxdam }}</td><td style="width: 9%">{{ m.armor }}</td><td style="width: 9%">{{ m.level }}</td><td style="width: 9%">{{ m.maxexp }}</td><td style="width: 9%">{{ m.maxgold }}</td><td style="width: 8%">{{ m.maxmp }}</td><td style="width: 12%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- if (m.lore or "") ~= "" then %}
+<tr class="help-lore-row"><td colspan="9"><div class="help-lore">{{{ paragraphs(m.lore) }}}</div></td></tr>
+{%- end %}
 {%- if #r.loadout > 0 then %}
 <tr class="help-loadout"><td colspan="9" class="small">{% for i, x in ipairs(r.loadout) do %}{% if i > 1 then %}; {% end %}{{ x.label }}: {{ x.text }}{% end %}{% if r.free then %} <span class="light">(its spells cost no MP)</span>{% end %}</td></tr>
 {%- end %}

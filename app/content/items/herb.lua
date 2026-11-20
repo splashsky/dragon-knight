@@ -5,6 +5,11 @@
 return {
 	name = "Herb",
 	description = "Restores 30 hit points, in a fight or out of it.",
+	-- story text for tooltips and the help page (optional; a blank line starts a paragraph)
+	lore = [[
+A bitter green leaf that grows wild along the roads around Midworld. Travelers chew it on
+the march, and every shopkeeper sells it by the bundle for a few pieces of gold. It tastes
+terrible and works every time.]],
 	category = "consumable",
 	price = 15,
 	max_stack = 10,

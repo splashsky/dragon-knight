@@ -17,6 +17,12 @@ Low dexterity
 2 sleep spells
 3 +defense spells
 3 +attack spells]],
+	-- story text for tooltips and the help page (optional; a blank line starts a paragraph)
+	lore = [[
+Warriors learn their trade on the long road between Midworld and Roma, where the slimes
+are many and the inns are few. They trust steel over spells, and a good night's rest over
+both. When the monsters of the far lands come down from the hills, it is a Warrior who
+stands at the gate.]],
 	sort = 2,
 	playable = true,
 

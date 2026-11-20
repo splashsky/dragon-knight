@@ -6,6 +6,11 @@
 return {
 	name = "Heal",
 	description = "Restores hit points, in a fight or out of it.",
+	-- story text for tooltips and the help page (optional; a blank line starts a paragraph)
+	lore = [[
+The first word every young Mage learns, and the last one a wise one forgets. Spoken
+softly over a wound, it draws warmth back into tired flesh. Old soldiers say a Heal cast
+in time is worth a hundred herbs.]],
 	mp = 5,
 	power = 10,                 -- the most HP it restores
 	usable_in = "both",

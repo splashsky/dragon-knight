@@ -44,7 +44,7 @@ SHAMAN=$(mon goblin_shaman)
 t_fight monsterer "$SHAMAN" 10
 mo_enemy_set "mp = 0, maxmp = 17"   # no MP for its spells: the potion is all it may use
 t_get /fight; CS=$(t_csrf)
-expect_body 'You are fighting a <b>Goblin Shaman</b>'; expect_body "Monster's MP: 0"
+expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Goblin Shaman<template class="tip">'; expect_body "Monster's MP: 0"
 t_post /fight "csrf=$CS&fight=Fight"
 expect_body 'class="fight-monsterturn">The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '
 mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "immune=i:0

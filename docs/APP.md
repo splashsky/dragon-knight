@@ -12,6 +12,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 |---|---|---|---|
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*` | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/lua/test_{php,router}.lua` |
 | Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js` | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
+| Tooltips, lore | `app/lib/tips.lua`, `app/lib/view.lua` (`tip`, `paragraphs`), the kinds' `lore` field (`app/lib/content/schema.lua`) | `templates/tip/tip.html`, `public/js/tooltip.js`, `public/css/dk.css` (`.dk-tip`, `.tip-*`) | `tests/e2e/tips.sh`, `tests/js/test_tooltip.js`, `tests/lua/test_content.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
@@ -27,7 +28,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
 | Realtime (event streams) | `app/routes/live.lua`, `app/lib/json.lua` | | `tests/e2e/live.sh`, `tests/lua/test_json.lua`, `tests/c/test_hub.c` |
 | Admin panel | `app/routes/admin.lua`, `app/admin/*` | `templates/admin/*`, `templates/layout/admin.html`, `public/css/admin.css` | `tests/e2e/admin.sh` |
-| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v3,...,seed_v8}.sql`), `tests/lua/test_db.lua` |
+| Install / CLI / migrations | `app/install.lua`, `app/cli/{user,migrate}.lua`, `app/lib/migrations.lua`, `app/sql/*` | `templates/errors/503.html` | `tests/run.sh`, `tests/e2e/migrate.sh` (`tests/fixtures/{schema_v*,seed_v*}.sql`), `tests/lua/test_db.lua` |
 | Whole game | | | `tests/e2e/playthrough.sh` |
 
 Route modules (`app/routes/*.lua`) stay thin: they register routes and guards and call
@@ -193,7 +194,8 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
 live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
-`layout/side_live.html`) and `scripts` (opts). The main layout marks the parts a script may
+`layout/side_live.html`) and `scripts` (opts). `layout/head.html` also loads
+`tooltip.js` on every page (see [Tooltips](#tooltips)). The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
 `<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
 column: the chat below it keeps its scroll position and typed text). Include `{{{ include("layout/head") }}}` in `<head>` to get the
@@ -448,6 +450,8 @@ starting with `__` are reserved.
 | `date(ts)` | PHP `date("F j, Y")` (legacy `prettydate`) |
 | `datetime(ts)` | `Y-m-d H:i:s` (what legacy printed for raw MySQL datetimes) |
 | `nl2br(s)` | escapes, then adds `<br />` → HTML |
+| `paragraphs(s)` | escapes; a blank line starts a new `<p>`, the lines of a paragraph are joined with spaces (lore) → HTML |
+| `tip(kind, row)` | the tooltip content of a `"spell"`, `"item"`, `"monster"` or `"class"` row (`lib/tips.lua`, `templates/tip/tip.html`; see [Tooltips](#tooltips)) → HTML |
 | `req` | the request (`req.user`, `req.path`, …) |
 | `php` | the `lib.php` module |
 | `ipairs pairs next select type tostring tonumber string table math utf8 os.date os.time dk` | Lua builtins |
@@ -507,6 +511,97 @@ footer (`.copyright`) and the selector; the side columns are 210px wide (legacy 
 11px Verdana), the admin menu 180px. A weight not in the folder is synthesized by the
 browser; to use SemiBold or Black, add the file and its `@font-face`.
 
+## Tooltips
+
+`public/js/tooltip.js` (loaded deferred by `layout/head.html` on every layout) shows a
+tooltip for any element with `data-tip`. One shared box (`<div id="dk-tooltip"
+role="tooltip" class="dk-tip">`, made on first use) serves every trigger; the only DOM work
+per show is cloning the content. Events are delegated to `document` (`pointerover`/`out`,
+`focusin`/`out`, `keydown`, `pointerdown`), so content swapped in later (fight.js fragments,
+live.js chat, a resync) needs no set-up, and nothing runs while nothing is hovered.
+
+**Markup.**
+
+```html
+<!-- rich content: an inert template child, rendered (and escaped) by the server -->
+<span class="tip-term" data-tip data-tip-side="bottom" tabindex="0">Mage
+	<template class="tip"><div class="tip-title">Mage</div><div class="tip-meta">...</div></template></span>
+<!-- plain text -->
+<li data-tip="Weapon: empty slot">...</li>
+```
+
+- `data-tip` marks the trigger. Its content is, in order: its `<template class="tip">` child;
+	the text of `data-tip`; its `title` (or a descendant's). Templates are inert: their content
+	is not rendered, read by screen readers or submitted.
+- `data-tip-side`: `top` (default), `bottom`, `left` or `right`, the preferred side.
+- Content classes (`dk.css`, coloured by the themes): `.tip-title` (bold name), `.tip-meta`
+	(short facts, muted: "5 MP · In fights"), `.tip-lines` (a list of stat lines),
+	`.tip-body` (the description, paragraphs) and `.tip-lore` (italic, muted, set apart by a
+	dotted rule). `.tip-term` underlines a word that has a tooltip (dotted, `cursor: help`).
+- **Game things**: `{{{ tip("spell", row) }}}` (also `"item"`, `"monster"`, `"class"`)
+	renders the template from a row: `lib/tips.lua` picks what to say (title, meta, lines,
+	description, lore), `templates/tip/tip.html` renders it, escaping everything; empty
+	parts (no lore, no description) are left out. For anything else,
+	`{{{ include("tip/tip", { title = ..., meta = { ... }, lines = { ... }, body = text, lore = text }) }}}`.
+- **Disabled controls** get no pointer events in some browsers: put `data-tip` on a wrapper
+	(the spell buttons' `<span class="spell-tip">`; `.spell-btn:disabled` has
+	`pointer-events: none` so the wrapper gets the hover).
+- **No JavaScript**: keep a short `title` (and `aria-label` for icon buttons) in the markup;
+	it is the browser's own tooltip then. With the script, `title` moves to `data-tip-title`
+	(at start and before each show) so the two don't double up; `aria-label` stays for screen
+	readers.
+
+**Showing.** Hover shows after 120 ms, at once when moving from one trigger to the next
+(within 300 ms of the last one closing); keyboard focus (`:focus-visible`, so not a mouse
+click or a tap) shows it at once; on touch screens a long press (400 ms, without moving)
+shows it and swallows the click that follows, while a normal tap still clicks. It hides on
+leaving, on blur, on Escape, on a click or tap (one opened by focus stays until blur), when the trigger scrolls out of view
+(the viewport or a scrolling ancestor) and when it leaves the DOM (a fight fragment
+swapped in). While shown, the focused element (or the trigger) has
+`aria-describedby="dk-tooltip"`. A short fade, none with `prefers-reduced-motion`.
+`window.dkTip.show(el)` / `.hide()` open and close one from other scripts (and test pages).
+
+**Placement** (`place(trigger, tip, vw, vh, side)` in tooltip.js, pure: rects in, `{ side,
+x, y, arrow }` out; `tests/js/test_tooltip.js`): the box (at most 280px wide, never wider
+than the viewport less 16px) goes on the preferred side if it fits there (8px gap for the
+arrow, 8px from the viewport's edges), else the first that fits of the opposite side and
+then the other axis (top → bottom → right → left; left → right → top → bottom), else on the
+side that lacks the least room; then it is clamped 8px inside the viewport on both axes,
+and the arrow points at the trigger's centre, clamped 10px from the box's corners. It is
+`position: fixed` and measured with `getBoundingClientRect`, so it works in scrolled
+containers and at any zoom; scrolling, resizing and DOM changes reposition it (once per
+animation frame) while it is open.
+
+**Adding a tooltip** to anything: add `data-tip` (and `tabindex="0"` if it isn't focusable,
+so keyboards reach it) with a `<template class="tip">` child (`tip(...)` or
+`include("tip/tip", ...)`) or a `data-tip="text"`, and keep a `title` for no-JS. That's all.
+
+**Where.** The fight menu's spell buttons and Fast Spells (name, MP, where usable,
+description, lore), the gear rows of the Inventory panel (item name, kind, stats or power,
+description, lore; an empty slot's label), the monster's name on the fight page (name,
+level, description, lore) and the class names on the registration page (starting HP/MP, the
+description's points, lore).
+
+## Lore
+
+`lore` is an optional content field of every kind (classes, spells, items, monsters,
+statuses, summons): story text, up to 2,000 characters (`schema.LORE_MAX`), several lines,
+a blank line between paragraphs (the lines of a paragraph are joined, so files may wrap
+it). Synced into the kinds' `lore` columns (schema version 13), overridable in the admin
+panel (a textarea on every content admin page), escaped wherever it shows
+(`paragraphs(text)`): in the tooltips (`.tip-lore`) and on the help pages under each entry
+(`.help-lore`: classes on `/help`, spells, statuses and allies on `/help/spells`, items on
+`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. The Mage, Warrior,
+Paladin, Heal, the Herb and the Blue Slime have some to begin with:
+
+```lua
+-- app/content/spells/heal.lua (excerpt)
+	lore = [[
+The first word every young Mage learns, and the last one a wise one forgets. Spoken
+softly over a wound, it draws warmth back into tired flesh. Old soldiers say a Heal cast
+in time is worth a hundred herbs.]],
+```
+
 ## Game helpers (`lib/game.lua`)
 
 | Function | Returns |
@@ -521,7 +616,7 @@ browser; to use SemiBold or Black, add the file and its `@font-face`.
 | `game.latitude_str(n)`, `game.longitude_str(n)` | `5N`/`5S`, `3E`/`3W` |
 | `game.statbar(cur, max)` | `{pct, width, level}`: width 0..100 (%), level `high`/`mid`/`low` (66/33); the Character panel's bars (`game.nav(user).bars`) and the fight bars share the CSS gradients `--bar-high/mid/low/mp/tp` in dk.css |
 | `game.is_low(cur, max)` | `cur <= max / 5` |
-| `game.gear_rows(names)` | the Inventory panel's rows from `inventory.names()`: `{label, icon|badge, name, empty}` (weapon, armor, shield, accessory slots 1–3) |
+| `game.gear_rows(equipped)` | the Inventory panel's rows from `inventory.equipped()`: `{label, icon|badge, name, empty, item}` (weapon, armor, shield, accessory slots 1–3; `item`: the row, for its tooltip) |
 | `game.forum_link()` | `/forum`, the external address, or nil |
 | `game.online_users()` | the players online (`id, charname`; `lib/presence.lua`) |
 | `game.nav(user)` | the table the side columns render |
@@ -602,6 +697,8 @@ High hit points]],                       -- one line per point on the help page
 }                                          -- (default 0), spells (default none)
 ```
 
+- **Lore**: every kind has the optional field `lore` (schema version 13; see
+	[Lore](#lore)).
 - **Files** `app/content/<kind>/<key>.lua` return a table. The key (file name) is
 	`[a-z0-9_]+` and never changes once players may reference it: renaming means a new
 	entity plus retiring the old one. A file runs in a restricted environment
@@ -638,7 +735,7 @@ High hit points]],                       -- one line per point on the help page
 	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
 	`/admin/spells/#id`, `/admin/items/#id`, `/admin/{statuses,summons,monsters}/#id`,
 	shared code in `admin/content.lua` and `templates/admin/content_form.html`) write them
-	for the kind's `admin_fields` (classes: name, description, sort, playable, starting
+	for the kind's `admin_fields` (every kind: lore; classes: name, description, sort, playable, starting
 	stats; spells: name, description, MP, power, icon, numbers and message strings; items: see
 	[Items](#items); monsters: see [Monsters](#monsters); a value equal to the file's
 	deletes the override) and offer "reset to file". Field names are those of the
@@ -717,7 +814,10 @@ return {
 	missing, `0` or non-numeric id is "You must select a spell first". The Fast Spells box
 	(`layout/nav_right.html`) is a grid of smaller (34px) buttons for the town spells, each
 	its own POST form to `/spell/<id>` with the CSRF field, disabled only when MP are short
-	(a full-HP heal is refused by the server). Both lists come from `spells.buttons`; the
+	(a full-HP heal is refused by the server). Each button has a tooltip (2.4, see
+	[Tooltips](#tooltips)): its name, MP cost, where it can be cast, description and lore; the
+	trigger is the fight button's wrapper `<span class="spell-tip" data-tip>` and the Fast
+	Spells form (`data-tip-side="left"`), since a disabled button gets no pointer events. Both lists come from `spells.buttons`; the
 	styles are `.spell-grid`, `.spell-btn` and `.spell-mp` in `dk.css` (hover, active,
 	`:focus-visible` outline, disabled = desaturated and faded; theme colours in
 	`themes/*.css`) and `.fight-spells` in `fight.css`. Items keep their select.
@@ -748,7 +848,7 @@ return {
 | `spells.knows(user, id)`, `spells.usable(spell, place)` | booleans (`usable`: per `usable_in`, and not retired) |
 | `spells.icon_url(spell)` | `/static/images/skills/<icon>.png`, or `.../default.png` when it has none or the file is missing |
 | `spells.label(spell)` | `"Heal (5 MP)"` (button tooltips) |
-| `spells.buttons(list, mp)` | the fight menu's and Fast Spells' buttons: `{ id, name, mp, label, icon, short }` (`short`: `mp` doesn't cover it) |
+| `spells.buttons(list, mp)` | the fight menu's and Fast Spells' buttons: `{ id, name, mp, label, icon, short, spell }` (`short`: `mp` doesn't cover it; `spell`: the row, for `tip("spell", b.spell)`) |
 | `spells.learn(user_id, id, level)`, `spells.set_known(user_id, ids)` | teach one (known ones keep their level) / set the whole list |
 
 Adding a spell: copy a file in `app/content/spells/` to `<key>.lua` (`hurt.lua` for an
@@ -1594,9 +1694,9 @@ To change the schema:
 	 step 1 does for `forum`. `DROP COLUMN` works for columns that no index, constraint,
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
-	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9) and
-	 `schema_v11.sql` with the game data of that time (`seed_v3.sql` to `seed_v9.sql`,
-	 `seed_v11.sql`), migrates them, checks the data and compares
+	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9),
+	 `schema_v11.sql` and `schema_v12.sql` with the game data of that time (`seed_v3.sql` to
+	 `seed_v9.sql`, `seed_v11.sql`, `seed_v12.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -1666,6 +1766,11 @@ t_get /inn;   expect_body 'You do not have enough gold'
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.
 `run.sh` runs them inside a dk VM, where they can `require("lib.php")` and friends.
+
+JavaScript unit tests: `tests/js/test_<name>.js` tests the pure functions of
+`public/js/<name>.js` (which exports them through `module.exports` when there is no DOM).
+`run.sh` feeds the two files on stdin to `node` (or Windows' `node.exe` under WSL; `NODE=`
+picks one) and skips them when there is none.
 
 Keep scripts independent: use your own cookie jars and users, and restore any control
 settings you change. `tests/run.sh -k` keeps the temp dir for debugging.

@@ -5,6 +5,7 @@
 -- lib/content/schema.lua for the kind interface and lib/content/scripted.lua for the
 -- scripted parts.
 local scripted = require("lib.content.scripted")
+local schema = require("lib.content.schema")
 
 local spells = { name = "spells", table = "spells", dir = "content.spells", label = "spell" }
 
@@ -17,6 +18,7 @@ spells.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page." },
+	schema.lore_field(),
 	{ name = "mp", type = "int", required = true, min = 0, max = 1000000, admin = true, label = "MP",
 		help = "Magic points it costs to cast." },
 	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",

@@ -192,11 +192,11 @@ function T.item_fields_and_overrides()
 	eq(#kind.modifiers(f), 1)
 	local names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.demons_sin)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,price,attack,defense,drop_level,sellable,droppable," ..
+	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,drop_level,sellable,droppable," ..
 		"modifiers.1.stat,modifiers.1.amount,modifiers.2.stat,modifiers.2.amount")
 	names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.herb)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,price,sellable,power,messages.full,messages.full_town,messages.used")
+	eq(table.concat(names, ","), "name,description,lore,price,sellable,power,messages.full,messages.full_town,messages.used")
 end
 
 function T.display()

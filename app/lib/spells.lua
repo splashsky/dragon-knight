@@ -34,11 +34,13 @@ function spells.label(spell)
 end
 
 -- The icon buttons of a list of spells (the fight menu, Fast Spells): { id, name, mp,
--- label ("Heal (5 MP)"), icon (URL), short (`mp`, the player's MP, doesn't cover it) }.
+-- label ("Heal (5 MP)"), icon (URL), short (`mp`, the player's MP, doesn't cover it),
+-- spell (the row: its tooltip, tip("spell", b.spell)) }.
 function spells.buttons(list, mp)
 	local out = {}
 	for i, s in ipairs(list) do
-		out[i] = { id = s.id, name = s.name, mp = s.mp, label = spells.label(s), icon = spells.icon_url(s), short = mp < s.mp }
+		out[i] = { id = s.id, name = s.name, mp = s.mp, label = spells.label(s), icon = spells.icon_url(s), short = mp < s.mp,
+			spell = s }
 	end
 	return out
 end

@@ -27,3 +27,10 @@ a:hover, button.link:hover { color: #d0161e; }
 .spell-btn { background-color: rgba(255, 255, 255, 0.8); border-color: rgba(22, 24, 29, 0.45); }
 .spell-btn:hover { border-color: #6b1510; }
 .spell-btn:focus-visible { outline-color: #d0161e; }
+
+/* tooltips: near-black border, a touch of the snow's blue in the shadow */
+.dk-tip, .dk-tip-arrow { border-color: #16181d; }
+.dk-tip { background-color: #fdfdfb; color: #16181d; box-shadow: 0 3px 12px rgba(22, 24, 29, 0.3); }
+.tip-meta { color: #5f6773; }
+.tip-lore { color: #4a515c; }
+.tip-term:focus-visible, .invpanel-gear li:focus-visible { outline-color: #d0161e; }

@@ -281,6 +281,11 @@ input[type="image"] { vertical-align: middle; }
 	text-align: center;
 	text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
+/* the trigger of a spell's tooltip (dk.css .dk-tip): a disabled button gets no pointer
+	 events in some browsers, so it lets them through to its wrapper */
+.spell-tip { display: block; margin: 0; }
+.spell-tip-short { cursor: not-allowed; }
+.spell-btn:disabled { pointer-events: none; }
 .spell-grid-small { gap: 5px; }
 .spell-grid-small .spell-btn { width: 34px; height: 34px; padding: 1px; }
 .spell-grid-small .spell-mp { font-size: 10px; line-height: 12px; padding: 0 2px; }
@@ -335,3 +340,60 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 	overflow-wrap: anywhere;
 }
 .dk-toast-close { position: absolute; top: 2px; right: 6px; }
+
+/* ---- tooltips (public/js/tooltip.js; docs/APP.md "Tooltips"): one shared box, placed by
+	 the script; theme colours in themes/*.css ---- */
+[data-tip] { -webkit-touch-callout: none; }
+.tip-term { border-bottom: dotted 1px currentColor; cursor: help; }
+.tip-term:focus-visible, .invpanel-gear li:focus-visible { outline: solid 2px #663300; outline-offset: 1px; }
+.dk-tip {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 50;
+	box-sizing: border-box;
+	max-width: 280px;
+	padding: 6px 10px 7px;
+	border: solid 1px rgba(0, 0, 0, 0.6);
+	border-radius: 4px;
+	background-color: #fffdf7;
+	color: #1b1b1b;
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+	font: 14px/1.35 Vollkorn, Georgia, "Times New Roman", serif;
+	font-variant-numeric: lining-nums;
+	text-align: left;
+	overflow-wrap: break-word;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.12s ease-out;
+}
+.dk-tip[hidden] { display: none; }
+.dk-tip.dk-tip-on { opacity: 1; }
+.dk-tip-arrow {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	border: solid 0 rgba(0, 0, 0, 0.6);
+	background-color: inherit;
+	transform: rotate(45deg);
+}
+.dk-tip[data-side="top"] .dk-tip-arrow { bottom: -6px; margin-left: -5px; border-width: 0 1px 1px 0; }
+.dk-tip[data-side="bottom"] .dk-tip-arrow { top: -6px; margin-left: -5px; border-width: 1px 0 0 1px; }
+.dk-tip[data-side="left"] .dk-tip-arrow { right: -6px; margin-top: -5px; border-width: 1px 1px 0 0; }
+.dk-tip[data-side="right"] .dk-tip-arrow { left: -6px; margin-top: -5px; border-width: 0 0 1px 1px; }
+.tip-title { font-weight: bold; font-size: 15px; }
+.tip-meta { font-size: 13px; color: #5f5a50; }
+.tip-lines { list-style: none; margin: 3px 0 0; padding: 0; font-size: 13px; }
+.tip-body { margin-top: 4px; }
+.tip-lore {
+	margin-top: 6px;
+	padding-top: 5px;
+	border-top: dotted 1px rgba(0, 0, 0, 0.3);
+	font-style: italic;
+	color: #55504a;
+}
+.tip-body p, .tip-lore p { margin: 0 0 0.35em; }
+.tip-body p:last-child, .tip-lore p:last-child { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+	.dk-tip { transition: none; }
+}

@@ -8,6 +8,15 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "2.4.0", date = "unreleased",
+		changes = {
+			"Added tooltips: pointing at a spell's button in the fight menu or the Fast Spells box (or focusing it with the keyboard, or pressing and holding it on a touch screen) shows its name, MP cost, where it can be cast, what it does and its lore, also when you don't have the MP for it.",
+			"The gear in the Inventory panel, the monster you are fighting and the classes on the registration page have tooltips too; tooltips stay inside the window, flipping to the other side near an edge.",
+			"Classes, spells, items, monsters, statuses and summons can have lore, a little story shown in their tooltips and on the help pages; the Mage, Warrior and Paladin, Heal, the Herb and the Blue Slime have some to begin with (schema version 13, run dk migrate).",
+			"Administrators can write or change an entry's lore on its admin page.",
+		},
+	},
+	{
 		version = "2.3.1", date = "11.20.2026",
 		changes = {
 			"Fixed the monster's HP bar not starting full: the HP a monster is rolled with is now its full health for the fight.",

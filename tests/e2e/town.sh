@@ -302,15 +302,19 @@ t_get /;                          expect_body 'action="/spell/1"'
 # Fast Spells: a grid of icon buttons, each its own form (CSRF) to /spell/<id>; town
 # spells only (Hurt is not one), the icon or default.png, the MP cost as a badge
 expect_body '<div class="spell-grid spell-grid-small">'
-expect_body '<form method="post" action="/spell/1"><input type="hidden" name="csrf" value="'"$TC"'"><button class="spell-btn" type="submit" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">5</span></button></form>'
+# each form carries its spell's tooltip (docs/APP.md "Tooltips"), opening to the left
+expect_body '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left"><input type="hidden" name="csrf" value="'"$TC"'"><button class="spell-btn" type="submit" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>The first word every young Mage learns,'
+expect_body '<span class="spell-mp" aria-hidden="true">10</span></button><template class="tip"><div class="tip-title">Revive</div><div class="tip-meta">10 MP · In fights and in town</div><div class="tip-body"><p>'
+expect_no_body '<div class="tip-lore"></div>'
 expect_body '<button class="spell-btn" type="submit" title="Revive (10 MP)" aria-label="Revive (10 MP)"><img src="/static/images/skills/default.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">10</span></button>'
 expect_no_body 'action="/spell/6"'; expect_no_body ' disabled><img'
 # disabled (greyed out) only when the MP don't cover it
 tu "currentmp=7"
 t_get /;                          expect_body 'title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img'
+expect_body '<form class="spell-tip spell-tip-short" method="post" action="/spell/2" data-tip data-tip-side="left">'
 expect_body 'title="Heal (5 MP)" aria-label="Heal (5 MP)"><img'
 # casting with the panel's button: its form as the page has it (action and CSRF field; the button has no name)
-FS_FORM=$(grep -o '<form method="post" action="/spell/1"><input type="hidden" name="csrf" value="[0-9a-f]*">' "$BODY")
+FS_FORM=$(grep -o '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left"><input type="hidden" name="csrf" value="[0-9a-f]*">' "$BODY")
 FS_ACTION=$(printf '%s' "$FS_FORM" | sed 's/.*action="\([^"]*\)".*/\1/'); FS_CSRF=$(printf '%s' "$FS_FORM" | sed 's/.*value="\([0-9a-f]*\)".*/\1/')
 t_post "$FS_ACTION" "csrf=$FS_CSRF"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 expect_db "currenthp,currentmp" "15|2" "Fast Spells button"
@@ -404,16 +408,17 @@ t_get /static/images/bars_green.gif; expect_status 404
 
 t_section "town: inventory panel (right column)"
 # bag first, then the gear: icons for weapon/armor/shield, numbered badges for the slots,
-# "None" greyed; the full label in each row's title
+# "None" greyed; the full label in each row's title (a tooltip: plain for an empty slot, the
+# item's for gear)
 t_get /inventory
 expect_body '<a class="invpanel-bag" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>0</b>/12</span></a>'
-expect_body '<li title="Weapon: None"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name light">None</span></li>'
-expect_body '<li class="invpanel-first-slot" title="Slot 1: None"><span class="invpanel-badge" aria-label="Slot 1">1</span>'
+expect_body '<li title="Weapon: None" data-tip data-tip-side="left"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name light">None</span></li>'
+expect_body '<li class="invpanel-first-slot" title="Slot 1: None" data-tip data-tip-side="left"><span class="invpanel-badge" aria-label="Slot 1">1</span>'
 t_give townie stick 1 weapon; t_give townie life_pebble 1 accessory2
 for k in herb potion ether antidote branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
 t_get /inventory
-expect_body '<li title="Weapon: Stick"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span></li>'
-expect_body '<li title="Slot 2: Life Pebble"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span></li>'
+expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
+expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul></template></li>'
 expect_body '<a class="invpanel-bag full" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>12</b>/12</span></a>'
 t_items_clear townie
 

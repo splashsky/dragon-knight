@@ -4,14 +4,16 @@
 		(the numbers it animates), data-fight-log (the round's lines), data-fight (forms it
 		sends with fetch). Every form carries the round it was shown at (stale forms play
 		nothing). A spell is an icon button, spell=<id> (spells.buttons: greyed out and
-		disabled when the MP don't cover it; the server checks again). -#}
+		disabled when the MP don't cover it; the server checks again), in a span that carries
+		its tooltip (a disabled button gets no pointer events; docs/APP.md "Tooltips"); the
+		monster's name has one too. -#}
 <section class="box fight">
 <div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
 <div class="box-body">
 {%- if stale then %}
 <p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
 {%- end %}
-<p>You are fighting a <b>{{ monstername }}</b></p>
+<p>You are fighting a <b class="tip-term" data-tip tabindex="0">{{ monstername }}{{{ tip("monster", monster) }}}</b></p>
 {%- if monsterhp then %}
 <p class="fight-monsterhp" data-fighter="{{ monsterid }}" data-stat="hp" data-value="{{ monsterhp }}" data-max="{{ monstermaxhp }}">Monster's HP: {{ monsterhp }}</p>
 {%- end %}
@@ -54,7 +56,7 @@
 {%- if #spells > 0 then %}
 <div class="spell-grid">
 {%- for _, s in ipairs(spells) do %}
-<button class="spell-btn" type="submit" name="spell" value="{{ s.id }}" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>
+<span class="spell-tip{% if s.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="spell" value="{{ s.id }}" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>{{{ tip("spell", s.spell) }}}</span>
 {%- end %}
 </div>
 {%- end %}

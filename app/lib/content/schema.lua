@@ -52,6 +52,15 @@ function schema.kind(name)
 	return require("lib.content.kinds." .. name)
 end
 
+-- The `lore` field of every kind (schema version 13): optional story text, multi-line
+-- (paragraphs separated by a blank line), shown in tooltips and on the help pages.
+schema.LORE_MAX = 2000
+
+function schema.lore_field()
+	return { name = "lore", type = "text", default = "", max = schema.LORE_MAX, admin = true, label = "Lore",
+		help = "Optional story text, shown in tooltips and on the help page (a blank line starts a new paragraph)." }
+end
+
 -- Keys (file names) of content entities.
 function schema.valid_key(key)
 	return type(key) == "string" and #key <= 64 and key:find("^[a-z0-9_]+$") ~= nil
@@ -65,7 +74,7 @@ local function describe(spec)
 		return "an integer"
 	elseif t == "bool" then return "true or false"
 	elseif t == "string" then return "a one-line string" .. (spec.max and (" of at most " .. spec.max .. " characters") or "")
-	elseif t == "text" then return "a string"
+	elseif t == "text" then return "a string" .. (spec.max and (" of at most " .. spec.max .. " characters") or "")
 	elseif t == "stages" then return 'stages like "2x2,1.5x8" (factor x steps)'
 	elseif t == "keys" then return 'a list of keys, like { "heal", "hurt" }'
 	elseif t == "choice" then return "one of " .. table.concat(spec.values, ", ")

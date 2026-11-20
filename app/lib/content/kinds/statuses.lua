@@ -6,6 +6,7 @@
 -- on_expire, on_remove, modify_damage_dealt, modify_damage_taken, blocks_action), which
 -- stay in the file. The runtime is app/fight/engine.lua.
 local scripted = require("lib.content.scripted")
+local schema = require("lib.content.schema")
 
 local statuses = { name = "statuses", table = "statuses", dir = "content.statuses", label = "status" }
 
@@ -22,6 +23,7 @@ statuses.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page." },
+	schema.lore_field(),
 	{ name = "kind", type = "choice", values = statuses.KINDS, default = "neutral", label = "Kind",
 		help = "harmful statuses are what an antidote cures; helpful ones are buffs." },
 	{ name = "tick_on", type = "choice", values = statuses.TICK_ON, default = "turn_end", label = "Ticks on",

@@ -78,6 +78,17 @@ mig_unserve() {
 MIG_SPELLS_OF="SELECT id, key, name, description, mp, usable_in, retired, power, target,
 	replace(messages, char(10), '/'), replace(data, char(10), '/'), icon FROM spells"
 MIG_SPELLS="$MIG_SPELLS_OF ORDER BY id"
+# The content that has lore (schema version 13), "kind:key" sorted, and the lore itself.
+MIG_LORE_KEYS="SELECT group_concat(k) FROM (SELECT k FROM (
+	SELECT 'classes:' || key AS k FROM classes WHERE lore <> '' UNION ALL SELECT 'items:' || key FROM items WHERE lore <> ''
+	UNION ALL SELECT 'monsters:' || key FROM monsters WHERE lore <> '' UNION ALL SELECT 'spells:' || key FROM spells WHERE lore <> ''
+	UNION ALL SELECT 'statuses:' || key FROM statuses WHERE lore <> '' UNION ALL SELECT 'summons:' || key FROM summons WHERE lore <> '')
+	ORDER BY k)"
+MIG_LORE_TEXT="SELECT key, replace(lore, char(10), '/') FROM classes UNION ALL SELECT key, replace(lore, char(10), '/') FROM spells
+	UNION ALL SELECT key, replace(lore, char(10), '/') FROM items UNION ALL SELECT key, replace(lore, char(10), '/') FROM monsters
+	UNION ALL SELECT key, replace(lore, char(10), '/') FROM statuses UNION ALL SELECT key, replace(lore, char(10), '/') FROM summons
+	ORDER BY 1, 2"
+MIG_LORE_EXPECTED="classes:mage,classes:paladin,classes:warrior,items:herb,monsters:blue_slime,spells:heal"
 # The items and what towns sell (the same on a fresh install and a migrated database without edits).
 MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id"
 # The monsters and their loadouts as data (the same on a fresh install and a migrated
@@ -198,6 +209,7 @@ grep -qF 'Migrating to version 6: items and drops are content files' "$T/migrate
 grep -qF 'Migrating to version 7: spells and consumables are scripted content' "$T/migrate.log" && t_ok || t_fail "step 7 not reported"
 grep -qF 'Migrating to version 8: the fight engine' "$T/migrate.log" && t_ok || t_fail "step 8 not reported"
 grep -qF 'Migrating to version 12: spells have icons' "$T/migrate.log" && t_ok || t_fail "step 12 not reported"
+grep -qF 'Migrating to version 13: classes, spells, items, monsters, statuses and summons have lore' "$T/migrate.log" && t_ok || t_fail "step 13 not reported"
 grep -qF 'Converted the stats of 3 characters to base stats (verified); 0 keep extra attack/defense power.' "$T/migrate.log" && t_ok || t_fail "stats conversion not reported"
 grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 24, 5 new, 0 retired; classes: 3, 0 new, 0 retired; items: 70, 2 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
@@ -214,6 +226,8 @@ mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's"
 mig_eq "SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> ''" "heal=heal" "spell icons (v0)"
+mig_eq "$MIG_LORE_KEYS" "$MIG_LORE_EXPECTED" "lore (v0)"
+mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v0)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name IN ('items', 'drops')" "0" "items ids are plain rowids now"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name = 'spells'" "0" "spells ids are plain rowids now"
@@ -525,7 +539,7 @@ mig_serve "$MIG/v4.lua" "$MIG/v4server.log"
 t_jar migv4
 t_login mag v4pass1; expect_redirect /
 t_get /character;  expect_body 'Mend<br>'; expect_body 'Hurt<br>'; expect_body 'Fireball<br>'
-t_get /;           expect_body 'action="/spell/1">'
+t_get /;           expect_body 'action="/spell/1" data-tip data-tip-side="left">'
 t_post /spell/1 "csrf=$(t_csrf)"; expect_body 'You have cast the Mend spell, and gained 12 Hit Points.'
 mig_eq "SELECT currenthp || '|' || currentmp FROM users WHERE id = 1" "13|6" "heal with the migrated values"
 mig_fight "$V4_DB" 1 2 100
@@ -848,7 +862,7 @@ done
 t_jar migv7
 t_login sleeper v7pass1; expect_redirect /
 t_get /;           expect_redirect /fight
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>Shadow</b>'; expect_body "Monster's HP: 9"
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
 expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'
 expect_body '<b>You</b> <span class="fight-statuses">&mdash; Damage Up, Defense Up</span>'
 mig_eq "SELECT $T_ROUND FROM users WHERE id = 1" "5" "the counter goes on"
@@ -865,11 +879,11 @@ t_get /victory;    expect_status 200; expect_body 'You have defeated the Blue Sl
 mig_eq "SELECT currentaction || '|' || $T_ROUND || '|' || (experience > 0) FROM users WHERE id = 3" "Exploring|0|1" "the victory paid out"
 t_jar migv7s
 t_login starter v7pass1
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>'
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 mig_eq "SELECT $T_ROUND || '|' || ($T_MONSTER > 0) FROM users WHERE id = 2" "2|1" "the encounter began"
 t_jar migv7o
 t_login orphan v7pass1
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>'
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 mig_eq "SELECT $T_ROUND || '|' || ($T_MONSTER BETWEEN 1 AND 151) FROM users WHERE id = 4" "3|1" "a new monster for a deleted one"
 mig_unserve "$MIG/v7server.log"
 "$BIN" migrate --config "$MIG/v7.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v7)"
@@ -941,13 +955,13 @@ for u in fighter brewer; do
 done
 t_jar migv8
 t_login fighter v8pass1; expect_redirect /
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>Shadow</b>'; expect_body "Monster's HP: 9"
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
 expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'; expect_no_body "Monster's MP"
 mig_eq "SELECT round || '|' || (SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2) FROM fights WHERE user_id = 1" \
 	"5|5|5" "the counter goes on; the Shadow's MP is full"
 t_jar migv8b
 t_login brewer v8pass1
-t_get /fight;      expect_status 200; expect_body 'You are fighting a <b>Homebrew</b>'; expect_body "Monster's HP: 20"
+t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Homebrew<template class="tip">'; expect_body "Monster's HP: 20"
 V8_CS=$(t_csrf)
 t_post /fight "csrf=$V8_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
 mig_eq "SELECT entity_id FROM fight_combatants WHERE user_id = 2 AND id = 2" "152" "the retired monster's fight goes on"
@@ -1039,13 +1053,74 @@ mig_serve "$MIG/v11.lua" "$MIG/v11server.log"
 t_jar migv11; t_reset_jar
 t_login caster v11pass1; expect_redirect /
 t_get /; expect_status 200
-expect_body 'action="/spell/1"><input type="hidden" name="csrf" value="'
+expect_body 'action="/spell/1" data-tip data-tip-side="left"><input type="hidden" name="csrf" value="'
 expect_body 'title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34"'
 expect_body 'title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img src="/static/images/skills/default.png"'
 t_post /spell/1 "csrf=$(t_csrf)"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 mig_eq "SELECT currenthp || '|' || currentmp FROM users WHERE id = 1" "15|2" "a Fast Spell after the migration"
 mig_unserve "$MIG/v11server.log"
 "$BIN" migrate --config "$MIG/v11.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v11)"
+
+t_section "migrate: version 12 database"
+# version 12 schema + its game data (content synced as at version 12: no lore columns), a
+# player in a fight against the Blue Slime who knows Heal and Hurt, and an admin override of
+# Heal's name from that time; only step 13 runs: the lore columns, filled in by the sync
+V12_DB="$MIG/v12.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V12_DB\"#" "$CONFIG" > "$MIG/v12.lua"
+mig_script "$V12_DB" "$ROOT/tests/fixtures/schema_v12.sql"
+mig_script "$V12_DB" "$ROOT/tests/fixtures/seed_v12.sql"
+cat > "$MIG/v12_data.sql" <<SQL
+INSERT INTO users (id, username, email, charname, verify, currentaction, currenthp, base_maxhp, currentmp, base_maxmp) VALUES
+	(1, 'loreman', 'l@example.com', 'Loreman', '1', 'Fighting', 9, 30, 12, 20);
+INSERT INTO user_spells (user_id, spell_id, learned_level) VALUES (1, 1, 1), (1, 6, 1);
+INSERT INTO fights (user_id, round, wave, data) VALUES (1, 3, 1, '');
+INSERT INTO fight_combatants (user_id, id, side, kind) VALUES (1, 1, 'player', 'player');
+INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, mp, maxmp, data)
+	VALUES (1, 2, 'enemy', 'monster', 1, 1, 3, 4, 5, 5, 'immune=i:0');
+INSERT INTO content_overrides (kind, key, field, value) VALUES ('spells', 'heal', 'name', 'Mend');
+PRAGMA user_version = 12;
+SQL
+mig_script "$V12_DB" "$MIG/v12_data.sql"
+MIG_DB=$V12_DB
+mig_eq "PRAGMA user_version" "12" "fixture is version 12"
+mig_eq "SELECT count(*) FROM pragma_table_info('spells') WHERE name = 'lore'" "0" "no lore column at version 12"
+V12_USERS=$(mig_users "$V12_DB")
+V12_FIGHT=$(mig_sql "$V12_DB" "SELECT * FROM fights; SELECT * FROM fight_combatants ORDER BY id")
+"$BIN" migrate --config "$MIG/v12.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v12) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version ([1-9]|1[012]):' "$T/migrate.log" && t_fail "steps 1-12 ran on a version 12 database" || t_ok
+grep -qF 'Migrating to version 13: classes, spells, items, monsters, statuses and summons have lore' "$T/migrate.log" && t_ok || t_fail "step 13 not reported: $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v12 stamped"
+[ "$(mig_layout "$V12_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v12 schema differs from a fresh install:"
+	diff <(mig_layout "$V12_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+for tbl in classes items monsters spells statuses summons; do
+	mig_layout "$V12_DB" | grep -qE "^$tbl\|[0-9]+\|lore\|TEXT\|1\|''\|0$" && t_ok || t_fail "no $tbl.lore column (v12)"
+done
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v12)"
+[ "$(mig_users "$V12_DB")" = "$V12_USERS" ] && t_ok || t_fail "users changed (v12)"
+[ "$(mig_sql "$V12_DB" "SELECT * FROM fights; SELECT * FROM fight_combatants ORDER BY id")" = "$V12_FIGHT" ] && t_ok || t_fail "the fight changed (v12)"
+mig_eq "$MIG_LORE_KEYS" "$MIG_LORE_EXPECTED" "lore (v12)"
+mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v12)"
+mig_eq "SELECT name FROM spells WHERE id = 1" "Mend" "the v12 override survives"
+mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's (v12)"
+mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items equal a fresh install's (v12)"
+mig_eq "$MIG_MONSTERS" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS")" "monsters equal a fresh install's (v12)"
+mig_eq "SELECT value FROM meta WHERE key = 'content_fingerprint'" \
+	"$(mig_sql "$MIG/fresh.db" "SELECT value FROM meta WHERE key = 'content_fingerprint'")" "content fingerprint (v12)"
+mig_serve "$MIG/v12.lua" "$MIG/v12server.log"
+"$BIN" user --config "$MIG/v12.lua" passwd loreman v12pass1 >/dev/null && t_ok || t_fail "dk user passwd (v12)"
+t_jar migv12; t_reset_jar
+t_login loreman v12pass1; expect_redirect /
+t_get /fight; expect_status 200
+expect_body '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>The humblest monster of the land'
+expect_body 'aria-label="Mend (5 MP)"><img src="/static/images/skills/heal.png"'
+expect_body '<template class="tip"><div class="tip-title">Mend</div><div class="tip-meta">5 MP · In fights and in town</div>'
+expect_body "Monster's HP: 3"
+t_post /fight "csrf=$(t_csrf)&round=$(mig_sql "$V12_DB" "SELECT round FROM fights")&spell=1"
+expect_body 'You have cast the Mend spell, and gained 10 Hit Points.'
+mig_unserve "$MIG/v12server.log"
+"$BIN" migrate --config "$MIG/v12.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v12)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

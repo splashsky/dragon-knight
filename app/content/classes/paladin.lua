@@ -17,6 +17,11 @@ High dexterity
 3 sleep spells
 2 +defense spells
 2 +attack spells]],
+	-- story text for tooltips and the help page (optional; a blank line starts a paragraph)
+	lore = [[
+The Paladins keep an oath sworn before the first dragon fell: to carry light into every
+dark place on the map. Their prayers are slower than a Mage's words and their arms slower
+than a Warrior's blade, but they rarely fall, and they never leave a companion behind.]],
 	sort = 3,
 	playable = true,
 

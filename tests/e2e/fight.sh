@@ -26,7 +26,7 @@ t_get /;        expect_redirect /fight
 t_section "fight: monster selection"
 t_fight_new fighter
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
-t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b>'
+t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 f_is "$T_ROUND" 2
 lvl=$(t_sql "SELECT m.level FROM users JOIN monsters m ON m.id = $T_MONSTER $FQ")

@@ -302,8 +302,11 @@ Paladin are `mage.lua`, `warrior.lua`, `paladin.lua`). Copy one to a new name (t
 name is the class's permanent key: lowercase letters, digits and `_`), change the name,
 description, starting stats, first experience step (`exp_base`; the rest of the curve is
 global unless the class sets its own `exp_stages`) and per-level gains, and run
-`./dk check`. The running game picks the file up on the next page load and offers the class
-at registration; on another server, deploy it like any code change. Deleting a file retires
+`./dk check`. Every kind of content file may also have `lore`: a few lines of story (a
+blank line between paragraphs, at most 2,000 characters) shown in the entry's tooltip and on
+the help pages, which administrators can override. The running game picks the file up on the
+next page load and offers the class at registration (its name there has a tooltip with its
+points and lore); on another server, deploy it like any code change. Deleting a file retires
 the class (no longer offered; its characters keep it).
 
 ### Adding a spell
@@ -341,7 +344,9 @@ A class learns it when a class file lists its key in `levels[N].spells`. `heal.l
 a self-targeted spell usable in town with a refusal (`can_cast`, "already full"). In fights
 and in the Fast Spells box a spell is an icon button: give it `icon = "firebolt"` and put
 `firebolt.png` (square) in `public/images/skills/`, or leave it out for `default.png`;
-`./dk check` fails, naming the spell file, if the PNG doesn't exist. The
+`./dk check` fails, naming the spell file, if the PNG doesn't exist. Its buttons get a
+tooltip by themselves (name, MP cost, where it can be cast, `description` and `lore`), so
+write the description as what the spell does and the lore as its story. The
 formats, the action API, the sync and the admin overrides are described in `docs/APP.md`
 ("Content", "Scripting spells and items", "Spells", "Items").
 
@@ -357,7 +362,8 @@ one bag slot (`max_stack`). A consumable is scripted like a spell: `power`, mess
 `use` function (see `herb.lua` and `potion.lua`, and `docs/APP.md`, "Scripting spells and
 items"). Give it a
 `drop_level` for monsters of that level and up to drop it, or add its key to a town's shop
-in the admin town editor. `./dk check` validates it; the next page load picks it up.
+in the admin town editor. `./dk check` validates it; the next page load picks it up. Its `description` and `lore` show
+in the tooltip of its Inventory panel row (with its stats) and on `/help/items`.
 
 ### Adding a status or a summon
 
@@ -399,7 +405,12 @@ return {
 ```
 
 `./dk check` validates it (unknown keys, an item in the wrong slot, ...); the next page
-load picks it up, and a roaming monster is met at random in its level band. See
+load picks it up, and a roaming monster is met at random in its level band. Its name on the
+fight page has a tooltip (level, `description`, `lore`), and `/help/monsters` shows its lore.
+
+Tooltips work on anything: an element with `data-tip` and a `<template class="tip">` child
+(or `data-tip="text"`) gets one, placed inside the window, on hover, keyboard focus or a long
+press (`public/js/tooltip.js`; see `docs/APP.md`, "Tooltips" and "Lore"). See
 `docs/APP.md`, "Monsters".
 
 ## Project layout
@@ -470,6 +481,9 @@ in-game `/changelog` page (also linked from the version number in the footer).
 	server (`/admin/classes`). All classes share the Mage's experience curve, scaled by
 	their own first step (Warrior and Paladin need up to about 10% more experience than in
 	the original from level 45 and 18 on); a class can define its own curve.
+- Tooltips (2.4) on the spell buttons, the Inventory panel's gear, the monster you fight and
+	the classes at registration, and lore for classes, spells, items, monsters, statuses and
+	summons (in the tooltips and on the help pages).
 - Spells are content files too (`app/content/spells/`), scripted in Lua instead of a type
 	and an attribute (the original 19 behave exactly as before); administrators override
 	names, descriptions, MP costs, power, icons and messages per server (`/admin/spells`). The

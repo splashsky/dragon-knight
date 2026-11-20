@@ -17,7 +17,9 @@ CREATE INDEX babble_author ON babble (author_id, posttime);
 
 -- Character classes: content files app/content/classes/<key>.lua synced into these tables
 -- (app/lib/content/sync.lua). Rows are never deleted: a class whose file is gone is
--- retired (existing characters keep it). users.charclass holds classes.id.
+-- retired (existing characters keep it). users.charclass holds classes.id. Every content
+-- table (classes, items, monsters, spells, statuses, summons) ends with `lore` (schema
+-- version 13): optional story text for tooltips and the help pages ('' = none).
 CREATE TABLE classes (
 	id               INTEGER PRIMARY KEY,
 	key              TEXT    NOT NULL UNIQUE,
@@ -32,7 +34,8 @@ CREATE TABLE classes (
 	start_dexterity  INTEGER NOT NULL DEFAULT 5,
 	exp_base         INTEGER NOT NULL DEFAULT 15,
 	exp_stages       TEXT    NOT NULL DEFAULT '',
-	retired          INTEGER NOT NULL DEFAULT 0
+	retired          INTEGER NOT NULL DEFAULT 0,
+	lore             TEXT    NOT NULL DEFAULT ''
 );
 
 -- Gains on reaching a level (2 .. 100) per class; hp is without the milestone bonus, and
@@ -158,7 +161,8 @@ CREATE TABLE items (
 	target       TEXT    NOT NULL DEFAULT 'enemy',
 	power        INTEGER NOT NULL DEFAULT 0,
 	messages     TEXT    NOT NULL DEFAULT '',
-	data         TEXT    NOT NULL DEFAULT ''
+	data         TEXT    NOT NULL DEFAULT '',
+	lore         TEXT    NOT NULL DEFAULT ''
 );
 
 -- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a
@@ -184,7 +188,8 @@ CREATE TABLE monsters (
 	uses_mp        INTEGER NOT NULL DEFAULT 1,
 	attack_weight  INTEGER NOT NULL DEFAULT 1,
 	roams          INTEGER NOT NULL DEFAULT 1,
-	retired        INTEGER NOT NULL DEFAULT 0
+	retired        INTEGER NOT NULL DEFAULT 0,
+	lore           TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX monsters_level ON monsters (level);
 
@@ -245,7 +250,8 @@ CREATE TABLE spells (
 	target       TEXT    NOT NULL DEFAULT 'enemy',
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
-	icon         TEXT    NOT NULL DEFAULT ''
+	icon         TEXT    NOT NULL DEFAULT '',
+	lore         TEXT    NOT NULL DEFAULT ''
 );
 
 -- Statuses: content files app/content/statuses/<key>.lua (like spells; never deleted, a
@@ -266,7 +272,8 @@ CREATE TABLE statuses (
 	blocks_action  INTEGER NOT NULL DEFAULT 0,
 	retired        INTEGER NOT NULL DEFAULT 0,
 	messages       TEXT    NOT NULL DEFAULT '',
-	data           TEXT    NOT NULL DEFAULT ''
+	data           TEXT    NOT NULL DEFAULT '',
+	lore           TEXT    NOT NULL DEFAULT ''
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
@@ -283,7 +290,8 @@ CREATE TABLE summons (
 	turns        INTEGER NOT NULL DEFAULT 0,
 	retired      INTEGER NOT NULL DEFAULT 0,
 	messages     TEXT    NOT NULL DEFAULT '',
-	data         TEXT    NOT NULL DEFAULT ''
+	data         TEXT    NOT NULL DEFAULT '',
+	lore         TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE towns (

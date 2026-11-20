@@ -9,14 +9,16 @@ local php = require("lib.php")
 local presence = require("lib.presence")
 local session = require("lib.session")
 local themes = require("lib.themes")
+local tips = require("lib.tips")
 
 local view = {}
 
-view.GAME_VERSION = "2.3.1"
+view.GAME_VERSION = "2.4.0-dev"
 view.BUILD = "C/Lua"
 
 -- Base helpers. Templates see these after ctx (names resolve scratch -> ctx -> h).
--- Helpers returning HTML (include, csrf_field, nl2br) must be output with {{{ }}}.
+-- Helpers returning HTML (include, csrf_field, nl2br, paragraphs, tip) must be output with
+-- {{{ }}}.
 local base = {
 	escape = dk.html,
 	ipairs = ipairs, pairs = pairs, next = next, select = select, type = type,
@@ -29,6 +31,19 @@ local base = {
 
 function base.nl2br(s)
 	return php.nl2br(dk.html(s))
+end
+
+-- Text as HTML paragraphs (lore): escaped; a blank line starts a new <p>, and the lines of
+-- a paragraph are joined with spaces (so content files can wrap long text). "" for blank
+-- text.
+function base.paragraphs(s)
+	local out = {}
+	s = tostring(s or ""):gsub("\r\n?", "\n")
+	for lines in (s .. "\n\n"):gmatch("(.-)\n[ \t]*\n%s*") do
+		local para = lines:gsub("%s+", " "):match("^ ?(.-) ?$")
+		if para ~= "" then out[#out + 1] = "<p>" .. dk.html(para) .. "</p>" end
+	end
+	return table.concat(out)
 end
 
 -- url("/shop/buy", 3) -> "/shop/buy/3"; a trailing table becomes the query string:
@@ -104,6 +119,13 @@ function view.render(name, ctx, req)
 	function h.csrf_token() return csrf.token(req) end
 	function h.theme_picker() return theme_picker(req) end
 	function h.logo() return logo(req) end
+	-- tip("spell", row): the tooltip content of a spell, item, monster or class
+	-- (lib/tips.lua, templates/tip/tip.html; docs/APP.md "Tooltips") -> HTML
+	function h.tip(kind, row)
+		if row == nil then return "" end
+		local build = assert(tips[kind], "tip: unknown kind")
+		return view.render("tip/tip", build(row), req)
+	end
 	return dk.render(name, ctx, h)
 end
 
