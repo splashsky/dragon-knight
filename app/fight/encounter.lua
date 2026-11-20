@@ -34,14 +34,31 @@ function encounter.log_of(r)
 	return table.concat(out, "\n")
 end
 
--- fights.log text -> { yourturn = { line, ... }, allyturn = ..., monsterturn = ..., roundend = ... }
+-- fights.log text -> { yourturn = { line, ... }, allyturn = ..., monsterturn = ..., roundend =
+-- ..., note = text or nil, stale = true or nil }
 function encounter.lines(log)
 	local out = {}
 	for _, p in ipairs(encounter.PARTS) do out[p[1]] = {} end
 	for part, line in tostring(log or ""):gmatch("([^\t\n]+)\t([^\n]*)") do
-		if out[part] then table.insert(out[part], line) end
+		if out[part] then table.insert(out[part], line)
+		elseif part == "note" then out.note = line
+		elseif part == "stale" then out.stale = true end
 	end
 	return out
+end
+
+-- What the fight page says about the last command when it played nothing, kept with the
+-- last round's lines (whose page it is shown on) until the next round replaces them:
+-- kind "note" (a refusal: text) or "stale" (a form from an older page). Returns the new
+-- fights.log text.
+function encounter.with_note(log, kind, text)
+	local keep = {}
+	for line in tostring(log or ""):gmatch("[^\n]+") do
+		local part = line:match("^([^\t]*)\t")
+		if part ~= "note" and part ~= "stale" then keep[#keep + 1] = line end
+	end
+	keep[#keep + 1] = kind .. "\t" .. tostring(text or ""):gsub("[\t\n]", " ")
+	return table.concat(keep, "\n")
 end
 
 -- The original random pick among the roaming monsters of the level band at (lat, lon)

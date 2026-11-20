@@ -50,9 +50,9 @@ local function fight_events(req, evs)
 	return { { kind = "fight", json = json.encode(evs) } }
 end
 
--- A page of the fight; t.events: the round's (fight/events.lua), for a live request.
-local function show(req, title, template, ctx, t)
-	return view.page(req, title, template, ctx, { events = fight_events(req, t and t.events) })
+-- A page of the fight (its rounds' events come with the redirects to it: go).
+local function show(req, title, template, ctx)
+	return view.page(req, title, template, ctx)
 end
 
 -- A redirect; t.events: the round's, carried to the page it lands on (main.lua follows
@@ -200,12 +200,12 @@ local function choice(user, st, f, form)
 end
 
 -- The fight page of fight f (in progress, or as it ended in a death): its combatants, the
--- lines of its last round (lines: encounter.lines), and the commands with the round they
--- carry. opts: stale (the note), events (the round's, for the live client).
-local function fight_page(req, f, lines, opts)
+-- lines of its last round and the note about the last command (lines: encounter.lines),
+-- and the commands with the round they carry.
+local function fight_page(req, f, lines)
 	local user = req.user
 	local page = { yourturn = lines.yourturn, allyturn = lines.allyturn, monsterturn = lines.monsterturn,
-		roundend = lines.roundend, stale = opts.stale, dead = f.outcome == "death" }
+		roundend = lines.roundend, stale = lines.stale, note = lines.note, dead = f.outcome == "death" }
 	local shown = view_of(f)
 	for k, v in pairs(shown) do page[k] = v end
 	local first = shown.enemies[1]
@@ -225,10 +225,20 @@ local function fight_page(req, f, lines, opts)
 		page.gear = gear_buttons(user)
 		page.round = f.round
 	end
-	return show(req, "Fighting", "fight/fight", page, { events = opts.events })
+	return show(req, "Fighting", "fight/fight", page)
 end
 
 local NO_MONSTER = "There are no monsters in this area. Please contact the game administrator."
+
+-- A command that played nothing (refused, or from an older page): the fight page says so,
+-- above its commands. The refusals' texts (some from content files) were written for an
+-- error page of their own ("Please go back and try again."); on the fight page there is
+-- nothing to go back to.
+local function note(req, f, kind, text)
+	if text then text = text:gsub("%s*Please go back and try again%.%s*$", "") end
+	dk.db:exec("UPDATE fights SET log = ? WHERE user_id = ?", encounter.with_note(f.log, kind, text), f.user_id)
+	return go(req, "/fight")
+end
 
 local function fight(req)
 	local user = req.user
@@ -241,7 +251,7 @@ local function fight(req)
 	if user.currentaction ~= "Fighting" then
 		-- the fight that just ended: a death shows as it ended, a victory has its own page
 		if f and f.outcome == "death" and #state.side(f, "enemy", true) > 0 and not post then
-			return fight_page(req, f, encounter.lines(f.log), {})
+			return fight_page(req, f, encounter.lines(f.log))
 		end
 		if f and f.outcome == "victory" and not post then return go(req, "/victory") end
 		-- a form of a fight that is over: the game as it is now
@@ -265,17 +275,19 @@ local function fight(req)
 		encounter.win(user, f, nil)
 		return go(req, "/victory", { stale = stale or nil })
 	end
-	if stale or not post then return fight_page(req, f, encounter.lines(f.log), { stale = stale }) end
+	if not post then return fight_page(req, f, encounter.lines(f.log)) end
+	-- Every POST ends on the fight page by a redirect (Post/Redirect/Get): what it did is
+	-- saved with the fight (a round's lines, or a note), and GET /fight shows it.
+	if stale then return note(req, f, "stale") end
 	f.rand = rand
 	f.max_allies = game.control().max_allies or 1
 	local a, entry, gear, err = choice(user, st, f, form)
-	if err then return error_page(req, err) end
-	if not a then return fight_page(req, f, encounter.lines(f.log), {}) end
+	if err then return note(req, f, "note", err) end
+	if not a then return go(req, "/fight") end
 
 	if req.live then f.trace = {} end
 	local r = round.play(f, a)
-	-- refusal texts may come from content files and admin overrides: escaped
-	if r.refused then return error_page(req, r.refused) end
+	if r.refused then return note(req, f, "note", r.refused) end
 	if entry then inventory.take(entry, 1) end
 	if gear then inventory.spend_charge(gear) end
 	f = r.f
@@ -293,13 +305,13 @@ local function fight(req)
 		return go(req, "/victory", { events = evs })
 	elseif r.died then
 		encounter.die(user, r)
-		return fight_page(req, f, encounter.lines(f.log), { events = evs })
+		return go(req, "/fight", { events = evs })
 	end
 	f.round = f.round + 1
 	f.log = encounter.log_of(r)
 	state.save(f)
 	encounter.save_player(user.id, f.st)
-	return fight_page(req, f, encounter.lines(f.log), { events = evs })
+	return go(req, "/fight", { events = evs })
 end
 
 local function victory(req)
@@ -358,7 +370,7 @@ local function drop_post(req)
 	if discard_id ~= 0 then
 		local e = inventory.entry(user.id, discard_id)
 		if not e or e.equipped or e.item.category == "quest" then
-			return error_page(req, "Please go back and select an item from your bag to discard.")
+			return drop_page(req, drop, { error = "Select an item from your bag to discard." })
 		end
 		inventory.take(e)
 		discarded = e

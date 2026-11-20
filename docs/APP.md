@@ -125,7 +125,9 @@ end
 	happen on a GET happens in the POST that causes it: an encounter begins (its monster
 	picked, its first strike played) on the map move, a victory is paid in the winning
 	round (`fight/encounter.lua`), and a finished fight is kept so `GET /fight` and `GET
-	/victory` can show it again. `tests/e2e/pure.sh` requests every GET route of the router
+	/victory` can show it again. Every `POST /fight` answers with a redirect to the page that
+	shows what it did (Post/Redirect/Get): a reload never sends a command again.
+	`tests/e2e/pure.sh` requests every GET route of the router
 	(`GET /__test/routes` lists them) in every game state and fails if any game table
 	changed; a new GET route has to be added to its list.
 - Pattern segments: `:name` matches any one segment (string). `#name` matches digits
@@ -1460,9 +1462,9 @@ With the [live client](#live-client) a fight round plays in place: the fight for
 like any other form, and the answer to a live request carries the round's **events** (an
 `events fight` frame: the JSON list below), which `public/js/fight.js` plays on the page
 being shown before the page's regions apply. The server side is the fight routes
-(`routes/fight.lua`): when `req.live`, the round records its trace and `show` passes the
-events to `view.page` (`opts.events`), `go` puts them on its redirect (`res.events`), which
-`main.lua` carries into the answer of the page it lands on (`/victory`, `/`). Everything
+(`routes/fight.lua`): when `req.live`, the round records its trace and `go` puts the events
+on its redirect (`res.events`), which `main.lua` carries into the answer of the page it
+lands on (`/fight`, `/victory`, `/`). Everything
 else is the page: the same handlers, the same round code, the same templates, so what stays
 on screen is what a page load shows. (2.3's JSON fight API, `Accept: application/json` with
 `fragments`, is gone: the live client replaced it.)
@@ -1496,13 +1498,25 @@ stock, immunity).
 Lists are present only when not empty; `turns` is absent for an unlimited status or ally.
 Changes go with their step's latest line (a spell's line, then its damage and MP cost).
 
+**Every command comes back to the fight page** (Post/Redirect/Get, since 3.0.1): a `POST
+/fight` that played a round saves its lines (`fights.log`) and redirects to `/fight` (a
+victory to `/victory`, an escape to `/`), and `GET /fight` shows them, as often as it is
+loaded. The live client follows the redirect on the server, so a round is still one
+request, with its events.
+
+**Refusals** (not enough MP, a spell not learned, an item not in the bag, a wand without
+charges, a content file's `s:refuse`): nothing is played or spent, and the fight page comes
+back with the reason as a note above the commands (`<p class="fight-note error"
+role="alert">`), the last round's lines still there; the note is kept with them
+(`encounter.with_note`) until the next round replaces them. Their texts were written for an
+error page of their own: the note leaves out "Please go back and try again.".
+
 **Stale rounds.** Every fight form carries the round it was shown at (`<input type="hidden"
 name="round">`, `fights.round`, which only a played round counts up). A `POST /fight` with
-another round (a second click, an older tab, a resubmitted page) plays nothing: the answer
-is the fight as `GET /fight` shows it (with its last round's lines) and the note "That
-command came from an older page, so nothing happened."; a fight that is over (not fighting
-any more) redirects to `/`. A form
-without the field (from before 2.3) plays as before. The counter has no cap (the original's
+another round (a second click, an older tab, a resubmitted page) plays nothing: the fight
+page comes back with the note "That command came from an older page, so nothing happened."
+at the top (kept like a refusal's); a fight that is over (not fighting any more) redirects
+to `/`. A form without the field (from before 2.3) plays as before. The counter has no cap (the original's
 stopped at 255), so long fights are protected too.
 
 **fight.js** (`DK.on("events:fight")`): while the round plays the fight forms' controls are

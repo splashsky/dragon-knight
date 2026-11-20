@@ -272,11 +272,18 @@ t_fight() {
 			SELECT u.id, 2, 'enemy', 'monster', m.id, 1, $3, m.maxhp, 'immune=i:' || m.immune FROM users u, monsters m
 			WHERE u.username = '$1' AND m.id = $2"
 }
+# t_round 'fields' [curl args]: POST /fight like a form, following its redirect back to the
+# fight page (a round, a refusal's note, a stale form: Post/Redirect/Get), so $BODY is the
+# page it shows; any other answer (a victory's redirect, a 403) as it is.
+t_round() {
+	t_post /fight "$@"
+	if [ "$STATUS" = 302 ] && grep -qiE '^location: /fight'$'\r''?$' "$HEADERS"; then t_get /fight; fi
+}
 # t_fight_win: the current jar's fight, already won (an enemy at 0 HP: t_fight USER MONSTER
 # 0), is paid as a winning round pays it (POST /fight); $BODY is then GET /victory.
 t_fight_win() {
 	t_get /changepassword
-	t_post /fight "csrf=$(t_csrf)&fight=Fight"; expect_redirect /victory
+	t_round "csrf=$(t_csrf)&fight=Fight"; expect_redirect /victory
 	t_get /victory
 }
 t_fight_status() {

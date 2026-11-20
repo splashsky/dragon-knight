@@ -50,7 +50,7 @@ t_get /help; expect_body '<li>6 hurt spells (Magic Bolt from the start)</li>'
 wd_sql "UPDATE users SET experience = 14"
 t_fight wizard 1 1
 wd_sql "UPDATE users SET base_attack = 100"
-t_post /fight "csrf=$(t_csrf)&fight=Fight"; expect_redirect /victory
+t_round "csrf=$(t_csrf)&fight=Fight"; expect_redirect /victory
 t_get /victory; expect_body 'You have gained a level!'
 wd_is "level || '|' || base_maxmp || '|' || $T_KNOWN" "2|10|1,25"
 wd_sql "UPDATE users SET base_attack = 0, currentaction = 'In Town', latitude = 0, longitude = 0, currenthp = base_maxhp"
@@ -61,13 +61,14 @@ t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 5, currenthp = 100, base_maxhp = 100"
 t_get /fight; CS=$(t_csrf)
 expect_body "<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\"><img src=\"/static/images/skills/magic_bolt.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"spell-mp\" aria-hidden=\"true\">1</span></button>"
-t_post /fight "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell for '
+t_round "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell for '
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
 { [ "$HP" = 46 ] || [ "$HP" = 47 ]; } && t_ok || t_fail "Magic Bolt: 3-4 damage (monster HP $HP)"
 wd_is currentmp 4
 # Silver Slime: immune
 t_fight wizard 9 5
-t_post /fight "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell, but the monster is immune to it.'
+wd_sql "UPDATE users SET currenthp = 1000, base_maxhp = 1000"   # (it hits up to 100)
+t_round "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell, but the monster is immune to it.'
 wd_is "$T_MONSTER_HP || '|' || currentmp" "5|3"
 wd_sql "UPDATE users SET currentmp = 0"
 t_get /fight; expect_body "value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\" disabled>"
@@ -104,7 +105,7 @@ ORDER=$(grep -o 'name="fight"\|name="use_gear"\|name="run"\|id="fight-spells-lab
 [ "$ORDER" = 'name="fight" name="use_gear" name="run" id="fight-spells-label" ' ] && t_ok || t_fail "fight menu order: $ORDER"
 expect_body "<span class=\"spell-tip\" data-tip><button class=\"spell-btn\" type=\"submit\" name=\"use_gear\" value=\"$WAND\" title=\"Wand (5/5 charges)\" aria-label=\"Wand (5/5 charges)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">5/5</span></button>"
 ROUND=$(t_sql "SELECT $T_ROUND FROM users $WQ")
-t_post /fight "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '
+t_round "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
 { [ "$HP" = 46 ] || [ "$HP" = 47 ]; } && t_ok || t_fail "the wand: 3-4 damage (monster HP $HP)"
 wd_is "currentmp || '|' || $WD_CHARGES || '|' || $T_ROUND" "0|weapon=4|$((ROUND + 1))"
@@ -114,14 +115,14 @@ t_sql "UPDATE user_items SET charges = 0 WHERE id = $WAND"
 t_get /fight
 expect_body "name=\"use_gear\" value=\"$WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" disabled><img"
 ROUND=$(t_sql "SELECT $T_ROUND FROM users $WQ"); HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
-t_post /fight "csrf=$CS&use_gear=$WAND"; expect_body 'The Wand has no charges left. Rest at an inn to recharge it.'
-expect_no_body 'The monster attacks'
+t_round "csrf=$CS&use_gear=$WAND"; expect_body 'The Wand has no charges left. Rest at an inn to recharge it.'
+expect_body '<p class="fight-note error" role="alert">'; expect_body 'name="fight"'
 wd_is "$T_MONSTER_HP || '|' || $T_ROUND || '|' || $WD_CHARGES" "$HP|$ROUND|weapon=0"
 # a wand in the bag can't be used (and has no button)
 t_give wizard wand 1
 BAGWAND=$(wd_wand bag)
 t_get /fight; expect_no_body "name=\"use_gear\" value=\"$BAGWAND\""
-t_post /fight "csrf=$CS&use_gear=$BAGWAND"; expect_body 'You do not have this item equipped.'
+t_round "csrf=$CS&use_gear=$BAGWAND"; expect_body 'You do not have this item equipped.'
 wd_is "$T_ROUND || '|' || $WD_CHARGES" "$ROUND|weapon=0,bag=5"
 t_fight_clear wizard
 wd_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"

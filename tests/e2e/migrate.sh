@@ -559,7 +559,7 @@ mig_eq "SELECT currenthp || '|' || currentmp FROM users WHERE id = 1" "13|11" "h
 mig_fight "$V4_DB" 1 2 100
 mig_sql "$V4_DB" "UPDATE users SET currentmp = 9 WHERE id = 1"
 t_get /fight;      expect_no_body 'title="Fireball ('; expect_body 'name="spell" value="6" title="Hurt ('
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'This spell cannot be cast.'
+t_round "csrf=$(t_csrf)&spell=Spell&userspell=20"; expect_body 'This spell cannot be cast.'
 mig_eq "SELECT currentmp || '|' || $T_MONSTER_HP FROM users WHERE id = 1" "9|100" "nothing spent"
 mig_unserve "$MIG/v4server.log"
 
@@ -800,14 +800,14 @@ t_login caster v6pass1
 t_get /fight;      expect_status 200; expect_body 'name="spell" value="6" title="Smite ('; expect_no_body 'title="Zap ('
 expect_body 'name="item" value="66" title="Herb (x2)"'; expect_no_body 'title="Bomb ('; expect_no_body 'title="Elixir ('
 V6_CS=$(t_csrf)
-t_post /fight "csrf=$V6_CS&spell=Spell&userspell=6"; expect_body 'You have cast the Smite spell for'
+t_round "csrf=$V6_CS&spell=Spell&userspell=6"; expect_body 'You have cast the Smite spell for'
 V6_HP=$(mig_sql "$V6_DB" "SELECT $T_MONSTER_HP FROM users WHERE id = 1")
 [ "$V6_HP" -ge 30 ] && [ "$V6_HP" -le 34 ] && t_ok || t_fail "Smite (power 20: 16-20 damage) left the monster $V6_HP HP"
 mig_eq "SELECT currentmp || '|' || $T_UBER_DEFENSE FROM users WHERE id = 1" "30|25" "MP spent (35 - 5), the fight's buff kept"
-t_post /fight "csrf=$V6_CS&spell=Spell&userspell=20"; expect_body 'This spell cannot be cast.'
+t_round "csrf=$V6_CS&spell=Spell&userspell=20"; expect_body 'This spell cannot be cast.'
 mig_sql "$V6_DB" "UPDATE users SET currenthp = 1 WHERE id = 1"
-t_post /fight "csrf=$V6_CS&item=Use+Item&useritem=66"; expect_body 'You have used the Herb, and gained 39 Hit Points.'
-t_post /fight "csrf=$V6_CS&item=Use+Item&useritem=69"; expect_body 'This item cannot be used.'
+t_round "csrf=$V6_CS&item=Use+Item&useritem=66"; expect_body 'You have used the Herb, and gained 39 Hit Points.'
+t_round "csrf=$V6_CS&item=Use+Item&useritem=69"; expect_body 'This item cannot be used.'
 t_get /help/spells; expect_body '>Smite<br>'; expect_no_body '>Zap<'
 mig_unserve "$MIG/v6server.log"
 "$BIN" migrate --config "$MIG/v6.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v6)"
@@ -890,9 +890,9 @@ expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'
 expect_body '<b>You</b> <span class="fight-statuses">&mdash; Damage Up, Defense Up</span>'
 mig_eq "SELECT $T_ROUND FROM users WHERE id = 1" "4" "the counter is kept"
 V7_CS=$(t_csrf)
-t_post /fight "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
+t_round "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 mig_sql "$V7_DB" "UPDATE users SET currenthp = 100 WHERE id = 1"
-t_post /fight "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
+t_round "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 if grep -qF 'The monster is still asleep.' "$BODY"; then mig_eq "SELECT $T_SLEEP FROM users WHERE id = 1" "13" "still asleep"
 else expect_body 'The monster has woken up.'; mig_eq "SELECT $T_SLEEP FROM users WHERE id = 1" "0" "woke up"; fi
 mig_eq "SELECT currentmp || '|' || $T_UBER_DAMAGE || '|' || $T_UBER_DEFENSE FROM users WHERE id = 1" "30|25|10" "MP spent (35 - 5), buffs kept"
@@ -979,13 +979,13 @@ t_login fighter v8pass1; expect_redirect /
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
 expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'; expect_no_body "Monster's MP"
 mig_eq "SELECT round FROM fights WHERE user_id = 1" "4" "the counter is kept"
-t_post /fight "csrf=$(t_csrf)&fight=Fight"; expect_status 200
+t_round "csrf=$(t_csrf)&fight=Fight"; expect_status 200
 mig_eq "SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2" "5|5" "the Shadow's MP is full"
 t_jar migv8b
 t_login brewer v8pass1
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Homebrew<template class="tip">'; expect_body "Monster's HP: 20"
 V8_CS=$(t_csrf)
-t_post /fight "csrf=$V8_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
+t_round "csrf=$V8_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
 mig_eq "SELECT entity_id FROM fight_combatants WHERE user_id = 2 AND id = 2" "152" "the retired monster's fight goes on"
 t_get /help/monsters; expect_body '>Big Slime</td>'; expect_no_body 'Homebrew'
 mig_unserve "$MIG/v8server.log"
@@ -1139,7 +1139,7 @@ expect_body '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime<
 expect_body 'aria-label="Mend (5 MP)"><img src="/static/images/skills/heal.png"'
 expect_body '<template class="tip"><div class="tip-title">Mend</div><div class="tip-meta">5 MP · In fights and in town</div>'
 expect_body "Monster's HP: 3"
-t_post /fight "csrf=$(t_csrf)&round=$(mig_sql "$V12_DB" "SELECT round FROM fights")&spell=1"
+t_round "csrf=$(t_csrf)&round=$(mig_sql "$V12_DB" "SELECT round FROM fights")&spell=1"
 expect_body 'You have cast the Mend spell, and gained 10 Hit Points.'
 mig_unserve "$MIG/v12server.log"
 "$BIN" migrate --config "$MIG/v12.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v12)"
@@ -1213,7 +1213,7 @@ t_jar migv13; t_reset_jar
 t_login oldmage v13pass1; expect_redirect /
 t_get /fight; expect_status 200; expect_body "Monster's HP: 40"
 expect_body 'name="spell" value="25" title="Magic Bolt (1 MP)" aria-label="Magic Bolt (1 MP)"><img src="/static/images/skills/magic_bolt.png"'
-t_post /fight "csrf=$(t_csrf)&round=$(mig_sql "$V13_DB" "SELECT round FROM fights")&spell=25"
+t_round "csrf=$(t_csrf)&round=$(mig_sql "$V13_DB" "SELECT round FROM fights")&spell=25"
 expect_body 'You have cast the Magic Bolt spell for '
 mig_eq "SELECT currentmp FROM users WHERE id = 1" "14" "1 MP spent"
 mig_unserve "$MIG/v13server.log"
@@ -1272,7 +1272,7 @@ t_jar migv14; t_reset_jar
 t_login midfight v14pass1; expect_redirect /
 t_get /fight; expect_status 200; expect_body "Monster's HP: 2"; expect_body 'name="round" value="3"'
 t_get /fight; mig_eq "SELECT round FROM fights WHERE user_id = 1" "3" "GET /fight counts nothing"
-t_post /fight "csrf=$(t_csrf)&round=3&fight=Fight"
+t_round "csrf=$(t_csrf)&round=3&fight=Fight"
 mig_eq "SELECT (round = 4 AND outcome = '') OR outcome = 'victory' FROM fights WHERE user_id = 1" "1" "a round is played"
 t_jar migv14w; t_reset_jar
 t_login winner v14pass1; expect_redirect /

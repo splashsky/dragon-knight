@@ -85,6 +85,8 @@ def answer():
 		if m: d["round"] = int(m.group(1))
 		if "fight-stale" in main: d["stale"] = True
 		if d.get("title") == "Error": d["error"] = html.unescape(re.sub(r"<[^>]*>", "", main)).strip()
+		m = re.search(r'<p class="fight-note error" role="alert">(.*?)</p>', main, re.S)
+		if m: d["error"] = html.unescape(m.group(1))
 	if "url" in d and d["url"] != req: d["redirect"] = d["url"]
 	return d
 
@@ -166,7 +168,7 @@ fa_location() { grep -i '^location:' "$HEADERS" | tr -d '\r' | cut -d' ' -f2; }
 fa_both() {
 	local label=$1 seed=$2 setup=$3 fields=$4 st1 st2 l1 l2 s1 loc1
 	$setup
-	t_post /fight "csrf=$FA_CS&$fields" -H "X-Test-Seed: $seed"
+	t_round "csrf=$FA_CS&$fields" -H "X-Test-Seed: $seed"
 	s1=$STATUS; st1=$(fa_state); l1=$(fa_py lines-html); loc1=$(fa_location)
 	$setup
 	fa_live POST /fight "csrf=$FA_CS&$fields" -H "X-Test-Seed: $seed"
@@ -211,7 +213,7 @@ if command -v node >/dev/null; then
 fi
 # a form from before 2.3 (no round field) still plays
 t_fight fapi 2 50
-t_post /fight "csrf=$FA_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
+t_round "csrf=$FA_CS&fight=Fight"; expect_status 200; expect_body 'You attack the monster for'
 fa_is "$T_ROUND" 3
 
 t_section "fight api: attacks, form and fetch alike"
@@ -222,7 +224,7 @@ for seed in 1 2 3 4 5 6; do
 	[ "$(fa_get 'any(e["type"] == "attack" and e["actor"] == "player" and e["hp"][0]["who"] == "enemy" and e["hp"][0]["to"] < e["hp"][0]["from"] for e in d["events"] if "hp" in e)')" = true ] && FA_HIT=1
 done
 [ -n "$FA_HIT" ] && t_ok || t_fail "no attack's damage in the events"
-fa_expect 'd["round"] == 3 and "url" not in d and d["title"] == "Fighting"' "a POST's own page: no address"
+fa_expect 'd["round"] == 3 and d["url"] == "/fight" and d["title"] == "Fighting"' "the fight page's address (Post/Redirect/Get)"
 fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "Latitude:" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
 fa_expect '"name=\"round\" value=\"3\"" in d["fragments"]["main"] and "<html" not in d["fragments"]["main"]'
 fa_expect 'not any("data" in e or "step" in e for e in d["events"])' "no internal state"
@@ -297,7 +299,7 @@ fa_expect "'action=\"/spell/$FA_HEAL\"' in d['fragments']['nav_right'] and 'clas
 for seed in 1 2; do
 	fa_both "heal button" "$seed" fa_hurt "spell=$FA_HEAL&round=2"
 	FA_BUTTON=$(fa_state)
-	fa_hurt; t_post /fight "csrf=$FA_CS&spell=Spell&userspell=$FA_HEAL&round=2" -H "X-Test-Seed: $seed"
+	fa_hurt; t_round "csrf=$FA_CS&spell=Spell&userspell=$FA_HEAL&round=2" -H "X-Test-Seed: $seed"
 	[ "$(fa_state)" = "$FA_BUTTON" ] && t_ok || t_fail "the button and the old select differ (seed $seed)"
 done
 for seed in 3 4; do fa_both "hurt button" "$seed" fa_slime "spell=$(sp hurt)&round=2"; done
@@ -321,7 +323,7 @@ for seed in 1 2; do
 	fa_expect 'any(e["type"] == "item" and e["text"] == "You have used the Herb, and gained 30 Hit Points." for e in d["events"] if "text" in e)' "Herb button: used"
 	fa_expect "'name=\"item\" value=\"$(it herb)\" title=\"Herb (x1)\" aria-label=\"Herb (x1)\"><img src=\"/static/images/items/herb.png\"' in d['fragments']['main']" "the fragment's item buttons"
 	FA_BUTTON=$(fa_state)
-	fa_herb; t_post /fight "csrf=$FA_CS&item=Use+Item&useritem=$(it herb)&round=2" -H "X-Test-Seed: $seed"
+	fa_herb; t_round "csrf=$FA_CS&item=Use+Item&useritem=$(it herb)&round=2" -H "X-Test-Seed: $seed"
 	[ "$(fa_state)" = "$FA_BUTTON" ] && t_ok || t_fail "the item button and the old select differ (seed $seed)"
 done
 # the Wand (a fixed user_items id, so both runs send the same button), no MP left
@@ -373,7 +375,7 @@ t_section "fight api: refusals"
 fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing changes, the same text both ways
 	local before st1
 	$1; before=$(fa_state)
-	t_post /fight "csrf=$FA_CS&$2"; expect_status 200
+	t_round "csrf=$FA_CS&$2"; expect_status 200
 	[ "$(fa_py html-has "$3")" = yes ] && t_ok || t_fail "page lacks: $3"
 	st1=$(fa_state); [ "$st1" = "$before" ] && t_ok || t_fail "a refusal changed: $before -> $st1"
 	$1
@@ -382,25 +384,25 @@ fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing chang
 	[ "$(fa_state)" = "$before" ] && t_ok || t_fail "a refusal changed (fetch)"
 }
 fa_full() { fa_player; t_fight fapi 2 50; t_give fapi herb 1; }
-fa_check_refusal fa_full "spell=Spell&userspell=$(sp heal)&round=2" "Your Hit Points are already full. Please go back and try again."
-fa_check_refusal fa_full "item=Use+Item&useritem=$(it herb)&round=2" "Your Hit Points are already full. Please go back and try again."
-fa_check_refusal fa_full "spell=Spell&userspell=0&round=2" "You must select a spell first. Please go back and try again."
-fa_check_refusal fa_full "item=Use+Item&useritem=$(it potion)&round=2" "You do not have this item. Please go back and try again."
-fa_check_refusal fa_full "spell=Spell&userspell=$(sp fury)&round=2" "You have not yet learned this spell. Please go back and try again."
+fa_check_refusal fa_full "spell=Spell&userspell=$(sp heal)&round=2" "Your Hit Points are already full."
+fa_check_refusal fa_full "item=Use+Item&useritem=$(it herb)&round=2" "Your Hit Points are already full."
+fa_check_refusal fa_full "spell=Spell&userspell=0&round=2" "You must select a spell first."
+fa_check_refusal fa_full "item=Use+Item&useritem=$(it potion)&round=2" "You do not have this item."
+fa_check_refusal fa_full "spell=Spell&userspell=$(sp fury)&round=2" "You have not yet learned this spell."
 # the same refusals for a spell button's value (a direct POST: the page disables what MP don't cover)
-fa_check_refusal fa_full "spell=$(sp heal)&round=2" "Your Hit Points are already full. Please go back and try again."
-fa_check_refusal fa_full "spell=0&round=2" "You must select a spell first. Please go back and try again."
-fa_check_refusal fa_full "spell=$(sp fury)&round=2" "You have not yet learned this spell. Please go back and try again."
+fa_check_refusal fa_full "spell=$(sp heal)&round=2" "Your Hit Points are already full."
+fa_check_refusal fa_full "spell=0&round=2" "You must select a spell first."
+fa_check_refusal fa_full "spell=$(sp fury)&round=2" "You have not yet learned this spell."
 fa_short() { fa_full; fa_sql "UPDATE users SET currentmp = 2"; }
-fa_check_refusal fa_short "spell=$(sp hurt)&round=2" "You do not have enough Magic Points to cast this spell. Please go back and try again."
+fa_check_refusal fa_short "spell=$(sp hurt)&round=2" "You do not have enough Magic Points to cast this spell."
 # an item button's value; the Wand with no charge left, one in the bag, one not yours
-fa_check_refusal fa_full "item=$(it herb)&round=2" "Your Hit Points are already full. Please go back and try again."
-fa_check_refusal fa_full "item=$(it potion)&round=2" "You do not have this item. Please go back and try again."
+fa_check_refusal fa_full "item=$(it herb)&round=2" "Your Hit Points are already full."
+fa_check_refusal fa_full "item=$(it potion)&round=2" "You do not have this item."
 fa_check_refusal fa_empty "use_gear=$FA_WAND&round=2" "The Wand has no charges left. Rest at an inn to recharge it."
 fa_bagged() { fa_wand; t_sql "UPDATE user_items SET equipped = NULL WHERE id = $FA_WAND"; }
-fa_check_refusal fa_bagged "use_gear=$FA_WAND&round=2" "You do not have this item equipped. Please go back and try again."
-fa_check_refusal fa_full "use_gear=1&round=2" "You do not have this item equipped. Please go back and try again."
-fa_check_refusal fa_full "use_gear=x&round=2" "You do not have this item equipped. Please go back and try again."
+fa_check_refusal fa_bagged "use_gear=$FA_WAND&round=2" "You do not have this item equipped."
+fa_check_refusal fa_full "use_gear=1&round=2" "You do not have this item equipped."
+fa_check_refusal fa_full "use_gear=x&round=2" "You do not have this item equipped."
 
 t_section "fight api: monster spells and items"
 # fa_find LABEL SETUP 'fields' 'python condition on d' : the first seed (of 40) whose fetch
@@ -439,23 +441,23 @@ t_section "fight api: death"
 fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 151 30000; }
 fa_both death 1 fa_doomed "fight=Fight&round=2"
 fa_expect 'd["events"][-1]["type"] == "death" and "<b>You have died.</b>" in d["fragments"]["main"] and "round" not in d'
-fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and "url" not in d'
+fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and d["url"] == "/fight"'
 fa_is currentaction "In Town"
 fa_live GET /dead; expect_status 200; fa_check
 fa_expect '"You have died." in d["fragments"]["main"] and d["title"] == "You Have Died" and d["url"] == "/dead"'
 
 t_section "fight api: stale rounds"
 fa_player; t_fight fapi 2 500
-t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_status 200
+t_round "csrf=$FA_CS&fight=Fight&round=1"; expect_status 200
 expect_body 'That command came from an older page, so nothing happened.'
 expect_no_body 'class="fight-yourturn"'; expect_body 'name="round" value="2"'
 fa_is "$T_MONSTER_HP" 500; fa_is "$T_ROUND" 2
 # a second click: the first plays, the second is stale (the page shows the fight as it is:
 # the last round's lines again, nothing played)
-t_post /fight "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'You attack the monster for'; expect_no_body 'fight-stale'
+t_round "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'You attack the monster for'; expect_no_body 'fight-stale'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ"); fa_is "$T_ROUND" 3
 BEFORE=$(fa_state)
-t_post /fight "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'fight-stale'; expect_body 'name="round" value="3"'
+t_round "csrf=$FA_CS&fight=Fight&round=2"; expect_body 'fight-stale'; expect_body 'name="round" value="3"'
 [ "$(fa_state)" = "$BEFORE" ] && t_ok || t_fail "a stale form changed the fight"
 # the same with fetch
 fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=3"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 4'
@@ -466,14 +468,14 @@ fa_is "$T_MONSTER_HP" "$HP"
 fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=x"; fa_check; fa_expect 'd["stale"] is True'
 # long fights: the counter goes past the original's cap of 255, stale rounds are still caught
 fa_player; t_fight fapi 2 5000 255
-t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 256
+t_round "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 256
 expect_body 'name="round" value="256"'
-t_post /fight "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'fight-stale'; fa_is "$T_ROUND" 256
+t_round "csrf=$FA_CS&fight=Fight&round=255"; expect_body 'fight-stale'; fa_is "$T_ROUND" 256
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fights SET round = 301 WHERE user_id = (SELECT id FROM users $FAQ)"
-t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 302
+t_round "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'You attack the monster for'; fa_is "$T_ROUND" 302
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
-t_post /fight "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'
+t_round "csrf=$FA_CS&fight=Fight&round=301"; expect_body 'fight-stale'
 fa_is "$T_MONSTER_HP" "$HP"; fa_is "$T_ROUND" 302
 fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=302"; fa_check; fa_expect '"stale" not in d and len(d["events"]) > 0 and d["round"] == 303'
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $FAQ")
@@ -483,11 +485,11 @@ fa_is "$T_MONSTER_HP" "$HP"
 fa_sql "UPDATE users SET currenthp = 300"
 t_sql "UPDATE fight_combatants SET hp = 0 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FAQ)"
 fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=1"; fa_check; fa_expect 'd["redirect"] == "/victory"'
-t_post /fight "csrf=$FA_CS&fight=Fight&round=1"; expect_redirect /   # paid: the fight is over
+t_round "csrf=$FA_CS&fight=Fight&round=1"; expect_redirect /   # paid: the fight is over
 t_fight_clear fapi; fa_sql "UPDATE users SET currentaction = 'Exploring'"
-t_post /fight "csrf=$FA_CS&fight=Fight&round=9"; expect_redirect /
+t_round "csrf=$FA_CS&fight=Fight&round=9"; expect_redirect /
 fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=9"; fa_check; fa_expect 'd["redirect"] == "/"'
-t_post /fight "csrf=$FA_CS&fight=Fight"; expect_body 'Cheat attempt detected.'   # no round: as before
+t_round "csrf=$FA_CS&fight=Fight"; expect_body 'Cheat attempt detected.'   # no round: as before
 fa_live POST /fight "csrf=$FA_CS&fight=Fight"; fa_check; fa_expect 'd["error"].startswith("Cheat attempt detected.")'
 
 t_section "fight api: CSRF"
@@ -511,7 +513,7 @@ fa_live POST /drop "csrf=$FA_CS&leave=Leave+it"; fa_check; fa_expect 'd["redirec
 for k in stick branch club dagger hatchet axe brand poleaxe broadsword battle_axe claymore; do t_give fapi "$k"; done
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"
 fa_live POST /drop "csrf=$FA_CS&take=x&discard=999999"; fa_check
-fa_expect 'd["error"] == "Please go back and select an item from your bag to discard."'
+fa_expect '"Select an item from your bag to discard." in d["fragments"]["main"]'
 fa_live POST /drop "csrf=$FA_CS&take=x"; fa_check; fa_expect '"Your bag is full. Choose an item to discard first" in d["fragments"]["main"]'
 fa_is dropcode "$(it life_pebble)"
 t_items_clear fapi; fa_sql "UPDATE users SET dropcode = 0"

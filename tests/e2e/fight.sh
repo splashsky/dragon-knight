@@ -40,7 +40,7 @@ hp=$(f_col "$T_MONSTER_HP")
 expect_body "data-value=\"$hp\" data-max=\"$hp\">Monster's HP: $hp</p>"
 f_is "(SELECT c.maxhp FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'enemy')" "$hp"
 f_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id)" 2
-t_post /fight "fight=Fight"; expect_status 403          # CSRF required
+t_round "fight=Fight"; expect_status 403          # CSRF required
 f_is "$T_ROUND" 2
 t_get /fight; expect_body "Monster's HP: $hp"; f_is "$T_ROUND" 2   # refresh: same monster, nothing counted
 
@@ -51,7 +51,7 @@ DEX=$(f_col dexterity)
 # dexterity 10000: rand(4,10) + 100 beats rand(1,5) + ceil(sqrt(maxdam)) of any level 9-11 monster
 f_sql "UPDATE users SET dexterity = 10000"
 t_fight_status fighter 1 uber_damage 'pct=i:10'; t_fight_status fighter 1 uber_defense 'pct=i:20'
-t_post /fight "csrf=$CS&run=Run"; expect_redirect /
+t_round "csrf=$CS&run=Run"; expect_redirect /
 f_is currentaction Exploring; f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0; f_is "$T_MONSTER_HP" 0
 f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0; f_is "$T_STATUSES" ""
 f_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id)" 0
@@ -63,7 +63,7 @@ t_section "fight: run away blocked"
 # no dodge with dexterity 0, and the hit is rand(300,600) - 0
 t_fight fighter 151 30000
 f_sql "UPDATE users SET dexterity = 0, base_defense = 0, currenthp = 5000, base_maxhp = 5000"
-t_post /fight "csrf=$CS&run=Run"; expect_status 200
+t_round "csrf=$CS&run=Run"; expect_status 200
 expect_body 'You tried to run away, but were blocked in front!'; expect_body "Monster's HP: 30000"
 expect_body 'The monster attacks you for'; expect_body 'name="run"'; expect_no_body 'You have died.'
 f_is currentaction Fighting; f_is "$T_ROUND" 3; f_is "$T_MONSTER" 151; f_is "$T_MONSTER_HP" 30000
@@ -78,7 +78,7 @@ f_sql "UPDATE users SET latitude = 0, longitude = 0,
 t_fight_new fighter
 t_get /fight; CS=$(t_csrf)
 for _ in $(seq 1 30); do
-	t_post /fight "csrf=$CS&fight=Fight"
+	t_round "csrf=$CS&fight=Fight"
 	[ "$STATUS" = 302 ] && break
 done
 expect_redirect /victory
@@ -102,7 +102,7 @@ t_fight_new fighter
 t_get /fight; CS=$(t_csrf)
 t_fight_status fighter 1 uber_damage 'pct=i:10'
 for _ in $(seq 1 30); do
-	t_post /fight "csrf=$CS&fight=Fight"
+	t_round "csrf=$CS&fight=Fight"
 	[ "$STATUS" = 302 ] && break
 done
 expect_redirect /victory
@@ -114,47 +114,75 @@ t_fight_new fighter
 f_sql "UPDATE users SET currenthp = 100, currentmp = 10, base_maxmp = 50"
 t_get /fight; CS=$(t_csrf)
 expect_body 'name="spell" value="1" title="Heal (5 MP)"'
-t_post /fight "csrf=$CS&spell=Spell&userspell=0"; expect_body 'You must select a spell first.'
-t_post /fight "csrf=$CS&spell=Spell";            expect_body 'You must select a spell first.'
-t_post /fight "csrf=$CS&spell=Spell&userspell=6"; expect_body 'You have not yet learned this spell.'
-t_post /fight "csrf=$CS&spell=Spell&userspell=$(t_enc "1' OR '1'='1")"; expect_body 'You have not yet learned this spell.'
-t_post /fight "csrf=$CS&spell=Spell&userspell=999"; expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=Spell&userspell=0"; expect_body 'You must select a spell first.'
+t_round "csrf=$CS&spell=Spell";            expect_body 'You must select a spell first.'
+t_round "csrf=$CS&spell=Spell&userspell=6"; expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=Spell&userspell=$(t_enc "1' OR '1'='1")"; expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=Spell&userspell=999"; expect_body 'You have not yet learned this spell.'
 f_is currentmp 10
-t_post /fight "csrf=$CS&spell=Spell&userspell=1"
+t_round "csrf=$CS&spell=Spell&userspell=1"
 expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 f_is currentmp 5
 # heal at (or above) full HP: refused, no MP spent, the monster doesn't act
 f_sql "UPDATE users SET currenthp = base_maxhp, currentmp = 10"
 FIGHT=$(f_col "$T_ROUND")
-t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
-expect_no_body 'The monster attacks'
+t_round "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
+expect_body '<p class="fight-note error" role="alert">'; expect_body 'name="fight"'
 f_is currentmp 10; f_is "$T_ROUND" "$FIGHT"; f_is "currenthp = base_maxhp" 1
 f_sql "UPDATE users SET currenthp = base_maxhp + 5"
-t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
+t_round "csrf=$CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 f_is currentmp 10; f_is "currenthp = base_maxhp + 5" 1
 # a retired spell (its file and so its code are gone): refused the same way
 t_sql "UPDATE spells SET retired = 1 WHERE id = 1"
 f_sql "UPDATE users SET currenthp = 100"
-t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'This spell cannot be cast.'
+t_round "csrf=$CS&spell=Spell&userspell=1"; expect_body 'This spell cannot be cast.'
 f_is currentmp 10; f_is currenthp 100; f_is "$T_ROUND" "$FIGHT"
 t_sql "UPDATE spells SET retired = 0 WHERE id = 1"
 f_sql "UPDATE users SET currentmp = 4"
-t_post /fight "csrf=$CS&spell=Spell&userspell=1"; expect_body 'You do not have enough Magic Points'
+t_round "csrf=$CS&spell=Spell&userspell=1"; expect_body 'You do not have enough Magic Points'
 f_is currentmp 4
 # sleep spell, then a hurt spell that kills
 t_spells fighter 1,6,11
 t_fight fighter 2 50 "$FIGHT"
 f_sql "UPDATE users SET currentmp = 50"
-t_post /fight "csrf=$CS&spell=Spell&userspell=11"
+t_round "csrf=$CS&spell=Spell&userspell=11"
 expect_body 'You have cast the Sleep spell. The monster is asleep.'
 if grep -qF 'The monster is still asleep.' "$BODY"; then f_is "$T_SLEEP" 5; f_is "$T_STATUSES" "enemy:sleep"
 	expect_body '&mdash; Asleep</span>'
 else expect_body 'The monster has woken up.'; f_is "$T_SLEEP" 0; fi
 f_is currentmp 40
 t_sql "UPDATE fight_combatants SET hp = 1 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FQ)"
-t_post /fight "csrf=$CS&spell=Spell&userspell=6"; expect_redirect /victory
+t_round "csrf=$CS&spell=Spell&userspell=6"; expect_redirect /victory
 [ "$(f_col "$T_MONSTER_HP")" -le 0 ] && t_ok || t_fail "the monster is not defeated"; f_is currentmp 35
 t_get /victory; expect_body 'You have defeated the Red Slime.'
+
+t_section "fight: every command comes back to the fight page (Post/Redirect/Get)"
+t_spells fighter 1,6
+t_fight fighter 2 500
+DEX0=$(f_col dexterity)
+f_sql "UPDATE users SET currenthp = 100, base_maxhp = 100, currentmp = 50, base_maxmp = 50, dexterity = 22500"
+t_get /fight; CS=$(t_csrf)
+# a round: a redirect, and the page shows its lines (again on a reload: nothing replayed)
+t_post /fight "csrf=$CS&fight=Fight&round=2"; expect_redirect /fight
+f_is "$T_ROUND" 3
+t_get /fight; expect_body 'class="fight-yourturn">'; expect_no_body 'fight-note'; expect_body 'name="round" value="3"'
+LINES=$(grep -o 'class="fight-yourturn">[^<]*' "$BODY")
+t_get /fight; [ "$(grep -o 'class="fight-yourturn">[^<]*' "$BODY")" = "$LINES" ] && t_ok || t_fail "a reload shows the same round"
+f_is "$T_ROUND" 3
+# a refusal: nothing played, the page says why above the commands, the round's lines stay
+t_post /fight "csrf=$CS&spell=Spell&userspell=11&round=3"; expect_redirect /fight
+t_get /fight; expect_body '<p class="fight-note error" role="alert">You have not yet learned this spell.</p>'
+expect_no_body 'Please go back'; expect_body 'name="fight"'; expect_body 'class="fight-yourturn">'
+f_is "$T_ROUND" 3
+# ... until the next command that plays
+t_round "csrf=$CS&fight=Fight&round=3"; expect_no_body 'fight-note'; f_is "$T_ROUND" 4
+# a form from an older page: the note at the top
+t_round "csrf=$CS&fight=Fight&round=3"; expect_body 'class="fight-stale"'; expect_no_body 'fight-note'
+f_is "$T_ROUND" 4
+t_round "csrf=$CS&fight=Fight&round=4"; expect_no_body 'class="fight-stale"'; f_is "$T_ROUND" 5
+t_fight_clear fighter
+f_sql "UPDATE users SET dexterity = $DEX0"
+t_spells fighter 1,6,11
 
 t_section "fight: spell buttons"
 # one icon button per spell (spell=<id>), the MP cost as a badge, the spell's icon or
@@ -175,21 +203,21 @@ f_sql "UPDATE users SET currentmp = 4"
 t_get /fight
 expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
 expect_body 'name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" disabled><img'
-t_post /fight "csrf=$CS&spell=1"; expect_body 'You do not have enough Magic Points'; f_is currentmp 4
+t_round "csrf=$CS&spell=1"; expect_body 'You do not have enough Magic Points'; f_is currentmp 4
 f_sql "UPDATE users SET currentmp = 6"
 t_get /fight; expect_no_body ' disabled><img'
 # the refusals of the old select hold for the button's value too
 FIGHT=$(f_col "$T_ROUND")
-t_post /fight "csrf=$CS&spell=0";   expect_body 'You must select a spell first.'
-t_post /fight "csrf=$CS&spell=";    expect_body 'You must select a spell first.'
-t_post /fight "csrf=$CS&spell=abc"; expect_body 'You must select a spell first.'
-t_post /fight "csrf=$CS&spell=11";  expect_body 'You have not yet learned this spell.'
-t_post /fight "csrf=$CS&spell=999"; expect_body 'You have not yet learned this spell.'
-t_post /fight "csrf=$CS&spell=$(t_enc "1' OR '1'='1")"; expect_body 'You have not yet learned this spell.'
-t_post /fight "csrf=$CS&spell=6&userspell=0"; expect_body 'You must select a spell first.'   # the old form's select wins
+t_round "csrf=$CS&spell=0";   expect_body 'You must select a spell first.'
+t_round "csrf=$CS&spell=";    expect_body 'You must select a spell first.'
+t_round "csrf=$CS&spell=abc"; expect_body 'You must select a spell first.'
+t_round "csrf=$CS&spell=11";  expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=999"; expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=$(t_enc "1' OR '1'='1")"; expect_body 'You have not yet learned this spell.'
+t_round "csrf=$CS&spell=6&userspell=0"; expect_body 'You must select a spell first.'   # the old form's select wins
 f_is currentmp 6; f_is "$T_ROUND" "$FIGHT"
 # casting with the button: the same as the old select
-t_post /fight "csrf=$CS&spell=1"
+t_round "csrf=$CS&spell=1"
 expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 f_is currentmp 1
 # after the round the page shows the new MP: both buttons greyed out
@@ -205,7 +233,7 @@ t_fight fighter 151 30000
 f_sql "UPDATE users SET base_attack = 1 - strength, currenthp = 1, base_maxhp = 30,
 	dexterity = 0, base_defense = 0, gold = 101, latitude = 40, longitude = -40"
 t_get /fight; CS=$(t_csrf)
-t_post /fight "csrf=$CS&fight=Fight"
+t_round "csrf=$CS&fight=Fight"
 expect_status 200; expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'
 expect_no_body 'name="fight"'
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
@@ -221,7 +249,7 @@ t_spells fighter 1,6,11,14
 t_fight fighter 151 30000
 t_fight_status fighter 1 uber_defense 'pct=i:25'
 f_sql "UPDATE users SET currenthp = 1, currentmp = 30, base_maxmp = 50, gold = 100"
-t_post /fight "csrf=$CS&spell=Spell&userspell=14"
+t_round "csrf=$CS&spell=Spell&userspell=14"
 expect_status 200; expect_body 'You have cast the Craze spell'; expect_body '<b>You have died.</b>'
 f_is currentaction 'In Town'; f_is currentmp 20; f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0
 f_is gold 50; f_is currenthp 8
@@ -230,7 +258,7 @@ t_section "fight: run away blocked, fatal"
 t_fight fighter 151 30000
 t_fight_status fighter 1 uber_damage 'pct=i:10'; t_fight_status fighter 1 uber_defense 'pct=i:10'
 f_sql "UPDATE users SET currenthp = 1, currentmp = 7, gold = 101, latitude = 40, longitude = -40"
-t_post /fight "csrf=$CS&run=Run"
+t_round "csrf=$CS&run=Run"
 expect_status 200; expect_body 'You tried to run away, but were blocked in front!'
 expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'; expect_no_body 'name="run"'
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
@@ -254,13 +282,13 @@ expect_body '<button class="spell-btn" type="submit" name="item" value="68" titl
 expect_body '<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · x3 · In fights and in town</div>'
 expect_no_body 'title="Stick'; expect_no_body 'name="use_gear"'; expect_no_body 'class="fight-gear"'
 FIGHT=$(f_col "$T_ROUND")
-t_post /fight "csrf=$CS&item=Use+Item&useritem=0";  expect_body 'You must select an item first.'
-t_post /fight "csrf=$CS&item=Use+Item&useritem=67"; expect_body 'You do not have this item.'
-t_post /fight "csrf=$CS&item=Use+Item";             expect_body 'You must select an item first.'
-t_post /fight "csrf=$CS&item=Use+Item&useritem=1";  expect_body 'This item cannot be used.'   # a stick
-t_post /fight "csrf=$CS&item=Use+Item&useritem=$(t_enc "66 OR 1=1")"; expect_body 'You do not have this item.'
+t_round "csrf=$CS&item=Use+Item&useritem=0";  expect_body 'You must select an item first.'
+t_round "csrf=$CS&item=Use+Item&useritem=67"; expect_body 'You do not have this item.'
+t_round "csrf=$CS&item=Use+Item";             expect_body 'You must select an item first.'
+t_round "csrf=$CS&item=Use+Item&useritem=1";  expect_body 'This item cannot be used.'   # a stick
+t_round "csrf=$CS&item=Use+Item&useritem=$(t_enc "66 OR 1=1")"; expect_body 'You do not have this item.'
 f_is "$T_ROUND" "$FIGHT"; f_is "$T_ITEMS" "herbx3,ether,stick"
-t_post /fight "csrf=$CS&item=Use+Item&useritem=66"
+t_round "csrf=$CS&item=Use+Item&useritem=66"
 expect_status 200; expect_body 'You have used the Herb, and gained 30 Hit Points.'; expect_body 'The monster attacks you for'
 f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" $((FIGHT + 1))
 [ "$(f_col currenthp)" -le 40 ] && [ "$(f_col currenthp)" -ge 30 ] && t_ok || t_fail "herb in a fight: hp $(f_col currenthp)"
@@ -270,15 +298,15 @@ f_sql "UPDATE users SET currenthp = 100"
 t_get /fight; expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)" disabled><img'
 expect_body 'name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)"><img'
 FIGHT=$(f_col "$T_ROUND")
-t_post /fight "csrf=$CS&item=Use+Item&useritem=66"; expect_body 'Your Hit Points are already full.'
-expect_no_body 'The monster attacks'; f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" "$FIGHT"
-t_post /fight "csrf=$CS&item=66"; expect_body 'Your Hit Points are already full.'; f_is "$T_ROUND" "$FIGHT"
+t_round "csrf=$CS&item=Use+Item&useritem=66"; expect_body 'Your Hit Points are already full.'
+expect_body '<p class="fight-note error" role="alert">'; expect_body 'name="fight"'; f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" "$FIGHT"
+t_round "csrf=$CS&item=66"; expect_body 'Your Hit Points are already full.'; f_is "$T_ROUND" "$FIGHT"
 # the icon button's contract: item=<id>; the last one of a stack: the row goes
-t_post /fight "csrf=$CS&item=68"; expect_body 'You have used the Ether, and gained 30 Magic Points.'
+t_round "csrf=$CS&item=68"; expect_body 'You have used the Ether, and gained 30 Magic Points.'
 f_is currentmp 30; f_is "$T_ITEMS" "herbx2,stick"
 expect_no_body 'title="Ether'
-t_post /fight "csrf=$CS&item=0";  expect_body 'You must select an item first.'
-t_post /fight "csrf=$CS&item=68"; expect_body 'You do not have this item.'
+t_round "csrf=$CS&item=0";  expect_body 'You must select an item first.'
+t_round "csrf=$CS&item=68"; expect_body 'You do not have this item.'
 t_items_clear fighter
 t_get /fight; expect_no_body 'id="fight-items-label"'   # no usable items: no Items section
 t_items_clear fighter
@@ -308,7 +336,7 @@ t_get /drop; expect_body 'Your bag is full.'; expect_body 'name="discard"'
 expect_body 'name="take" value="Discard it and take the Demon&#39;s Sin"'
 t_post /drop "csrf=$CS&take=x"; expect_body 'Your bag is full. Choose an item to discard first'
 OTHER=$(t_sql "SELECT min(id) FROM user_items WHERE user_id <> (SELECT id FROM users WHERE username = 'fighter')")
-[ -n "$OTHER" ] && { t_post /drop "csrf=$CS&take=x&discard=$OTHER"; expect_body 'Please go back and select an item from your bag'; }
+[ -n "$OTHER" ] && { t_post /drop "csrf=$CS&take=x&discard=$OTHER"; expect_body '<p class="error">Select an item from your bag to discard.</p>'; }
 STICK=$(t_sql "SELECT ui.id FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE i.key = 'stick' AND ui.user_id = (SELECT id FROM users WHERE username = 'fighter')")
 t_post /drop "csrf=$CS&take=x&discard=$STICK"; expect_body 'You discarded the Stick. The Demon&#39;s Sin is in your bag.'
 f_is dropcode 0

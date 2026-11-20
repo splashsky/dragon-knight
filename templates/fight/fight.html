@@ -1,9 +1,10 @@
 {#- Fight screen (legacy templates/fight.php + fight.php fight()); statuses, allies and the
 		locked "Continue" turn are new (fight/round.lua). The data-* attributes are fight.js's
-		hooks (docs/APP.md "Fight API"): data-fighter (a combatant's id), data-stat/-value/-max
-		(the numbers it animates), data-fight-log (the round's lines), data-fight (forms it
-		sends with fetch). Every form carries the round it was shown at (stale forms play
-		nothing). Attack and Run are icon buttons too (fight=Fight, run=Run, as the text buttons
+		hooks (docs/APP.md "Fight events"): data-fighter (a combatant's id), data-stat/-value/-max
+		(the numbers it animates), data-fight-log (the round's lines), data-fight (the forms it
+		locks while a round plays). Every form carries the round it was shown at (stale forms
+		play nothing: the page says so at the top); a refused command (not enough MP, ...) is a
+		note above the commands. Attack and Run are icon buttons too (fight=Fight, run=Run, as the text buttons
 		before 2.4 sent: routes/fight.lua reads the name), Run set apart from Attack. A
 		spell is an icon button, spell=<id> (spells.buttons: greyed out and
 		disabled when the MP don't cover it; the server checks again), in a span that carries
@@ -43,6 +44,9 @@
 {%- end %}
 {%- end %}
 </div>
+{%- if note and not dead then %}
+<p class="fight-note error" role="alert">{{ note }}</p>
+{%- end %}
 {%- if dead then %}
 {{{ include("fight/died") }}}
 {%- elseif locked then %}

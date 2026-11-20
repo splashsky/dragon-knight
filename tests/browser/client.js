@@ -230,6 +230,17 @@ async function run(wsUrl, port) {
 			check("the bar still there", await js("!!document.querySelector('[data-fighter] .fight-meter[data-client]')"));
 		}
 		check("no reload", await js("window.__dk === 1"));
+		// a refused command (a spell not known): the fight page with a note above the
+		// commands, in place
+		if (await js("!!document.querySelector('form[data-fight] button[name=fight]')")) {
+			await js("var f = document.querySelector('form[data-fight]'), i = document.createElement('input');" +
+				"i.type = 'hidden'; i.name = 'spell'; i.value = '999'; f.appendChild(i); f.requestSubmit()");
+			check("a refusal: the note", await until("!DK.busy() && !!document.querySelector('.fight-note[role=alert]')"),
+				await js("document.querySelector('[data-r=main]').textContent.slice(0, 200)"));
+			check("its text", await js("document.querySelector('.fight-note').textContent === 'You have not yet learned this spell.'"));
+			check("the commands still there", await js("!!document.querySelector('form[data-fight] button[name=fight]')"));
+			check("no reload", await js("window.__dk === 1 && location.pathname === '/fight'"));
+		}
 	}
 	await js("DK.visit('/')");
 	await until("!DK.busy()");

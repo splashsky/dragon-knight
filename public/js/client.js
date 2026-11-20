@@ -494,7 +494,10 @@
 	window.addEventListener("submit", function (ev) {
 		var form = ev.target;
 		if (ev.defaultPrevented || closest(form, "[data-native]")) return;
-		var submitter = ev.submitter || (lastButton && lastButton.form === form ? lastButton : null);
+		// (the last button clicked only where browsers don't say: an Enter key or a script's
+		// requestSubmit() has no button)
+		var submitter = "submitter" in ev ? ev.submitter : (lastButton && lastButton.form === form ? lastButton : null);
+		lastButton = null;
 		var r = formRequest(form, submitter);
 		if (!r) return;
 		ev.preventDefault();

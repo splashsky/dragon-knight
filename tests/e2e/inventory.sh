@@ -135,7 +135,7 @@ iv_is "(SELECT qty FROM user_items WHERE id = $BOMB)" "2"
 t_section "inventory: a fight-only item in a fight"
 t_fight invhero 2 1
 t_get /fight;                     expect_body 'name="item" value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'" title="Bomb (x2)" aria-label="Bomb (x2)"><img src="/static/images/skills/default.png"'
-t_post /fight "csrf=$TC&item=Use+Item&useritem=$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"
+t_round "csrf=$TC&item=Use+Item&useritem=$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"
 expect_redirect /victory
 iv_is "($T_MONSTER_HP <= 0) || '|' || (SELECT qty FROM user_items WHERE id = $BOMB)" "1|1"
 t_get /victory;                   expect_body 'You have defeated the Red Slime.'
@@ -180,7 +180,7 @@ t_post /drop "csrf=$TC&take=x";   expect_body 'The Old Key is in your bag.'
 # a gear drop into a full bag: discard first; quest items are not offered
 iv_sql "UPDATE users SET dropcode = (SELECT id FROM items WHERE key = 'ruby')"
 t_get /drop;                      expect_body 'Your bag is full.'; expect_no_body "value=\"$KEY\""
-t_post /drop "csrf=$TC&take=x&discard=$KEY"; expect_body 'Please go back and select an item from your bag to discard.'
+t_post /drop "csrf=$TC&take=x&discard=$KEY"; expect_body '<p class="error">Select an item from your bag to discard.</p>'
 iv_is dropcode "$(t_sql "SELECT id FROM items WHERE key = 'ruby'")"
 t_post /drop "csrf=$TC&leave=x";  expect_redirect /
 # the admin setting

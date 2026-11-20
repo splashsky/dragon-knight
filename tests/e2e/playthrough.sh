@@ -50,7 +50,7 @@ pt_fight() {
 	t_get /fight; expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 	for i in $(seq 1 60); do
 		[ "$(pq currenthp)" -lt 8 ] && pu "currenthp = base_maxhp"   # keep the dice from killing us
-		t_post /fight "csrf=$TC&fight=Fight"
+		t_round "csrf=$TC&fight=Fight"
 		[ "$STATUS" = 302 ] && break
 		expect_status 200; expect_no_body 'You have died.'
 	done

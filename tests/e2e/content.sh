@@ -225,7 +225,7 @@ t_post /spell/26 "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
 t_fight ctknight 2 50
 t_sql "UPDATE users SET currentmp = 10, currenthp = 500, base_maxhp = 500 WHERE username = 'ctknight'"
 t_get /fight;         expect_body 'name="spell" value="26" title="Zap ('
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=26"
+t_round "csrf=$(t_csrf)&spell=Spell&userspell=26"
 expect_body 'You have cast the Zap spell for 6 damage.<br>You have cast the Zap spell, and will gain 20% defense until the end of this fight.'
 ct_eq "SELECT $T_MONSTER_HP || '|' || $T_UBER_DEFENSE || '|' || currentmp FROM users WHERE username = 'ctknight'" \
 	"44|20|7" "spell changes saved"
@@ -241,7 +241,7 @@ expect_redirect '/admin/spells/26\?saved=1'
 t_jar ctknight
 ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
 t_get /fight
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=26"
+t_round "csrf=$(t_csrf)&spell=Spell&userspell=26"
 expect_body 'Zap (Zap): 6 damage!<br>You have cast the Zap spell, and will gain 30% defense'
 # only the code changes: noticed all the same (the fingerprint covers the source)
 CT_FP=$(t_sql "SELECT value FROM meta WHERE key = 'content_fingerprint'")
@@ -252,7 +252,7 @@ for _ in $(seq 1 50); do
 done
 [ "$(t_sql "SELECT value FROM meta WHERE key = 'content_fingerprint'")" != "$CT_FP" ] && t_ok || t_fail "code-only edit not noticed"
 ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=26"
+t_round "csrf=$(t_csrf)&spell=Spell&userspell=26"
 expect_body 'and will gain 30% defense'
 ct_eq "SELECT $T_UBER_DEFENSE FROM users WHERE username = 'ctknight'" "31" "the edited code runs"
 # an error in the code: nothing happens, nothing is spent, no turn (logged as a warning)
@@ -260,11 +260,11 @@ sed -i 's/s.target:hurt(damage)$/s.target:hurt(damage) error("zap broke")/' "$CT
 for _ in $(seq 1 50); do
 	ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight';
 		DELETE FROM fight_statuses WHERE user_id = (SELECT id FROM users WHERE username = 'ctknight')"
-	t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=26"
+	t_round "csrf=$(t_csrf)&spell=Spell&userspell=26"
 	grep -qF 'Something went wrong' "$BODY" && break
 	sleep 0.1
 done
-expect_body 'Something went wrong with the Zap spell. Please go back and try again.'
+expect_body '<p class="fight-note error" role="alert">Something went wrong with the Zap spell.</p>'
 ct_eq "SELECT $T_MONSTER_HP || '|' || currentmp || '|' || $T_UBER_DEFENSE FROM users WHERE username = 'ctknight'" \
 	"50|10|0" "nothing changed"
 grep -qF '[lua] spell zap failed (nothing changed):' "$T/server.log" && t_ok || t_fail "content error not logged"
@@ -343,7 +343,7 @@ t_get /character;     expect_body 'Zap<br>'
 # what it did was its file's code: still known, but no longer castable
 ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
 t_get /fight;         expect_no_body 'name="spell" value="26"'
-t_post /fight "csrf=$(t_csrf)&spell=Spell&userspell=26"; expect_body 'This spell cannot be cast.'
+t_round "csrf=$(t_csrf)&spell=Spell&userspell=26"; expect_body 'This spell cannot be cast.'
 ct_eq "SELECT currentmp || '|' || $T_MONSTER_HP FROM users WHERE username = 'ctknight'" "10|50" "nothing spent"
 t_jar admin
 t_get /admin/spells;  expect_body 'Zap</a> <span class="highlight">(retired)</span>'

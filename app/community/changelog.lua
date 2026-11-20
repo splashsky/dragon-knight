@@ -8,6 +8,14 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.0.1", date = "unreleased",
+		changes = {
+			"A command that can't be carried out in a fight (not enough MP, a spell you haven't learned, an empty wand) is now explained right on the fight page, above your commands, instead of on a page of its own.",
+			"Reloading the fight page after a round no longer offers to send the command again: every command now comes back to the fight page, which shows what happened.",
+			"Taking a dropped item into a full bag without choosing what to discard now says so on the drop page.",
+		},
+	},
+	{
 		version = "3.0.0", date = "11.20.2026",
 		changes = {
 			"Loading a page no longer changes the game: reloading the fight page shows the last round again instead of counting a turn, and the victory page can be reloaded or revisited without losing it (schema version 15, run dk migrate).",

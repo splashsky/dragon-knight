@@ -45,28 +45,28 @@ t_fight monsterer "$SHAMAN" 10
 mo_enemy_set "mp = 0, maxmp = 17"   # no MP for its spells: the potion is all it may use
 t_get /fight; CS=$(t_csrf)
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Goblin Shaman<template class="tip">'; expect_body "Monster's MP: 0"
-t_post /fight "csrf=$CS&fight=Fight"
+t_round "csrf=$CS&fight=Fight"
 expect_body 'class="fight-monsterturn">The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '
 mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "immune=i:0
 stock_1=i:1"
 mo_enemy_set "hp = 10"
-t_post /fight "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
+t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
 mo_is "$(enemy data)" "immune=i:0
 stock_1=i:0"
 mo_enemy_set "hp = 10"
-t_post /fight "csrf=$CS&fight=Fight"; expect_no_body 'uses the Potion'
+t_round "csrf=$CS&fight=Fight"; expect_no_body 'uses the Potion'
 expect_body 'You dodge the monster&#39;s attack.'
 # a new encounter: two potions again
 t_fight monsterer "$SHAMAN" 10
 mo_enemy_set "mp = 0, maxmp = 17"
-t_post /fight "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
+t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
 mo_is "$(enemy data)" "immune=i:0
 stock_1=i:1"
 
 t_section "monsters: the Goblin Shaman casts Hurt (MP)"
 t_fight monsterer "$SHAMAN" 40   # full HP: no heal, no potion; 17 MP
 t_get /fight; expect_body "Monster's MP: 17"
-t_post /fight "csrf=$CS&fight=Fight"
+t_round "csrf=$CS&fight=Fight"
 expect_body 'class="fight-monsterturn">The monster casts Hurt on you for '; expect_body "Monster's MP: 12"
 mo_is "$(enemy mp)" 12
 hp=$(t_sql "SELECT currenthp FROM users $MQ")
@@ -81,7 +81,7 @@ t_fight_status monsterer 1 sleep 'chance=i:15'
 t_fight_status monsterer 1 poison '' 5
 t_get /fight; CS=$(t_csrf); expect_body "Monster's MP: 33"; expect_body 'name="continue"'
 for _ in 1 2; do
-	t_post /fight "csrf=$CS&continue=Continue"
+	t_round "csrf=$CS&continue=Continue"
 	expect_body 'You are still asleep.'; expect_body 'class="fight-monsterturn">The monster casts Pain on you for '
 	expect_body "Monster's MP: 33"
 done
@@ -89,7 +89,7 @@ mo_is "$(enemy mp)" 33
 # awake and cured: Sleep or Poison (or Pain), still free
 t_sql "DELETE FROM fight_statuses WHERE user_id = (SELECT id FROM users $MQ)"
 t_sql "UPDATE users SET currenthp = 500 $MQ"
-t_post /fight "csrf=$CS&fight=Fight"
+t_round "csrf=$CS&fight=Fight"
 if grep -qF 'The Bog Witch casts Sleep.<br>You fall asleep.' "$BODY"; then mo_is "$T_STATUSES" "player:sleep"
 elif grep -qF 'The monster casts Poison. You are poisoned for 3 turns.' "$BODY"; then mo_is "$T_STATUSES" "player:poison/3"
 else expect_body 'The monster casts Pain on you for '; fi
@@ -101,14 +101,14 @@ BANDIT=$(mon bandit_captain)
 t_fight monsterer "$BANDIT" 145
 mo_enemy_set "maxhp = 145"   # with its Life Stone
 t_get /fight; CS=$(t_csrf); expect_body "Monster's MP: 40"
-t_post /fight "csrf=$CS&fight=Fight"
+t_round "csrf=$CS&fight=Fight"
 expect_body 'The Bandit Captain casts Craze.<br>The Bandit Captain will deal 10% more damage until the end of this fight.'
 expect_body '<b>Bandit Captain</b> <span class="fight-statuses">&mdash; Damage Up</span>'
 mo_is "$(enemy mp)" 30
 # buffed already, not hurt enough for its herb: the attack
-t_post /fight "csrf=$CS&fight=Fight"; expect_body 'You dodge the monster&#39;s attack.'; expect_no_body 'casts Craze'
+t_round "csrf=$CS&fight=Fight"; expect_body 'You dodge the monster&#39;s attack.'; expect_no_body 'casts Craze'
 mo_enemy_set "hp = 40"
-t_post /fight "csrf=$CS&fight=Fight"; expect_body 'The Bandit Captain uses the Herb.<br>The Bandit Captain recovers 30 Hit Points.'
+t_round "csrf=$CS&fight=Fight"; expect_body 'The Bandit Captain uses the Herb.<br>The Bandit Captain recovers 30 Hit Points.'
 t_fight_clear monsterer
 t_sql "UPDATE users SET currentaction = 'Exploring' $MQ"
 
