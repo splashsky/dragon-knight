@@ -12,7 +12,7 @@ local themes = require("lib.themes")
 
 local view = {}
 
-view.GAME_VERSION = "2.3.1-dev"
+view.GAME_VERSION = "2.3.1"
 view.BUILD = "C/Lua"
 
 -- Base helpers. Templates see these after ctx (names resolve scratch -> ctx -> h).

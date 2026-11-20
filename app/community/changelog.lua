@@ -8,7 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "2.3.1", date = "unreleased",
+		version = "2.3.1", date = "11.20.2026",
 		changes = {
 			"Fixed the monster's HP bar not starting full: the HP a monster is rolled with is now its full health for the fight.",
 			"Redesigned the Character panel to be more compact: name and level on one line, and HP, MP and TP as slim bars with their values.",
