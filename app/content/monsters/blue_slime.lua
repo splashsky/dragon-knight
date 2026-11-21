@@ -11,4 +11,11 @@ defeated. Some say slimes are what is left when a spell goes wrong.]],
 	maxexp = 1, maxgold = 1,
 	immune = 0,
 	maxmp = 5,
+	speech = {
+		start = { "*squelch*", chance = 15 },
+		hurt = { "*bloop*", "*wobble*", chance = 15 },
+		losing = { "*bubbles*", chance = 10 },
+		death = { "*splat*", chance = 30 },
+		victory = { "*wobbles happily*", chance = 10 },
+	},
 }

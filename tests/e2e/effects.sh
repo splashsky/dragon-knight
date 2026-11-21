@@ -155,7 +155,7 @@ t_form_submit /admin/settings max_allies=11; expect_body 'Allies must be a numbe
 
 t_section "effects: admin pages for statuses and summons"
 t_get /admin/statuses; expect_status 200; expect_body '<a href="/admin/statuses/1">Asleep</a>'
-expect_body 'statuses: 7 files, 7 in the database (0 retired), 0 overrides.'
+expect_body "statuses: $(ls app/content/statuses | wc -l) files, $(t_sql 'SELECT count(*) FROM statuses') in the database (0 retired), 0 overrides."
 POISON=$(t_sql "SELECT id FROM statuses WHERE key = 'poison'")
 t_get "/admin/statuses/$POISON"; expect_body 'Edit Status: Poisoned'; expect_body 'app/content/statuses/poison.lua'
 expect_body 'name="data.max" size="6" value="5"'
@@ -166,8 +166,9 @@ expect_redirect "/admin/statuses/$POISON\\?saved=1"
 t_get "/admin/statuses/$POISON"; t_post "/admin/statuses/$POISON/reset" "csrf=$(t_csrf)&field=*"
 expect_redirect "/admin/statuses/$POISON\\?saved=1"
 [ "$(t_sql "SELECT count(*) FROM content_overrides WHERE kind = 'statuses'")" = 0 ] && t_ok || t_fail "status overrides not reset"
-t_get /admin/summons; expect_body '<a href="/admin/summons/1">Wolf</a>'
-t_get /admin/summons/1; expect_body 'Edit Summon: Wolf'; expect_body 'name="hp" size="6" value="30"'
+WOLF=$(t_sql "SELECT id FROM summons WHERE key = 'wolf'")
+t_get /admin/summons; expect_body "<a href=\"/admin/summons/$WOLF\">Wolf</a>"
+t_get /admin/summons/$WOLF; expect_body 'Edit Summon: Wolf'; expect_body 'name="hp" size="6" value="30"'
 t_get /admin/summons/99; expect_status 404
 t_jar effects
 t_sql "DELETE FROM user_statuses WHERE user_id = (SELECT id FROM users $EQ)"

@@ -2,6 +2,10 @@
 return {
 	name = "Ether",
 	description = "Restores 30 magic points, in a fight or out of it.",
+	lore = [[
+A clear, faintly blue liquid distilled by mages who run dry in the middle of a fight.
+Apothecaries sell it by the flask, and most mages carry three before going into the hills.
+It tastes of pennies and smells of rain.]],
 	category = "consumable",
 	price = 80,
 	max_stack = 10,

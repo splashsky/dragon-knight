@@ -11,6 +11,10 @@ end
 return {
 	name = "Hurt",
 	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
+	lore = [[
+The first real attack spell most Mages learn, and the one they practise on sparring dummies
+until the dummies complain. It sends a sharp jolt through a monster's body, which hurts even
+when it does not kill. Wise casters cast it early, before the enemy has settled into its stride.]],
 	mp = 5,
 	power = 15,                 -- the most damage it deals
 	messages = {

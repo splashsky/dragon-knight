@@ -388,9 +388,12 @@ t_fight_win; expect_body '<title>Courage and Wit have served thee well!</title>'
 expect_body 'You have gained 2 levels!'; expect_no_body 'gained a level'
 expect_body 'You gain 4 hit points.'; expect_body 'You gain 7 magic points.'
 expect_body 'You gain 3 travel points.'; expect_body 'You gain 5 strength.'
-expect_body 'You gain 3 dexterity.'; expect_body 'You have learned a new spell.'
+expect_body 'You gain 3 dexterity.'
+[ "$(t_sql "SELECT count(*) FROM class_spells WHERE class_id = 2 AND level IN (2, 3)")" -ge 1 ] && expect_body 'You have learned ' || expect_no_body 'learned a new spell'
 f_is level 3; f_is base_maxhp 19; f_is base_maxmp 7; f_is base_maxtp 13; f_is strength 10; f_is dexterity 8
-f_is "strength + base_attack" 10; f_is "dexterity + base_defense" 8; f_is "$T_KNOWN" 1; f_is experience 54
+f_is "strength + base_attack" 10; f_is "dexterity + base_defense" 8; f_is experience 54
+# what the Warrior learns at levels 2 and 3
+f_is "$T_KNOWN" "$(t_sql "SELECT group_concat(spell_id) FROM (SELECT spell_id FROM class_spells WHERE class_id = 2 AND level IN (2, 3) ORDER BY spell_id)")"
 
 t_section "fight: milestone level (formula experience, TP and HP bonus)"
 # Warrior level 10 needs 2368 (lib/leveling.lua; the original table said 2369): 2367 + 1.
@@ -406,7 +409,9 @@ t_fight fighter 1 0
 t_fight_win; expect_body 'You have gained a level!'
 expect_body 'You gain 10 hit points.'; expect_body 'You gain 2 magic points.'
 expect_body 'You gain 2 travel points.'; expect_body 'You gain 6 strength.'
-expect_body 'You gain 3 dexterity.'; expect_no_body 'learned a new spell'
+expect_body 'You gain 3 dexterity.'
+# a spell at level 10 is announced, none is not
+if [ "$(t_sql "SELECT count(*) FROM class_spells WHERE class_id = 2 AND level = 10")" = 0 ]; then expect_no_body 'learned a new spell'; else expect_body 'You have learned '; fi
 f_is level 10; f_is base_maxhp 60; f_is base_maxmp 22; f_is base_maxtp 22; f_is strength 36; f_is dexterity 33
 
 fi

@@ -9,6 +9,11 @@ end
 return {
 	name = "Poison",
 	description = "Poisons the monster: it loses a few hit points every turn. Some monsters are immune.",
+	lore = [[
+Poison is an old trick brewed in the back rooms of Hambry, where the herbalists keep the
+bottles the town guard would rather not inventory. The spell sets a foul sickness in the
+monster, which costs it a little life on every turn it lasts. Some creatures have no blood to
+spoil, and they shrug it off.]],
 	mp = 6,
 	power = 3,                  -- how many turns the poison lasts
 	data = { min = 2, max = 6 },

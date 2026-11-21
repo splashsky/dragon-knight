@@ -115,12 +115,25 @@ end
 -- the experience parameters lib/leveling.lua had at version 3; every value an admin could
 -- edit (class names, per-level gains and spells) is also recorded in content_adopt, so
 -- the sync at the end of `dk migrate` keeps the ones that differ from the content files
--- as admin overrides. New characters keep the starting stats they got before (the users
+-- as admin overrides. A level's spell only when it differs from the original game's
+-- (V4_STOCK_SPELLS): the class files have since taught spells at more levels, and a
+-- stock database's "no spell here" is no edit. New characters keep the starting stats they got before (the users
 -- column defaults; the levels table's row 1 was only shown on the help page).
 local V4_CLASSES = {
 	{ key = "mage", name = "Mage", exp_base = 15, exp_stages = "2x2,1.5x8,1.25x5,1.125x28" },
 	{ key = "warrior", name = "Warrior", exp_base = 18, exp_stages = "2x2,1.5x8,1.25x5,1.125x27" },
 	{ key = "paladin", name = "Paladin", exp_base = 20, exp_stages = "2x2,1.5x8,1.25x6,1.125x25" },
+}
+
+-- the original game's spell ids per class and level (the levels table's spell columns as
+-- installed; ids are the original spells', see V5_SPELLS)
+local V4_STOCK_SPELLS = {
+	{ [2] = 1, [4] = 6, [7] = 11, [9] = 2, [12] = 7, [14] = 17, [17] = 12, [25] = 3, [31] = 8, [36] = 18,
+		[40] = 13, [45] = 4, [51] = 9, [60] = 19, [70] = 5, [79] = 10 },
+	{ [2] = 1, [5] = 6, [8] = 11, [11] = 2, [14] = 7, [18] = 14, [22] = 12, [25] = 17, [29] = 3, [34] = 8,
+		[38] = 15, [45] = 18, [51] = 13, [58] = 19, [70] = 16 },
+	{ [2] = 1, [5] = 6, [8] = 11, [11] = 2, [14] = 7, [18] = 17, [22] = 12, [25] = 14, [29] = 3, [34] = 8,
+		[38] = 18, [45] = 4, [51] = 13, [56] = 9, [60] = 15 },
 }
 
 local function v4_classes_content()
@@ -199,7 +212,9 @@ CREATE TABLE meta (
 			if spell > 0 then
 				db:exec("INSERT INTO class_spells (class_id, level, spell_id) VALUES (?, ?, ?)", id, row.id, spell)
 			end
-			adopt("levels." .. row.id .. ".spells", spell > 0 and spell or "")
+			if spell ~= (V4_STOCK_SPELLS[id][row.id] or 0) then
+				adopt("levels." .. row.id .. ".spells", spell > 0 and spell or "")
+			end
 		end
 	end
 	db:exec_script([[

@@ -109,6 +109,11 @@ t_csrf() { grep -o 'name="csrf" value="[0-9a-f]*"' "$BODY" | head -n1 | cut -d'"
 expect_status() { if [ "$STATUS" = "$1" ]; then t_ok; else t_fail "expected status $1, got $STATUS"; fi; }
 expect_body() { if grep -qF -- "$1" "$BODY"; then t_ok; else t_fail "body lacks: $1"; fi; }
 expect_no_body() { if grep -qF -- "$1" "$BODY"; then t_fail "body unexpectedly has: $1"; else t_ok; fi; }
+# expect_body on the body without its lore (the help pages' rows: every entry has some;
+# lore paragraphs are escaped text, so they hold no "<")
+expect_row() {
+	if sed -E 's#<div class="help-lore">(<p>[^<]*</p>)*</div>##g' "$BODY" | grep -qF -- "$1"; then t_ok; else t_fail "body (without lore) lacks: $1"; fi
+}
 # The body's text as a reader sees it, line by line: tooltip templates and tags removed
 # (entities stay as they are).
 t_text() { sed -e 's#</template>#\x01#g' -e 's#<template class="tip">[^\x01]*\x01##g' -e 's#<[^>]*>##g' "$BODY"; }

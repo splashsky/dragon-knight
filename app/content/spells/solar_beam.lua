@@ -13,6 +13,10 @@ end
 return {
 	name = "Solar Beam",
 	description = "Gathers sunlight for a turn, then fires a mighty beam. Some monsters are immune.",
+	lore = [[
+Solar Beam is a patient spell, learned by Mages who like to sit in the sun and wait. The caster
+gathers light for a turn, then releases it in a beam that scorches nearly anything. It is
+worth the wait on a clear day, and useless under cloud.]],
 	mp = 12,
 	power = 90,                 -- the most damage it deals
 	uses = { statuses = { "charging" } },

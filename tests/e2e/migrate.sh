@@ -18,6 +18,9 @@
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
 
+# the content files of each kind (what a sync reports)
+M_ST=$(ls "$ROOT/app/content/statuses" | wc -l); M_SU=$(ls "$ROOT/app/content/summons" | wc -l); M_SP=$(ls "$ROOT/app/content/spells" | wc -l)
+
 mig_sql() { t_sql_db "$@"; }  # mig_sql DB "SQL"
 mig_script() { t_sql_script "$@"; }  # mig_script DB FILE
 mig_eq() {  # mig_eq "SQL" expected label   (on the migrated database)
@@ -101,7 +104,6 @@ MIG_LORE_TEXT="SELECT key, replace(lore, char(10), '/') FROM classes UNION ALL S
 	UNION ALL SELECT key, replace(lore, char(10), '/') FROM items UNION ALL SELECT key, replace(lore, char(10), '/') FROM monsters
 	UNION ALL SELECT key, replace(lore, char(10), '/') FROM statuses UNION ALL SELECT key, replace(lore, char(10), '/') FROM summons
 	ORDER BY 1, 2"
-MIG_LORE_EXPECTED="classes:mage,classes:paladin,classes:warrior,items:herb,items:wand,monsters:blue_slime,spells:heal,spells:magic_bolt"
 # The items and what towns sell (the same on a fresh install and a migrated database without edits).
 MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id;
 	SELECT * FROM town_maps ORDER BY town_id, map_id"
@@ -126,8 +128,9 @@ MIG_LEVELS_V3="SELECT c, id, hp, mp, st, dx, sp FROM (
 	UNION ALL SELECT 2, id, \"2_hp\", \"2_mp\", \"2_strength\", \"2_dexterity\", \"2_spells\" FROM levels
 	UNION ALL SELECT 3, id, \"3_hp\", \"3_mp\", \"3_strength\", \"3_dexterity\", \"3_spells\" FROM levels)
 	WHERE id >= 2 ORDER BY c, id"
+# (the original spells, ids 1-19: the class files have taught others at more levels since)
 MIG_LEVELS_V4="SELECT l.class_id, l.level, l.hp, l.mp, l.strength, l.dexterity,
-	coalesce((SELECT group_concat(spell_id) FROM class_spells s WHERE s.class_id = l.class_id AND s.level = l.level), 0)
+	coalesce((SELECT group_concat(spell_id) FROM class_spells s WHERE s.class_id = l.class_id AND s.level = l.level AND s.spell_id <= 19), 0)
 	FROM class_levels l WHERE l.class_id <= 3 ORDER BY 1, 2"
 # Before version 3 the levels table's hp columns held the milestone HP (10 at levels 10-30,
 # 15 at 40-60, 20 at 70-90, 50 at 99); the seed has 0 there now (lib/leveling.lua adds it).
@@ -145,7 +148,7 @@ CUR_VERSION=$(t_sql "PRAGMA user_version")
 [ "$CUR_VERSION" -ge 3 ] && t_ok || t_fail "install did not stamp user_version ($CUR_VERSION)"
 "$BIN" migrate --config "$CONFIG" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate on a current db failed"
 grep -qF "Database schema is up to date (version $CUR_VERSION)." "$T/migrate.log" && t_ok || t_fail "no-op message: $(cat "$T/migrate.log")"
-grep -qF "Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 0 new, 0 retired; monsters: 154, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
+grep -qF "Content synced (statuses: $M_ST, 0 new, 0 retired; summons: $M_SU, 0 new, 0 retired; spells: $M_SP, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 0 new, 0 retired; monsters: 154, 0 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content sync message: $(cat "$T/migrate.log")"
 [ "$(t_sql "PRAGMA user_version")" = "$CUR_VERSION" ] && t_ok || t_fail "version changed"
 
 t_section "migrate: version checks on every request"
@@ -225,7 +228,7 @@ grep -qF 'Migrating to version 8: the fight engine' "$T/migrate.log" && t_ok || 
 grep -qF 'Migrating to version 12: spells have icons' "$T/migrate.log" && t_ok || t_fail "step 12 not reported"
 grep -qF 'Migrating to version 13: classes, spells, items, monsters, statuses and summons have lore' "$T/migrate.log" && t_ok || t_fail "step 13 not reported"
 grep -qF 'Converted the stats of 3 characters to base stats (verified); 0 keep extra attack/defense power.' "$T/migrate.log" && t_ok || t_fail "stats conversion not reported"
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" && t_ok || t_fail "content not synced by migrate"
+grep -qF "Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)." "$T/migrate.log" && t_ok || t_fail "content not synced by migrate: $(grep "Content synced" "$T/migrate.log")"
 grep -qF "Database schema is now version $CUR_VERSION." "$T/migrate.log" && t_ok || t_fail "done message"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "stamped"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/fresh.db\"#" "$CONFIG" > "$MIG/fresh.lua"
@@ -240,7 +243,7 @@ mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's"
 mig_eq "SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> ''" "heal=heal,magic_bolt=magic_bolt" "spell icons (v0)"
-mig_eq "$MIG_LORE_KEYS" "$MIG_LORE_EXPECTED" "lore (v0)"
+mig_eq "$MIG_LORE_KEYS" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_KEYS")" "lore (v0)"
 mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v0)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's"
 mig_eq "SELECT count(*) FROM sqlite_sequence WHERE name IN ('items', 'drops')" "0" "items ids are plain rowids now"
@@ -420,7 +423,7 @@ V3_USERS=$(mig_users "$V3_DB")
 "$BIN" migrate --config "$MIG/v3.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v3) failed: $(cat "$T/migrate.log")"
 grep -qF 'Migrating to version 4: character classes are content files' "$T/migrate.log" && t_ok || t_fail "step 4 not reported (v3)"
 grep -qE 'Migrating to version [123]:' "$T/migrate.log" && t_fail "steps 1-3 ran on a version 3 database" || t_ok
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" \
+grep -qF "Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired, 8 earlier admin edits kept as overrides; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)." "$T/migrate.log" \
 	&& t_ok || t_fail "sync report (v3): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v3 stamped"
 [ "$(mig_layout "$V3_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -504,7 +507,7 @@ grep -qF 'Migrating to version 5: spells are content files with effects; the spe
 grep -qE 'Migrating to version [1234]:' "$T/migrate.log" && t_fail "steps 1-4 ran on a version 4 database" || t_ok
 grep -qF "warning: spell 7 (Pain) had its type changed to 4; it keeps the effect of app/content/spells/pain.lua" \
 	"$T/migrate.log" && t_ok || t_fail "type change not reported: $(cat "$T/migrate.log")"
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 6 new, 1 retired, 4 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).' \
+grep -qF "Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 19)) new, 1 retired, 4 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired, 1 earlier admin edits kept as overrides; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)." \
 	"$T/migrate.log" && t_ok || t_fail "sync report (v4): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v4 stamped"
 [ "$(mig_layout "$V4_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -519,7 +522,7 @@ mig_eq "SELECT count(*) FROM pragma_table_info('users') WHERE name = 'spells'" "
 # retired, its data kept
 mig_eq "$MIG_SPELLS_OF WHERE id <= 20 ORDER BY id" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS_OF WHERE id <= 19 ORDER BY id" | sed 's/^1|heal|Heal|\([^|]*\)|5|both|0|10|/1|heal|Mend|\1|4|both|0|12|/; s/^11|sleep|Sleep|\([^|]*\)|10|fight|0|5|/11|sleep|Sleep|\1|10|fight|0|99|/')
 20|spell_20|Fireball||9|fight|1|40|enemy|||" "spells (v4)"
-mig_eq "SELECT group_concat(key) FROM (SELECT key FROM spells WHERE id > 20 ORDER BY id)" "call_wolf,hyper_beam,magic_bolt,poison,regen,solar_beam" "the 2.2 and 2.4 spells after the database's own (v4)"
+mig_eq "SELECT group_concat(key) FROM (SELECT key FROM spells WHERE id > 20 ORDER BY id)" "$(mig_sql "$MIG/fresh.db" "SELECT group_concat(key) FROM (SELECT key FROM spells WHERE id > 19 ORDER BY key)")" "the 2.2 and 2.4 spells after the database's own (v4)"
 mig_eq "SELECT kind || '|' || key || '|' || field || '|' || value FROM content_overrides ORDER BY kind, key, field" \
 	"classes|mage|levels.2.spells|
 classes|mage|name|Wizard
@@ -540,13 +543,13 @@ mig_eq "SELECT user_id || '|' || spell_id || '|' || coalesce(learned_level, '-')
 	"1|1|2
 1|6|4
 1|20|-
-1|23|1
+1|$(mig_sql "$MIG_DB" "SELECT id FROM spells WHERE key = 'magic_bolt'")|1
 2|1|-
 2|7|-
 4|2|-" "known spells (v4)"
 [ "$(mig_users "$V4_DB")" = "$V4_USERS" ] && t_ok || t_fail "users otherwise changed (v4)"
 "$BIN" content status --config "$MIG/v4.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk content status (v4)"
-grep -qF 'spells: 25 files, 26 in the database (1 retired), 4 overrides' "$T/migrate.log" && t_ok || t_fail "status (v4): $(cat "$T/migrate.log")"
+grep -qF "spells: $M_SP files, $((M_SP + 1)) in the database (1 retired), 4 overrides" "$T/migrate.log" && t_ok || t_fail "status (v4): $(cat "$T/migrate.log")"
 grep -qF 'The database is in sync with the content files' "$T/migrate.log" && t_ok || t_fail "status in sync (v4): $(cat "$T/migrate.log")"
 # the game on it: the overridden Heal, the retired Fireball (known, but without a file
 # there is no code to cast it)
@@ -625,7 +628,7 @@ for line in 'Migrating to version 6: items and drops are content files; inventor
 	'note: character Oddone (user 3) keeps 8 attack and 0 defense power that strength, dexterity and gear don'"'"'t give' \
 	'warning: item 19 (Leather Armor) has the special "gold,100", which is not a stat' \
 	'warning: item 30 (Small Shield) had its type changed to 1; it keeps the category of app/content/items/small_shield.lua' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 2 retired, 11 earlier admin edits kept as overrides; monsters: 154, 3 new, 0 retired).' \
+	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 2 retired, 11 earlier admin edits kept as overrides; monsters: 154, 3 new, 0 retired)." \
 	'warning: character Typo (user 6): the items'"'"' new values changed attack, defense; base stats adjusted to keep them'; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v5) output lacks: $line
 $(cat "$T/migrate.log")"
@@ -755,7 +758,7 @@ grep -qE 'Migrating to version [123456]:' "$T/migrate.log" && t_fail "steps 1-6 
 for line in 'Migrating to version 7: spells and consumables are scripted content' \
 	'warning: spell zap: the edit of effects.1.min (5) can'"'"'t be kept: spells and items are scripted now, with one power' \
 	'warning: spell zap: the edit of effects.2.pct (25) can'"'"'t be kept' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 6 new, 0 retired, 1 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).' \
+	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 20)) new, 0 retired, 1 restored, 1 earlier admin edits kept as overrides; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)." \
 	'Moved 1 fight in progress to the new fight tables.'; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v6) output lacks: $line
 $(cat "$T/migrate.log")"
@@ -768,7 +771,7 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "v6 stamped"
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v6)"
 V6_KEPT14=${V6_KEPT/currentmp,/currentmp - $MIG_MAGE_MP,}
 mig_eq "${V6_KEPT14/base_maxmp,/base_maxmp - $MIG_MAGE_MP,}" "$V6_BEFORE" "characters, their spells and items, shops unchanged (v6)"
-mig_eq "SELECT currentmp || '|' || base_maxmp || '|' || $T_KNOWN FROM users" "35|35|1,6,20,21,24" "the Mage: +5 MP, Magic Bolt (24 here) (v6)"
+mig_eq "SELECT currentmp || '|' || base_maxmp || '|' || $T_KNOWN FROM users" "35|35|1,6,20,21,$(mig_sql "$MIG_DB" "SELECT id FROM spells WHERE key = 'magic_bolt'")" "the Mage: +5 MP, Magic Bolt (v6)"
 # the edited amounts are power overrides now (the adoption too: it differs from the file)
 mig_eq "SELECT kind || '|' || key || '|' || field || '|' || value FROM content_overrides ORDER BY kind, key, field" \
 	"items|herb|power|45
@@ -786,8 +789,9 @@ mig_eq "SELECT key || '|' || name || '|' || power || '|' || target FROM spells W
 sleep|Sleep|7|enemy
 rage|Rage|30|self" "edited spells"
 # the database-only rows keep their old amount as power, for display (they have no code)
-mig_eq "$MIG_SPELLS_OF WHERE id IN (20, 21) ORDER BY id" "20|zap|Zap||3|fight|1|6|enemy|||
-21|mend|Mend||2|both|1|8|self|||" "retired spells (v6)"
+mig_eq "$MIG_SPELLS_OF WHERE id = 20" "20|zap|Zap||3|fight|1|6|enemy|||" "retired spell (v6)"
+# a database-only spell whose key a content file now has (mend) is restored from the file
+mig_eq "SELECT retired || '|' || key || '|' || (description <> '') || '|' || (SELECT count(*) FROM spells WHERE key = 'mend') FROM spells WHERE id = 21" "0|mend|1|1" "a database-only spell with a new file's key is restored (v6)"
 mig_eq "SELECT id || '|' || key || '|' || usable_in || '|' || target || '|' || power || '|' || retired FROM items WHERE id IN (69, 70) ORDER BY id" \
 	"69|bomb|fight|enemy|12|1
 70|elixir|both|self|9|1" "retired consumables (v6)"
@@ -847,7 +851,7 @@ V7_USERS=$(mig_users "$V7_DB")
 grep -qE 'Migrating to version [1-7]:' "$T/migrate.log" && t_fail "steps 1-7 ran on a version 7 database" || t_ok
 for line in 'Migrating to version 8: the fight engine: fights in progress move to their own tables' \
 	'Moved 4 fights in progress to the new fight tables.' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).'; do
+	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)."; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v7) output lacks: $line
 $(cat "$T/migrate.log")"
 done
@@ -943,7 +947,7 @@ V8_USERS=$(mig_users "$V8_DB")
 grep -qE 'Migrating to version [1-8]:' "$T/migrate.log" && t_fail "steps 1-8 ran on a version 8 database" || t_ok
 for line in 'Migrating to version 9: monsters are content files with MP, equipment, items and spells' \
 	'warning: monster 152 Homebrew (monster_152) has no content file and is retired (fights against it go on; it is no longer met). Write app/content/monsters/monster_152.lua to bring it back.' \
-	'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 1 retired, 2 earlier admin edits kept as overrides).'; do
+	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 1 retired, 2 earlier admin edits kept as overrides)."; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v8) output lacks: $line
 $(cat "$T/migrate.log")"
 done
@@ -1124,7 +1128,7 @@ done
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v12)"
 [ "$(mig_users "$V12_DB")" = "$V12_USERS" ] && t_ok || t_fail "users changed (v12)"
 [ "$(mig_sql "$V12_DB" "SELECT user_id, round, wave, data FROM fights; SELECT * FROM fight_combatants ORDER BY id")" = "$V12_FIGHT" ] && t_ok || t_fail "the fight changed (v12)"
-mig_eq "$MIG_LORE_KEYS" "$MIG_LORE_EXPECTED" "lore (v12)"
+mig_eq "$MIG_LORE_KEYS" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_KEYS")" "lore (v12)"
 mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v12)"
 mig_eq "SELECT name FROM spells WHERE id = 1" "Mend" "the v12 override survives"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's (v12)"
@@ -1181,7 +1185,7 @@ V13_USERS=$(mig_users "$V13_DB")
 grep -qE 'Migrating to version ([1-9]|1[0-3]):' "$T/migrate.log" && t_fail "steps 1-13 ran on a version 13 database" || t_ok
 grep -qF 'Migrating to version 14: starting spells, items that cast spells with charges, item icons; Mages start with 5 MP' "$T/migrate.log" \
 	&& t_ok || t_fail "step 14 not reported: $(cat "$T/migrate.log")"
-grep -qF 'Content synced (statuses: 7, 4 new, 0 retired; summons: 1, 1 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired).' "$T/migrate.log" \
+grep -qF "Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 3 new, 0 retired; monsters: 154, 3 new, 0 retired)." "$T/migrate.log" \
 	&& t_ok || t_fail "sync report (v13): $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v13 stamped"
 [ "$(mig_layout "$V13_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
@@ -1301,7 +1305,7 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "partial install stamped"
 mig_eq "SELECT count(*) FROM forums" "2" "partial install has the boards"
 mig_eq "SELECT count(*) FROM towns" "0" "partial install has no game data"
 mig_eq "SELECT count(*) || '|' || (SELECT count(*) FROM class_levels) FROM classes" "3|297" "partial install has the classes"
-mig_eq "SELECT count(*) || '|' || max(id) || '|' || sum(messages <> '') FROM spells" "25|25|25" "partial install has the spells"
+mig_eq "SELECT count(*) || '|' || max(id) || '|' || sum(messages <> '') FROM spells" "$M_SP|$M_SP|$M_SP" "partial install has the spells"
 mig_eq "SELECT count(*) || '|' || max(id) || '|' || (SELECT count(*) FROM town_items) FROM items" "71|71|0" "partial install has the items, no shops"
 mig_eq "SELECT f.board || '|' || f.author || '|' || (f.author_id = n.author_id) FROM news n JOIN forum f ON f.id = n.thread_id" \
 	"2|Parter|1" "partial install news thread"

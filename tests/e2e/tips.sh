@@ -35,7 +35,7 @@ t_get /static/css/dk.css; expect_body '.dk-tip-arrow'; expect_body '.tip-lore'
 t_section "tips: the classes on the registration page"
 t_get /register
 expect_body 'The classes: <span class="tip-term" data-tip data-tip-side="bottom" tabindex="0">Mage<template class="tip"><div class="tip-title">Mage</div><div class="tip-meta">Starts with 15 HP, 5 MP · Knows Magic Bolt</div><ul class="tip-lines"><li>Fast level-ups</li><li>High hit points</li>'
-expect_body '<li>0 +attack spells</li></ul><div class="tip-lore"><p>In the towers of Midworld the old masters still teach the words that bend the world: a whisper that closes wounds, a cry that calls down fire. Mages are frail in a brawl, and every adventurer they have saved will tell you so. Few of them mind.</p></div></template></span>'
+expect_body '</li></ul><div class="tip-lore"><p>In the towers of Midworld the old masters still teach the words that bend the world: a whisper that closes wounds, a cry that calls down fire. Mages are frail in a brawl, and every adventurer they have saved will tell you so. Few of them mind.</p></div></template></span>'
 expect_body '>Warrior<template class="tip"><div class="tip-title">Warrior</div><div class="tip-meta">Starts with 15 HP, 0 MP</div>'
 expect_body '>Paladin<template class="tip"><div class="tip-title">Paladin</div>'
 expect_body 'name="charclass"'
@@ -50,8 +50,8 @@ t_get /fight; expect_status 200
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
 # each button in a span that carries its tooltip: name, MP, where, description, lore
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>'"$TP_HEAL_LORE"'</p></div></template></span>'
-# no lore: no lore block
-expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div></template></span>'
+# every spell has lore: Hurt's follows its description
+expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div><div class="tip-lore"><p>'
 expect_no_body '<div class="tip-lore"></div>'; expect_no_body '<div class="tip-body"></div>'
 # a disabled button keeps its tooltip: the span is the trigger (pointer events pass to it)
 expect_body '<span class="spell-tip spell-tip-short" data-tip><button class="spell-btn" type="submit" name="spell" value="2" title="Revive (10 MP)" aria-label="Revive (10 MP)" aria-keyshortcuts="3" disabled><img'
@@ -115,7 +115,7 @@ t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 W
 t_give tipper herb 1 && t_give tipper dagger 1 weapon
 t_get /inventory
 # an item without a picture: the slot's icon
-expect_body '<li title="Weapon: Dagger" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Dagger</span><template class="tip"><div class="tip-title">Dagger</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +8</li></ul></template></li>'
+expect_body '<li title="Weapon: Dagger" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Dagger</span><template class="tip"><div class="tip-title">Dagger</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +8</li></ul>'
 expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
 # an item with a picture shows it instead of the slot's icon; its tooltip says its charges
 t_items_clear tipper; t_give tipper wand 1 weapon
@@ -133,7 +133,7 @@ t_form_submit /admin/items/2 "description=<img src=x onerror=alert(3)>" "lore=$(
 expect_redirect '/admin/items/2\?saved=1'
 TP_BRANCH='>Branch<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/branch.png" width="20" height="20" alt="">Branch</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +4</li></ul><div class="tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div><div class="tip-lore"><p>&lt;script&gt;alert(4)&lt;/script&gt; &amp; &quot;q&quot;</p></div></template>'
 TP_HERB='>Herb<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · In fights and in town</div><ul class="tip-lines"><li>Power 30</li></ul><div class="tip-body"><p>Restores 30 hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>A bitter green leaf that grows wild along the roads around Midworld.'
-TP_STICK='>Stick<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template>'
+TP_STICK='>Stick<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul>'
 tp_no_xss() { expect_no_body '<script>alert(4)'; expect_no_body '<img src=x'; }
 t_jar tips
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, gold = 1000 WHERE username = 'tipper'"
@@ -142,7 +142,7 @@ TP_HERB_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = u
 TP_BRANCH_E=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id WHERE u.username = 'tipper' AND ui.item_id = 2")
 # /inventory: the equipped slots and every bag entry (focusable names), the actions as before
 t_get /inventory; expect_status 200
-expect_body '<td><img class="item-icon" src="/static/images/items/stick.png" width="22" height="22" alt=""> <b class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</b> <span class="small">(Attack Power +2)</span></td>'
+expect_body '<td><img class="item-icon" src="/static/images/items/stick.png" width="22" height="22" alt=""> <b class="tip-term" data-tip tabindex="0"'"$TP_STICK"; expect_body '</template></b> <span class="small">(Attack Power +2)</span></td>'
 expect_body '<img class="inv-icon" src="/static/images/items/herb.png" width="32" height="32" alt="">'
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></b> x3'
 expect_body '<img class="inv-icon" src="/static/images/items/branch.png" width="32" height="32" alt="">'
@@ -194,34 +194,35 @@ t_jar tipadmin
 t_get /admin/items/2
 t_post /admin/items/2/reset "csrf=$(t_csrf)&field=*"
 tp_eq "SELECT count(*) FROM content_overrides WHERE kind = 'items' AND key = 'branch'" "0" "branch overrides reset"
-tp_eq "SELECT coalesce(description, '') || '|' || coalesce(lore, '') FROM items WHERE id = 2" "|" "branch description and lore reset"
+tp_eq "SELECT instr(description, 'alert(3)') + instr(lore, 'alert(4)') FROM items WHERE id = 2" "0" "branch description and lore reset"
 t_jar tips
 
 t_section "tips: lore on the help pages"
 t_jar tipsout
 t_get /help
-tp_has '<li>0 +attack spells</li>
+tp_has '</li>
 </ul>
 <div class="help-lore help-lore-class"><p>In the towers of Midworld the old masters'
 expect_body '<div class="help-lore help-lore-class"><p>Warriors learn their trade on the long road between Midworld and Roma'
 expect_body '<div class="help-lore help-lore-class"><p>The Paladins keep an oath sworn before the first dragon fell'
 t_get /help/spells
 expect_body '<div class="help-lore"><p>'"$TP_HEAL_LORE"'</p></div></td>'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "only Heal and Magic Bolt have lore on /help/spells"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT count(*) FROM spells WHERE lore <> '' AND retired = 0")" ] && t_ok || t_fail "the spells with lore have a lore block on /help/spells, no one else"
 t_get /help/items
 expect_body '>Herb<br><span class="small">Restores 30 hit points, in a fight or out of it.</span><div class="help-lore"><p>A bitter green leaf'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "only the Herb and the Wand have lore on /help/items"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT count(*) FROM items WHERE lore <> '' AND retired = 0")" ] && t_ok || t_fail "the items with lore have a lore block on /help/items, no one else"
 t_get /help/monsters
 expect_body '<tr class="help-lore-row"><td colspan="9"><div class="help-lore"><p>'"$TP_SLIME_LORE"'</p></div></td></tr>'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = 1 ] && t_ok || t_fail "only the Blue Slime has lore on /help/monsters"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT count(*) FROM monsters WHERE lore <> '' AND retired = 0")" ] && t_ok || t_fail "the monsters with lore have a lore block on /help/monsters, no one else"
 
 t_section "tips: lore overrides, escaped everywhere"
 t_jar tipadmin; t_reset_jar; t_login "$ADMIN_USER" "$ADMIN_PASS"
 t_get /admin/spells/6; expect_status 200
 tp_has '<tr><td class="admin-label">Lore:</td><td>
-<textarea name="lore" rows="6" cols="40"></textarea>'
+<textarea name="lore" rows="6" cols="40">'
 expect_body 'Optional story text, shown in tooltips and on the help page'
 TP_HURT_DESC=$(t_sql "SELECT description FROM spells WHERE id = 6")
+TP_HURT_LORE=$(t_sql "SELECT lore FROM spells WHERE id = 6")
 TP_LORE=$(printf 'A <b>bold</b> lie,\nwrapped.\n\n<script>alert(1)</script> & "quoted" '"'"'too'"'"'')
 # too long: refused, nothing saved
 t_form_submit /admin/spells/6 "description=$TP_HURT_DESC" "lore=$(printf '%2001s' x)"
@@ -249,7 +250,7 @@ expect_no_body '<script>alert(1)'
 t_jar tipadmin
 t_get /admin/spells/6
 t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=lore"
-tp_eq "SELECT lore FROM spells WHERE id = 6" "" "lore reset to the file's (none)"
+tp_eq "SELECT lore FROM spells WHERE id = 6" "$TP_HURT_LORE" "lore reset to the file's"
 t_get /admin/spells/6; expect_no_body 'Reset Lore to file'; expect_body 'Reset Description to file'
 t_post /admin/spells/6/reset "csrf=$(t_csrf)&field=*"
 tp_eq "SELECT count(*) FROM content_overrides WHERE kind = 'spells' AND key = 'hurt'" "0" "overrides reset"

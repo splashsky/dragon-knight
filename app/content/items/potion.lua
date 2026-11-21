@@ -10,6 +10,10 @@ end
 return {
 	name = "Potion",
 	description = "Restores 100 hit points, in a fight or out of it.",
+	lore = [[
+A red healing draught in a stoppered glass bottle, the most common remedy on the road.
+Apothecaries in every town brew it, and the good ones seal the cork with wax. It tastes
+sour and works quickly.]],
 	category = "consumable",
 	price = 60,
 	max_stack = 10,

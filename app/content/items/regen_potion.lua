@@ -9,6 +9,10 @@ end
 return {
 	name = "Regen Potion",
 	description = "Recovers hit points with every move on the map (or every turn of a fight) for a while.",
+	lore = [[
+A green syrup that keeps working long after it is swallowed, so wounds knit a little with
+every step. Mages in the border towns sell it to travellers who expect to be hurt and have
+a long way to go. Taken early, it saves the healer a lot of work.]],
 	category = "consumable",
 	price = 100,
 	max_stack = 10,

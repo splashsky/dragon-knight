@@ -9,6 +9,10 @@ end
 return {
 	name = "Rend",
 	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
+	lore = [[
+Rend is the spell old Mages used to finish a monster for them, and some still teach it that
+way. It tears at the target's defences and its flesh alike, leaving it bloodied and unsteady.
+Hunters in Endworld say a Rend cast well makes a beast forget where it was going.]],
 	mp = 40,
 	power = 100,                 -- the most damage it deals
 	messages = {

@@ -14,6 +14,11 @@ end
 return {
 	name = "Goblin Shaman",
 	description = "Hurls Hurt spells, heals itself when wounded and carries two potions.",
+	lore = [[
+A goblin who picked up a few spells from a dropped spellbook and has been bragging about
+it ever since. Its hurts are weak but cheap to cast, and it keeps two potions tucked in
+its belt for emergencies. Goblins say the shaman is the one to kill first, which is good
+advice from any goblin you can find.]],
 	level = 5,
 	maxhp = 40, maxdam = 8, armor = 4,
 	maxexp = 12, maxgold = 15,

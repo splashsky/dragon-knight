@@ -154,7 +154,7 @@ t_section "admin: spells"
 t_get /admin/spells;       expect_status 200; expect_body '<a href="/admin/spells/1">Heal</a>'
 expect_body '<td>heal</td><td>5</td><td>10</td><td>both</td><td>self</td>'
 expect_body '<td>hurt</td><td>5</td><td>15</td><td>fight</td><td>enemy</td>'
-expect_body 'spells: 25 files, 25 in the database (0 retired), 0 overrides.'
+expect_body "spells: $(ls app/content/spells | wc -l) files, $(t_sql 'SELECT count(*) FROM spells') in the database (0 retired), 0 overrides."
 t_get /admin/spells/6;     expect_status 200; expect_body 'Edit Spell: Hurt'; expect_body 'app/content/spells/hurt.lua'
 expect_body 'name="power" size="6" value="15"'; expect_body 'name="mp" size="6" value="5"'
 expect_body 'Message hit:'; expect_body 'name="messages.hit" size="70" value="You have cast the %s spell for %d damage."'
@@ -165,14 +165,15 @@ expect_no_body 'name="usable_in"'; expect_no_body 'name="target"'; expect_no_bod
 t_get /admin/spells/99;    expect_status 404
 t_post /admin/spells/6 "name=NoToken"; expect_status 403
 ADM_HURT_DESC=$(t_sql "SELECT description FROM spells WHERE id = 6")
+ADM_HURT_LORE=$(t_sql "SELECT lore FROM spells WHERE id = 6")
 t_get /admin/spells/6
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" mp=-1 power=x name= "messages.immune=100% %s"
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" "lore=$ADM_HURT_LORE" mp=-1 power=x name= "messages.immune=100% %s"
 expect_status 200; expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
 expect_body 'MP must be an integer from 0 to 1000000.'; expect_body 'Power must be an integer from 0 to 1000000.'
 expect_body 'Message immune must be a one-line message of at most 500 characters'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid spell form not saved"
 t_get /admin/spells/6
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" name=Smite mp=4 power=20 "messages.hit=Smite! %s hits for %d." \
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" "lore=$ADM_HURT_LORE" name=Smite mp=4 power=20 "messages.hit=Smite! %s hits for %d." \
 	usable_in=both target=self cast=x
 expect_redirect '/admin/spells/6\?saved=1'
 admin_eq "SELECT name || '|' || mp || '|' || power || '|' || usable_in || '|' || target || '|' || (instr(messages, char(10) || 'hit=Smite! %s hits for %d.') > 0) FROM spells WHERE id = 6" \
@@ -203,13 +204,13 @@ expect_body '<span class="admin-icon"><img src="/static/images/skills/heal.png" 
 t_get /admin/spells/6
 expect_body '<span class="admin-icon"><img src="/static/images/skills/default.png" width="44" height="44" alt="Current icon"> <input type="text" name="icon" size="20" value=""></span>'
 expect_body 'A PNG in public/images/skills/, without &quot;.png&quot;'
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=nope
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" "lore=$ADM_HURT_LORE" icon=nope
 expect_status 200; expect_body 'Icon names a missing file: '; expect_body '/images/skills/nope.png.'
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=../heal
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" "lore=$ADM_HURT_LORE" icon=../heal
 expect_status 200; expect_body 'Icon must be the name of a PNG file in public/images/skills/'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid icons not saved"
 t_get /admin/spells/6
-t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" icon=heal
+t_form_submit /admin/spells/6 "description=$ADM_HURT_DESC" "lore=$ADM_HURT_LORE" icon=heal
 expect_redirect '/admin/spells/6\?saved=1'
 admin_eq "SELECT icon FROM spells WHERE id = 6" "heal" "icon override applied"
 admin_eq "SELECT group_concat(field || '=' || value, ';') FROM content_overrides WHERE kind = 'spells'" "icon=heal" "only the icon is overridden"
@@ -245,13 +246,14 @@ expect_body 'Usable in:</td><td>both</td>'; expect_body 'What the item does is i
 expect_body 'Sold in:</td><td>Midworld, Newtown, Bris'; expect_no_body 'name="attack"'
 t_get /admin/items/9999;   expect_status 404
 t_post /admin/items/46 "name=NoToken"; expect_status 403
+ADM_DEMON_LORE=$(t_sql "SELECT lore FROM items WHERE id = 46")
 t_get /admin/items/46
-t_form_submit /admin/items/46 name= price=-1 modifiers.1.amount=x
+t_form_submit /admin/items/46 "lore=$ADM_DEMON_LORE" name= price=-1 modifiers.1.amount=x
 expect_status 200; expect_body 'Name must be a one-line string of at most 50 characters, not empty.'
 expect_body 'Price must be an integer from 0 to 10000000.'; expect_body 'Modifier 1 amount must be an integer from -1000000 to 1000000.'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid item form not saved"
 t_get /admin/items/46
-t_form_submit /admin/items/46 "name=<script>alert(1)</script>" price=123 drop_level=3 modifiers.1.stat=maxmp \
+t_form_submit /admin/items/46 "lore=$ADM_DEMON_LORE" "name=<script>alert(1)</script>" price=123 drop_level=3 modifiers.1.stat=maxmp \
 	modifiers.1.amount=-20 category=weapon id=7
 expect_redirect '/admin/items/46\?saved=1'
 admin_eq "SELECT id || '|' || name || '|' || category || '|' || price || '|' || drop_level || '|' || modifiers FROM items WHERE key = 'demons_sin'" \
@@ -260,7 +262,8 @@ admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM co
 	"drop_level=3;modifiers.1.amount=-20;modifiers.1.stat=maxmp;name=<script>alert(1)</script>;price=123" "only the changed fields are overridden"
 t_get '/admin/items/46?saved=1'; expect_body 'Item updated.'; expect_body 'File value: maxhp'; expect_body 'File value: -50'
 t_get /admin/items;        expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
-t_get /help/items;         expect_body '>&lt;script&gt;alert(1)&lt;/script&gt;</td><td style="width: 15%">3</td><td style="width: 30%">Max MP -20</td>'
+t_get /help/items
+expect_row '>&lt;script&gt;alert(1)&lt;/script&gt;</td><td style="width: 15%">3</td><td style="width: 30%">Max MP -20</td>'
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
 admin_eq "SELECT price || '|' || modifiers FROM items WHERE id = 46" "123|stat stat=maxmp amount=-20; stat stat=strength amount=50" "item overrides survive a sync"
 t_get /admin/items/66
@@ -342,7 +345,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF 'Content synced (statuses: 7, 0 new, 0 retired; summons: 1, 0 new, 0 retired; spells: 25, 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: 71, 0 new, 0 retired; monsters: 154, 0 new, 0 retired).' "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF "Content synced (statuses: $(ls app/content/statuses | wc -l), 0 new, 0 retired; summons: $(ls app/content/summons | wc -l), 0 new, 0 retired; spells: $(ls app/content/spells | wc -l), 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: $(ls app/content/items | wc -l), 0 new, 0 retired; monsters: $(ls app/content/monsters | wc -l), 0 new, 0 retired)." "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"

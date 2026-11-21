@@ -1010,8 +1010,11 @@ it). Synced into the kinds' `lore` columns (schema version 13), overridable in t
 panel (a textarea on every content admin page), escaped wherever it shows
 (`paragraphs(text)`): in the tooltips (`.tip-lore`) and on the help pages under each entry
 (`.help-lore`: classes on `/help`, spells, statuses and allies on `/help/spells`, items on
-`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. The Mage, Warrior,
-Paladin, Heal, Magic Bolt, the Herb, the Wand and the Blue Slime have some to begin with:
+`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. Every class, item, monster and spell has some
+(3.1; the statuses and allies don't yet). The voice is plain and concrete (a place, a
+habit, a rumour, who uses it), and only the upper echelon sounds legendary: monsters from
+level 42, the dragons and demon lords, the Destiny gear and the Dragon's, Angel's, Seraph's
+and Demon's accessories, the strongest spells:
 
 ```lua
 -- app/content/spells/heal.lua (excerpt)
@@ -1177,7 +1180,10 @@ High hit points]],                       -- one line per point on the help page
 	that differ from the file (and are valid) into overrides (that is how schema version 4
 	kept edited class names and levels data, version 5 edited spell names, MP and amounts,
 	version 6 edited items and drops, version 7 turned edited effect amounts into
-	`power`, and version 9 kept edited monster stats).
+	`power`, and version 9 kept edited monster stats). Only values that may have been
+	edited belong there: version 4 records a level's spell only where it differs from the
+	original game's (`V4_STOCK_SPELLS`), since the class files teach spells at more levels
+	now and a stock database's empty level is no edit.
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
@@ -1197,6 +1203,24 @@ Spells are content (see [Content](#content)): `app/content/spells/<key>.lua`, sy
 `spells`. The original 19 keep ids 1-19 (keys from the names: `heal`, `revive`, `life`,
 `breath`, `gaia`, `hurt`, `pain`, `maim`, `rend`, `chaos`, `sleep`, `dream`, `nightmare`,
 `craze`, `rage`, `fury`, `ward`, `fend`, `barrier`).
+
+3.1 added 40 spells so that each class learns something new at least every 6 levels up to
+100 (`tests/lua/test_spells.lua` checks it, and that each spell's MP fits the class's pool
+at the level it is learned); the original assignments stayed where they were. Each new
+file names where it is learned (`-- learned: ...`). The Mage's are damage and control
+(Spark, Frostbite, Cinder Lash, Sap Mind, Rockfall, Lightning Lance, Starfall, Whiteout,
+Ember, Inferno, Venom, Plague, Withering, Enfeeble, Curse); the Warrior's battle cries,
+strikes on its strength or attack with a cap (Cleave, Reaver, Blood Strike at a cost in
+HP, Finishing Blow against a monster at a quarter of its HP), rough self-healing (Grit,
+Second Wind) and Hunter's Mark (more damage from the weapon); the Paladin's healing with
+cures (Cleanse, Mend, Mercy, Renewal, Dawn), protection (Iron Vigil), holy strikes
+(Dawnstrike, Judgement) and allies. HP and MP costs and restores are shares of the maximum
+(Tithe, Wellspring, Stand Fast), so they mean the same at every level. New statuses:
+`weakened` and `venom` (the monster deals less damage), `burning`, `withering` (drains HP
+to the caster), `marked` (weapon attacks deal more); new allies: the bear, the spirit, the
+golem. `tests/lua/test_spells.lua` casts every spell, by the player and by a monster, over
+many seeded states (no errors, whole amounts, MP spent only when cast, immune monsters
+untouched).
 
 ```lua
 -- app/content/spells/heal.lua (scripted: see Scripting spells and items)
@@ -1898,8 +1922,9 @@ items, spells }` with item and spell rows, read once per request; a row may carr
 
 Monsters may speak in a fight (`app/fight/speech.lua`): a `speech` table in the file holds
 lists of lines for moments of the fight. Nothing is ever certain: each moment speaks by
-chance, and lines may be held back for conditions, or to once a fight. The Goblin Shaman
-(the commented example), the Troll, the Necromancer and the Red Dragon have some.
+chance, and lines may be held back for conditions, or to once a fight. Every monster has
+some (3.1; the Goblin Shaman's is the commented example): beasts and mindless things only
+a sound now and then ("Kraa!", "*hisses*"), thinking ones in a voice of their own.
 
 ```lua
 -- app/content/monsters/red_dragon.lua (abridged)
@@ -2417,6 +2442,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_csrf` | CSRF token from the last body |
 | `t_enc value` | urlencode |
 | `expect_status N`, `expect_body text`, `expect_no_body text`, `expect_header regex`, `expect_redirect /path` | assertions; `expect_body` matches raw HTML, so write `'` as `&#39;` |
+| `expect_row text` | `expect_body` on the body without its lore divs (`.help-lore`: the help pages' rows) |
 | `expect_text text`, `t_text` | the body's text without tags and tooltip templates (a sentence with an item name that has a tooltip); entities stay |
 | `t_ok` / `t_fail msg` | custom assertions |
 | `t_sql "SQL"` | run SQL on the test DB (sqlite3 or python3); `t_has_sql` |

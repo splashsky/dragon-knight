@@ -538,8 +538,8 @@ expect_body '<li class="invpanel-first-slot" title="Slot 1: None" data-tip data-
 t_give townie stick 1 weapon; t_give townie life_pebble 1 accessory2
 for k in herb potion ether antidote branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
 t_get /inventory
-expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/stick.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul></template></li>'
-expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul></template></li>'
+expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/stick.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul>'
+expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul>'
 expect_body '<a class="invpanel-bag full" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>12</b>/12</span></a>'
 t_items_clear townie
 

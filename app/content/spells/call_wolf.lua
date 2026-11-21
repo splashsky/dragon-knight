@@ -13,6 +13,10 @@ end
 return {
 	name = "Call Wolf",
 	description = "A wolf fights alongside you for a few rounds; monsters may attack it instead of you.",
+	lore = [[
+Hunters in the hills near Kalle claim a wolf will follow anyone who calls it properly, and
+this spell is the proper way. The wolf is no pet: it stays a few rounds, bites what it can
+reach, and takes a blow meant for its master when a monster is in the mood.]],
 	mp = 10,
 	power = 5,                  -- rounds the wolf stays
 	target = "self",

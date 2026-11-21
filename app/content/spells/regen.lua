@@ -4,6 +4,10 @@
 return {
 	name = "Regen",
 	description = "Recovers hit points every turn of a fight, or every move outside one.",
+	lore = [[
+Regen is a slow mending that Mages in Narcissa picked up from watching the town's cats, which
+heal scratches overnight. It closes small wounds a little each turn, in a fight or on the road.
+It helps on long walks and long fights, but it will not close a deep cut.]],
 	mp = 8,
 	power = 5,                  -- turns (moves outside fights)
 	usable_in = "both",

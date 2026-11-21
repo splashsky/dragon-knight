@@ -1,6 +1,12 @@
 -- app/content/monsters/necromancer.lua :: the Necromancer (the original game's monster 75).
 return {
 	name = "Necromancer",
+	lore = [[
+Necromancers are mages who found the dead more willing to talk than the living. They
+keep to the old graveyards past Gilead, where they raise what they can from the soil and
+sell the rest to people who should know better. Most are found by their smell before
+they are seen.
+]],
 	level = 26,
 	maxhp = 90, maxdam = 80, armor = 62,
 	maxexp = 190, maxgold = 63,

@@ -9,6 +9,11 @@ end
 return {
 	name = "Chaos",
 	description = "Hurts the monster, whatever its armor. Some monsters are immune.",
+	lore = [[
+Scholars argue over whether Chaos was written by a Mage or a madman, and the spell does not
+settle the question. It tears at a monster's form with no regard for its armor, and in the
+deep towns of Gilead it has ended more than one lord's bodyguard. Casters use it only when
+nothing gentler will do.]],
 	mp = 50,
 	power = 130,                 -- the most damage it deals
 	messages = {

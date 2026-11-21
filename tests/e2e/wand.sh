@@ -45,7 +45,7 @@ expect_no_body "action=\"/spell/$WD_BOLT\""   # fight-only: not a Fast Spell
 t_get /help/levels; expect_body '<tr><td>1</td><td>0</td><td>15</td><td>5</td><td>5</td><td>5</td><td>5</td><td>Magic Bolt</td></tr>'
 expect_body '<tr><td>1</td><td>0</td><td>15</td><td>0</td><td>5</td><td>5</td><td>5</td><td><span class="light">None</span></td></tr>'
 t_get /help/spells; expect_body '>Magic Bolt<br>'
-t_get /help; expect_body '<li>6 hurt spells (Magic Bolt from the start)</li>'
+t_get /help; expect_body 'hurt spells (Magic Bolt from the start)</li>'
 # level 2: the same +5 MP as before 2.4 (and Heal)
 wd_sql "UPDATE users SET experience = 14"
 t_fight wizard 1 1

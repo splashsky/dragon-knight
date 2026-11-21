@@ -2,6 +2,10 @@
 return {
 	name = "Barrier",
 	description = "Reduces the damage you take until the end of the fight.",
+	lore = [[
+Mages in Hambry swear by it before a long march, though few can afford the mana. The
+Barrier wraps the caster in a shimmer that turns half of every blow aside until the fight
+is over. Gate wardens in Endworld are said to cast it on each other in turns.]],
 	mp = 30,
 	power = 50,                 -- percent less damage taken
 	target = "self",

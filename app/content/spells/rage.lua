@@ -7,6 +7,10 @@ end
 return {
 	name = "Rage",
 	description = "Increases the damage you deal until the end of the fight.",
+	lore = [[
+Rage is the spell fighters learn when Craze stops being enough. It works the same way, only
+more so, and the caster feels the heat in the arms for the rest of the fight. Trainers warn
+students to keep a clear head, which is harder with a bellyful of anger.]],
 	mp = 20,
 	power = 25,                 -- percent more damage
 	target = "self",

@@ -2,6 +2,11 @@
 return {
 	name = "Ward",
 	description = "Reduces the damage you take until the end of the fight.",
+	lore = [[
+Ward is the first defence a Mage learns, a thin shimmer around the body that turns a blow
+aside now and then. It will not save a caster from a dragon, but it has spared more than one
+apprentice a bruise. Guards on the road out of Midworld are taught it before they are given
+a spear.]],
 	mp = 10,
 	power = 10,                 -- percent less damage taken
 	target = "self",

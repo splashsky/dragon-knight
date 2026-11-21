@@ -1,9 +1,22 @@
 -- app/content/monsters/rogue_scorpion.lua :: the Rogue Scorpion (the original game's monster 19).
 return {
 	name = "Rogue Scorpion",
+	lore = [[
+A scorpion that left the desert and took up thieving, mostly in the caravan camps south of
+Roma. It is cleverer than its cousins, and will dart in to take a purse or a pouch before
+you blink. Merchants in Roma keep their coin in locked chests and pay the guards to watch
+the stables.]],
 	level = 7,
 	maxhp = 28, maxdam = 22, armor = 9,
 	maxexp = 32, maxgold = 11,
 	immune = 0,
 	maxmp = 26,
+	speech = {
+		start = { "Your purse, friend, or your tail.", chance = 30 },
+		turn = { "Quick now. Quick.", "*claws pick at your pack*", chance = 15 },
+		hurt = { "Ow! Sneaky, that.", chance = 25 },
+		losing = { "Bah. Not worth the trouble.", chance = 25 },
+		death = { "*clicks once, faintly*", chance = 30 },
+		victory = { "Pockets full, {player}!", chance = 25 },
+	},
 }

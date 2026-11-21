@@ -2,6 +2,10 @@
 return {
 	name = "Sleep",
 	description = "Puts the monster to sleep. Some monsters are immune.",
+	lore = [[
+Sleep is the first spell most Mages learn to hold a monster still, and it buys only a short
+nap. A drowsy monster may wake on any turn, so the caster must be quick. Innkeepers in
+Midworld say it works just as well on drunk customers.]],
 	mp = 10,
 	power = 5,                  -- the chance in 15 that it stays asleep each turn
 	messages = {
