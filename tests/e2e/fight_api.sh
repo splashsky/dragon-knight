@@ -271,7 +271,7 @@ FA_ATTACK=$(fa_button fight); FA_RUN=$(fa_button run)
 [ "$FA_RUN" = "run=Run" ] && t_ok || t_fail "Run sends '$FA_RUN'"
 for seed in 1 2; do fa_both "attack button" "$seed" fa_slime "$FA_ATTACK&round=2"; done
 fa_expect 'any(e["type"] == "attack" and e["actor"] == "player" for e in d["events"])' "Attack button: an attack"
-fa_expect "'name=\"fight\" value=\"Fight\" title=\"Attack\" aria-label=\"Attack\"><img src=\"/static/images/skills/attack.png\"' in d['fragments']['main'] and 'name=\"run\" value=\"Run\" title=\"Run\" aria-label=\"Run\"><img src=\"/static/images/skills/run.png\"' in d['fragments']['main']" "the fragment's action buttons"
+fa_expect "'name=\"fight\" value=\"Fight\" title=\"Attack\" aria-label=\"Attack\" aria-keyshortcuts=\"1\"><img src=\"/static/images/skills/attack.png\"' in d['fragments']['main'] and 'name=\"run\" value=\"Run\" title=\"Run\" aria-label=\"Run\" aria-keyshortcuts=\"0\"><img src=\"/static/images/skills/run.png\"' in d['fragments']['main']" "the fragment's action buttons"
 fa_both "attack button, victory" 7 fa_win "$FA_ATTACK&round=2"
 fa_expect 'd["redirect"] == "/victory"'
 fa_both "run button, blocked" 4 fa_blocked "$FA_RUN&round=2"
@@ -298,7 +298,7 @@ t_section "fight api: spell buttons, form and fetch alike"
 FA_HEAL=$(sp heal)
 fa_both "heal button" 1 fa_hurt "spell=$FA_HEAL&round=2"
 fa_expect 'any(e["type"] == "spell" and e["text"].startswith("You have cast the Heal spell") and e["mp"][0]["from"] - e["mp"][0]["to"] == 5 for e in d["events"] if "mp" in e)' "Heal button: cast"
-fa_expect "'<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\"><img src=\"/static/images/skills/heal.png\"' in d['fragments']['main']" "the fragment's spell buttons"
+fa_expect "'<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\" aria-keyshortcuts=\"2\"><img src=\"/static/images/skills/heal.png\"' in d['fragments']['main']" "the fragment's spell buttons"
 fa_expect "'action=\"/spell/$FA_HEAL\"' in d['fragments']['side'] and 'class=\"spell-btn\"' in d['fragments']['side']" "the fragment's Fast Spells"
 for seed in 1 2; do
 	fa_both "heal button" "$seed" fa_hurt "spell=$FA_HEAL&round=2"
@@ -311,7 +311,7 @@ fa_expect 'any(e["type"] == "spell" and e["text"].startswith("You have cast the 
 # the MP left after the round: the buttons it no longer covers come back disabled
 fa_low() { fa_slime; fa_sql "UPDATE users SET currentmp = 7"; }
 fa_both "last MP" 5 fa_low "spell=$(sp hurt)&round=2"
-fa_expect "'value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\" disabled>' in d['fragments']['main']" "disabled after the round"
+fa_expect "'value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\" aria-keyshortcuts=\"2\" disabled>' in d['fragments']['main']" "disabled after the round"
 
 t_section "fight api: item and gear buttons, form and fetch alike"
 # A consumable's icon button is <button name="item" value="<items id>"> (2.4), an equipped
@@ -344,12 +344,12 @@ for seed in 1 2 3; do
 	[ "$(t_sql "SELECT charges FROM user_items WHERE id = $FA_WAND")" = 4 ] && t_ok || t_fail "the wand's charge (seed $seed)"
 done
 fa_expect 'any(e["type"] == "item" and e["actor"] == "player" and e["text"].startswith("You have cast the Magic Bolt spell for ") and e["hp"][0]["who"] == "enemy" and e["hp"][0]["from"] - e["hp"][0]["to"] in (3, 4) and "mp" not in e for e in d["events"] if "text" in e and "hp" in e)' "Wand: Magic Bolt, no MP"
-fa_expect "'name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (4/5 charges)\" aria-label=\"Wand (4/5 charges)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">4/5</span>' in d['fragments']['main']" "the fragment's gear button: 4/5"
+fa_expect "'name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (4/5 charges)\" aria-label=\"Wand (4/5 charges)\" aria-keyshortcuts=\"2\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">4/5</span>' in d['fragments']['main']" "the fragment's gear button: 4/5"
 fa_is currentmp 0
 # no charge left: refused both ways, nothing spent (no turn)
 fa_empty() { fa_wand; t_sql "UPDATE user_items SET charges = 0 WHERE id = $FA_WAND"; }
 fa_empty; t_get /fight
-expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" disabled><img"
+expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" aria-keyshortcuts=\"2\" disabled><img"
 expect_body '<span class="item-badge item-badge-charges item-badge-empty" aria-hidden="true">0/5</span>'
 
 t_section "fight api: statuses, summons, locked turns"

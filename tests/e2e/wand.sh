@@ -60,7 +60,7 @@ t_section "wand: Magic Bolt in a fight"
 t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 5, currenthp = 100, base_maxhp = 100"
 t_get /fight; CS=$(t_csrf)
-expect_body "<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\"><img src=\"/static/images/skills/magic_bolt.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"spell-mp\" aria-hidden=\"true\">1</span></button>"
+expect_body "<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\" aria-keyshortcuts=\"3\"><img src=\"/static/images/skills/magic_bolt.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"spell-mp\" aria-hidden=\"true\">1</span></button>"
 t_round "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell for '
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
 { [ "$HP" = 46 ] || [ "$HP" = 47 ]; } && t_ok || t_fail "Magic Bolt: 3-4 damage (monster HP $HP)"
@@ -71,7 +71,7 @@ wd_sql "UPDATE users SET currenthp = 1000, base_maxhp = 1000"   # (it hits up to
 t_round "csrf=$CS&spell=$WD_BOLT"; expect_body 'You have cast the Magic Bolt spell, but the monster is immune to it.'
 wd_is "$T_MONSTER_HP || '|' || currentmp" "5|3"
 wd_sql "UPDATE users SET currentmp = 0"
-t_get /fight; expect_body "value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\" disabled>"
+t_get /fight; expect_body "value=\"$WD_BOLT\" title=\"Magic Bolt (1 MP)\" aria-label=\"Magic Bolt (1 MP)\" aria-keyshortcuts=\"3\" disabled>"
 t_fight_clear wizard
 wd_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"
 
@@ -100,20 +100,20 @@ t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 0, currenthp = 100, base_maxhp = 100"
 WAND=$(wd_wand)
 t_get /fight; CS=$(t_csrf)
-# the wand's button sits in the Actions row, between Attack and Run (before the spells)
-ORDER=$(grep -o 'name="fight"\|name="use_gear"\|name="run"\|id="fight-spells-label"' "$BODY" | tr '\n' ' ')
-[ "$ORDER" = 'name="fight" name="use_gear" name="run" id="fight-spells-label" ' ] && t_ok || t_fail "fight menu order: $ORDER"
-expect_body "<span class=\"spell-tip\" data-tip><button class=\"spell-btn\" type=\"submit\" name=\"use_gear\" value=\"$WAND\" title=\"Wand (5/5 charges)\" aria-label=\"Wand (5/5 charges)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">5/5</span></button>"
+# the wand's button comes first after Attack (the equipped gear before the spells): key 2
+ORDER=$(grep -o 'name="fight"\|name="use_gear"\|name="spell"\|name="run"' "$BODY" | uniq | tr '\n' ' ')
+[ "$ORDER" = 'name="fight" name="use_gear" name="spell" name="run" ' ] && t_ok || t_fail "fight menu order: $ORDER"
+expect_body "<span class=\"spell-tip\" data-tip><button class=\"spell-btn\" type=\"submit\" name=\"use_gear\" value=\"$WAND\" title=\"Wand (5/5 charges)\" aria-label=\"Wand (5/5 charges)\" aria-keyshortcuts=\"2\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"><span class=\"item-badge item-badge-charges\" aria-hidden=\"true\">5/5</span></button>"
 ROUND=$(t_sql "SELECT $T_ROUND FROM users $WQ")
 t_round "csrf=$CS&use_gear=$WAND"; expect_body 'You have cast the Magic Bolt spell for '
 HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
 { [ "$HP" = 46 ] || [ "$HP" = 47 ]; } && t_ok || t_fail "the wand: 3-4 damage (monster HP $HP)"
 wd_is "currentmp || '|' || $WD_CHARGES || '|' || $T_ROUND" "0|weapon=4|$((ROUND + 1))"
-expect_body "title=\"Wand (4/5 charges)\" aria-label=\"Wand (4/5 charges)\"><img"
+expect_body "title=\"Wand (4/5 charges)\" aria-label=\"Wand (4/5 charges)\" aria-keyshortcuts=\"2\"><img"
 # at 0 charges: greyed out, and refused without spending the turn
 t_sql "UPDATE user_items SET charges = 0 WHERE id = $WAND"
 t_get /fight
-expect_body "name=\"use_gear\" value=\"$WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" disabled><img"
+expect_body "name=\"use_gear\" value=\"$WAND\" title=\"Wand (0/5 charges)\" aria-label=\"Wand (0/5 charges)\" aria-keyshortcuts=\"2\" disabled><img"
 ROUND=$(t_sql "SELECT $T_ROUND FROM users $WQ"); HP=$(t_sql "SELECT $T_MONSTER_HP FROM users $WQ")
 t_round "csrf=$CS&use_gear=$WAND"; expect_body 'The Wand has no charges left. Rest at an inn to recharge it.'
 expect_body '<p class="fight-note error" role="alert">'; expect_body 'name="fight"'

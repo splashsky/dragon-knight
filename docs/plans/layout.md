@@ -1,6 +1,6 @@
 # Plan: 3.1 — the new layout and the hotbar
 
-Status: **in progress** — version **3.1** (started after 3.0.0 with `view.GAME_VERSION =
+Status: **done** (unreleased) — version **3.1** (started after 3.0.0 with `view.GAME_VERSION =
 "3.1.0-dev"`, `DK_VERSION "3.1.0-dev"` and a new top changelog entry `version = "3.1.0",
 date = "unreleased"`). Three steps: **Y1** the frame, **Y2** the stage, **Y3** the hotbar.
 
@@ -57,7 +57,15 @@ always Attack, 0 always Run, and the player puts their other actions in 2-9.
 - The legacy messages that sent the player to "the direction buttons on the left" say "the
 	compass"; the help pages describe the new layout.
 
-## Y3: the hotbar
+## Y3: the hotbar — ✅ done
+
+**As implemented** (`docs/APP.md` "Hotbar"): as designed, plus: an action met while the bar was
+full stays off it even when a key frees later (it was met: only the player moves it); the
+fight page's title is the location panel's heading (Retro still draws its picture); the
+Reset button is `forget` (a control named `reset` hides the form's `reset()`, which the live
+client calls after a POST); `scene.js` doesn't fade `/hotbar` into `/hotbar` (a drag saves
+in place); `dk install --force` drops `user_hotbar` too.
+
 
 - **Model** (schema version 17): `user_hotbar (user_id, kind, ref_id, slot)`: every action
 	the player has met (`kind` `spell` with a spells id, or `item` with an items id: gear

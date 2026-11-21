@@ -1,0 +1,16 @@
+{#- One of the fight menu's action buttons (fight/fight.html: on the hotbar, or under More),
+		as routes/fight.lua builds them: a spell (kind "spell": spell=<id>, its MP; greyed out
+		and disabled when the MP don't cover it), gear that casts (kind "gear":
+		use_gear=<user_items id>, a charges badge, disabled at 0) or a consumable (kind
+		"item": item=<items id>, a quantity badge, disabled when its can_use refuses now); the
+		server checks again. tip: its tooltip's ctx (lib/tips.lua), in the span around the
+		button (a disabled button gets no pointer events; docs/APP.md "Tooltips"). hotkey: its
+		number key on the bar (aria-keyshortcuts; hotbar.js presses it). -#}
+{%- local keys = hotkey and (' aria-keyshortcuts="' .. hotkey .. '"') or "" %}
+{%- if kind == "spell" then -%}
+<span class="spell-tip{% if short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="spell" value="{{ id }}" title="{{ label }}" aria-label="{{ label }}"{{{ keys }}}{% if short then %} disabled{% end %}><img src="{{ icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ mp }}</span></button>{{{ include("tip/tip", tip) }}}</span>
+{%- elseif kind == "gear" then -%}
+<span class="spell-tip{% if short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="use_gear" value="{{ id }}" title="{{ label }}" aria-label="{{ label }}"{{{ keys }}}{% if short then %} disabled{% end %}><img src="{{ icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-charges{% if charges < 1 then %} item-badge-empty{% end %}" aria-hidden="true">{{ charges }}/{{ max }}</span></button>{{{ include("tip/tip", tip) }}}</span>
+{%- else -%}
+<span class="spell-tip{% if short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="item" value="{{ id }}" title="{{ label }}" aria-label="{{ label }}"{{{ keys }}}{% if short then %} disabled{% end %}><img src="{{ icon }}" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">{{ qty }}</span></button>{{{ include("tip/tip", tip) }}}</span>
+{%- end -%}

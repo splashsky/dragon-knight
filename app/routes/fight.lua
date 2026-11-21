@@ -28,6 +28,7 @@ local auth = require("lib.auth")
 local encounter = require("fight.encounter")
 local events = require("fight.events")
 local game = require("lib.game")
+local hotbar = require("lib.hotbar")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local scene = require("lib.scene")
@@ -84,16 +85,17 @@ local function victory_detail(res)
 end
 
 -- The fight menu's item buttons: consumables in the bag usable in fights, one per item with
--- the quantity over all its stacks: { id, name, qty, label, icon (URL), short (its can_use
--- refuses now: greyed out; the server checks again), item (the row), tip (its tooltip) }.
+-- the quantity over all its stacks: { kind = "item", key (its hotbar key), id, name, qty,
+-- label, icon (URL), short (its can_use refuses now: greyed out; the server checks again),
+-- item (the row), tip (its tooltip) }.
 local function usable_items(user, f)
 	local out, by_id = {}, {}
 	for _, e in ipairs(inventory.bag(user.id)) do
 		if items.usable(e.item, "fight") then
 			local line = by_id[e.item.id]
 			if not line then
-				line = { id = e.item.id, name = e.item.name, qty = 0, icon = items.icon_url(e.item), item = e.item,
-					short = not act.can_use(f, e.item) }
+				line = { kind = "item", key = hotbar.key("item", e.item.id), id = e.item.id, name = e.item.name, qty = 0,
+					icon = items.icon_url(e.item), item = e.item, short = not act.can_use(f, e.item) }
 				by_id[e.item.id] = line
 				out[#out + 1] = line
 			end
@@ -107,9 +109,10 @@ local function usable_items(user, f)
 	return out
 end
 
--- The fight menu's gear buttons: equipped items that cast a spell, in slot order: { id
--- (the user_items id), name, charges, max, label ("Wand (3/5 charges)"), icon (URL), short
--- (no charge left, or the spell can't be cast: greyed out), tip (its tooltip) }.
+-- The fight menu's gear buttons: equipped items that cast a spell, in slot order: { kind =
+-- "gear", key (its hotbar key: the item's), id (the user_items id), name, charges, max,
+-- label ("Wand (3/5 charges)"), icon (URL), short (no charge left, or the spell can't be
+-- cast: greyed out), tip (its tooltip) }.
 local function gear_buttons(user)
 	local out = {}
 	local eq = inventory.equipped(user.id)
@@ -118,12 +121,61 @@ local function gear_buttons(user)
 		if e and items.casts(e.item) then
 			local spell = items.spell(e.item)
 			local charges = math.min(e.charges, e.item.charges)
-			out[#out + 1] = { id = e.id, name = e.item.name, charges = charges, max = e.item.charges,
+			out[#out + 1] = { kind = "gear", key = hotbar.key("item", e.item.id), id = e.id, name = e.item.name,
+				charges = charges, max = e.item.charges,
 				label = e.item.name .. " (" .. charges .. "/" .. e.item.charges .. " charges)", icon = items.icon_url(e.item),
 				short = charges < 1 or not (spell and spells.usable(spell, "fight")), tip = tips.gear(e) }
 		end
 	end
 	return out
+end
+
+-- The fight menu's spell buttons (spells.buttons), with their kind, hotbar key and tooltip.
+local function spell_buttons(user, mp)
+	local out = spells.buttons(spells.known(user, "fight"), mp)
+	for _, b in ipairs(out) do b.kind, b.key, b.tip = "spell", hotbar.key("spell", b.id), tips.spell(b.spell) end
+	return out
+end
+
+-- What an action on the bar but not at hand lacks, for its greyed slot.
+local function missing(a)
+	if a.kind == "spell" then return "not known" end
+	if a.item.category == "consumable" then return "none left" end
+	return "not worn"
+end
+
+-- The hotbar (lib/hotbar.lua) from the fight menu's buttons (gear, spells, items, in that
+-- order): slots 2-9, each { n, button } (its hotkey n), { n, gone = action, why } (an
+-- action of the bar's not at hand) or { n } (empty); and the buttons off the bar ("More").
+local function hotbar_view(user, buttons)
+	local by_key, keys = {}, {}
+	for _, b in ipairs(buttons) do
+		if not by_key[b.key] then
+			by_key[b.key] = b
+			keys[#keys + 1] = b.key
+		end
+	end
+	local slots = hotbar.arrange(user.id, keys)
+	local bar, shown = {}, {}
+	for n = hotbar.FIRST, hotbar.LAST do
+		local key = slots[n]
+		local b = key and by_key[key]
+		local gone = key and not b and hotbar.describe(key)
+		if b then
+			b.hotkey = n
+			shown[b] = true
+			bar[#bar + 1] = { n = n, button = b }
+		elseif gone then
+			bar[#bar + 1] = { n = n, gone = gone, why = missing(gone) }
+		else
+			bar[#bar + 1] = { n = n }
+		end
+	end
+	local more = {}
+	for _, b in ipairs(buttons) do
+		if not shown[b] then more[#more + 1] = b end
+	end
+	return bar, more
 end
 
 -- name (turns left) of each status of combatant c, for the page
@@ -252,9 +304,11 @@ local function fight_page(req, f, lines)
 		local weapon = inventory.equipped(user.id).weapon
 		page.attack_tip = tips.attack(f.st.attackpower, weapon and weapon.item.name)
 		page.run_tip = tips.run()
-		page.spells = spells.buttons(spells.known(user, "fight"), f.st.currentmp)
-		page.items = usable_items(user, f)
-		page.gear = gear_buttons(user)
+		local buttons = gear_buttons(user)
+		for _, list in ipairs({ spell_buttons(user, f.st.currentmp), usable_items(user, f) }) do
+			for _, b in ipairs(list) do buttons[#buttons + 1] = b end
+		end
+		page.bar, page.more = hotbar_view(user, buttons)
 		page.round = f.round
 	end
 	return show(req, "Fighting", "fight/fight", page)

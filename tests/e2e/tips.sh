@@ -49,12 +49,12 @@ t_get /fight; expect_status 200
 # the monster's name: its level and lore (Blue Slime has no description)
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
 # each button in a span that carries its tooltip: name, MP, where, description, lore
-expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>'"$TP_HEAL_LORE"'</p></div></template></span>'
+expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>'"$TP_HEAL_LORE"'</p></div></template></span>'
 # no lore: no lore block
-expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div></template></span>'
+expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div></template></span>'
 expect_no_body '<div class="tip-lore"></div>'; expect_no_body '<div class="tip-body"></div>'
 # a disabled button keeps its tooltip: the span is the trigger (pointer events pass to it)
-expect_body '<span class="spell-tip spell-tip-short" data-tip><button class="spell-btn" type="submit" name="spell" value="2" title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img'
+expect_body '<span class="spell-tip spell-tip-short" data-tip><button class="spell-btn" type="submit" name="spell" value="2" title="Revive (10 MP)" aria-label="Revive (10 MP)" aria-keyshortcuts="3" disabled><img'
 expect_body '<span class="spell-mp" aria-hidden="true">10</span></button><template class="tip"><div class="tip-title">Revive</div><div class="tip-meta">10 MP · In fights and in town</div>'
 # Fast Spells in the sidebar: Heal and Revive, opening to the left
 expect_body '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left">'
@@ -80,32 +80,33 @@ fi
 
 t_section "tips: the fight menu's actions"
 # Attack and Run are icon buttons (fight=Fight, run=Run, as the old text buttons sent) in
-# spans that carry their tooltips; Attack's says the attack power (strength + base attack +
-# the weapon's) and the weapon. The order: Attack, the equipped gear's abilities, Run, the
-# spells, the items.
+# spans that carry their tooltips, on the hotbar's keys 1 and 0; Attack's says the attack
+# power (strength + base attack + the weapon's) and the weapon. The order: Attack, the
+# equipped gear's abilities, the spells, the items (each on the first free key), Run.
 t_sql "UPDATE users SET strength = 10, base_attack = 3 WHERE username = 'tipper'"
 t_get /fight
-expect_body '<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>'
-expect_body '<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Attack</div><div class="tip-meta">Attack Power 13</div><div class="tip-body"><p>Strike the monster with your weapon.</p></div></template></span>'
-expect_body '<span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Run</div><div class="tip-body"><p>Try to escape. The monster may block your way and strike.</p></div></template></span>'
+expect_body '<div class="hotbar" role="group" aria-labelledby="hotbar-label"><span class="hotbar-label" id="hotbar-label">Hotbar</span>'
+expect_body '<li class="hotbar-slot" data-hotkey="1"><kbd class="hotkey" aria-hidden="true">1</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack" aria-keyshortcuts="1"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Attack</div><div class="tip-meta">Attack Power 13</div><div class="tip-body"><p>Strike the monster with your weapon.</p></div></template></span>'
+expect_body '<li class="hotbar-slot hotbar-run" data-hotkey="0"><kbd class="hotkey" aria-hidden="true">0</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run" aria-keyshortcuts="0"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button><template class="tip"><div class="tip-title">Run</div><div class="tip-body"><p>Try to escape. The monster may block your way and strike.</p></div></template></span>'
 expect_no_body '<input type="submit" name="fight"'; expect_no_body '<input type="submit" name="run"'
 t_give tipper stick 1 weapon
 t_get /fight; expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Stick</div>'
 t_items_clear tipper; t_give tipper wand 1 weapon; t_give tipper herb 1
 t_get /fight
 TP_ORDER=$(grep -o 'name="fight"\|name="run"\|name="spell"\|name="use_gear"\|name="item"' "$BODY" | uniq | tr '\n' ' ')
-[ "$TP_ORDER" = 'name="fight" name="use_gear" name="run" name="spell" name="item" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
+[ "$TP_ORDER" = 'name="fight" name="use_gear" name="spell" name="item" name="run" ' ] && t_ok || t_fail "fight menu order: $TP_ORDER"
 # the wand's button: its picture, the charges as a badge, a tooltip with the spell
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="use_gear" value="'
-expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · 5/5 Charges · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'
+expect_body '" title="Wand (5/5 charges)" aria-label="Wand (5/5 charges)" aria-keyshortcuts="2"><img src="/static/images/items/wand.png" width="44" height="44" alt=""><span class="item-badge item-badge-charges" aria-hidden="true">5/5</span></button><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/wand.png" width="20" height="20" alt="">Wand</div><div class="tip-meta">Casts Magic Bolt · 5/5 Charges · No MP</div><ul class="tip-lines"><li>Magic Bolt: Hurls a small bolt of force at the monster, whatever its armor. Some monsters are immune.</li></ul><div class="tip-body"><p>A short rod'
 expect_body '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power 15 · Wand</div>'
 t_get /static/images/skills/attack.png; expect_status 200; expect_header '^content-type: image/png'
 t_get /static/images/skills/run.png;    expect_status 200; expect_header '^content-type: image/png'
-# a turn a status blocks: only the "Continue" text button, as before
+# a turn a status blocks: only the "Continue" text button, as before (any number key presses
+# it: hotbar.js)
 t_fight_status tipper 1 recharging '' 1
 t_get /fight
-expect_body '<p><input type="submit" name="continue" value="Continue"></p>'
-expect_no_body 'class="action-btn"'; expect_no_body 'fight-actions'; expect_no_body 'name="run"'
+expect_body '<p><input type="submit" name="continue" value="Continue"> <span class="hotkey-hint light">(or any number key)</span></p>'
+expect_no_body 'class="action-btn"'; expect_no_body 'class="hotbar"'; expect_no_body 'name="run"'
 t_items_clear tipper
 t_fight_clear tipper
 

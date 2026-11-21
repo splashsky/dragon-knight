@@ -4,17 +4,18 @@
 		(the numbers it animates), data-fight-log (the round's lines), data-fight (the forms it
 		locks while a round plays). Every form carries the round it was shown at (stale forms
 		play nothing: the page says so at the top); a refused command (not enough MP, ...) is a
-		note above the commands. Attack and Run are icon buttons too (fight=Fight, run=Run, as the text buttons
-		before 2.4 sent: routes/fight.lua reads the name), Run set apart from Attack. A
-		spell is an icon button, spell=<id> (spells.buttons: greyed out and
-		disabled when the MP don't cover it; the server checks again), in a span that carries
-		its tooltip (a disabled button gets no pointer events; docs/APP.md "Tooltips"); the
-		actions' spans and the monster's name have one too. Then the Gear (equipped items that
-		cast a spell: use_gear=<user_items id>, a charges badge, disabled at 0) and the Items
-		(consumables: item=<items id>, a quantity badge, disabled when their can_use refuses
-		now), icon buttons like the spells. -#}
+		note above the commands. The commands are the hotbar (3.1, lib/hotbar.lua; docs/APP.md
+		"Hotbar"): ten slots on the number keys (data-hotkey: hotbar.js presses them and shows
+		their .hotkey), 1 Attack and 0 Run (icon buttons: fight=Fight, run=Run, as the text
+		buttons before 2.4 sent: routes/fight.lua reads the name), 2-9 the player's actions
+		(fight/action.html), an action of the bar's not at hand greyed (its tooltip, and why),
+		an empty slot dashed; then the actions off the bar, under More. A locked turn has only
+		Continue, which any number key presses. The page's title is the location panel's
+		heading ("Fighting"); a theme with a picture for "fighting" draws it here too. -#}
 <section class="box fight">
+{%- if art_src("fighting") then %}
 <h1 class="title page-title">{{{ art("fighting", "Fighting") }}}</h1>
+{%- end %}
 <div class="box-body">
 {%- if stale then %}
 <p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
@@ -53,35 +54,32 @@
 <p class="fight-locked">You can't act this turn.</p>
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
-<p><input type="submit" name="continue" value="Continue"></p>
+<p><input type="submit" name="continue" value="Continue"> <span class="hotkey-hint light">(or any number key)</span></p>
 </form>
 {%- else %}
 <p>Command?</p>
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
-<div class="fight-actions" role="group" aria-labelledby="fight-actions-label"><span class="fight-actions-label" id="fight-actions-label">Actions</span>
-<div class="action-row">
-<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", attack_tip) }}}</span>
-{%- for _, g in ipairs(gear) do %}
-<span class="spell-tip{% if g.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="use_gear" value="{{ g.id }}" title="{{ g.label }}" aria-label="{{ g.label }}"{% if g.short then %} disabled{% end %}><img src="{{ g.icon }}" width="44" height="44" alt=""><span class="item-badge item-badge-charges{% if g.charges < 1 then %} item-badge-empty{% end %}" aria-hidden="true">{{ g.charges }}/{{ g.max }}</span></button>{{{ include("tip/tip", g.tip) }}}</span>
+<div class="hotbar" role="group" aria-labelledby="hotbar-label"><span class="hotbar-label" id="hotbar-label">Hotbar</span>
+<ol class="hotbar-slots">
+<li class="hotbar-slot" data-hotkey="1"><kbd class="hotkey" aria-hidden="true">1</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight" title="Attack" aria-label="Attack" aria-keyshortcuts="1"><img src="/static/images/skills/attack.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", attack_tip) }}}</span></li>
+{%- for _, s in ipairs(bar) do %}
+{%- if s.button then %}
+<li class="hotbar-slot" data-hotkey="{{ s.n }}"><kbd class="hotkey" aria-hidden="true">{{ s.n }}</kbd>{{{ include("fight/action", s.button) }}}</li>
+{%- elseif s.gone then %}
+<li class="hotbar-slot hotbar-gone"><kbd class="hotkey" aria-hidden="true">{{ s.n }}</kbd><span class="spell-tip spell-tip-short" data-tip><span class="spell-btn" role="img" title="{{ s.gone.name }} ({{ s.why }})" aria-label="{{ s.gone.name }} ({{ s.why }})"><img src="{{ s.gone.icon }}" width="44" height="44" alt=""></span>{{{ tip(s.gone.kind, s.gone.spell or s.gone.item) }}}</span></li>
+{%- else %}
+<li class="hotbar-slot hotbar-empty" aria-hidden="true"><kbd class="hotkey">{{ s.n }}</kbd><span class="hotbar-hole"></span></li>
 {%- end %}
-<span class="action-tip action-run" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", run_tip) }}}</span>
+{%- end %}
+<li class="hotbar-slot hotbar-run" data-hotkey="0"><kbd class="hotkey" aria-hidden="true">0</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run" aria-keyshortcuts="0"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", run_tip) }}}</span></li>
+</ol>
 </div>
-</div>
-{%- if #spells > 0 then %}
-<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>
+{%- if #more > 0 then %}
+<div class="fight-more" role="group" aria-labelledby="fight-more-label"><span class="fight-more-label" id="fight-more-label">More</span>
 <div class="spell-grid">
-{%- for _, s in ipairs(spells) do %}
-<span class="spell-tip{% if s.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="spell" value="{{ s.id }}" title="{{ s.label }}" aria-label="{{ s.label }}"{% if s.short then %} disabled{% end %}><img src="{{ s.icon }}" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">{{ s.mp }}</span></button>{{{ tip("spell", s.spell) }}}</span>
-{%- end %}
-</div>
-</div>
-{%- end %}
-{%- if #items > 0 then %}
-<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>
-<div class="spell-grid">
-{%- for _, it in ipairs(items) do %}
-<span class="spell-tip{% if it.short then %} spell-tip-short{% end %}" data-tip><button class="spell-btn" type="submit" name="item" value="{{ it.id }}" title="{{ it.label }}" aria-label="{{ it.label }}"{% if it.short then %} disabled{% end %}><img src="{{ it.icon }}" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">{{ it.qty }}</span></button>{{{ include("tip/tip", it.tip) }}}</span>
+{%- for _, b in ipairs(more) do %}
+{{{ include("fight/action", b) }}}
 {%- end %}
 </div>
 </div>

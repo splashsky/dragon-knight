@@ -304,10 +304,10 @@ for _ in $(seq 1 50); do
 done
 ct_eq "SELECT icon FROM spells WHERE key = 'zap'" "zap_test" "icon synced"
 ct_monster_hp 50; t_sql "UPDATE users SET currentmp = 10 WHERE username = 'ctknight'"
-t_get /fight;         expect_body 'name="spell" value="26" title="Zap (3 MP)" aria-label="Zap (3 MP)"><img src="/static/images/skills/zap_test.png"'
+t_get /fight;         expect_body 'name="spell" value="26" title="Zap (3 MP)" aria-label="Zap (3 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/zap_test.png"'
 # the file deleted after the sync: default.png at once (no sync needed), and dk check fails
 rm -f "$CT_SKILLS/zap_test.png"
-t_get /fight;         expect_body 'name="spell" value="26" title="Zap (3 MP)" aria-label="Zap (3 MP)"><img src="/static/images/skills/default.png"'
+t_get /fight;         expect_body 'name="spell" value="26" title="Zap (3 MP)" aria-label="Zap (3 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png"'
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_fail "dk check passed after the icon was deleted" || t_ok
 grep -qF "zap.lua: field 'icon' names a missing file" "$T/content.log" && t_ok || t_fail "deleted icon: $(cat "$T/content.log")"
 ct_zap_icon ''

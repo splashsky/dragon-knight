@@ -1,0 +1,44 @@
+{#- Arranging the hotbar (GET /hotbar, town/hotbar.lua; docs/APP.md "Hotbar"): the ten slots
+		as the fight shows them, 1 Attack and 0 Run fixed, each of 2-9 with its action's tile
+		(greyed when it isn't at hand) and a list of the actions to put there ("Empty" first);
+		Save and Reset. Then the player's actions, each saying where it is. With JavaScript
+		(hotbar.js, html.dk-hotbar-js) the tiles can be dragged onto the slots, between them
+		(a swap) and out of them (emptied), which fills the lists and saves. ctx: slots ({ n,
+		action }), choices (the actions: { key, kind, name, icon, label, tip, away, slot }),
+		saved, reset, attack_icon, run_icon. -#}
+<section class="hotbar-page" data-hotbar-page>
+<h1 class="title page-title">Hotbar</h1>
+{%- if saved then %}
+<p class="hotbar-note" role="status">Your hotbar is saved.</p>
+{%- elseif reset then %}
+<p class="hotbar-note" role="status">Your hotbar is back to its first arrangement: your actions fill it in the fight menu's order.</p>
+{%- end %}
+<p>In a fight, press a number key (or click) to act: 1 is always Attack and 0 always Run. Put your other actions on 2 to 9. An action you get later takes the first free key when your next fight begins; the rest wait under More in the fight menu.</p>
+<form class="hotbar-form" method="post" action="/hotbar">
+{{{ csrf_field() }}}
+<ol class="hotbar-slots hotbar-edit">
+<li class="hotbar-slot hotbar-fixed"><kbd class="hotkey">1</kbd><span class="action-btn"><img src="{{ attack_icon }}" width="44" height="44" alt=""></span><span class="hotbar-name">Attack</span></li>
+{%- for _, s in ipairs(slots) do %}
+<li class="hotbar-slot" data-slot="{{ s.n }}"><kbd class="hotkey">{{ s.n }}</kbd>
+{%- if s.action then %}<span class="spell-tip" data-tip><span class="spell-btn hotbar-tile{% if s.action.away then %} hotbar-away{% end %}" draggable="true" data-key="{{ s.action.key }}"><img src="{{ s.action.icon }}" width="44" height="44" alt=""></span>{{{ include("tip/tip", s.action.tip) }}}</span>
+{%- else %}<span class="hotbar-hole"></span>{% end -%}
+<select name="slot{{ s.n }}" aria-label="Key {{ s.n }}"><option value="">Empty</option>
+{%- for _, a in ipairs(choices) do %}<option value="{{ a.key }}"{% if s.action and a.key == s.action.key then %} selected{% end %}>{{ a.label }}</option>{% end -%}
+</select></li>
+{%- end %}
+<li class="hotbar-slot hotbar-fixed"><kbd class="hotkey">0</kbd><span class="action-btn"><img src="{{ run_icon }}" width="44" height="44" alt=""></span><span class="hotbar-name">Run</span></li>
+</ol>
+<p class="hotbar-buttons"><input type="submit" name="save" value="Save"> <input type="submit" name="forget" value="Reset"></p>
+</form>
+<h2 class="title">Your actions</h2>
+{%- if #choices == 0 then %}
+<p class="light">You have no actions besides Attack and Run yet. The spells you learn, the gear you wear that casts spells and the potions you carry come here.</p>
+{%- else %}
+<p class="hotbar-drag-hint small light">Drag an action onto a key, a key onto another to swap them, or a key back here to empty it.</p>
+<ul class="hotbar-actions" data-hotbar-actions>
+{%- for _, a in ipairs(choices) do %}
+<li><span class="spell-tip" data-tip><span class="spell-btn hotbar-tile{% if a.away then %} hotbar-away{% end %}" draggable="true" data-key="{{ a.key }}"><img src="{{ a.icon }}" width="44" height="44" alt=""></span>{{{ include("tip/tip", a.tip) }}}</span><span class="hotbar-name">{{ a.name }}<span class="small light">{% if a.slot then %}Key {{ a.slot }}{% else %}Not on the bar{% end %}{% if a.away then %}, not at hand{% end %}</span></span></li>
+{%- end %}
+</ul>
+{%- end %}
+</section>

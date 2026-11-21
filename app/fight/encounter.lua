@@ -8,6 +8,7 @@
 local classes = require("lib.classes")
 local combat = require("fight.combat")
 local game = require("lib.game")
+local hotbar = require("lib.hotbar")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
@@ -178,6 +179,8 @@ function encounter.begin(user_id)
 		return nil
 	end
 	state.clear(user.id)
+	-- the hotbar is fixed for the fight: actions new to it take their slots now
+	hotbar.settle(user)
 	local st = game.player(user)
 	local f = state.new({ user_id = user.id, round = 1, st = st })
 	state.add_monster(f, monster, 1)

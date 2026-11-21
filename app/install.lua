@@ -23,10 +23,10 @@ usage: dk install [--partial] [--force]
 ]]
 
 -- children before parents (foreign keys): sessions/news/forum before forum/forums/users,
--- user_spells/user_items/town_items/class_levels/class_spells before users/spells/items/
--- towns/classes, the monster loadouts before monsters/items/spells, the fight tables and
+-- user_spells/user_items/user_hotbar/town_items/class_levels/class_spells before
+-- users/spells/items/towns/classes, the monster loadouts before monsters/items/spells, the fight tables and
 -- user_statuses before users/statuses; "levels" (before schema version 4) and "drops" (before 6) are old tables
-local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items",
+local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items", "user_hotbar",
 								 "town_items", "monster_equipment", "monster_items", "monster_spells", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
 								 "spells", "towns", "fight_statuses", "fight_combatants", "fights", "user_statuses", "users",
 								 "classes", "statuses", "summons", "content_overrides", "content_adopt", "meta" }

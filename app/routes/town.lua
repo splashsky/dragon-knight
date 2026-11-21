@@ -1,5 +1,5 @@
--- routes/town.lua :: town, shop, inventory, exploring, fast heal spells, character/map popups,
--- babble box
+-- routes/town.lua :: town, shop, inventory, hotbar, exploring, travel, fast heal spells,
+-- character/map popups, babble box
 -- Ports legacy towns.php, explore.php, heal.php and the misc index.php actions.
 -- The logic lives in app/town/*.lua.
 local auth = require("lib.auth")
@@ -8,6 +8,7 @@ local character = require("town.character")
 local common = require("town.common")
 local explore = require("town.explore")
 local heal = require("town.heal")
+local hotbar = require("town.hotbar")
 local inn = require("town.inn")
 local inventory = require("town.inventory")
 local maps = require("town.maps")
@@ -31,6 +32,9 @@ return function(r)
 	r:post("/inventory/use/#id", game_ok, not_fighting, inventory.use)
 	r:get("/inventory/discard/#id", game_ok, not_fighting, inventory.discard_confirm)
 	r:post("/inventory/discard/#id", game_ok, not_fighting, inventory.discard)
+
+	r:get("/hotbar", game_ok, not_fighting, hotbar.show)
+	r:post("/hotbar", game_ok, not_fighting, hotbar.save)
 
 	r:get("/maps", game_ok, not_fighting, maps.list)
 	r:get("/maps/buy/#id", game_ok, not_fighting, maps.confirm)

@@ -12,6 +12,7 @@ t_jar browser; t_reset_jar
 t_register browseruser browserpw1 browser@example.com Browser 2
 expect_body 'Your account was created succesfully'
 t_sql "UPDATE users SET towns = '0,1,2', currenttp = 20, base_maxtp = 20 WHERE username = 'browseruser'"   # the travel dialog
+t_spells browseruser 1,6   # the hotbar's page: Heal and Hurt to drag
 if out=$(cat "$ROOT/tests/browser/client.js" | timeout 180 "$NODE" - "$BASE" browseruser browserpw1 2>&1); then
 	case $out in
 		skip:*) echo "   (browser test skipped: ${out#skip: })" ;;

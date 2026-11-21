@@ -239,6 +239,24 @@ async function run(wsUrl, port) {
 	await js("window.__travelObs.disconnect()");
 	check("no reload", await js("window.__dk === 1"));
 
+	section = "the hotbar's page";
+	// dragging an action onto a key (hotbar.js): the lists follow (a swap: Hurt onto Heal's
+	// key) and the form saves, in place (tests/e2e/browser.sh taught Heal and Hurt)
+	await js("DK.visit('/hotbar')");
+	check("the page", await until("location.pathname === '/hotbar' && !DK.busy()"));
+	check("Heal on 2, Hurt on 3", await js("document.querySelector('[name=slot2]').value === 'spell:1' && document.querySelector('[name=slot3]').value === 'spell:6'"),
+		await js("[...document.querySelectorAll('select[name^=slot]')].map(s => s.value).join(',')"));
+	await js("(function () { var dt = new DataTransfer(), from = document.querySelector('[data-hotbar-actions] [data-key=\"spell:6\"]'), to = document.querySelector('[data-slot=\"2\"]');" +
+		"from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));" +
+		"to.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));" +
+		"to.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })); })()");
+	check("saved", await until("!DK.busy() && !!document.querySelector('.hotbar-note')"));
+	check("swapped", await js("document.querySelector('[name=slot2]').value === 'spell:6' && document.querySelector('[name=slot3]').value === 'spell:1'"),
+		await js("[...document.querySelectorAll('select[name^=slot]')].map(s => s.value).join(',')"));
+	check("in place", await js("window.__dk === 1 && location.pathname === '/hotbar'"));
+	await js("DK.visit('/')");
+	await until("!DK.busy()");
+
 	section = "forms";
 	await js("document.querySelector('a[href=\"/\"]').click()");
 	await until("location.pathname === '/'");
@@ -365,6 +383,21 @@ async function run(wsUrl, port) {
 			check("its text", await js("document.querySelector('.fight-note').textContent === 'You have not yet learned this spell.'"));
 			check("the commands still there", await js("!!document.querySelector('form[data-fight] button[name=fight]')"));
 			check("no reload", await js("window.__dk === 1 && location.pathname === '/fight'"));
+		}
+		// the hotbar (hotbar.js): the keys show; a number key presses its slot's button, but
+		// not while typing (the chat)
+		if (await js("!!document.querySelector('form[data-fight] button[name=fight]')")) {
+			check("the keys show", await js("getComputedStyle(document.querySelector('.hotbar .hotkey')).display !== 'none'"));
+			var round2 = await js("Number(document.querySelector('form[data-fight] [name=round]').value)");
+			await js("document.querySelector('[data-chat-form] [name=babble]').focus()");
+			await press("1", 49);
+			await sleep(500);
+			check("not while typing", await js("!DK.busy() && Number(document.querySelector('form[data-fight] [name=round]').value)") === round2);
+			await js("document.activeElement.blur()");
+			await press("1", 49);
+			check("1 attacks: a round plays", await until("location.pathname !== '/fight' || !DK.busy() && Number((document.querySelector('form[data-fight] [name=round]') || {}).value) === " + (round2 + 1), 8000),
+				await js("location.pathname + ' ' + (document.querySelector('form[data-fight] [name=round]') || {}).value"));
+			check("no reload", await js("window.__dk === 1"));
 		}
 	}
 	await js("DK.visit('/')");

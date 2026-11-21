@@ -241,3 +241,23 @@ button.buy-choice:focus-visible { outline: solid 2px currentColor; outline-offse
 .shop-tip-body { margin-top: 5px; font-size: 12px; font-style: italic; color: #55504a; }
 .shop-tip-body p { margin: 0 0 0.35em; }
 .shop-tip-body p:last-child { margin-bottom: 0; }
+
+/* arranging the hotbar (town/hotbar.html; the slots are fight.css's): each of 2-9 with its
+	list under it; the actions as tiles with their names. With hotbar.js the tiles drag:
+	where one would drop is outlined */
+.hotbar-note { font-weight: bold; }
+.hotbar-edit { gap: 6px; margin: 12px 0 6px; }
+.hotbar-edit .hotbar-slot { flex: 1 1 66px; min-width: 0; max-width: 96px; }
+.hotbar-edit .hotbar-run { margin-left: 0; }
+.hotbar-edit select { box-sizing: border-box; width: 100%; font-size: 12px; }
+.hotbar-fixed .action-btn, .hotbar-fixed .action-btn:hover { cursor: default; transform: none; }
+.hotbar-name { font-size: 13px; line-height: 1.25; text-align: center; }
+.hotbar-name .small { display: block; }
+.hotbar-buttons { margin: 6px 0 16px; }
+[draggable].hotbar-tile { cursor: grab; }
+.hotbar-drag-hint { display: none; margin: 0 0 4px; }
+.dk-hotbar-js .hotbar-drag-hint { display: block; }
+.hotbar-actions { display: flex; flex-wrap: wrap; gap: 10px 18px; list-style: none; margin: 0; padding: 6px; border-radius: 6px; }
+.hotbar-actions li { display: flex; align-items: center; gap: 8px; }
+.hotbar-actions .hotbar-name { text-align: left; }
+.hotbar-over .hotbar-hole, .hotbar-over .hotbar-tile, .hotbar-actions.hotbar-over { outline: dashed 2px #663300; outline-offset: 2px; }

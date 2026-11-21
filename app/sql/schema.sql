@@ -392,6 +392,19 @@ CREATE TABLE user_items (
 );
 CREATE UNIQUE INDEX user_items_equipped ON user_items (user_id, equipped);
 
+-- The hotbar (schema version 17, app/lib/hotbar.lua): every fight action besides Attack
+-- and Run a character has met, kind 'spell' (ref_id: a spells id) or 'item' (ref_id: an
+-- items id: gear that casts, or a consumable), on the bar (slot 2-9: its number key) or off
+-- it (slot NULL: taken off, or the bar was full when it came).
+CREATE TABLE user_hotbar (
+	user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	kind     TEXT    NOT NULL,
+	ref_id   INTEGER NOT NULL,
+	slot     INTEGER,
+	PRIMARY KEY (user_id, kind, ref_id)
+) WITHOUT ROWID;
+CREATE UNIQUE INDEX user_hotbar_slot ON user_hotbar (user_id, slot);
+
 -- Server-side login sessions (app/lib/session.lua). token_hash = hex(sha256(cookie)).
 CREATE TABLE sessions (
 	token_hash  TEXT    PRIMARY KEY,

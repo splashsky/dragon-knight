@@ -1173,6 +1173,22 @@ local function v16_rechargeable()
 	dk.db:exec("ALTER TABLE items ADD COLUMN rechargeable INTEGER NOT NULL DEFAULT 1")
 end
 
+-- 17: the hotbar (3.1, lib/hotbar.lua): the fight actions each character has met and where
+-- they are on the bar. Empty: each bar fills itself from what its character has when their
+-- next fight begins.
+local function v17_hotbar()
+	dk.db:exec_script([[
+CREATE TABLE user_hotbar (
+	user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+	kind     TEXT    NOT NULL,
+	ref_id   INTEGER NOT NULL,
+	slot     INTEGER,
+	PRIMARY KEY (user_id, kind, ref_id)
+) WITHOUT ROWID;
+CREATE UNIQUE INDEX user_hotbar_slot ON user_hotbar (user_id, slot);
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1202,6 +1218,7 @@ migrations.STEPS = {
 		"winning round, a finished fight is kept for its page (pending encounters are cancelled, won fights " ..
 		"are paid)", up = v15_pure_gets, after_sync = v15_after_sync },
 	{ name = "items that cast a spell may be single use (not rechargeable)", up = v16_rechargeable },
+	{ name = "the hotbar: the fight actions each character puts on number keys", up = v17_hotbar },
 }
 
 migrations.VERSION = #migrations.STEPS

@@ -19,6 +19,8 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
+| Hotbar (the fight's number keys) | `app/lib/hotbar.lua`, `app/town/hotbar.lua`, `app/routes/fight.lua` (`hotbar_view`), `app/fight/encounter.lua` (settling) | `templates/fight/{fight,action}.html`, `templates/town/hotbar.html`, `public/js/hotbar.js`, `public/css/{fight,town}.css` | `tests/e2e/hotbar.sh`, `tests/e2e/browser.sh` |
+| Travel, the location panel | `app/town/travel.lua`, `app/lib/game.lua` (`game.nav`) | `templates/town/travel.html`, `templates/layout/place.html`, `public/js/modal.js` (`data-modal-leave`) | `tests/e2e/town.sh`, `tests/e2e/browser.sh` |
 | Smooth fights (fight events) | `app/fight/events.lua`, `app/routes/fight.lua` | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua`, `tests/e2e/browser.sh` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
@@ -202,11 +204,11 @@ live.js), `side` (with `nav`: the online count and the Babble Box for the sideba
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
 `tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
 `scene.js`, see [Scenes](#scenes),
-`live.js`, `fight.js`): the head is the same
+`live.js`, `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
 everywhere, so the live client never loads a page again for its scripts.
 
 **The main layout** (3.1, `docs/plans/layout.md`): a header (the logo; with `nav` the
-game's links, Inventory, News, the forum when there is one, Admin for admins, Help,
+game's links, Inventory, Hotbar, News, the forum when there is one, Admin for admins, Help,
 and the account's, Change Password and Log Out; without it Log In, Register and Help),
 then two columns: the **stage** (`.dk-stage`: the location panel, `layout/place.html`,
 over the page's content, `<main class="dk-main" data-r="main">`) and the **sidebar**
@@ -363,7 +365,8 @@ The live client changes pages smoothly (`public/js/scene.js`). Any action of the
 that changes the page's content (`main`: a link or form: the inn and resting there, the shop and
 selling, the map store and buying a map, the inventory, ...) fades it out (0.15 s, in the
 `before` hook, `html.dk-fade-out`) and the new one in (0.25 s); fight rounds (`fight.js`
-plays them: from `/fight` to `/fight`), refreshes, back/forward and answers that leave the
+plays them: from `/fight` to `/fight`), the hotbar saved after a drag (`/hotbar` to
+`/hotbar`), refreshes, back/forward and answers that leave the
 content as it is (a step while exploring: only the location panel changes) don't. When the
 player's state changes the whole stage (the location panel too) fades out through a caption
 instead: a fight beginning, a victory, a death,
@@ -1162,8 +1165,8 @@ return {
 	fights and 34px in Fast Spells, scaled by CSS), set `icon = "<name>"` in the spell file
 	and run `./dk check`. The two current PNGs are 256×256 (120–165 KB); smaller files
 	(88×88 for 2× screens) would load faster.
-- **Buttons.** The fight menu shows the spells castable in fights as a row of icon buttons
-	(`templates/fight/fight.html`): `<button type="submit" name="spell" value="<id>">` with
+- **Buttons.** The fight menu shows the spells castable in fights as icon buttons
+	(`templates/fight/action.html`): `<button type="submit" name="spell" value="<id>">` with
 	the icon, the MP cost as a badge (`.spell-mp`) and `title`/`aria-label` "Heal (5 MP)";
 	a spell the player's MP don't cover is `disabled` and greyed out (the server checks
 	again). `POST /fight` reads the spell from `spell=<id>`; the old form's
@@ -1178,8 +1181,9 @@ return {
 	styles are `.spell-grid`, `.spell-btn` (shared with the fight menu's Attack and Run,
 	`.action-btn`) and `.spell-mp` in `dk.css` (hover, active,
 	`:focus-visible` outline, disabled = desaturated and faded; theme colours in
-	`themes/*.css`) and `.fight-spells` in `fight.css`. Items are icon buttons too (2.4, see
-	[Fight engine](#fight-engine)).
+	`themes/*.css`). Since 3.1 the fight's buttons are on the hotbar (see [Hotbar](#hotbar)):
+	a spell on a key carries `aria-keyshortcuts`, the others are under More. Items are icon
+	buttons too (2.4, see [Fight engine](#fight-engine)).
 - Magic Bolt (`magic_bolt`, 2.4, id 25): the Mage's starting spell, 1 MP, Hurt's formula
 	with power 4 (3-4 damage), none to monsters immune to hurt spells; the Wand casts it.
 - The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
@@ -1383,22 +1387,23 @@ is `fight/engine.lua`. Monsters choose by weight (`fight/ai.lua`). The dice and 
 the original game stay in `fight/combat.lua`; `routes/fight.lua` picks the monster, checks
 the player's choice (known spell, MP, item in the bag) and saves.
 
-**The fight menu** (`templates/fight/fight.html`, one form posting to `/fight`): an
-"Actions" group of icon buttons (`.action-btn`, styled with the spell buttons in `dk.css`
-and the themes; `.fight-actions`, `.action-row` in `fight.css`): **Attack**
-`<button type="submit" name="fight" value="Fight" aria-label="Attack">` with
-`images/skills/attack.png`, then **Run** `<button type="submit" name="run" value="Run"
-aria-label="Run">` with `images/skills/run.png`, set apart by a gap and a dotted rule
-(`.action-run`) so it isn't pressed instead of Attack; then the Spells row (see
-[Spells](#spells)); then, side by side, **Gear** (only when the player wears an item that
-casts a spell: `<button type="submit" name="use_gear" value="<user_items id>">` with the
-item's picture and its charges on a badge, `.item-badge-charges` "3/5", red and disabled at 0;
-tooltip `tips.gear`) and **Items** (each consumable in the bag usable in fights, one button
-per item: `<button type="submit" name="item" value="<items id>">` with its picture and how
-many on a badge, `.item-badge`; disabled when its `can_use` refuses now, checked by
-`act.can_use` with no dice; tooltip `tips.consumable`; "None" without any), all
-`.spell-btn`s in `.spell-tip` wrappers (`.fight-bag`, `.fight-gear`, `.fight-items` in
-`fight.css`). `POST /fight` reads a consumable from `item=<id>`; the form before 2.4
+**The fight menu** (`templates/fight/fight.html`, one form posting to `/fight`) is the
+**hotbar** (3.1, see [Hotbar](#hotbar)): ten slots on the number keys, each an icon button
+(`.action-btn`, `.spell-btn`, styled in `dk.css` and the themes; the slots in `fight.css`):
+**1 Attack** `<button type="submit" name="fight" value="Fight" aria-label="Attack"
+aria-keyshortcuts="1">` with `images/skills/attack.png`, **2-9** the player's actions, and
+**0 Run** `<button type="submit" name="run" value="Run" aria-label="Run"
+aria-keyshortcuts="0">` with `images/skills/run.png`, set apart (`.hotbar-run`) so it
+isn't pressed instead; then, under **More**, the actions not on the bar, without keys. An
+action's button (`templates/fight/action.html`, from the route's `gear_buttons`,
+`spell_buttons` and `usable_items`, each with its `kind` and hotbar `key`) is one of: a
+spell (see [Spells](#spells)); **gear** that casts (`<button type="submit" name="use_gear"
+value="<user_items id>">` with the item's picture and its charges on a badge,
+`.item-badge-charges` "3/5", red and disabled at 0; tooltip `tips.gear`); an **item** (each
+consumable in the bag usable in fights, one button per item: `<button type="submit"
+name="item" value="<items id>">` with its picture and how many on a badge, `.item-badge`;
+disabled when its `can_use` refuses now, checked by `act.can_use` with no dice; tooltip
+`tips.consumable`). `POST /fight` reads a consumable from `item=<id>`; the form before 2.4
 (`item=Use Item&useritem=<id>`) still works (`useritem` wins), and a missing or `0` id is
 "You must select an item first". `use_gear=<id>` must be an entry of the player's that is
 equipped and casts a spell ("You do not have this item equipped.") with a charge left ("The
@@ -1409,11 +1414,13 @@ and no MP cost (`act.run` with `{ kind = "gear", item, spell }`, an `item` step 
 trace), and the route spends one charge (`inventory.spend_charge`), also when the player
 dies that turn. The route only checks that the
 field is there (`form.fight`, `form.run`), so `fight=Fight` and `run=Run` (the text buttons
-before 2.4, old forms, tests) and whatever value a button sends play the same. Each action
-sits in a `<span class="action-tip" data-tip>` carrying its tooltip (`tips.attack(power,
+before 2.4, old forms, tests) and whatever value a button sends play the same. Each button
+sits in a span carrying its tooltip (`.action-tip`, `.spell-tip`; `tips.attack(power,
 weapon)`: "Attack", the player's attack power and weapon, what it does; `tips.run()`), as
 fight.js disables the buttons while a round plays. A turn a status blocks shows only the
-"Continue" text button (`continue=Continue`; any command is a Continue then).
+"Continue" text button (`continue=Continue`; any command is a Continue then), which any
+number key presses. The page's title is the location panel's heading ("Fighting"); a theme
+with a picture for `fighting` (Retro) draws it on the page too.
 **The model** (`fight/state.lua`; tables `fights`, `fight_combatants`, `fight_statuses`):
 
 | | |
@@ -2072,6 +2079,59 @@ an item that casts, see [Items](#items)), equipped in a slot
 | `inventory.full_charges(item)`, `inventory.spend_charge(entry)`, `inventory.recharge(uid)` | an item's charges when obtained; one charge used (true: a single-use item's last, the item is gone); the inn: refill the equipped rechargeable items (returns them) |
 | `inventory.equip(uid, entry, slot)`, `inventory.equip_new(uid, item, slot)`, `inventory.unequip(uid, slot)`, `inventory.free_accessory_slot(uid)` | equipment (they clamp) |
 | `inventory.stats(user)`, `inventory.names(uid)` | effective stats, equipped names per slot |
+
+## Hotbar
+
+(3.1, `docs/plans/layout.md`.) The fight menu is a bar of ten slots on the number keys: **1
+Attack** and **0 Run**, fixed, and **2-9** the player's other fight actions where they put
+them (`app/lib/hotbar.lua`).
+
+- **Actions** (`hotbar.actions(user)`): the equipped gear that casts (by slot), the fight
+	spells known, the fight consumables in the bag (bag order), keyed `spell:<spells id>` or
+	`item:<items id>` (gear and consumables are both items; the route tells them apart).
+- **The table** `user_hotbar (user_id, kind, ref_id, slot)` (schema version 17) keeps every
+	action a character has **met**: on the bar (`slot` 2-9, unique per character) or off it
+	(`slot` NULL: taken off, or the bar was full when it came). Attack and Run aren't stored.
+- **The bar** (`hotbar.arrange(user_id, keys)`, keys: the actions at hand in the menu's
+	order): the stored slots, then each action **not met yet** in the first free slot (off
+	the bar when none is free). It only reads: GET pages show the bar this way without
+	writing it ([pure GETs](#routes)).
+- **Settling** (`hotbar.settle(user)`, from `encounter.begin`): when a fight begins, the
+	actions not met yet are written where `arrange` put them. So the bar is fixed for the
+	fight and after: an action never moves unless the player moves it, a new one takes a
+	free key at the next fight, and one met while the bar was full stays off it even when a
+	key frees later.
+- **Not at hand** (a consumable used up, gear not worn, a spell forgotten): its slot
+	stays, greyed (`.hotbar-gone`: the picture, its tooltip, and why: "none left", "not worn",
+	"not known"); pressing its key does nothing.
+- **The fight page** (`templates/fight/fight.html`; `hotbar_view` in `routes/fight.lua`
+	builds `bar`, ten `{ n, button | gone, why }`, and `more`, the buttons off the bar): each
+	slot `<li class="hotbar-slot" data-hotkey="<n>">` with `<kbd class="hotkey">` and its
+	button (`aria-keyshortcuts="<n>"`); an empty one dashed (`.hotbar-empty`, hidden from
+	screen readers). Then `.fight-more` ("More") with the rest, without keys.
+- **The keys** (`public/js/hotbar.js`, every page): 1-9 and 0 press the slot's button on a
+	page with `form[data-fight]` (a locked turn's Continue for any of them), as a click
+	would (the live client sends it, `fight.js` plays the round); not while a field has the
+	keyboard (the chat), a modifier is held, a dialog is open, the key repeats or the live
+	client is busy; a disabled button (MP short; every button while a round plays) does
+	nothing. The script marks `<html class="dk-hotbar-js">`; the key badges and the "(or any
+	number key)" hint show only then, since without it the keys do nothing.
+- **Arranging** (`GET/POST /hotbar`, `app/town/hotbar.lua`, `templates/town/hotbar.html`;
+	not while fighting: `common.not_fighting`): the ten slots, each of 2-9 with its tile and
+	a list (`slot2` ... `slot9`: "Empty" and every choice, `hotbar.choices`: the actions at
+	hand and those on the bar now); **Save** (`save`) puts the chosen ones on their keys and
+	everything else met off the bar (`hotbar.save`; an unknown key is the cheat page, the
+	same action in two lists keeps the first); **Reset** (`forget`: not `reset`, which would
+	hide the form's `reset()` from the live client) forgets the arrangement
+	(`hotbar.reset`): the bar fills again. Both redirect to `/hotbar?saved=1` or
+	`?reset=1`. Then "Your actions", each with where it is. With `hotbar.js` the tiles drag
+	(HTML drag and drop): onto a slot (its list takes the action; where the action was gets
+	the slot's old one: a swap), between slots, or back to the actions (the slot empties),
+	then the form saves through the live client, in place (`scene.js` doesn't fade `/hotbar`
+	into `/hotbar`). Keyboard and touch use the lists.
+- Tests: `tests/e2e/hotbar.sh` (filling, settling, the fight's bar, greyed slots, More,
+	saving, refusals, reset, new actions), `tests/e2e/migrate.sh` (step 17),
+	`tests/browser/client.js` (a number key plays a round, not while typing; a drag saves).
 
 ## Derived stats
 

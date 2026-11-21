@@ -13,7 +13,7 @@
 # Magic Bolt, Midworld sells the Wand, and the rest equals a fresh install; version 14 -> 15
 # (schema_v14.sql, seed_v14.sql) that a fight in progress goes on, an encounter waiting for
 # GET /fight is cancelled and a won fight waiting for GET /victory is paid (and version 16's
-# items.rechargeable). Since version
+# items.rechargeable, version 17's user_hotbar). Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -1213,7 +1213,7 @@ mig_serve "$MIG/v13.lua" "$MIG/v13server.log"
 t_jar migv13; t_reset_jar
 t_login oldmage v13pass1; expect_redirect /
 t_get /fight; expect_status 200; expect_body "Monster's HP: 40"
-expect_body 'name="spell" value="25" title="Magic Bolt (1 MP)" aria-label="Magic Bolt (1 MP)"><img src="/static/images/skills/magic_bolt.png"'
+expect_body 'name="spell" value="25" title="Magic Bolt (1 MP)" aria-label="Magic Bolt (1 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/magic_bolt.png"'
 t_round "csrf=$(t_csrf)&round=$(mig_sql "$V13_DB" "SELECT round FROM fights")&spell=25"
 expect_body 'You have cast the Magic Bolt spell for '
 mig_eq "SELECT currentmp FROM users WHERE id = 1" "14" "1 MP spent"
@@ -1223,9 +1223,10 @@ mig_unserve "$MIG/v13server.log"
 t_section "migrate: version 14 database"
 # version 14 schema + its game data, characters in every state GET /fight and GET /victory
 # used to move on: a fight in progress, an encounter waiting for GET /fight to pick its
-# monster, a won fight waiting for GET /victory to pay, and one exploring; only steps 15
-# and 16 (items.rechargeable) run. The fight in progress goes on (its counter kept), the pending encounter is
-# cancelled, the victory is paid and kept for its page; nobody else changes.
+# monster, a won fight waiting for GET /victory to pay, and one exploring; only steps 15,
+# 16 (items.rechargeable) and 17 (the hotbar: an empty table) run. The fight in progress
+# goes on (its counter kept), the pending encounter is cancelled, the victory is paid and
+# kept for its page; nobody else changes.
 V14_DB="$MIG/v14.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V14_DB\"#" "$CONFIG" > "$MIG/v14.lua"
 mig_script "$V14_DB" "$ROOT/tests/fixtures/schema_v14.sql"
@@ -1253,6 +1254,8 @@ grep -qE 'Migrating to version ([1-9]|1[0-4]):' "$T/migrate.log" && t_fail "step
 grep -qF "Migrating to version 15: GETs don't change the game" "$T/migrate.log" && t_ok || t_fail "step 15 not reported: $(cat "$T/migrate.log")"
 grep -qF "Migrating to version 16: items that cast a spell may be single use" "$T/migrate.log" && t_ok || t_fail "step 16 not reported"
 mig_eq "SELECT group_concat(DISTINCT rechargeable) FROM items" "1" "every item rechargeable (16)"
+grep -qF "Migrating to version 17: the hotbar" "$T/migrate.log" && t_ok || t_fail "step 17 not reported"
+mig_eq "SELECT count(*) FROM user_hotbar" "0" "no hotbar yet (17): the next fight fills it"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
 [ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v14 schema differs from a fresh install:"

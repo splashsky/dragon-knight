@@ -134,7 +134,7 @@ iv_is "(SELECT qty FROM user_items WHERE id = $BOMB)" "2"
 
 t_section "inventory: a fight-only item in a fight"
 t_fight invhero 2 1
-t_get /fight;                     expect_body 'name="item" value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'" title="Bomb (x2)" aria-label="Bomb (x2)"><img src="/static/images/skills/default.png"'
+t_get /fight;                     expect_body 'name="item" value="'"$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"'" title="Bomb (x2)" aria-label="Bomb (x2)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png"'
 t_round "csrf=$TC&item=Use+Item&useritem=$(t_sql "SELECT id FROM items WHERE key = 'test_bomb'")"
 expect_redirect /victory
 iv_is "($T_MONSTER_HP <= 0) || '|' || (SELECT qty FROM user_items WHERE id = $BOMB)" "1|1"

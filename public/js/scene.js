@@ -88,11 +88,13 @@
 	}
 
 	// Before an answer applies: one that changes the page's content after a link or form of
-	// the player's fades it out (unless a scene does, or it is the next round of a fight).
+	// the player's fades it out (unless a scene does, or it is the next round of a fight or
+	// the hotbar saved).
 	function before(info) {
 		if (!motion || pending || !info.user) return;
 		if (info.regions.indexOf("main") < 0 && info.regions.indexOf("root") < 0) return;
 		if (/^\/fight(\?|$)/.test(info.from) && /^\/fight(\?|$)/.test(info.to)) return;
+		if (/^\/hotbar(\?|$)/.test(info.from) && /^\/hotbar(\?|$)/.test(info.to)) return;
 		clear();
 		fading = true;
 		root.classList.add("dk-fade-out");

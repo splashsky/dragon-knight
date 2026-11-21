@@ -28,7 +28,7 @@ t_section "fight: monster selection"
 # is picked by the level band, its first strike (when quicker) played
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
 t_fight_new fighter
-t_get /fight;   expect_status 200; expect_body '<h1 class="title page-title">Fighting</h1>'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
+t_get /fight;   expect_status 200; expect_body '<h2 class="title">Fighting</h2>'; expect_no_body 'page-title'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 expect_no_body 'action="/move"'                       # no compass while fighting
 f_is "$T_ROUND" 2
@@ -186,14 +186,15 @@ t_spells fighter 1,6,11
 
 t_section "fight: spell buttons"
 # one icon button per spell (spell=<id>), the MP cost as a badge, the spell's icon or
-# default.png, disabled when the MP don't cover it; the old select and "Spell" are gone
+# default.png, disabled when the MP don't cover it; the old select and "Spell" are gone.
+# They are on the hotbar (lib/hotbar.lua): Attack 1, then the first free keys
 t_spells fighter 1,6
 t_fight fighter 2 50
 f_sql "UPDATE users SET currenthp = 10, currentmp = 6, base_maxmp = 50"
 t_get /fight; CS=$(t_csrf)
-expect_body '<div class="fight-spells" role="group" aria-labelledby="fight-spells-label"><span class="fight-spells-label" id="fight-spells-label">Spells</span>'
-expect_body '<button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
-expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
+expect_body '<div class="hotbar" role="group" aria-labelledby="hotbar-label"><span class="hotbar-label" id="hotbar-label">Hotbar</span>'
+expect_body '<button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
+expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="3"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
 expect_no_body 'name="userspell"'; expect_no_body 'value="Spell"'
 expect_no_body 'name="useritem"'; expect_no_body 'value="Use Item"'      # items are icon buttons too (2.4)
 t_get /static/images/skills/heal.png;    expect_status 200; expect_header '^content-type: image/png'
@@ -201,8 +202,8 @@ t_get /static/images/skills/default.png; expect_status 200
 # MP short: greyed out (disabled), and the server refuses a direct POST anyway
 f_sql "UPDATE users SET currentmp = 4"
 t_get /fight
-expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
-expect_body 'name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" disabled><img'
+expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2" disabled><img'
+expect_body 'name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="3" disabled><img'
 t_round "csrf=$CS&spell=1"; expect_body 'You do not have enough Magic Points'; f_is currentmp 4
 f_sql "UPDATE users SET currentmp = 6"
 t_get /fight; expect_no_body ' disabled><img'
@@ -221,10 +222,12 @@ t_round "csrf=$CS&spell=1"
 expect_status 200; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 f_is currentmp 1
 # after the round the page shows the new MP: both buttons greyed out
-expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" disabled><img'
-# no spells: no Spells section at all
+expect_body 'name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2" disabled><img'
+# no spells: no spell buttons; the keys they had (an earlier fight settled the hotbar) stay,
+# greyed
 t_spells fighter ""
-t_get /fight; expect_no_body 'id="fight-spells-label"'; expect_no_body 'class="spell-btn"'
+t_get /fight; expect_no_body 'name="spell"'
+expect_body '<li class="hotbar-slot hotbar-gone"><kbd class="hotkey" aria-hidden="true">2</kbd><span class="spell-tip spell-tip-short" data-tip><span class="spell-btn" role="img" title="Heal (not known)" aria-label="Heal (not known)"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""></span><template class="tip"><div class="tip-title">Heal</div>'
 t_spells fighter 1,6,11
 t_fight_clear fighter
 
@@ -276,9 +279,9 @@ t_fight fighter 2 50
 f_sql "UPDATE users SET currenthp = 10, base_maxhp = 100, currentmp = 0,
 	base_maxmp = 50, base_attack = 0, base_defense = 0"
 t_get /fight; CS=$(t_csrf)
-expect_body '<div class="fight-items" role="group" aria-labelledby="fight-items-label"><span class="fight-items-label" id="fight-items-label">Items</span>'
-expect_body '<button class="spell-btn" type="submit" name="item" value="66" title="Herb (x3)" aria-label="Herb (x3)"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">3</span></button>'
-expect_body '<button class="spell-btn" type="submit" name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)"><img src="/static/images/items/ether.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">1</span></button>'
+expect_body '<ol class="hotbar-slots">'
+expect_body '<button class="spell-btn" type="submit" name="item" value="66" title="Herb (x3)" aria-label="Herb (x3)" aria-keyshortcuts="6"><img src="/static/images/items/herb.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">3</span></button>'
+expect_body '<button class="spell-btn" type="submit" name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)" aria-keyshortcuts="7"><img src="/static/images/items/ether.png" width="44" height="44" alt=""><span class="item-badge" aria-hidden="true">1</span></button>'
 expect_body '<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/herb.png" width="20" height="20" alt="">Herb</div><div class="tip-meta">Consumable · x3 · In fights and in town</div>'
 expect_no_body 'title="Stick'; expect_no_body 'name="use_gear"'; expect_no_body 'class="fight-gear"'
 FIGHT=$(f_col "$T_ROUND")
@@ -292,11 +295,11 @@ t_round "csrf=$CS&item=Use+Item&useritem=66"
 expect_status 200; expect_body 'You have used the Herb, and gained 30 Hit Points.'; expect_body 'The monster attacks you for'
 f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" $((FIGHT + 1))
 [ "$(f_col currenthp)" -le 40 ] && [ "$(f_col currenthp)" -ge 30 ] && t_ok || t_fail "herb in a fight: hp $(f_col currenthp)"
-expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)"><img'
+expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)" aria-keyshortcuts="6"><img'
 # at full HP: greyed out; a POST is refused, nothing used, the monster doesn't act
 f_sql "UPDATE users SET currenthp = 100"
-t_get /fight; expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)" disabled><img'
-expect_body 'name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)"><img'
+t_get /fight; expect_body 'name="item" value="66" title="Herb (x2)" aria-label="Herb (x2)" aria-keyshortcuts="6" disabled><img'
+expect_body 'name="item" value="68" title="Ether (x1)" aria-label="Ether (x1)" aria-keyshortcuts="7"><img'
 FIGHT=$(f_col "$T_ROUND")
 t_round "csrf=$CS&item=Use+Item&useritem=66"; expect_body 'Your Hit Points are already full.'
 expect_body '<p class="fight-note error" role="alert">'; expect_body 'name="fight"'; f_is "$T_ITEMS" "herbx2,ether,stick"; f_is "$T_ROUND" "$FIGHT"
@@ -308,7 +311,7 @@ expect_no_body 'title="Ether'
 t_round "csrf=$CS&item=0";  expect_body 'You must select an item first.'
 t_round "csrf=$CS&item=68"; expect_body 'You do not have this item.'
 t_items_clear fighter
-t_get /fight; expect_no_body 'id="fight-items-label"'   # no usable items: no Items section
+t_get /fight; expect_no_body 'name="item"'   # no usable items: no item buttons
 t_items_clear fighter
 
 t_section "fight: item drop"
