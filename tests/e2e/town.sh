@@ -314,25 +314,8 @@ t_post /maps/buy/3 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 expect_db "towns" "0,1,2" "map bought outside town"
 
 t_section "town: travel"
-tu "$TOWN_HOME, towns='0', currenttp=3, base_maxtp=50"
-t_get /;                          expect_body '<a class="town-service" href="/travel" data-modal><b>Travel</b><span>No towns on your map yet</span></a>'
-t_get /travel;                    expect_status 200; expect_body 'No towns are on your map yet.'; expect_no_body 'action="/travel/'
-tu "towns='0,1,2'"
-t_get /;                          expect_body '<span>2 towns on your map</span>'
-expect_body '<a href="/travel" data-modal>Travel</a>'   # the location panel's link
-# the list (a dialog's page): a button per town on the map, the one the player is in and
-# those their TP don't cover greyed out; the forms leave the dialog (modal.js)
-t_get /travel;                    expect_status 200; expect_body '<title>Travel</title>'; expect_body 'You have <b>3</b> TP.'
-expect_body '<form method="post" action="/travel/1" data-modal-leave>'
-expect_body '<button class="travel-town travel-here" type="submit" disabled><b>Midworld</b><span>You are here</span></button>'
-expect_body '<button class="travel-town travel-short" type="submit" disabled><b>Roma</b><span>5 TP: you need 2 more</span></button>'
-expect_no_body 'action="/travel/3"'                   # Bris isn't on the map
-t_get /travel -H 'X-DK-Modal: 1'; expect_header '^X-DK-Modal: 1'; expect_body '<h2 class="dk-modal-title" id="dk-modal-title">Travel</h2>'
-tu "currenttp=20"
-t_get /travel;                    expect_body '<button class="travel-town" type="submit"><b>Roma</b><span>5 TP</span></button>'
-tu "currentaction='Exploring', latitude=3, longitude=3"
-t_get /travel;                    expect_body '<button class="travel-town" type="submit"><b>Midworld</b><span>0 TP</span></button>'
-tu "$TOWN_HOME, currenttp=3"
+tu "$TOWN_HOME, towns='0,1,2', currenttp=3, base_maxtp=50"
+t_get /;                          expect_body 'action="/travel/2"'
 t_post /travel/2 "csrf=$TC";      expect_body 'You do not have enough TP to travel here.'
 tu "currenttp=20"
 t_post /travel/3 "csrf=$TC";      expect_body 'Cheat attempt detected.'        # Bris not mapped
@@ -345,7 +328,6 @@ expect_db "currentaction,latitude,longitude,currenttp,towns" "In Town|30|30|15|0
 t_get /;                          expect_body 'Welcome to Roma'
 tu "currentaction='Fighting'"
 t_post /travel/1 "csrf=$TC";      expect_redirect /fight
-t_get /travel;                    expect_redirect /fight
 expect_db "latitude,currenttp" "30|15" "travel while fighting"
 
 t_section "town: move"
@@ -481,7 +463,7 @@ expect_no_body '] msg2<'; expect_body '] msg3<'
 t_section "town: ninja"
 t_get /ninja;                     expect_redirect 'http://www\.se7enet\.com/img/shirtninja\.jpg'
 
-t_section "town: character panel (sidebar)"
+t_section "town: character panel (right column)"
 # compact panel: CSS-gradient bars with values; HP coloured by how full, MP and TP fixed;
 # HP/MP at or below a fifth blink (no bar images any more)
 t_items_clear townie
@@ -500,7 +482,7 @@ tu "currenthp=7"
 t_get /inventory;                 expect_body '<span class="meter-fill bar-mid" data-bar="hp" style="width: 47%"></span>'
 t_get /static/images/bars_green.gif; expect_status 404
 
-t_section "town: inventory panel (sidebar)"
+t_section "town: inventory panel (right column)"
 # bag first, then the gear: icons for weapon/armor/shield, numbered badges for the slots,
 # "None" greyed; the full label in each row's title (a tooltip: plain for an empty slot, the
 # item's for gear)

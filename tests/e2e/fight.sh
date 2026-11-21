@@ -28,7 +28,7 @@ t_section "fight: monster selection"
 # is picked by the level band, its first strike (when quicker) played
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
 t_fight_new fighter
-t_get /fight;   expect_status 200; expect_body '<h2 class="title">Fighting</h2>'; expect_no_body 'page-title'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
+t_get /fight;   expect_status 200; expect_body '<h1 class="title page-title">Fighting</h1>'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 expect_no_body 'action="/move"'                       # no compass while fighting
 f_is "$T_ROUND" 2
@@ -241,7 +241,7 @@ expect_status 200; expect_body 'The monster attacks you for'; expect_body '<b>Yo
 expect_no_body 'name="fight"'
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0
-t_get /; expect_status 200; expect_body 'class="town-services"'
+t_get /; expect_status 200; expect_body 'Town Options'
 # the fight as it ended stays on its page (GET /fight) until the player moves on
 t_get /fight; expect_status 200; expect_body '<b>You have died.</b>'; expect_body 'The monster attacks you for'
 expect_no_body 'name="fight"'; f_is gold 51
@@ -267,7 +267,7 @@ expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'; 
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0; f_is "$T_MONSTER_HP" 0
 f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0; f_is currentmp 7
-t_get /; expect_status 200; expect_body 'class="town-services"'
+t_get /; expect_status 200; expect_body 'Town Options'
 
 t_section "fight: use an item"
 # Herbs (heal_hp 30) and an Ether (heal_mp 30) in the bag; Red Slime awake, no immunity. Each

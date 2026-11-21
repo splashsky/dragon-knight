@@ -112,7 +112,7 @@ function game.online_users()
 	return presence.list()
 end
 
--- The Inventory panel's equipment rows (layout/side.html), from
+-- The Inventory panel's equipment rows (layout/nav_right.html), from
 -- inventory.equipped(): { label, icon (weapon/armor/shield) or badge (accessory slot
 -- number), image (the equipped item's own picture, shown instead, or nil), name, empty,
 -- item (the items row, for its tooltip; nil when empty), entry (its user_items entry) }.
@@ -136,9 +136,7 @@ function game.gear_rows(equipped)
 	return rows
 end
 
--- Everything the layout's game parts need: the header's links (layout/main.html), the
--- location panel (layout/place.html) and the sidebar (layout/side.html). Port of legacy
--- display().
+-- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
 	local s = game.stats(user)
@@ -160,6 +158,7 @@ function game.nav(user)
 		latitude = game.latitude_str(user.latitude),
 		longitude = game.longitude_str(user.longitude),
 		town = town,
+		towns = game.user_towns(user),
 		forum = game.forum_link(),
 		is_admin = user.authlevel == 1,
 		experience = php.number_format(user.experience),

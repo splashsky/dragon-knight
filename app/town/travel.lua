@@ -1,10 +1,8 @@
--- town/travel.lua :: legacy towns.php travelto($id, $usepoints): travelling (costs TP, the
--- town must be on your map; the list is GET /travel, which replaced the Travel To box in
--- 3.1) and arriving by walking onto a town (explore.lua, free). The
+-- town/travel.lua :: legacy towns.php travelto($id, $usepoints): Travel To menu (costs TP,
+-- town must be on your map) and arriving by walking onto a town (explore.lua, free). The
 -- arrival goes straight to the town's page (3.0: no "You have travelled to ..." page in
 -- between), a scene for the live client (lib/scene.lua).
 local common = require("town.common")
-local game = require("lib.game")
 local php = require("lib.php")
 local scene = require("lib.scene")
 local state = require("fight.state")
@@ -39,20 +37,6 @@ function travel.go(req, id, usepoints)
 	return scene.add(req, view.redirect("/"), "town", town.name, usepoints
 		and ("You travel to " .. town.name .. " for " .. town.travelpoints .. " TP.")
 		or ("You arrive in " .. town.name .. "."))
-end
-
--- GET /travel: the towns on the player's map (legacy: the Travel To box), each with what
--- it costs: { town, cost, here (the player is in it), short (their TP don't cover it) }.
--- Opened in a dialog from the location panel and the town (data-modal); its forms leave
--- the dialog (data-modal-leave), so the arrival's scene plays.
-function travel.list(req)
-	local user = req.user
-	local towns = {}
-	for _, t in ipairs(game.user_towns(user)) do
-		local here = user.currentaction == "In Town" and user.latitude == t.latitude and user.longitude == t.longitude
-		towns[#towns + 1] = { town = t, cost = t.travelpoints, here = here, short = not here and user.currenttp < t.travelpoints }
-	end
-	return view.page(req, "Travel", "town/travel", { towns = towns, tp = user.currenttp })
 end
 
 -- POST /travel/#id

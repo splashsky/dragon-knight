@@ -10,7 +10,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
-| Core | `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/test.lua` (test-only routes) | `templates/layout/{main,minimal,head,place,side}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/e2e/pure.sh` (pure GETs), `tests/lua/test_{php,router}.lua` |
+| Core | `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/test.lua` (test-only routes) | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/e2e/pure.sh` (pure GETs), `tests/lua/test_{php,router}.lua` |
 | Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js` | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
 | Tooltips, lore | `app/lib/tips.lua`, `app/lib/view.lua` (`tip`, `paragraphs`), the kinds' `lore` field (`app/lib/content/schema.lua`) | `templates/tip/tip.html`, `public/js/tooltip.js`, `public/css/dk.css` (`.dk-tip`, `.tip-*`) | `tests/e2e/tips.sh`, `tests/js/test_tooltip.js`, `tests/lua/test_content.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
@@ -20,7 +20,6 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
 | Hotbar (the fight's number keys) | `app/lib/hotbar.lua`, `app/town/hotbar.lua`, `app/routes/fight.lua` (`hotbar_view`), `app/fight/encounter.lua` (settling) | `templates/fight/{fight,action}.html`, `templates/town/hotbar.html`, `public/js/hotbar.js`, `public/css/{fight,town}.css` | `tests/e2e/hotbar.sh`, `tests/e2e/browser.sh` |
-| Travel, the location panel | `app/town/travel.lua`, `app/lib/game.lua` (`game.nav`) | `templates/town/travel.html`, `templates/layout/place.html`, `public/js/modal.js` (`data-modal-leave`) | `tests/e2e/town.sh`, `tests/e2e/browser.sh` |
 | Smooth fights (fight events) | `app/fight/events.lua`, `app/routes/fight.lua` | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua`, `tests/e2e/browser.sh` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
@@ -187,8 +186,8 @@ Form and query values are raw strings. Validate them, and convert them with
 	`theme-<key>`, see [Themes](#themes)). The help pages pass
 	`{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
 	page (`body.minimal.help` in `community.css`).
-- `chat_inline`: the page shows the Babble Box itself (the town and exploring pages,
-	`/babble`), so the sidebar doesn't.
+- `chat_inline`: the page shows the Babble Box itself (town page, `/babble`), so the
+	right column doesn't.
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -200,21 +199,15 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `theme` (the request's theme, see [Themes](#themes)), `gamename`, `nav` (table or nil),
 `logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
-live.js), `side` (with `nav`: the online count and the Babble Box for the sidebar,
+live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
 `tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
 `scene.js`, see [Scenes](#scenes),
 `live.js`, `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
-everywhere, so the live client never loads a page again for its scripts.
-
-**The main layout** (3.1, `docs/plans/layout.md`): a header (the logo; with `nav` the
-game's links, Inventory, Hotbar, News, the forum when there is one, Admin for admins, Help,
-and the account's, Change Password and Log Out; without it Log In, Register and Help),
-then two columns: the **stage** (`.dk-stage`: the location panel, `layout/place.html`,
-over the page's content, `<main class="dk-main" data-r="main">`) and the **sidebar**
-(`<aside class="dk-side" data-r="side">`: `layout/side.html`'s Character, Inventory and
-Fast Spells panels, then `layout/side_live.html`'s online count and Babble Box). Below
-760px the two stack, the stage first. Include `{{{ include("layout/head") }}}` in `<head>` to get the
+everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
+swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
+`<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
+column: the chat below it keeps its scroll position and typed text). Include `{{{ include("layout/head") }}}` in `<head>` to get the
 CSS links (`dk.css` + the four feature stylesheets + the theme's), `dk.js` and, with
 `live`, `live.js`; put `theme-{{ theme.key }}` in the `<body>` class followed by
 `{{{ include("layout/live_attrs") }}}`, start the body with
@@ -239,7 +232,7 @@ and templates don't change for it: the same code answers both ways.
 carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
-`banner`, `loc` (the location panel), `main`, `side` (`charpanel`, `invpanel`,
+`banner`, `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
 `spellpanel`, `online-count`, `chat` with `chat-posts` and `chat-form` with `chat-back`),
 `foot` (with `foot-time`, the timing line), `themes` (with `theme-back`); `minimal` and
 `admin` have `banner`, `main` (and `foot`, `themes`). The `back` fields (the page's
@@ -314,20 +307,20 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 	returning a promise), then the `before` hooks (`DK.on("before", fn)`: `{ regions,
 	from, to, user }`, the regions' names coming, the address on screen and the answer's,
 	whether a link or form of the player's sent it rather than a refresh or back/forward;
-	a promise too: `scene.js` fades the page's content out there), then each `region` is morphed into `[data-r=name]` (`root` into
+	a promise too: `scene.js` fades the middle column out there), then each `region` is morphed into `[data-r=name]` (`root` into
 	`<body>`), the hashes merged, the title set; after a POST the submitted form is
 	`reset()`, so it shows what the server rendered (empty after success, the values the
 	server put back after a refusal). Then the history entry: a new address is pushed (and
 	scrolled to the top or its `#hash`, and announced to screen readers), the same address
 	replaced (the scroll stays: a fight round). A page a POST answered with itself (no
 	`url`) keeps the address on screen and is marked as such (`DK.view().post`). Focus lost
-	with its element goes to the page's content (`main`).
+	with its element goes to the middle column.
 - **The morph** changes only what differs: attributes, text, children matched by key
 	(`data-r`, `id`, `data-k`, `data-id`) or by position and tag; `<template>` contents
 	compared as HTML. A placeholder (`<template data-r-keep>`) is the page's own element,
 	moved there untouched; in anything new that goes in, a region the page already shows
 	(by name) is the page's own element, moved and morphed (the chat panel moving from the
-	town page's stage to the sidebar keeps its scroll and typed text). Regions
+	town page's middle column to the right one keeps its scroll and typed text). Regions
 	taken out while an answer applies are kept aside until it is done, for a later region of
 	the same answer. It never removes elements marked `data-client` (the tooltip box, the
 	toasts, the progress bar, the announcer: give anything a script adds to the page that
@@ -362,14 +355,13 @@ routes only) is a page that takes its time.
 ## Scenes
 
 The live client changes pages smoothly (`public/js/scene.js`). Any action of the player's
-that changes the page's content (`main`: a link or form: the inn and resting there, the shop and
+that changes the middle column (a link or form: the inn and resting there, the shop and
 selling, the map store and buying a map, the inventory, ...) fades it out (0.15 s, in the
 `before` hook, `html.dk-fade-out`) and the new one in (0.25 s); fight rounds (`fight.js`
 plays them: from `/fight` to `/fight`), the hotbar saved after a drag (`/hotbar` to
 `/hotbar`), refreshes, back/forward and answers that leave the
-content as it is (a step while exploring: only the location panel changes) don't. When the
-player's state changes the whole stage (the location panel too) fades out through a caption
-instead: a fight beginning, a victory, a death,
+middle column as it is (a step while exploring) don't. When the player's state changes the
+middle column fades out through a caption instead: a fight beginning, a victory, a death,
 a getaway, arriving in a town, setting out from one.
 
 - **The server** adds a `scene` event to the redirect that ends the change:
@@ -387,8 +379,8 @@ a getaway, arriving in a town, setting out from one.
 | `POST /fight`, a getaway | `escape` | You got away | "The Blue Slime is left behind." |
 
 - **The client** plays it after the round's events (`fight.js`) and before the regions
-	apply: the stage fades out (0.2 s) while the caption (`.dk-scene
-	.dk-scene-<kind>`: the title large, the detail under it, over the stage,
+	apply: the middle column fades out (0.2 s) while the caption (`.dk-scene
+	.dk-scene-<kind>`: the title large, the detail under it, over the middle column,
 	`role="status"`) fades in; the new page goes in under it, the caption lingers (0.55 s;
 	arriving in a town and setting out 0.8 s), then it fades out and the page in (0.25 s):
 	1 s in all (1.25 s). The victory is a page scene
@@ -403,14 +395,13 @@ a getaway, arriving in a town, setting out from one.
 	... You may now enter this town." page is gone; its sentence is the scene's detail.
 - Tests: `tests/e2e/live_wire.sh` (the encounter's, the town's and setting out's scenes,
 	none while exploring on or without the live client), `tests/e2e/fight_api.sh` (victory,
-	death, escape), `tests/browser/client.js` (a link: the content faded out and in;
+	death, escape), `tests/browser/client.js` (a link: the middle column faded out and in;
 	back: no fade; walking into Midworld: the caption seen, the page back after it).
 
 ## Modals
 
-A page can open in a dialog over the one on screen (`public/js/modal.js`): the shop's
-purchase and the travel list (`GET /travel`, from the location panel and the town's
-Travel tile). Give the link `data-modal`.
+A page can open in a dialog over the one on screen (`public/js/modal.js`), the shop's
+purchase first: give the link `data-modal`.
 
 ```html
 <a href="/shop/buy/3" data-modal>Club</a>
@@ -438,9 +429,7 @@ Travel tile). Give the link `data-modal`.
 	`data-modal` one opens in it instead). An element with `data-modal-close` closes it
 	without a request: on a submit button (`<input type="submit" name="cancel" value="No"
 	data-modal-close>`) the page without JavaScript still submits it. The close button
-	(×) and a click on the backdrop close it too. A form with `data-modal-leave` closes the
-	dialog and goes on as the page's own (the live client sends it, so the answer's scene
-	plays): the travel list's (`town/travel.html`), whose answer is the town arrived in. Tooltips inside it work as anywhere
+	(×) and a click on the backdrop close it too. Tooltips inside it work as anywhere
 	(`tooltip.js` puts its box into the open dialog), and the compass's arrow keys rest.
 - **Without it** (no JavaScript, no `<dialog>`): the link is an ordinary link and the page
 	shows as a page, exactly as before. A GET that fails or answers something else (a 503
@@ -638,7 +627,7 @@ everywhere.
 `lib/presence.lua`. **Online** = has a stream open (`dk.subscribers("user:<id>") > 0`) or
 made a request within `online_seconds` (600). `users.online = 1` marks the players
 announced as online; the Who's Online list (town page, `/babble`) and the count in the
-sidebar ("Online: N", when `control.showonline` is on) are those players, so they
+right column ("Online: N", when `control.showonline` is on) are those players, so they
 always match the events. Both read the partial index `users_online` (schema version 11:
 only the players online), so their cost follows the players online, not the accounts.
 The Who's Online box lists at most `presence.SHOWN` (50) names, by name, then "and N
@@ -705,8 +694,7 @@ starting with `__` are reserved.
 - Every POST form needs `{{{ csrf_field() }}}` (the chat's and the banner's too).
 - Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
 	sized window; without JS it's a normal link).
-- The compass (`layout/place.html`, the location panel at the top of the stage; not while
-	fighting): the original's picture (`public/images/compass.png`,
+- The compass (`layout/nav_left.html`): the original's picture (`public/images/compass.png`,
 	its four pieces joined) with a submit button over each quarter (`.compass-rose`: the
 	triangles between the diagonals, `clip-path`, lit within the parchment by a `mask`),
 	named `north`, `west`, `east`, `south` like the old text buttons, so `POST /move` reads
@@ -748,7 +736,7 @@ starting with `__` are reserved.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
 	`<blink>`.
 - Shared CSS classes: `.title` (headings: `<h1 class="title page-title">` the page's own,
-	once, first in the page's content; `<h2 class="title">` a panel's; the browser's heading
+	once, first in the middle column; `<h2 class="title">` a panel's; the browser's heading
 	sizes don't apply, the theme styles them), `.box` / `.box-body`, `.small`, `.light`,
 	`.highlight`, `.error`, `.copyright`, `button.link`, `form.inline`. A heading the theme
 	may draw as a picture goes through `{{{ art(key, text) }}}` (see [Themes](#themes)).
@@ -781,8 +769,8 @@ the page's structure is the same in every theme. `app/lib/themes.lua` lists them
 
 | Key | Name | Stylesheet | Logo | Labels |
 |---|---|---|---|---|
-| `default` | Default | `/static/css/themes/default.css`: the snow background (`public/images/themes/default/background.jpg`), near-black text, dark red links with a bright red hover; headings as text in small capitals over a hairline (the page's title larger, without one), no line between the stage and the sidebar but 26px of space, the chat in light stripes, the footer a row of small print without a box | `/static/images/themes/default/logo.png` (shown at 355×120) | text |
-| `retro` | Retro | `/static/css/themes/retro.css`: the original tiled `background.jpg`, the grey heading boxes and black lines (under the header, beside the sidebar) of `dk.css` | `/static/images/themes/retro/logo.gif` (409×108) | the original's pictures (`public/images/themes/retro/`: `button_*.gif`, `title_*.gif`, `town_N.gif`) |
+| `default` | Default | `/static/css/themes/default.css`: the snow background (`public/images/themes/default/background.jpg`), near-black text, dark red links with a bright red hover; headings as text in small capitals over a hairline (the page's title larger, without one), no lines between the columns but 22px of space, the chat in light stripes, the footer a row of small print without a box | `/static/images/themes/default/logo.png` (shown at 355×120) | text |
+| `retro` | Retro | `/static/css/themes/retro.css`: the original tiled `background.jpg`, the grey heading boxes and black column lines of `dk.css` | `/static/images/themes/retro/logo.gif` (409×108) | the original's pictures (`public/images/themes/retro/`: `button_*.gif`, `title_*.gif`, `town_N.gif`) |
 
 ```lua
 -- an entry of themes.list (the selector lists them in this order)
@@ -818,20 +806,18 @@ the page's structure is the same in every theme. `app/lib/themes.lua` lists them
 	(`<h1 class="title page-title">`) and the top links are written with `{{{ art(key,
 	text) }}}`: the theme's picture for `key` (`<img>` with `text` as alt and title), or
 	`text`, escaped. `art_src(key)` is the picture's URL or nil (the Log Out button: an
-	image button or a link-styled one). Keys: `location`, `character`, `inventory`,
-	`fastspells`, `spells`, `exploring` (the exploring page draws its title only when the
-	theme has this picture: the location panel names the state), `fighting`, `town_<id>`
-	("Welcome to <town>"), `login`, `logout`, `register`, `help`. A key the theme has no
-	picture for is text, so a ninth town reads "Welcome to ..." in Retro too. (Retro's
-	`button_towns.gif` and `button_functions.gif` headed panels 3.1 replaced; the files
-	stay.) The location panel's heading is where the player is ("In Midworld", "Exploring",
+	image button or a link-styled one). Keys: `location`, `towns`, `functions`,
+	`character`, `inventory`, `fastspells`, `spells`, `exploring`, `fighting`,
+	`town_<id>` ("Welcome to <town>"), `login`, `logout`, `register`, `help`. A key the
+	theme has no picture for is text, so a ninth town reads "Welcome to ..." in Retro too.
+	The Location panel's heading is where the player is ("In Midworld", "Exploring",
 	"Fighting") when the theme draws it as text; a theme with a `location` picture shows
 	that, and where the player is as the panel's first line (`.loc-where`). Then the
-	coordinates, latitude first (`.loc-coords`, "3N, 5W"), and the map and Travel links.
+	coordinates, latitude first (`.loc-coords`, "3N, 5W"), and the map link on one line.
 - **Theme CSS** only overrides `dk.css` and the feature stylesheets: background, colours,
-	borders, the headings' and the stage's and sidebar's look, logo effects. Since only the current theme's
+	borders, the headings' and columns' look, logo effects. Since only the current theme's
 	file is linked, plain selectors (`body`, `a`) are enough; `body.theme-<key>` is there
-	for feature CSS that needs to differ by theme. Keep the sidebar's width and the page's
+	for feature CSS that needs to differ by theme. Keep the columns' widths and the page's
 	structure in `dk.css` so every theme fits the same.
 - **Adding a theme**: put its images under `public/images/themes/<key>/`, write
 	`public/css/themes/<key>.css` (copy `default.css`), add an entry to `themes.list`, and
@@ -842,8 +828,8 @@ Regular, Italic, Bold and Bold Italic; SIL Open Font License 1.1, `OFL.txt` next
 fonts): the `@font-face` rules and `font: 15px/1.4 Vollkorn, Georgia, "Times New Roman",
 serif` on `body` are at the top of `dk.css`, tables and form controls inherit it, and
 `layout/head.html` preloads the regular weight. Sizes: 15px text, 13px for `.small`, the
-footer (`.copyright`) and the selector; the sidebar is 230px wide (legacy: two side
-columns of 180px at 11px Verdana), the page at most 1200px, the admin menu 180px. A weight not in the folder is synthesized by the
+footer (`.copyright`) and the selector; the side columns are 210px wide (legacy 180px at
+11px Verdana), the admin menu 180px. A weight not in the folder is synthesized by the
 browser; to use SemiBold or Black, add the file and its `@font-face`.
 
 ## Tooltips
@@ -967,7 +953,7 @@ in time is worth a hundred herbs.]],
 | `game.gear_rows(equipped)` | the Inventory panel's rows from `inventory.equipped()`: `{label, icon|badge, name, empty, item}` (weapon, armor, shield, accessory slots 1–3; `item`: the row, for its tooltip) |
 | `game.forum_link()` | `/forum`, the external address, or nil |
 | `game.online_users()` | the players online (`id, charname`; `lib/presence.lua`) |
-| `game.nav(user)` | the table the layout's game parts render (the header's links, the location panel, the sidebar) |
+| `game.nav(user)` | the table the side columns render |
 
 ## Classes (`lib/classes.lua`)
 
@@ -1152,7 +1138,7 @@ return {
 ```
 
 - `usable_in`: where it can be cast. `"town"` and `"both"` need `target = "self"`; they
-	are the Fast Spells in the sidebar (`POST /spell/#id`, `town/heal.lua`), and the
+	are the Fast Spells in the right column (`POST /spell/#id`, `town/heal.lua`), and the
 	fight's spell list shows `"fight"` and `"both"` spells.
 - `icon` (optional): the spell's picture on its buttons, the name of a PNG in
 	`public/images/skills/` without `.png` (`[a-z0-9_]+`; served at
@@ -1172,7 +1158,7 @@ return {
 	again). `POST /fight` reads the spell from `spell=<id>`; the old form's
 	`spell=Spell&userspell=<id>` still works (`userspell` wins when both are sent), and a
 	missing, `0` or non-numeric id is "You must select a spell first". The Fast Spells box
-	(`layout/side.html`) is a grid of smaller (34px) buttons for the town spells, each
+	(`layout/nav_right.html`) is a grid of smaller (34px) buttons for the town spells, each
 	its own POST form to `/spell/<id>` with the CSRF field, disabled only when MP are short
 	(a full-HP heal is refused by the server). Each button has a tooltip (2.4, see
 	[Tooltips](#tooltips)): its name, MP cost, where it can be cast, description and lore; the
@@ -1419,8 +1405,7 @@ sits in a span carrying its tooltip (`.action-tip`, `.spell-tip`; `tips.attack(p
 weapon)`: "Attack", the player's attack power and weapon, what it does; `tips.run()`), as
 fight.js disables the buttons while a round plays. A turn a status blocks shows only the
 "Continue" text button (`continue=Continue`; any command is a Continue then), which any
-number key presses. The page's title is the location panel's heading ("Fighting"); a theme
-with a picture for `fighting` (Retro) draws it on the page too.
+number key presses.
 **The model** (`fight/state.lua`; tables `fights`, `fight_combatants`, `fight_statuses`):
 
 | | |
@@ -1699,14 +1684,14 @@ stopped at 255), so long fights are protected too.
 **fight.js** (`DK.on("events:fight")`): while the round plays the fight forms' controls are
 disabled (`data-fight-locked`); it clears the round lines (`[data-fight-log]`) and adds each
 line (in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms after the
-previous one; its changes update the player's numbers and bars in the sidebar
+previous one; its changes update the player's numbers and bars in the right column
 (`[data-meter=hp|mp|tp]` values, `[data-bar=hp|mp|tp]` widths), the numbers and bars of the
 monsters and allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`), the
 status chips of a combatant's line (made if the page had none), allies joining and leaving.
-A click on the page's content, any key (not while typing) or the "Skip" button plays the rest
+A click in the middle column, any key (not while typing) or the "Skip" button plays the rest
 at once; with `prefers-reduced-motion` there are no delays and no animations (`fight.css`).
 A round that ends in a victory or an escape pauses 800 ms before the next page comes. Then
-the regions apply; when the keyboard was in the page's content, the button that sent the
+the regions apply; when the keyboard was in the middle column, the button that sent the
 round gets the focus back (the same spell's button, unless it is now disabled; else
 Attack). The monsters' and allies' bars are fight.js's (`span.fight-meter[data-client]`, so
 the morph keeps them; it updates them from `data-value`/`data-max` after every answer):
@@ -2082,7 +2067,7 @@ an item that casts, see [Items](#items)), equipped in a slot
 
 ## Hotbar
 
-(3.1, `docs/plans/layout.md`.) The fight menu is a bar of ten slots on the number keys: **1
+(3.1, `docs/plans/hotbar.md`.) The fight menu is a bar of ten slots on the number keys: **1
 Attack** and **0 Run**, fixed, and **2-9** the player's other fight actions where they put
 them (`app/lib/hotbar.lua`).
 
@@ -2116,8 +2101,8 @@ them (`app/lib/hotbar.lua`).
 	client is busy; a disabled button (MP short; every button while a round plays) does
 	nothing. The script marks `<html class="dk-hotbar-js">`; the key badges and the "(or any
 	number key)" hint show only then, since without it the keys do nothing.
-- **Arranging** (`GET/POST /hotbar`, `app/town/hotbar.lua`, `templates/town/hotbar.html`;
-	not while fighting: `common.not_fighting`): the ten slots, each of 2-9 with its tile and
+- **Arranging** (`GET/POST /hotbar`, linked from the Functions box, `app/town/hotbar.lua`,
+	`templates/town/hotbar.html`; not while fighting: `common.not_fighting`): the ten slots, each of 2-9 with its tile and
 	a list (`slot2` ... `slot9`: "Empty" and every choice, `hotbar.choices`: the actions at
 	hand and those on the bar now); **Save** (`save`) puts the chosen ones on their keys and
 	everything else met off the bar (`hotbar.save`; an unknown key is the cheat page, the

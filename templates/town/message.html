@@ -1,15 +1,15 @@
 {#- Short legacy display("...") messages for town/explore/heal. ctx.key picks one. The
 		purchase's (shop_*) may show in the shop's dialog (public/js/modal.js): a button back
 		to the shop then, instead of the ways on. -#}
-{%- local shop_tail = '<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the compass to start exploring.' %}
+{%- local shop_tail = '<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.' %}
 {%- if req and req.modal then shop_tail = '<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the shop</button></div>' end %}
 <div class="town-message">
 {%- if key == "cheat" then %}
 Cheat attempt detected.<br><br>Get a life, loser.
 {%- elseif key == "inn_poor" then %}
-You do not have enough gold to stay at this Inn tonight.<br><br>You may return to <a href="/">town</a>, or use the compass to start exploring.
+You do not have enough gold to stay at this Inn tonight.<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "inn_done" then %}
-You wake up feeling refreshed and ready for action.{% if recharged and #recharged > 0 then %} Your {% for i, n in ipairs(recharged) do %}{% if i > 1 then %}{{ i == #recharged and " and " or ", " }}{% end %}{{ n }}{% end %} {{ #recharged > 1 and "are" or "is" }} fully charged again.{% end %}<br><br>You may return to <a href="/">town</a>, or use the compass to start exploring.
+You wake up feeling refreshed and ready for action.{% if recharged and #recharged > 0 then %} Your {% for i, n in ipairs(recharged) do %}{% if i > 1 then %}{{ i == #recharged and " and " or ", " }}{% end %}{{ n }}{% end %} {{ #recharged > 1 and "are" or "is" }} fully charged again.{% end %}<br><br>You may return to <a href="/">town</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "shop_poor" then %}
 You do not have enough gold to buy this item.{{{ shop_tail }}}
 {%- elseif key == "shop_done" then %}
@@ -19,11 +19,11 @@ Your bag is full. Make room in your <a href="/inventory">inventory</a> first.{{{
 {%- elseif key == "shop_qty" then %}
 Please enter a quantity from 1 to {{ max }}.{{{ shop_tail }}}
 {%- elseif key == "shop_sold" then %}
-You sold {% if qty > 1 then %}{{ qty }} x {{ name }}{% else %}the {{ name }}{% end %} for {{ gold }} gold.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the compass to start exploring.
+You sold {% if qty > 1 then %}{{ qty }} x {{ name }}{% else %}the {{ name }}{% end %} for {{ gold }} gold.<br><br>You may return to <a href="/">town</a>, <a href="/shop">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "maps_poor" then %}
-You do not have enough gold to buy this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the compass to start exploring.
+You do not have enough gold to buy this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "maps_done" then %}
-Thank you for purchasing this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the compass to start exploring.
+Thank you for purchasing this map.<br><br>You may return to <a href="/">town</a>, <a href="/maps">store</a>, or use the direction buttons on the left to start exploring.
 {%- elseif key == "travel_tp" then %}
 You do not have enough TP to travel here. Please go back and try again when you get more TP.
 {%- elseif key == "travel_here" then %}

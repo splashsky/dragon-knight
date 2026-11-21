@@ -528,9 +528,8 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 8. **3.0 live HTML client** (`docs/plans/live-client.md`): ✅ L0 pure GETs (schema
 	 version 15), ✅ L1 regions and the wire protocol, ✅ L2 the client, ✅ L3 fights on the
 	 client, ✅ L4 live sync, ✅ L5 measure, document, release.
-9. **3.1 layout** (`docs/plans/layout.md`): Y1 the frame (header links, stage and sidebar,
-	 travel dialog), Y2 the stage (location panel, town, exploring), Y3 the hotbar (schema
-	 version 17).
+9. **3.1 hotbar** (`docs/plans/hotbar.md`): ✅ the fight's number keys (schema version 17);
+	 a layout redesign was tried and reverted.
 
 ## Definition of done
 

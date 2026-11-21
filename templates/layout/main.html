@@ -9,22 +9,10 @@
 <div class="dk-page">
 <header class="dk-top">
 	{{{ logo() }}}
-	<nav class="dk-topnav" aria-label="Game">
+	<nav class="dk-topnav">
 {%- if nav then %}
-		<a href="/inventory">Inventory</a>
-		<a href="/hotbar">Hotbar</a>
-		<a href="/news">News</a>
-{%- if nav.forum then %}
-		<a href="{{ nav.forum }}">Forum</a>
-{%- end %}
-{%- if nav.is_admin then %}
-		<a href="/admin">Admin</a>
-{%- end %}
-		<a href="/help">{{{ art("help", "Help") }}}</a>
-		<span class="dk-account">
-		<a href="/changepassword">Change Password</a>
 		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}{% if art_src("logout") then %}<input type="image" src="{{ art_src("logout") }}" alt="Log Out" title="Log Out">{% else %}<button class="link">Log Out</button>{% end %}</form>
-		</span>
+		<a href="/help">{{{ art("help", "Help") }}}</a>
 {%- else %}
 		<a href="/login">{{{ art("login", "Log In") }}}</a>
 		<a href="/register">{{{ art("register", "Register") }}}</a>
@@ -33,17 +21,19 @@
 	</nav>
 </header>
 <div class="dk-cols">
-	<div class="dk-stage">
+	{{{ region("left") }}}<aside class="dk-left" data-r="left" data-nav-left>
 {%- if nav then %}
-{{{ include("layout/place", nav) }}}
+{{{ include("layout/nav_left", nav) }}}
 {%- end %}
-	{{{ region("main") }}}<main class="dk-main" data-r="main" data-main>
+	</aside>{{{ endregion() }}}
+	{{{ region("main") }}}<main class="dk-middle" data-r="main" data-main>
 {{{ content }}}
 	</main>{{{ endregion() }}}
-	</div>
-	{{{ region("side") }}}<aside class="dk-side" data-r="side">
+	{{{ region("right") }}}<aside class="dk-right" data-r="right">
 {%- if nav then %}
-{{{ include("layout/side", nav) }}}
+<div class="dk-nav-right" data-nav-right>
+{{{ include("layout/nav_right", nav) }}}
+</div>
 {%- end %}
 {%- if side then %}
 {{{ include("layout/side_live", side) }}}
@@ -62,6 +52,4 @@
 </body>{{{ endregion() }}}
 </html>
 {# Regions (region()/endregion(), data-r; docs/APP.md "Live client"): the parts of the page a
-		live request sends on their own when they change. The stage (.dk-stage) is the location
-		panel (layout/place.html, region loc) over the page's content (main); the sidebar (side)
-		is the player's panels (layout/side.html) and the chat. #}
+		live request sends on their own when they change. #}

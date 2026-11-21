@@ -1,11 +1,11 @@
 // scene.js :: smooth changes of page (docs/APP.md "Scenes"). Any action of the player's
-// that changes the page's content (main: a link, a form: the inn, the shops, the
-// inventory...) fades it out and the new one in, quickly; fight rounds (fight.js plays
-// them), refreshes and back/forward don't. And the page fades through a caption when the
-// player's state changes: an answer's `scene` event (lib/scene.lua: { kind, title, detail
-// }), played by the live client (client.js) after the round's events (fight.js) and before
-// the page's regions apply. The stage (the location panel and the content) fades out while
-// the caption (the title, a line of details) fades in over it; the new page goes in under it, the caption lingers, then it
+// that changes the middle column (a link, a form: the inn, the shops, the inventory...)
+// fades it out and the new one in, quickly; fight rounds (fight.js plays them), refreshes
+// and back/forward don't. And the page fades through a caption when the player's state
+// changes: an answer's `scene` event (lib/scene.lua: { kind, title, detail }), played by
+// the live client (client.js) after the round's events (fight.js) and before the page's
+// regions apply. The middle column fades out while the caption (the title, a line of
+// details) fades in over it; the new page goes in under it, the caption lingers, then it
 // fades out and the new page in. A scene whose page is drawn like the caption (`page`: the
 // victory page) has no caption: the page fades in slowly and stays. A click or a key cuts
 // it short; with prefers-reduced-motion the new page
@@ -24,7 +24,7 @@
 	var card = null;       // the caption on screen
 	var pending = false;   // the caption (or a page scene) waits for its page
 	var pageScene = false; // the page is the caption: it fades in itself
-	var fading = false;    // a page change faded the content out
+	var fading = false;    // a page change faded the middle column out
 	var hold = HOLD;       // how long the caption on screen lingers
 	var wake = null, timer = 0, lost = 0;
 
@@ -36,7 +36,6 @@
 	}
 	function cut() { if (wake) wake(); }
 	function main() { return document.querySelector('[data-r="main"]') || document.querySelector("[data-main]"); }
-	function stage() { return document.querySelector(".dk-stage") || main(); }
 
 	// The caption goes, the page shows (at once: a newer scene, or no page came).
 	function clear() {
@@ -51,7 +50,7 @@
 	function play(data) {
 		var s;
 		try { s = JSON.parse(data); } catch (e) { return; }
-		var m = stage();
+		var m = main();
 		if (!motion || !s || !s.title || !m) return;
 		clear();
 		if (s.page) {
@@ -75,7 +74,7 @@
 			detail.textContent = s.detail;
 			c.appendChild(detail);
 		}
-		// over the stage, a little above the middle of the window
+		// over the middle column, a little above the middle of the window
 		var r = m.getBoundingClientRect();
 		c.style.left = Math.round(r.left) + "px";
 		c.style.width = Math.round(r.width) + "px";
@@ -87,7 +86,7 @@
 		return wait(OUT);
 	}
 
-	// Before an answer applies: one that changes the page's content after a link or form of
+	// Before an answer applies: one that changes the middle column after a link or form of
 	// the player's fades it out (unless a scene does, or it is the next round of a fight or
 	// the hotbar saved).
 	function before(info) {

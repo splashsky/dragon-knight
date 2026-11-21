@@ -29,7 +29,7 @@ PU_ROUTES="/ /admin /admin/broadcast /admin/classes /admin/classes/#id /admin/dr
 	/dead /drop /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/items /hotbar
 	/help/levels /help/monsters /help/spells /inn /inventory /inventory/discard/#id /live /live/state /login
 	/lostpassword /map /maps /maps/buy/#id /news /news/#id /ninja /online /register /shop /shop/buy/#id
-	/travel /verify /victory /__test/routes"
+	/verify /victory /__test/routes"
 
 t_section "pure GETs: the list covers every GET route"
 t_jar default

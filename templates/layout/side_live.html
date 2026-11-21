@@ -1,4 +1,4 @@
-{#- Under the sidebar's panels (layout/main.html): the online count and the Babble Box. ctx: side. -#}
+{#- Under the right column: the online count and the Babble Box. ctx: side. -#}
 {%- if online_count then %}
 {{{ region("online-count") }}}<p class="online-count small" data-r="online-count"><a href="/babble">Online: <span data-online-count>{{ online_count }}</span></a></p>{{{ endregion() }}}
 {%- end %}

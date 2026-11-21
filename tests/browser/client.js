@@ -107,15 +107,15 @@ async function run(wsUrl, port) {
 
 	section = "navigation";
 	var loadsBefore = tab.loads;
-	// (scene.js: a link of the player's fades the page's content out and the new one in)
+	// (scene.js: a link of the player's fades the middle column out and the new one in)
 	await js("window.__fades = []; new MutationObserver(function () { window.__fades.push(document.documentElement.className); })" +
 		".observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })");
 	await js("document.querySelector('a[href=\"/inventory\"]').click()");
 	check("inventory page", await until("location.pathname === '/inventory' && document.title === 'Inventory'"), await js("document.title"));
 	check("no reload", await js("window.__dk === 1") && tab.loads === loadsBefore);
-	check("the content faded out and in", await until("window.__fades.some(function (c) { return /dk-fade-out/.test(c); }) && !/dk-fade-out/.test(document.documentElement.className)"),
+	check("the middle column faded out and in", await until("window.__fades.some(function (c) { return /dk-fade-out/.test(c); }) && !/dk-fade-out/.test(document.documentElement.className)"),
 		await js("window.__fades"));
-	check("the content", await js("!!document.querySelector('[data-r=main]').textContent.match(/bag/i)"));
+	check("the middle column", await js("!!document.querySelector('[data-r=main]').textContent.match(/bag/i)"));
 	check("one region of each", await js("[...document.querySelectorAll('[data-r]')].map(e => e.dataset.r).every((n, i, a) => a.indexOf(n) === i)"));
 	await js("window.__fades = []; history.back()");
 	check("back: town again", await until("location.pathname === '/' && document.title === 'In Town' && !DK.busy()"), await js("document.title"));
@@ -136,7 +136,7 @@ async function run(wsUrl, port) {
 	check("the same input element", await js("document.querySelector('[data-chat-form] [name=babble]') === window.__inp"), await js("window.__mut.slice(0, 40)"));
 
 	section = "a panel that moves";
-	// the town page has the chat on its stage, the others in the sidebar: the
+	// the town page has the chat in its middle column, the others in the right one: the
 	// region comes as a placeholder, and the page's own panel moves there untouched
 	await js("DK.visit('/')");
 	await until("location.pathname === '/' && !DK.busy()");
@@ -144,7 +144,7 @@ async function run(wsUrl, port) {
 		await js("window.__chat = document.querySelector('[data-r=chat]'); document.querySelector('[data-r=chat] [name=babble]').value = 'typed in town'");
 		await js("document.querySelector('a[href=\"/inventory\"]').click()");
 		check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
-		check("the chat in the sidebar", await js("!!document.querySelector('[data-r=side] [data-r=chat]')"));
+		check("the chat in the right column", await js("!!document.querySelector('[data-r=right] [data-r=chat]')"));
 		check("the same panel (moved, not rebuilt)", await js("document.querySelector('[data-r=chat]') === window.__chat"));
 		check("with what was typed", await js("document.querySelector('[data-r=chat] [name=babble]').value === 'typed in town'"));
 		check("its address field follows the page", await js("document.querySelector('[data-r=chat-form] [name=back]').value === '/inventory'"));
@@ -212,32 +212,6 @@ async function run(wsUrl, port) {
 	await press("Escape", 27);
 	check("Escape closes it", await until("!document.querySelector('dialog[open]')"));
 	check("no reload", await js("window.__dk === 1 && location.pathname === '/shop'"));
-
-	section = "the travel dialog";
-	// the location panel's Travel opens the list in a dialog (tests/e2e/browser.sh put Roma
-	// on the map); a town's button closes it and travels as the page's own form
-	// (data-modal-leave): the arrival's scene plays; back to Midworld the same way
-	await js("DK.visit('/')");
-	await until("location.pathname === '/' && !DK.busy()");
-	await js("window.__scenes = []; window.__travelObs = new MutationObserver(function (l) { l.forEach(function (m) { m.addedNodes.forEach(function (n) {" +
-		" if (n.classList && n.classList.contains('dk-scene')) window.__scenes.push(n.className + '|' + n.textContent); }); }); });" +
-		"window.__travelObs.observe(document.body, { childList: true })");
-	await js("document.querySelector('[data-r=loc] a[href=\"/travel\"]').click()");
-	check("the list in a dialog", await until("!!document.querySelector('dialog.dk-modal[open] .travel-list')"));
-	check("its title", await js("document.querySelector('dialog .dk-modal-title').textContent === 'Travel'"));
-	check("Midworld: here", await js("document.querySelector('dialog .travel-here').disabled && /Midworld/.test(document.querySelector('dialog .travel-here').textContent)"));
-	await js("[...document.querySelectorAll('dialog .travel-town')].find(b => /Roma/.test(b.textContent)).click()");
-	check("the dialog closes", await until("!document.querySelector('dialog[open]')"));
-	check("in Roma", await until("!DK.busy() && document.title === 'In Town' && /Welcome to Roma/.test(document.querySelector('[data-r=main]').textContent)"));
-	check("through the town's scene", await js("window.__scenes.join(';')") === "dk-scene dk-scene-town|RomaYou travel to Roma for 5 TP.", await js("window.__scenes"));
-	await until("!document.querySelector('.dk-scene')");
-	await js("document.querySelector('.town-service[href=\"/travel\"]').click()");
-	await until("!!document.querySelector('dialog.dk-modal[open] .travel-list')");
-	await js("[...document.querySelectorAll('dialog .travel-town')].find(b => /Midworld/.test(b.textContent)).click()");
-	check("back in Midworld", await until("!DK.busy() && /Welcome to Midworld/.test(document.querySelector('[data-r=main]').textContent)"));
-	await until("!document.querySelector('.dk-scene')");
-	await js("window.__travelObs.disconnect()");
-	check("no reload", await js("window.__dk === 1"));
 
 	section = "the hotbar's page";
 	// dragging an action onto a key (hotbar.js): the lists follow (a swap: Hurt onto Heal's
@@ -408,7 +382,7 @@ async function run(wsUrl, port) {
 		"document.querySelector('[data-r=main]').appendChild(a); a.click()");
 	await sleep(500);
 	check("the progress bar after a moment", await js("document.documentElement.classList.contains('dk-busy') && !!document.querySelector('.dk-progress')"));
-	check("the content is busy", await js("document.querySelector('[data-r=main]').getAttribute('aria-busy') === 'true'"));
+	check("the middle column is busy", await js("document.querySelector('[data-r=main]').getAttribute('aria-busy') === 'true'"));
 	check("the page comes", await until("document.title === 'Slow' && !DK.busy()"), await js("document.title"));
 	check("no bar after", await js("!document.documentElement.classList.contains('dk-busy')"));
 	// a second link while the first is on its way: the first is dropped
@@ -422,12 +396,12 @@ async function run(wsUrl, port) {
 	await js("window.scrollTo(0, 0); document.querySelector('.dk-topnav a[href=\"/help\"]').click()");
 	check("help (the minimal layout)", await until("location.pathname === '/help' && document.body.classList.contains('minimal') && !DK.busy()"));
 	check("no reload", await js("window.__dk === 1"));
-	check("one body region", await js("!document.querySelector('[data-r=side]')"));
+	check("one body region", await js("!document.querySelector('[data-r=left]')"));
 	check("the stream lives on (a player's page)", await js("document.body.hasAttribute('data-live')"));
 	await js("window.scrollTo(0, 600)");
 	var y = await js("window.scrollY");
 	await js("history.back()");
-	check("back: the news in the main layout", await until("location.pathname === '/news' && !!document.querySelector('[data-r=side]') && !DK.busy()"));
+	check("back: the news in the main layout", await until("location.pathname === '/news' && !!document.querySelector('[data-r=left]') && !DK.busy()"));
 	await js("history.forward()");
 	check("forward: help, scrolled where it was", await until("location.pathname === '/help' && !DK.busy() && Math.abs(window.scrollY - " + y + ") < 2"),
 		await js("window.scrollY") + " vs " + y);

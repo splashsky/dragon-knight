@@ -10,13 +10,8 @@ changelog.RELEASES = {
 	{
 		version = "3.1.0", date = "unreleased",
 		changes = {
-			"A new layout: a header with the game's links (Inventory, Hotbar, News, Forum, Admin, Help, Change Password, Log Out), a wide stage for what you are doing, and one sidebar with your character, inventory, Fast Spells and the Babble Box. The Towns and Functions boxes are gone. In a narrow window the sidebar goes under the stage.",
-			"Where you are is at the top of the stage: the compass beside your location, your coordinates, the map and Travel. Walking changes only that part of the page.",
-			"Towns show what they offer as large tiles: the Inn with its price, the shop, the Map Store and Travel.",
-			"Travel opens a list of the towns on your map over the page, each with what the trip costs (greyed out when your TP don't cover it, and the town you are in); pick one and you're on your way. Without JavaScript the list is a page of its own.",
-			"While exploring, who's online and the Babble Box are on the stage, as in towns.",
 			"The fight menu is a hotbar: press 1 to attack and 0 to run away, and 2 to 9 for your spells, your potions and the gear that casts spells (or click them, as before). Each button shows its key. When you can't act, any number key presses Continue.",
-			"Arrange your hotbar on the new Hotbar page when you aren't fighting: pick an action for each key, or drag them around. Nothing moves unless you move it: a spell or item you get later takes the first free key when your next fight begins, what doesn't fit waits under More in the fight menu, and a potion you've used up or gear you've taken off keeps its key, greyed out, until you have it again (schema version 17, run dk migrate).",
+			"Arrange your hotbar on the new Hotbar page (in the Functions box) when you aren't fighting: pick an action for each key, or drag them around. Nothing moves unless you move it: a spell or item you get later takes the first free key when your next fight begins, what doesn't fit waits under More in the fight menu, and a potion you've used up or gear you've taken off keeps its key, greyed out, until you have it again (schema version 17, run dk migrate).",
 		},
 	},
 	{

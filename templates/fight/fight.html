@@ -10,12 +10,9 @@
 		buttons before 2.4 sent: routes/fight.lua reads the name), 2-9 the player's actions
 		(fight/action.html), an action of the bar's not at hand greyed (its tooltip, and why),
 		an empty slot dashed; then the actions off the bar, under More. A locked turn has only
-		Continue, which any number key presses. The page's title is the location panel's
-		heading ("Fighting"); a theme with a picture for "fighting" draws it here too. -#}
+		Continue, which any number key presses. -#}
 <section class="box fight">
-{%- if art_src("fighting") then %}
 <h1 class="title page-title">{{{ art("fighting", "Fighting") }}}</h1>
-{%- end %}
 <div class="box-body">
 {%- if stale then %}
 <p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
