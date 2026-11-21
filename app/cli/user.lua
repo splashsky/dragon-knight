@@ -1,5 +1,6 @@
 -- cli/user.lua :: `dk user ...` account administration from the shell.
 local auth = require("lib.auth")
+local roles = require("lib.roles")
 local session = require("lib.session")
 
 local USAGE = [[
@@ -42,7 +43,7 @@ function commands.admin(username)
 	if not username then return nil end
 	local u = find(username)
 	if not u then return 1 end
-	dk.db:exec("UPDATE users SET authlevel = 1 WHERE id = ?", u.id)
+	dk.db:exec("UPDATE users SET authlevel = ? WHERE id = ?", roles.ADMIN, u.id)
 	print("'" .. u.username .. "' is now an administrator.")
 	return 0
 end

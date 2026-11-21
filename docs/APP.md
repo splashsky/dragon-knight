@@ -144,8 +144,8 @@ end
 | Guard | Behaviour |
 |---|---|
 | `auth.login` | not logged in → 302 `/login` |
-| `auth.game` | legacy index.php chain: not logged in → `/login`; `control.gameopen == 0` → "Game Closed" page; `verifyemail == 1` and not verified → `/verify`; `authlevel == 2` → 403 blocked page |
-| `auth.admin` | not logged in → `/login`; `authlevel ~= 1` → 403 |
+| `auth.game` | legacy index.php chain: not logged in → `/login`; `control.gameopen == 0` → "Game Closed" page; `verifyemail == 1` and not verified → `/verify`; blocked (`roles.is_blocked`, see [Roles](#roles)) → 403 blocked page |
+| `auth.admin` | not logged in → `/login`; not an administrator (`roles.is_admin`) → 403 |
 
 Use `auth.game` for every game page (town, fight, character, babble, news, `/live`). The forum
 routes use `forum.guard`, which wraps it.
@@ -534,8 +534,8 @@ the browser sees only the name):
 
 | Channel | Event | Data | Published by |
 |---|---|---|---|
-| `babble` | `babble` | `{ id, author, text, time, when, delete }` (a new chat message; `time`: unix seconds, `when`: as the page shows it, `delete`: the address administrators delete it with) | `POST /babble` (`chat.post`) |
-| `babble` | `delete` | `{ id }` | `POST /babble/#id/delete` (administrators) |
+| `babble` | `babble` | `{ id, author, author_id, role, text, time, when, delete }` (a new chat message; `author_id`: the author's account (public anyway: Who's Online links to it), so each page tells the viewer's own; `role`: the author's ([Roles](#roles)); `time`: unix seconds, `when`: as the page shows it, `delete`: the address administrators and moderators delete it with) | `POST /babble` (`chat.post`) |
+| `babble` | `delete` | `{ id }` | `POST /babble/#id/delete` (administrators and moderators) |
 | `presence` | `join` | `{ id, name, url, online }` (`url`: the character page; `online`: how many are online now) | a player's first request while not online (`session.load`) |
 | `presence` | `leave` | `{ id, name, url, online }` | the presence sweep |
 | `notices` | `news` | `{ id, title, author, url }` | a news post (`/admin/news`) |
@@ -615,8 +615,12 @@ it off everywhere (the link too). Its messages are in a box of a fixed height
 as messages come and go) that scrolls from the bottom, the newest last; each message is
 compact, the author's name (`.babble-author`) over the text (`.babble-text`;
 `layout/chat_posts.html`, no whitespace between the tags since messages keep their
-spaces; an administrator's delete button on the name's line, shown on the message pointed
-at). Then the message bar (`.chat-bar`): the field across the box, the send button
+spaces; an administrator's or moderator's delete button on the name's line, shown on the
+message pointed at), on the box's own ground: the viewer's messages on the right in red
+(`.babble-mine`: the author is the list's `data-me`), the others on the left, black, an
+administrator's gold (`.babble-admin`) and a moderator's green (`.babble-moderator`), by the
+author's role now ([Roles](#roles); `chat.history` joins it, the event carries it; live.js
+gives the prototype the same classes). Then the message bar (`.chat-bar`): the field across the box, the send button
 (`.chat-send`, an SVG arrow, `aria-label="Send"`) inside it. live.js sends the chat's forms
 itself (its submit listener captures: no dialog or live client takes them) and adds the
 messages that come to every list on the page (the window's too).
@@ -645,7 +649,8 @@ messages that come to every list on the page (the window's too).
 	application/json` (live.js's fetch, CSRF in `X-CSRF-Token`) the answer is `{ message =
 	{ id, author, text, time } | null }` or `{ error, wait }`; otherwise a redirect to
 	`back` (or `/babble`), or the 429 page.
-- `POST /babble/#id/delete` (administrators; the button shows for them): deletes the
+- `POST /babble/#id/delete` (administrators and moderators, `roles.can_moderate`; the
+	button shows for them): deletes the
 	message and publishes `delete`; JSON `{ deleted }` or a redirect back.
 - `babble.author` keeps the name at posting time (shown), `author_id` the account.
 
@@ -2277,6 +2282,18 @@ To change the schema:
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
+
+## Roles
+
+An account's role is `users.authlevel` (`app/lib/roles.lua` names them): **0** a player,
+**1** an administrator (the control panel, the admin event channel, News threads, and
+everything a moderator may), **2** blocked (can't play: `auth.game`), **3** a moderator (3.1:
+deletes Babble Box messages; no control panel). `roles.name(level)` ("player", "admin",
+"blocked", "moderator"), `roles.is_admin(user)`, `roles.can_moderate(user)` (administrators
+and moderators), `roles.is_blocked(user)`; every check goes through them. Administrators
+set roles in the user editor (`roles.CHOICES`: User, Moderator, Admin, Blocked); `dk user
+admin <name>` makes an administrator. The chat draws administrators' messages gold and
+moderators' green ([Chat](#chat)).
 
 ## Sessions, CSRF, accounts
 

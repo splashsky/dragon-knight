@@ -1,8 +1,11 @@
 -- chat.lua :: the Babble Box, the game's global chat (docs/APP.md "Chat"). Messages are
 -- `babble` rows (text stored raw, escaped on output); new ones and deletions go out on the
--- `babble` event channel: `babble` { id, author, text, time } and `delete` { id }.
+-- `babble` event channel: `babble` { id, author, author_id, role, text, time, when, delete }
+-- and `delete` { id }. A message's role is its author's now (lib/roles.lua): the page draws
+-- administrators' and moderators' messages in their colours.
 local json = require("lib.json")
 local php = require("lib.php")
+local roles = require("lib.roles")
 
 local chat = {}
 
@@ -22,12 +25,17 @@ function chat.clean(s)
 	return s
 end
 
--- The last HISTORY messages, oldest first.
+-- The last HISTORY messages, oldest first, each with its author's role (role: a
+-- lib/roles.lua name; "player" for an author whose account is gone).
 function chat.history()
-	local rows = dk.db:query("SELECT id, posttime, author, author_id, babble FROM babble ORDER BY id DESC LIMIT ?",
-													 chat.HISTORY)
+	local rows = dk.db:query("SELECT b.id, b.posttime, b.author, b.author_id, b.babble, u.authlevel FROM babble b " ..
+		"LEFT JOIN users u ON u.id = b.author_id ORDER BY b.id DESC LIMIT ?", chat.HISTORY)
 	local out = {}
-	for i = #rows, 1, -1 do out[#out + 1] = rows[i] end
+	for i = #rows, 1, -1 do
+		local r = rows[i]
+		r.role = roles.name(r.authlevel)
+		out[#out + 1] = r
+	end
 	return out
 end
 
@@ -35,8 +43,8 @@ end
 -- it; delete: the address administrators delete it with; live.js fills the page's
 -- chat-post prototype, layout/chat.html, with these).
 function chat.event(row)
-	return { id = row.id, author = row.author, text = row.babble, time = row.posttime,
-		when = php.datetime(row.posttime), delete = "/babble/" .. row.id .. "/delete" }
+	return { id = row.id, author = row.author, author_id = row.author_id, role = row.role, text = row.babble,
+		time = row.posttime, when = php.datetime(row.posttime), delete = "/babble/" .. row.id .. "/delete" }
 end
 
 -- Seconds `user` has to wait before posting again (0: may post now).
@@ -56,7 +64,8 @@ function chat.post(user, text)
 	if wait > 0 then return nil, wait end
 	local _, id = dk.db:exec("INSERT INTO babble (posttime, author, author_id, babble) VALUES (?, ?, ?, ?)",
 													 now, user.charname, user.id, text)
-	local row = { id = id, posttime = now, author = user.charname, author_id = user.id, babble = text }
+	local row = { id = id, posttime = now, author = user.charname, author_id = user.id, babble = text,
+		role = roles.name(user.authlevel) }
 	dk.publish(chat.CHANNEL, "babble", json.encode(chat.event(row)))
 	return row
 end

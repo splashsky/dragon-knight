@@ -336,7 +336,7 @@ CREATE TABLE users (
 	charname              TEXT    NOT NULL DEFAULT '' COLLATE NOCASE,
 	regdate               INTEGER NOT NULL DEFAULT 0,
 	onlinetime            INTEGER NOT NULL DEFAULT 0,
-	authlevel             INTEGER NOT NULL DEFAULT 0,
+	authlevel             INTEGER NOT NULL DEFAULT 0,   -- the role (lib/roles.lua): 0 player, 1 admin, 2 blocked, 3 moderator
 	latitude              INTEGER NOT NULL DEFAULT 0,
 	longitude             INTEGER NOT NULL DEFAULT 0,
 	charclass             INTEGER NOT NULL DEFAULT 0,

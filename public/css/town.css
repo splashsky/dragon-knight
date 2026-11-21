@@ -31,21 +31,24 @@ table.inventory td + td { width: 100%; }
 	background-color: rgba(255, 255, 255, 0.5);
 }
 .chat-posts { list-style: none; margin: 0; padding: 0; }
+/* each message on the box's own ground (no stripes): the viewer's on the right in red,
+	the others on the left, black, an administrator's gold and a moderator's green
+	(layout/chat_posts.html's classes; the role is the author's now, lib/roles.lua) */
 .babble-post {
-	padding: 2px 5px 3px;
-	border-top: solid 1px rgba(0, 0, 0, 0.15);
+	padding: 3px 8px;
 	line-height: 1.25;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
 }
-.babble-post:first-child { border-top: none; }
 .babble-author { display: block; font-size: 12px; }
 .babble-text { display: block; }
-/* legacy alternated from the newest post (#eeeeee) upwards */
-.babble-post:nth-last-child(odd) { background-color: #eeeeee; }
-.babble-post:nth-last-child(even) { background-color: #ffffff; }
-/* an administrator's delete button: on the name's line, shown on the message pointed at or focused */
+.babble-admin { color: #9a7200; }
+.babble-moderator { color: #2e7d22; }
+.babble-post.babble-mine { text-align: right; color: #c00000; }
+/* the delete button (administrators, moderators): on the name's line, at the message's
+	outer side, shown on the message pointed at or focused */
 .chat-delete { float: right; visibility: hidden; }
+.babble-mine .chat-delete { float: left; }
 .babble-post:hover .chat-delete, .babble-post:focus-within .chat-delete { visibility: visible; }
 .chat-delete button.link { font-weight: normal; padding: 0 2px; }
 /* the message bar: the field across the box, the send button inside it */

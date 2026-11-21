@@ -12,10 +12,10 @@
 {%- if not (req and req.modal) then %}
 <h2 class="title">Babble Box</h2>
 {%- end %}
-<div class="chat-scroll">{{{ region("chat-posts") }}}<ol class="chat-posts" data-r="chat-posts" data-chat-posts>
+<div class="chat-scroll">{{{ region("chat-posts") }}}<ol class="chat-posts" data-r="chat-posts" data-chat-posts{% if me then %} data-me="{{ me }}"{% end %}>
 {{{ include("layout/chat_posts") }}}
 </ol>{{{ endregion() }}}</div>
-<template data-proto="chat-post"><li class="babble-post" data-slot-attr="data-id:id title:when">{% if is_admin then %}<form class="inline chat-delete" method="post" data-slot-attr="action:delete">{{{ csrf_field() }}}<button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end %}<b class="babble-author" data-slot="author"></b><span class="babble-text" data-slot="text"></span></li></template>
+<template data-proto="chat-post"><li class="babble-post" data-slot-attr="class:cls data-id:id title:when">{% if can_delete then %}<form class="inline chat-delete" method="post" data-slot-attr="action:delete">{{{ csrf_field() }}}<button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end %}<b class="babble-author" data-slot="author"></b><span class="babble-text" data-slot="text"></span></li></template>
 {{{ region("chat-form") }}}<form class="chat-form" method="post" action="/babble" data-r="chat-form" data-chat-form>
 {{{ csrf_field() }}}{{{ region("chat-back") }}}<input type="hidden" name="back" value="{{ back }}" data-r="chat-back">{{{ endregion() }}}
 <div class="chat-bar"><input type="text" name="babble" maxlength="{{ max_chars }}" placeholder="Message" aria-label="Message" autocomplete="off"><button class="chat-send" type="submit" name="submit" value="Babble" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M3 20.5 21.5 12 3 3.5 3 10l12 2-12 2z"/></svg></button></div>

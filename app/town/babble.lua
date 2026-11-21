@@ -3,6 +3,7 @@
 -- with fetch and `Accept: application/json` and gets JSON instead of a redirect.
 local chat = require("lib.chat")
 local json = require("lib.json")
+local roles = require("lib.roles")
 local view = require("lib.view")
 
 local babble = {}
@@ -32,11 +33,12 @@ function babble.post(req)
 	return view.redirect(view.back_to(req, "/babble"))
 end
 
--- POST /babble/#id/delete (administrators): the message goes, on every open page too.
+-- POST /babble/#id/delete (administrators and moderators, lib/roles.lua): the message
+-- goes, on every open page too.
 function babble.delete(req, params)
 	req.quiet = true
-	if req.user.authlevel ~= 1 then
-		local msg = "Only administrators can delete messages."
+	if not roles.can_moderate(req.user) then
+		local msg = "Only administrators and moderators can delete messages."
 		if view.wants_json(req) then return view.json({ error = msg }, 403) end
 		return view.error(req, 403, "Babble Box", msg)
 	end

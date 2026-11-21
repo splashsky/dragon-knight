@@ -6,6 +6,7 @@ local auth = require("lib.auth")
 local classes = require("lib.classes")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
+local roles = require("lib.roles")
 local session = require("lib.session")
 local spells = require("lib.spells")
 
@@ -150,8 +151,8 @@ tables.users = function()
 			{ name = "onlinetime", label = "Last Online", kind = "static", format = "datetime" },
 			{ name = "authlevel", label = "Auth Level", kind = "select", int = true,
 				required = "Auth Level is required.", numeric = "Auth Level must be a number.",
-				options = { { 0, "User" }, { 1, "Admin" }, { 2, "Blocked" } },
-				help = 'Set to "Blocked" to temporarily (or permanently) ban a user.' },
+				options = roles.CHOICES,
+				help = 'A moderator may delete Babble Box messages; set to "Blocked" to temporarily (or permanently) ban a user.' },
 			{ name = "newpassword", label = "New Password", kind = "password",
 				help = "Leave blank to keep the current password. Setting one logs the user out." },
 			SEP,

@@ -15,9 +15,12 @@ function T.clean()
 	assert(chat.clean("<b>&</b>") == "<b>&</b>")   -- stored raw, escaped on output
 end
 
+-- a message's event: its author's account (public anyway: Who's Online links to it) and
+-- role, so each page tells the viewer's messages and draws the roles' colours
 function T.event()
-	local e = chat.event({ id = 7, posttime = 100, author = "A", author_id = 3, babble = "hi" })
-	assert(e.id == 7 and e.time == 100 and e.author == "A" and e.text == "hi" and e.author_id == nil)
+	local e = chat.event({ id = 7, posttime = 100, author = "A", author_id = 3, babble = "hi", role = "moderator" })
+	assert(e.id == 7 and e.time == 100 and e.author == "A" and e.text == "hi" and e.author_id == 3 and e.role == "moderator")
+	assert(e.delete == "/babble/7/delete")
 end
 
 function T.config_seconds()

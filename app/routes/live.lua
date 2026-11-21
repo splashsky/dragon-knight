@@ -14,6 +14,7 @@
 local auth = require("lib.auth")
 local banner = require("lib.banner")
 local cookie = require("lib.cookie")
+local roles = require("lib.roles")
 local themes = require("lib.themes")
 local view = require("lib.view")
 
@@ -26,7 +27,7 @@ function live.channels(user)
 	local channels = {}
 	for i, name in ipairs(live.PUBLIC) do channels[i] = name end
 	channels[#channels + 1] = "user:" .. user.id
-	if user.authlevel == 1 then channels[#channels + 1] = "admin" end
+	if roles.is_admin(user) then channels[#channels + 1] = "admin" end
 	return channels
 end
 

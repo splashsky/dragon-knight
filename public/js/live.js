@@ -75,7 +75,12 @@
 		if (!id) return;
 		$$("[data-chat-posts]").forEach(function (list) {
 			if (list.querySelector('[data-id="' + id + '"]')) return;
-			var li = proto("chat-post", { id: id, when: m.when, author: m.author, text: m.text,
+			// the classes the server gives it (layout/chat_posts.html): the viewer's
+			// (data-me), the author's role
+			var mine = m.author_id != null && String(m.author_id) === list.getAttribute("data-me");
+			var cls = "babble-post" + (mine ? " babble-mine" : "") +
+				(m.role === "admin" || m.role === "moderator" ? " babble-" + m.role : "");
+			var li = proto("chat-post", { id: id, cls: cls, when: m.when, author: m.author, text: m.text,
 				delete: safeUrl(m.delete) });
 			if (!li) return;
 			var next = null;

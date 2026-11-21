@@ -1,5 +1,6 @@
 -- auth.lua :: password hashing + route guards.
 local game = require("lib.game")
+local roles = require("lib.roles")
 local view = require("lib.view")
 
 local auth = {}
@@ -78,7 +79,7 @@ function auth.game(req)
 	if control.verifyemail == 1 and tostring(req.user.verify) ~= "1" then
 		return view.redirect("/verify")
 	end
-	if req.user.authlevel == 2 then
+	if roles.is_blocked(req.user) then
 		return view.error(req, 403, "Blocked", "Your account has been blocked. Please try back later.")
 	end
 end
@@ -86,7 +87,7 @@ end
 -- Admin control panel (legacy admin.php: login + authlevel 1; no gameopen check).
 function auth.admin(req)
 	if not req.user then return view.redirect("/login") end
-	if req.user.authlevel ~= 1 then
+	if not roles.is_admin(req.user) then
 		return view.error(req, 403, "Error",
 			"You must have administrator privileges to use the control panel.")
 	end

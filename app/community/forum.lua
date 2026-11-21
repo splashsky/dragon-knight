@@ -5,6 +5,7 @@ local game = require("lib.game")
 local notices = require("lib.notices")
 local paging = require("lib.paging")
 local php = require("lib.php")
+local roles = require("lib.roles")
 local view = require("lib.view")
 
 local forum = {}
@@ -63,7 +64,7 @@ end
 
 -- Boards with admin_threads = 1 (News) only take new threads from administrators.
 local function can_start_thread(board, user)
-	return board.admin_threads == 0 or user.authlevel == 1
+	return board.admin_threads == 0 or roles.is_admin(user)
 end
 
 local function find_board(id)

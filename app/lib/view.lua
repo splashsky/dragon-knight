@@ -7,6 +7,7 @@ local game = require("lib.game")
 local json = require("lib.json")
 local php = require("lib.php")
 local presence = require("lib.presence")
+local roles = require("lib.roles")
 local session = require("lib.session")
 local themes = require("lib.themes")
 local tips = require("lib.tips")
@@ -166,7 +167,8 @@ function view.chat(req)
 	if game.control().showbabble ~= 1 then return nil end
 	return {
 		posts = chat.history(),
-		is_admin = req.user and req.user.authlevel == 1,
+		can_delete = roles.can_moderate(req.user),   -- administrators and moderators
+		me = req.user and req.user.id,               -- whose messages are the viewer's
 		back = view.back_path(req),
 		max_chars = chat.MAX_CHARS,
 	}
@@ -190,7 +192,7 @@ local function live_ctx(req, ctx, layout, nav)
 	ctx.live = {
 		csrf = csrf.token(req),
 		session = req.session and session.live_id(req.session) or "",
-		admin = user.authlevel == 1,
+		admin = roles.is_admin(user),
 	}
 	if not nav then return end
 	local side = {}

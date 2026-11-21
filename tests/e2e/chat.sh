@@ -1,7 +1,7 @@
 # tests/e2e/chat.sh :: the Babble Box, live (lib/chat.lua, town/babble.lua, live.js): two
 # players with event streams: a message posted with fetch (JSON) reaches the other stream,
 # stays text (JSON-escaped data, escaped history), the rate limit (429), the length limit,
-# blank messages, the no-JS form path, admin deletes, its page and dialog, and
+# blank messages, the no-JS form path, admin deletes, its page and window, roles, and
 # well-formed frames. Sourced by tests/run.sh (live_* and t_fetch helpers there).
 
 chat_unlimit() { t_sql "UPDATE babble SET posttime = posttime - 10"; }
@@ -56,7 +56,8 @@ CHAT_ID=$(grep -o '"id":[0-9]*' "$BODY" | cut -d: -f2)
 [ "$(t_sql "SELECT author_id || '|' || babble FROM babble WHERE id = ${CHAT_ID:-0}")" = "$CHATA_ID|$XSS" ] \
 	&& t_ok || t_fail "message stored raw with its author"
 live_has b "event: babble"
-live_has b "\"id\":$CHAT_ID,\"text\":\"\\u003cscript\\u003ealert(\\\"x\\\")\\u003c/script\\u003e \\u0026 \\u003c/b\\u003e\""
+live_has b "\"author_id\":$CHATA_ID,"
+live_has b "\"id\":$CHAT_ID,\"role\":\"player\",\"text\":\"\\u003cscript\\u003ealert(\\\"x\\\")\\u003c/script\\u003e \\u0026 \\u003c/b\\u003e\""
 live_lacks b '<script>'
 t_jar chatb
 t_get /babble
@@ -121,6 +122,53 @@ live_has b "data: {\"id\":$PLAIN_ID}"
 t_get /babble; expect_no_body 'plain form post'
 t_jar chatb
 t_get /babble; expect_no_body "class=\"babble-post\" data-id=\"$CHAT_ID\""; expect_no_body 'chat-delete'
+
+t_section "chat: roles"
+# the viewer's messages (babble-mine: right, red), an administrator's (babble-admin: gold)
+# and a moderator's (babble-moderator: green), by the author's role now (lib/roles.lua),
+# on the page and in the events; moderators delete messages, nothing more
+chat_unlimit
+t_jar chatmod; t_reset_jar
+t_register chatmod chatmodpw1 chatmod@example.com ChatMod; t_login chatmod chatmodpw1
+t_sql "UPDATE users SET authlevel = 3 WHERE username = 'chatmod'"
+t_get /babble; MC=$(t_csrf)
+t_fetch /babble "babble=moderating"; expect_status 200; expect_body '"role":"moderator"'
+MOD_MSG=$(grep -o '"id":[0-9]*' "$BODY" | cut -d: -f2)
+live_has b '"role":"moderator","text":"moderating"'
+t_get /babble
+expect_body "<li class=\"babble-post babble-mine babble-moderator\" data-id=\"$MOD_MSG\""
+expect_body "action=\"/babble/$MOD_MSG/delete\""   # a moderator's delete buttons
+expect_body 'data-me="'"$(t_sql "SELECT id FROM users WHERE username = 'chatmod'")"'"'
+t_get /admin; expect_status 403   # no control panel
+t_jar chatadmin
+chat_unlimit
+t_get /babble
+t_fetch /babble "babble=administrating"; expect_status 200; expect_body '"role":"admin"'
+ADM_MSG=$(grep -o '"id":[0-9]*' "$BODY" | cut -d: -f2)
+t_jar chatb
+chat_unlimit
+t_get /babble
+t_fetch /babble "babble=just+playing"; expect_status 200; expect_body '"role":"player"'
+MINE_MSG=$(grep -o '"id":[0-9]*' "$BODY" | cut -d: -f2)
+t_get /babble
+expect_body "<li class=\"babble-post babble-moderator\" data-id=\"$MOD_MSG\""
+expect_body "<li class=\"babble-post babble-admin\" data-id=\"$ADM_MSG\""
+expect_body "<li class=\"babble-post babble-mine\" data-id=\"$MINE_MSG\""
+expect_no_body 'chat-delete'
+t_fetch "/babble/$MINE_MSG/delete"; expect_status 403; expect_body 'Only administrators and moderators can delete messages.'
+# a moderator deletes a player's message
+t_jar chatmod
+t_get /babble
+t_fetch "/babble/$MINE_MSG/delete"; expect_status 200; expect_body '{"deleted":true}'
+live_has b "data: {\"id\":$MINE_MSG}"
+# the role is the author's now: a moderator made a player again, their message is black
+t_sql "UPDATE users SET authlevel = 0 WHERE username = 'chatmod'"
+t_jar chatb
+t_get /babble; expect_body "<li class=\"babble-post\" data-id=\"$MOD_MSG\""
+# the admin panel's choices
+t_jar chatadmin
+t_get "/admin/users/$(t_sql "SELECT id FROM users WHERE username = 'chatmod'")"
+expect_body '<option value="3">Moderator</option>'; expect_body 'A moderator may delete Babble Box messages'
 
 t_section "chat: well-formed frames"
 live_stop

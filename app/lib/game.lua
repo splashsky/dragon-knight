@@ -5,6 +5,7 @@ local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
 local presence = require("lib.presence")
+local roles = require("lib.roles")
 local spells = require("lib.spells")
 local stats = require("lib.stats")
 
@@ -161,7 +162,7 @@ function game.nav(user)
 		towns = game.user_towns(user),
 		forum = game.forum_link(),
 		chat = game.control().showbabble == 1,   -- the Functions box's Babble Box link (the chat window)
-		is_admin = user.authlevel == 1,
+		is_admin = roles.is_admin(user),
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),
 		bars = bars,   -- { key = "hp"|"mp"|"tp", label, value, max, width, tone, low } (fight.js updates them)

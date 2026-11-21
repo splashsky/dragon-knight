@@ -48,11 +48,9 @@ a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }
 /* the footer: a row of small print (the theme picker in it), no box */
 .copyright { border: none; background-color: transparent; }
 
-/* the chat: light stripes in a box with a hairline */
+/* the chat: a box with a hairline; the viewer's messages in the links' bright red */
 .chat-scroll { border-color: rgba(22, 24, 29, 0.22); border-radius: 4px; background-color: rgba(255, 255, 255, 0.35); }
-.babble-post { padding: 2px 6px 3px; border: none; }
-.babble-post:nth-last-child(odd) { background-color: rgba(255, 255, 255, 0.7); }
-.babble-post:nth-last-child(even) { background-color: transparent; }
+.babble-post.babble-mine { color: #c8141b; }
 
 .dk-top .dk-logo img { filter: drop-shadow(0 2px 3px rgba(22, 24, 29, 0.25)); }
 
