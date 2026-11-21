@@ -12,11 +12,12 @@ t_register chata chatapw1 chata@example.com ChatA; t_login chata chatapw1
 CHATA_ID=$(t_sql "SELECT id FROM users WHERE username = 'chata'")
 t_get /;      expect_status 200
 [ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "town page: one chat panel"
-expect_body '<details class="chat chat-large" data-r="chat" data-chat open>'
+expect_body '<section class="chat chat-large" data-r="chat" data-chat>
+<h2 class="title">Babble Box</h2>'; expect_no_body '<details'
 expect_body '<script src="/static/js/live.js" defer></script>'
 expect_body 'data-live data-csrf="'; expect_no_body 'data-live-admin'
 t_get /inn;   expect_status 200
-expect_body '<details class="chat" data-r="chat" data-chat open>'; expect_body 'name="back" value="/inn"'
+expect_body '<section class="chat" data-r="chat" data-chat>'; expect_body 'name="back" value="/inn"'
 expect_body 'Online: <span data-online-count>'
 t_get /babble; expect_status 200; expect_body 'chat-large'; expect_body "Who's Online"
 [ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "/babble: one chat panel"
@@ -53,10 +54,10 @@ live_lacks b '<script>'
 t_jar chatb
 t_get /inn
 expect_body "<li class=\"babble-post\" data-id=\"$CHAT_ID\""
-expect_body '[<b>ChatA</b>] &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;/b&gt;</li>'
+expect_body '"><b class="babble-author">ChatA</b><span class="babble-text">&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;/b&gt;</span></li>'
 expect_no_body '<script>alert'
 t_get "/live/state?back=/inn"; expect_status 200
-expect_body '] \u0026lt;script\u0026gt;alert(\u0026quot;x\u0026quot;)'; expect_no_body '<script>'
+expect_body '\u0026lt;script\u0026gt;alert(\u0026quot;x\u0026quot;)'; expect_no_body '<script>'
 
 t_section "chat: rate limit, length, blank"
 t_sql "UPDATE babble SET posttime = strftime('%s', 'now') WHERE id = $CHAT_ID"   # just posted
@@ -86,7 +87,7 @@ chat_unlimit
 t_get /inn
 CC=$(t_csrf)
 t_post /babble "csrf=$CC&babble=$(t_enc 'plain form post')&back=/inn"; expect_redirect /inn
-t_get /inn;   expect_body '[<b>ChatA</b>] plain form post</li>'
+t_get /inn;   expect_body '<b class="babble-author">ChatA</b><span class="babble-text">plain form post</span></li>'
 live_has b '"text":"plain form post"'
 chat_unlimit
 t_post /babble "csrf=$CC&babble=elsewhere&back=$(t_enc '//evil.example/')"; expect_redirect /babble

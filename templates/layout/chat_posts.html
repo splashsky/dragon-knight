@@ -1,8 +1,10 @@
 {#- The Babble Box's messages, oldest first (new ones: live.js fills the chat-post
-		prototype in layout/chat.html, the same markup: keep the two alike). ctx: posts,
+		prototype in layout/chat.html, the same markup: keep the two alike): the author's name
+		over the message (an administrator's delete button first, floated onto the name's line). No whitespace
+		between the tags: messages keep their spaces (white-space: pre-wrap). ctx: posts,
 		is_admin, back. -#}
 {%- for _, p in ipairs(posts) do %}
-<li class="babble-post" data-id="{{ p.id }}" title="{{ datetime(p.posttime) }}">[<b>{{ p.author }}</b>] {{ p.babble }}
-{%- if is_admin then %} <form class="inline chat-delete" method="post" action="/babble/{{ p.id }}/delete">{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}"><button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end -%}
-</li>
+<li class="babble-post" data-id="{{ p.id }}" title="{{ datetime(p.posttime) }}">
+{%- if is_admin then %}<form class="inline chat-delete" method="post" action="/babble/{{ p.id }}/delete">{{{ csrf_field() }}}<input type="hidden" name="back" value="{{ back }}"><button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end -%}
+<b class="babble-author">{{ p.author }}</b><span class="babble-text">{{ p.babble }}</span></li>
 {%- end %}

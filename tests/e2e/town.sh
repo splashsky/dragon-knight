@@ -314,10 +314,18 @@ t_post /maps/buy/3 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 expect_db "towns" "0,1,2" "map bought outside town"
 
 t_section "town: travel"
-tu "$TOWN_HOME, towns='0,1,2', currenttp=3, base_maxtp=50"
+# the Towns box: a button per town on the map with its TP; here, out of reach or while
+# fighting: disabled; no maps: where to buy them
+tu "$TOWN_HOME, towns='0', currenttp=3, base_maxtp=50"
+t_get /;                          expect_body 'No maps yet: buy them at a town'; expect_no_body 'action="/travel/'
+tu "towns='0,1,2'"
 t_get /;                          expect_body 'action="/travel/2"'
+expect_body '<button class="towns-btn towns-here" type="submit" title="You are here" disabled><span class="towns-name">Midworld</span><span class="towns-cost">here</span></button>'
+expect_body '<button class="towns-btn towns-short" type="submit" title="You need 2 more TP" disabled><span class="towns-name">Roma</span><span class="towns-cost">5 TP</span></button>'
+expect_no_body 'action="/travel/3"'   # Bris isn't on the map
 t_post /travel/2 "csrf=$TC";      expect_body 'You do not have enough TP to travel here.'
 tu "currenttp=20"
+t_get /;                          expect_body '<button class="towns-btn" type="submit" title="Travel to Roma for 5 TP"><span class="towns-name">Roma</span>'
 t_post /travel/3 "csrf=$TC";      expect_body 'Cheat attempt detected.'        # Bris not mapped
 t_post /travel/99 "csrf=$TC";     expect_body 'Cheat attempt detected.'
 t_post /travel/1 "csrf=$TC";      expect_body 'You are already in this town.'
@@ -327,6 +335,7 @@ t_post /travel/2 "csrf=$TC";      expect_redirect /    # the town's page at once
 expect_db "currentaction,latitude,longitude,currenttp,towns" "In Town|30|30|15|0,1,2" "travel to roma"
 t_get /;                          expect_body 'Welcome to Roma'
 tu "currentaction='Fighting'"
+t_get /fight;                     expect_body 'title="Not while fighting" disabled><span class="towns-name">Midworld</span>'
 t_post /travel/1 "csrf=$TC";      expect_redirect /fight
 expect_db "latitude,currenttp" "30|15" "travel while fighting"
 
@@ -448,7 +457,7 @@ t_post /babble "csrf=$BC&babble=$(t_enc '   ')"; expect_redirect /babble
 [ "$(t_sql "SELECT count(*) FROM babble")" = $((before + 1)) ] && t_ok || t_fail "blank babble stored"
 [ "$(t_sql "SELECT babble FROM babble ORDER BY id DESC LIMIT 1")" = '<script>alert(1)</script> & "q"' ] && t_ok || t_fail "babble not stored raw"
 t_get /babble
-expect_body '[<b>Townie</b>] &lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot;'; expect_no_body '<script>alert'
+expect_body '<b class="babble-author">Townie</b><span class="babble-text">&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot;'; expect_no_body '<script>alert'
 long=$(printf 'x%.0s' $(seq 1 200))
 t_post /babble "csrf=$BC&babble=$long&submit=Babble"
 [ "$(t_sql "SELECT length(babble) FROM babble ORDER BY id DESC LIMIT 1")" = 120 ] && t_ok || t_fail "babble not cut to 120"
@@ -456,8 +465,8 @@ t_sql "INSERT INTO babble (posttime, author, author_id, babble) WITH RECURSIVE n
 	SELECT 1000 + i, 'Townie', NULL, 'msg' || i FROM n"
 t_get /babble
 [ "$(grep -c 'class="babble-post" data-id=' "$BODY")" = 50 ] && t_ok || t_fail "babble shows $(grep -c 'class="babble-post" data-id=' "$BODY") posts"
-expect_no_body '] msg2<'; expect_body '] msg3<'
-[ "$(grep -o '] msg[0-9]*<' "$BODY" | head -n1)" = '] msg3<' ] && [ "$(grep -o '] msg[0-9]*<' "$BODY" | tail -n1)" = '] msg52<' ] \
+expect_no_body '>msg2<'; expect_body '>msg3<'
+[ "$(grep -o '>msg[0-9]*<' "$BODY" | head -n1)" = '>msg3<' ] && [ "$(grep -o '>msg[0-9]*<' "$BODY" | tail -n1)" = '>msg52<' ] \
 	&& t_ok || t_fail "babble order (oldest first)"
 
 t_section "town: ninja"

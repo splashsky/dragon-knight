@@ -85,9 +85,10 @@ a:hover, button.link:hover {
 @media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
 
 /* ---- three-column frame (legacy: table width 90%, 180px side cells; 210px for the
-	 larger type) ---- */
+	 larger type); at most 1200px wide (the footer and the banner too) ---- */
 .dk-page {
 	width: 90%;
+	max-width: 1200px;
 	margin: 0 auto;
 }
 .dk-top {
@@ -120,6 +121,7 @@ a:hover, button.link:hover {
 }
 .dk-footer {
 	width: 90%;
+	max-width: 1200px;
 	margin: 12px auto 0;
 	display: flex;
 }
@@ -141,6 +143,36 @@ a:hover, button.link:hover {
 .loc-coords { font-variant-numeric: lining-nums; }
 .box .title { margin: 0 0 3px; }
 .box .title img { display: block; }
+
+/* the Towns box (layout/nav_left.html): a button per town on the map, its TP cost on the
+	right; the town the player is in, those their TP don't cover and all while fighting are
+	disabled (dashed; "here" stays readable) */
+.towns-list { display: grid; gap: 3px; list-style: none; margin: 0; padding: 0; }
+.towns-list form { margin: 0; }
+.towns-btn {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 2px 8px;
+	border: solid 1px rgba(0, 0, 0, 0.35);
+	border-radius: 3px;
+	background-color: rgba(255, 255, 255, 0.55);
+	color: #663300;
+	font: inherit;
+	font-weight: bold;
+	text-align: left;
+	cursor: pointer;
+}
+.towns-cost { font-size: 13px; font-weight: normal; color: #5f5a50; white-space: nowrap; font-variant-numeric: lining-nums; }
+.towns-btn:hover:not(:disabled) { border-color: currentColor; background-color: #ffffff; color: #330000; }
+.towns-btn:focus-visible { outline: solid 2px #663300; outline-offset: 1px; }
+.towns-btn:disabled { border-style: dashed; background-color: transparent; color: inherit; font-weight: normal; opacity: 0.6; cursor: default; }
+.towns-btn.towns-here:disabled { border-style: solid; background-color: rgba(0, 0, 0, 0.06); font-weight: bold; opacity: 1; }
+.towns-short .towns-cost { color: #c00000; }
+.towns-none { margin: 0; }
 
 /* inline POST forms that look like links / plain buttons */
 form.inline { display: inline; margin: 0; }
@@ -392,6 +424,7 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 	align-items: center;
 	gap: 8px;
 	width: 90%;
+	max-width: 1200px;
 	box-sizing: border-box;
 	margin: 0 auto 8px;
 	padding: 6px 10px;

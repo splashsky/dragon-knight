@@ -8,8 +8,8 @@ body {
 	background: #e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 	color: #16181d;
 }
-a, button.link { color: #6b1510; }
-a:hover, button.link:hover { color: #d0161e; }
+a, button.link, .towns-btn { color: #6b1510; }
+a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }
 .highlight, .error { color: #c8141b; }
 .light { color: #5f6773; }
 
@@ -48,8 +48,9 @@ a:hover, button.link:hover { color: #d0161e; }
 /* the footer: a row of small print (the theme picker in it), no box */
 .copyright { border: none; background-color: transparent; }
 
-/* the chat: light stripes instead of a box around each message */
-.babble-post { margin: 0; padding: 3px 6px; border: none; border-radius: 3px; }
+/* the chat: light stripes in a box with a hairline */
+.chat-scroll { border-color: rgba(22, 24, 29, 0.22); border-radius: 4px; background-color: rgba(255, 255, 255, 0.35); }
+.babble-post { padding: 2px 6px 3px; border: none; }
 .babble-post:nth-last-child(odd) { background-color: rgba(255, 255, 255, 0.7); }
 .babble-post:nth-last-child(even) { background-color: transparent; }
 

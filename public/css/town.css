@@ -16,27 +16,36 @@ table.inventory td + td { width: 100%; }
 .world-map { text-align: center; }
 
 /* the Babble Box (layout/chat.html): in the right column, larger on the town page and
-	 /babble; the list scrolls from the bottom (column-reverse) so the newest message shows */
+	 /babble; a box of a fixed height (it doesn't grow or shrink as messages come and go)
+	 whose list scrolls from the bottom (column-reverse) so the newest message shows; each
+	 message compact, the author's name over the text */
 .chat { margin-bottom: 12px; }
-.chat > summary { cursor: pointer; margin: 0 0 3px; }
+.chat > .title { margin: 0 0 3px; }
 .chat-scroll {
-	max-height: 260px;
+	box-sizing: border-box;
+	height: 300px;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column-reverse;
+	border: solid 1px rgba(0, 0, 0, 0.35);
+	background-color: rgba(255, 255, 255, 0.5);
 }
-.chat-large .chat-scroll { max-height: 360px; }
+.chat-large .chat-scroll { height: 380px; }
 .chat-posts { list-style: none; margin: 0; padding: 0; }
 .babble-post {
-	padding: 2px;
-	border: solid 1px black;
-	margin: 2px;
+	padding: 2px 5px 3px;
+	border-top: solid 1px rgba(0, 0, 0, 0.15);
+	line-height: 1.25;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
 }
+.babble-post:first-child { border-top: none; }
+.babble-author { display: block; font-size: 12px; }
+.babble-text { display: block; }
 /* legacy alternated from the newest post (#eeeeee) upwards */
 .babble-post:nth-last-child(odd) { background-color: #eeeeee; }
 .babble-post:nth-last-child(even) { background-color: #ffffff; }
+.chat-delete { float: right; }
 .chat-delete button.link { font-weight: normal; padding: 0 2px; }
 .chat-form { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 2px 0; }
 .chat-form input[type="text"] { flex: 1 1 6em; min-width: 0; }

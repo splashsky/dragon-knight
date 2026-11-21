@@ -154,7 +154,7 @@ pt_is "currentmp" "5" "heal costs 5 mp"
 t_section "playthrough: babble + forum"
 t_get /babble;   expect_status 200
 t_post /babble "csrf=$TC&babble=$(t_enc 'Hello from the playthrough')"; expect_redirect /babble
-t_get /babble;   expect_body '[<b>Wanderer</b>] Hello from the playthrough'
+t_get /babble;   expect_body '<b class="babble-author">Wanderer</b><span class="babble-text">Hello from the playthrough'
 t_get /forum;    expect_status 200
 t_get /forum/1/new; expect_body 'Make A New Post'
 t_post /forum/1/new "csrf=$TC&title=$(t_enc 'Journey log')&content=$(t_enc 'Found a Stick.')"; expect_redirect /forum/1

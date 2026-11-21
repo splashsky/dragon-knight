@@ -4,8 +4,12 @@
 		.compass-rose), as named as the old text buttons; dk.js presses them for the arrow keys.
 		Location: where the player is as its heading ("In Midworld", "Exploring", "Fighting";
 		a theme with a picture for "location" shows that, and this as the first line), then
-		the coordinates ("3N, 5E": latitude, longitude) and the map. -#}
+		the coordinates ("3N, 5E": latitude, longitude) and the map. Towns: a button per town on
+		the player's map (POST /travel/<id>, town/travel.lua) with what the trip costs; the town
+		they are in, those their TP don't cover and all of them while fighting are disabled
+		(the server checks again). -#}
 {%- local where = town and ("In " .. town.name) or user.currentaction %}
+{%- local fighting = user.currentaction == "Fighting" %}
 {{{ region("loc") }}}<section class="box" data-r="loc">
 <h2 class="title">{% if art_src("location") then %}{{{ art("location", "Location") }}}{% else %}{{ where }}{% end %}</h2>
 <div class="box-body">
@@ -13,7 +17,7 @@
 <div class="loc-where">{{ where }}</div>
 {%- end %}
 <div class="loc-line"><span class="loc-coords" title="Latitude {{ latitude }}, longitude {{ longitude }}">{{ latitude }}, {{ longitude }}</span> &middot; <a href="/map" target="_blank" data-popup="520x520">View Map</a></div>
-{%- if user.currentaction ~= "Fighting" then %}
+{%- if not fighting then %}
 <form class="compass" method="post" action="/move">
 {{{ csrf_field() }}}<div class="compass-rose"><img src="/static/images/compass.png" width="128" height="128" alt="">
 <button class="compass-n" type="submit" name="north" value="North" title="North (&uarr;)" aria-label="North" aria-keyshortcuts="ArrowUp"></button>
@@ -28,12 +32,18 @@
 {{{ region("towns") }}}<section class="box" data-r="towns">
 <h2 class="title">{{{ art("towns", "Towns") }}}</h2>
 <div class="box-body">
-{%- if town then %}
-Welcome to <b>{{ town.name }}</b>.<br><br>
-{%- end %}
-Travel To:<br>
+{%- if #towns == 0 then %}
+<p class="towns-none small light">No maps yet: buy them at a town's Map Store to travel there.</p>
+{%- else %}
+<ul class="towns-list">
 {%- for _, t in ipairs(towns) do %}
-<form class="inline" method="post" action="/travel/{{ t.id }}">{{{ csrf_field() }}}<button class="link" type="submit">{{ t.name }}</button></form><br>
+{%- local here = town and town.id == t.id %}
+{%- local short = not here and user.currenttp < t.travelpoints %}
+<li><form method="post" action="/travel/{{ t.id }}">{{{ csrf_field() }}}<button class="towns-btn{% if here then %} towns-here{% elseif short then %} towns-short{% end %}" type="submit"
+{%- if here then %} title="You are here"{% elseif fighting then %} title="Not while fighting"{% elseif short then %} title="You need {{ t.travelpoints - user.currenttp }} more TP"{% else %} title="Travel to {{ t.name }} for {{ t.travelpoints }} TP"{% end %}
+{%- if here or short or fighting then %} disabled{% end %}><span class="towns-name">{{ t.name }}</span><span class="towns-cost">{% if here then %}here{% else %}{{ t.travelpoints }} TP{% end %}</span></button></form></li>
+{%- end %}
+</ul>
 {%- end %}
 </div>
 </section>{{{ endregion() }}}

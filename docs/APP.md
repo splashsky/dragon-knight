@@ -347,8 +347,8 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 addresses qualify); `tests/e2e/browser.sh` drives `tests/browser/client.js` in headless
 Chrome, Edge or Chromium over the DevTools protocol (node's `WebSocket`, no dependencies;
 skipped without node or a browser): logging in and out without a page load (and the event
-stream starting and stopping), links, back/forward with their scroll, typed text and a
-folded chat kept, the chat, a move, a POST's own page (resting at the inn), the progress bar, a newer link
+stream starting and stopping), links, back/forward with their scroll, typed text kept,
+the chat (its box's fixed height, the name over the text), a move, a POST's own page (resting at the inn), the progress bar, a newer link
 winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
 routes only) is a page that takes its time.
 
@@ -602,10 +602,13 @@ reload. No toasts in popup windows (`window.opener`).
 ### Chat
 
 The Babble Box (`lib/chat.lua`, routes in `town/babble.lua`, `layout/chat.html`): a
-`<details>` panel (folding it is remembered by live.js in `localStorage`) in the right
-column of every in-game page, and larger in the middle of the town page and of `/babble`
-(its own page; old links to the iframe land there). `control.showbabble` turns it off
-everywhere.
+panel in the right column of every in-game page, and larger in the middle of the town page
+and of `/babble` (its own page; old links to the iframe land there). `control.showbabble`
+turns it off everywhere. Its messages are in a box of a fixed height (`.chat-scroll`, 300px;
+380px when large: it doesn't grow or shrink as messages come and go) that scrolls from the
+bottom, the newest last; each message is compact, the author's name
+(`.babble-author`) over the text (`.babble-text`; `layout/chat_posts.html`, no whitespace
+between the tags since messages keep their spaces). The panel doesn't fold (3.1).
 
 - History: the last 50 messages (`chat.HISTORY`), oldest first, rendered on the page;
 	live ones arrive as `babble` events (live.js builds the same markup).
@@ -700,6 +703,11 @@ starting with `__` are reserved.
 	named `north`, `west`, `east`, `south` like the old text buttons, so `POST /move` reads
 	them as before. `dk.js` presses them for the arrow keys (not while a field has the
 	keyboard or a modifier is held; a held key walks on only while the live client is free).
+- The Towns box (`layout/nav_left.html`, 3.1): a button per town on the player's map
+	(`.towns-btn`, a `POST /travel/<id>` form each) with the trip's TP on the right; the town
+	the player is in ("here"), those their TP don't cover (the cost in red, "You need N more
+	TP" as its title) and all of them while fighting are disabled; no maps: a line saying
+	where to buy them. The server checks everything again (`town/travel.lua`).
 - Item and skill tiles (`dk.css` "frames"): a gradient frame drawn as a background layer
 	under the tile, through a 2px transparent border, bright at the top to dark at the
 	bottom: gold (`--frame-gold`, lit on hover) for spells, items and gear, steel for the

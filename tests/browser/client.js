@@ -152,6 +152,7 @@ async function run(wsUrl, port) {
 	}
 
 	section = "the chat";
+	var chatHeight = await js("document.querySelector('[data-r=chat] .chat-scroll').offsetHeight");
 	await js("var f = document.querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'hello from the browser'; f.requestSubmit()");
 	check("my message in the panel", await until("/hello from the browser/.test(document.querySelector('[data-r=chat-posts]').textContent)"));
 	check("the input cleared", await until("document.querySelector('[data-chat-form] [name=babble]').value === ''"));
@@ -164,12 +165,16 @@ async function run(wsUrl, port) {
 		var theirs = await js("[...document.querySelectorAll('[data-r=chat-posts] li')].pop().outerHTML");
 		check("the prototype's markup is the server's", mine === theirs, [mine, theirs]);
 	}
-	await js("document.querySelector('details[data-chat]').open = false");
+	// a box of a fixed height: a message doesn't grow it; the name over the text; no fold
+	check("the box keeps its height", await js("document.querySelector('[data-r=chat] .chat-scroll').offsetHeight") === chatHeight);
+	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('[data-r=chat-posts] li')].pop();" +
+		"return li.querySelector('.babble-text').getBoundingClientRect().top >= li.querySelector('.babble-author').getBoundingClientRect().bottom - 1; })()"));
+	check("no fold", await js("!document.querySelector('[data-r=chat] summary, details[data-chat]')"));
 	await js("document.querySelector('a[href=\"/inventory\"]').click()");
 	check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
 	check("the message is still there", await js("/hello from the browser/.test(document.querySelector('[data-r=chat-posts]').textContent)"));
-	check("the chat stays folded", await js("document.querySelector('details[data-chat]').open === false"));
-	await js("document.querySelector('details[data-chat]').open = true");
+	check("the right column's box: 300px", await js("document.querySelector('[data-r=right] .chat-scroll').offsetHeight") === 300,
+		await js("document.querySelector('[data-r=right] .chat-scroll').offsetHeight"));
 
 	section = "the shop's dialog";
 	// an item's link opens its purchase in a dialog over the shop (modal.js): the page stays

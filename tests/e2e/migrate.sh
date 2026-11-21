@@ -1032,7 +1032,7 @@ mig_serve "$MIG/v9.lua" "$MIG/v9server.log"
 "$BIN" user --config "$MIG/v9.lua" passwd chatter v9pass1 >/dev/null && t_ok || t_fail "dk user passwd (v9)"
 t_jar migv9; t_reset_jar
 t_login chatter v9pass1; expect_redirect /
-t_get /babble;     expect_status 200; expect_body '[<b>Chatter</b>] hello &lt;there&gt;</li>'
+t_get /babble;     expect_status 200; expect_body '<b class="babble-author">Chatter</b><span class="babble-text">hello &lt;there&gt;</span></li>'
 expect_body '>Chatter</a>'; expect_no_body '>Idler</a>'
 t_fetch /babble "babble=after+the+migration"; expect_status 200
 mig_eq "SELECT author_id FROM babble WHERE babble = 'after the migration'" "1" "a new message after the migration"

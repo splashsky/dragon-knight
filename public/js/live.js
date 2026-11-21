@@ -110,16 +110,6 @@
 			});
 		}).catch(function () { chatStatus(form, "The message could not be sent."); });
 	}
-	// a folded Babble Box stays folded (also the panels the live client brings in)
-	function keepChatOpen() {
-		$$("details[data-chat]").forEach(function (d) {
-			if (local(function (s) { return s.getItem("dk-chat-closed"); }) === "1") d.removeAttribute("open");
-		});
-	}
-	document.addEventListener("toggle", function (ev) {
-		var d = ev.target;
-		if (d.matches && d.matches("details[data-chat]")) local(function (s) { s.setItem("dk-chat-closed", d.open ? "0" : "1"); });
-	}, true);
 
 	// ---- who's online
 
@@ -421,7 +411,6 @@
 		if (running || !live()) return;
 		running = true;
 		stopped = false;
-		keepChatOpen();
 		initBanners();
 		if (!bc) { leader = true; open(false); return; }
 		tick(false);
@@ -433,10 +422,10 @@
 		clearInterval(beat);
 		stop();
 	}
-	// the live client brought a page: logged in or out, panels to fold, banners to time
+	// the live client brought a page: logged in or out, banners to time
 	if (window.DK) window.DK.on("applied", function () {
 		if (!live()) { end(); return; }
-		if (running) { keepChatOpen(); initBanners(); } else begin();
+		if (running) initBanners(); else begin();
 	});
 	begin();
 })();
