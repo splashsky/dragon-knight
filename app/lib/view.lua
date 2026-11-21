@@ -243,6 +243,7 @@ function view.layout(req, title, content, opts)
 		queries = dbcount.count,
 		banner = banner.current(req),
 		back = view.back_path(req),
+		here = req.path,   -- (layout/main.html: the way back hides on the page it leads to)
 	}
 	live_ctx(req, ctx, layout, nav and user ~= nil)
 	for k, v in pairs(opts.vars or {}) do ctx[k] = v end

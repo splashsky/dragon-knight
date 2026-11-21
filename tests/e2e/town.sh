@@ -32,6 +32,18 @@ expect_no_body '<html'
 t_get /character -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body '<div class="charsheet">'; expect_body 'Travel Points:'
 expect_no_body '<html'
 
+t_section "town: the way back (the header's button to /)"
+# named for where / leads, and not on that page itself
+t_get /;                          expect_no_body 'class="dk-home"'
+t_get /inventory;                 expect_body '<a class="dk-home" href="/">Back to Midworld</a>'
+tu "currentaction='Exploring', latitude=5, longitude=5, currenthp=100000, base_maxhp=100000"
+t_get /;                          expect_no_body 'class="dk-home"'
+t_get /inventory;                 expect_body '<a class="dk-home" href="/">Back to exploring</a>'
+t_post /__test/encounter "csrf=$TC"; expect_redirect /fight
+t_get /fight;                     expect_no_body 'class="dk-home"'
+t_get /news;                      expect_body '<a class="dk-home" href="/">Back to the fight</a>'
+t_fight_clear townie; tu "$TOWN_HOME, currenthp=15, base_maxhp=15"
+
 t_section "town: inn"
 tu "$TOWN_HOME, gold=100, currenthp=1, currentmp=0, currenttp=0, base_maxhp=20, base_maxmp=10, base_maxtp=12"
 t_get /inn;                       expect_status 200; expect_body 'Resting at the inn'; expect_body '<b>5 gold</b>'

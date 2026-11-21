@@ -12,7 +12,9 @@
 	{{{ region("topnav") }}}<nav class="dk-topnav" data-r="topnav">
 {%- if nav then %}
 {%- local action = nav.user.currentaction %}
+{%- if here ~= (action == "Fighting" and "/fight" or "/") then %}
 		<a class="dk-home" href="/">{% if action == "Fighting" then %}Back to the fight{% elseif action == "In Town" then %}Back to {{ nav.town and nav.town.name or "town" }}{% else %}Back to exploring{% end %}</a>
+{%- end %}
 		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}{% if art_src("logout") then %}<input type="image" src="{{ art_src("logout") }}" alt="Log Out" title="Log Out">{% else %}<button class="link">Log Out</button>{% end %}</form>
 		<a href="/help">{{{ art("help", "Help") }}}</a>
 {%- else %}
@@ -55,4 +57,5 @@
 </html>
 {# Regions (region()/endregion(), data-r; docs/APP.md "Live client"): the parts of the page a
 		live request sends on their own when they change. The header's first button (.dk-home)
-		goes to / (routes/home.lua: the fight, the town or exploring), named for where that is. #}
+		goes to / (routes/home.lua: the fight, the town or exploring), named for where that is;
+		not on that page itself (/, or /fight while fighting). #}

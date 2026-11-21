@@ -80,7 +80,7 @@ done
 [ "$(w_payload url)" = /fight ] && t_ok || t_fail "no encounter in 60 moves"
 [ "$(w_payload title)" = Fighting ] && t_ok || t_fail "title: $(w_payload title)"
 w_payload region main | grep -q 'You are fighting a' && t_ok || t_fail "fight page in main"
-w_payload region topnav | grep -q '>Back to the fight</a>' && t_ok || t_fail "topnav while fighting"
+w_lacks region topnav   # (no way back on the page it leads to: here /fight, before it /)
 # a change of state is a scene for the live client (lib/scene.lua): the fight beginning...
 w_has events scene
 w_payload events scene | grep -qE '"kind": ?"(fight|death)"' && t_ok || t_fail "encounter scene: $(w_payload events scene)"
@@ -88,7 +88,7 @@ w_payload events scene | grep -qE '"kind": ?"(fight|death)"' && t_ok || t_fail "
 t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring', latitude = 0, longitude = 1 $LQ"; t_live GET /
 t_live POST /move "csrf=$LW_CS&west=West"
 [ "$(w_payload url)" = / ] && [ "$(w_payload title)" = "In Town" ] && t_ok || t_fail "into Midworld: $(w_payload url) $(w_payload title)"
-w_payload region topnav | grep -q '>Back to Midworld</a>' && t_ok || t_fail "topnav in town"
+w_lacks region topnav   # (the same: none on /)
 [ "$(w_payload events scene)" = '{"detail":"You arrive in Midworld.","kind":"town","title":"Midworld"}' ] && t_ok \
 	|| t_fail "town scene: $(w_payload events scene)"
 for _ in $(seq 1 30); do   # (an encounter right outside the gate is a fight scene instead)
@@ -108,6 +108,11 @@ w_lacks events scene
 t_sql "UPDATE users SET currentaction = 'Exploring', latitude = 0, longitude = 1 $LQ"
 t_post /move "csrf=$LW_CS&west=West"; expect_redirect /
 t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 $LQ"
+# the way back: on the town's other pages, and gone again on the town's
+t_get /; t_live_page
+t_live GET /inn; w_payload region topnav | grep -q '>Back to Midworld</a>' && t_ok || t_fail "topnav off the town page"
+t_live GET /; w_has region topnav
+w_payload region topnav | grep -q 'dk-home' && t_fail "the way back on the town page" || t_ok
 
 t_section "live wire: errors, CSRF, other answers"
 t_get /; t_live_page

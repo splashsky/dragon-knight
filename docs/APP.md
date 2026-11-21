@@ -759,8 +759,10 @@ starting with `__` are reserved.
 - The way back (`layout/main.html`, 3.1): the header's first button (`.dk-home`, a gold
 	frame on dark brown, black in Retro), on every page of the main layout, links to `/`
 	(`routes/home.lua`: the fight, the town or exploring) and is named for where that is:
-	"Back to the fight", "Back to Midworld" (the player's town), "Back to exploring". The
-	header's links are a region (`topnav`), so the name follows the state on live pages.
+	"Back to the fight", "Back to Midworld" (the player's town), "Back to exploring". It
+	isn't there on the page it leads to (`/`, or `/fight` while fighting: the layout's
+	`here`, the request's path). The header's links are a region (`topnav`), so the button
+	follows the state and the page on live pages.
 - The compass (`layout/nav_left.html`): the original's picture (`public/images/compass.png`,
 	its four pieces joined) with a submit button over each quarter (`.compass-rose`: the
 	triangles between the diagonals, `clip-path`, lit within the parchment by a `mask`),

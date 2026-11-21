@@ -15,7 +15,7 @@ changelog.RELEASES = {
 			"The Babble Box's messages sit on the window's own background: yours on the right in red, everyone else's on the left in black, administrators' in gold and moderators' in green.",
 			"The town's places are light cards with round pictures that sit in the page: the Inn and the Market. The Market is the shop and the map store in one.",
 			"A town sells only the maps of its neighbours along the road, the towns just before and after it: to buy the map to a far town, get near it first. Administrators choose which maps a town sells in the town editor (schema version 18, run dk migrate).",
-			"A Back button at the top of every page takes you back to the fight, the town or exploring, wherever you are.",
+			"A Back button at the top of the page takes you back to the fight, the town or exploring, wherever you are (it hides when you are already there).",
 			"View Map and Extended Stats open small windows over the page, like the Babble Box, instead of new browser windows: move them by their title, resize them by their corner, and they stay open from page to page. The stats keep up as you play; click a window to bring it to the front.",
 			"The forum is written on parchment: boards and threads in rows with fine engraved lines between them, who started each thread, posts with who wrote them and when, the page numbers as small buttons, and a clear way back to the board and the forum at the top.",
 			"News posts look like parchment: the title, the date and who posted it, then the post, the same in the town and on the news pages.",
