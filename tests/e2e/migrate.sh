@@ -103,7 +103,8 @@ MIG_LORE_TEXT="SELECT key, replace(lore, char(10), '/') FROM classes UNION ALL S
 	ORDER BY 1, 2"
 MIG_LORE_EXPECTED="classes:mage,classes:paladin,classes:warrior,items:herb,items:wand,monsters:blue_slime,spells:heal,spells:magic_bolt"
 # The items and what towns sell (the same on a fresh install and a migrated database without edits).
-MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id"
+MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY town_id, item_id;
+	SELECT * FROM town_maps ORDER BY town_id, map_id"
 # The monsters and their loadouts as data (the same on a fresh install and a migrated
 # database without edits).
 MIG_MONSTERS="SELECT * FROM monsters ORDER BY id; SELECT * FROM monster_equipment ORDER BY monster_id, slot;
@@ -1224,8 +1225,8 @@ t_section "migrate: version 14 database"
 # version 14 schema + its game data, characters in every state GET /fight and GET /victory
 # used to move on: a fight in progress, an encounter waiting for GET /fight to pick its
 # monster, a won fight waiting for GET /victory to pay, and one exploring; only steps 15,
-# 16 (items.rechargeable) and 17 (the hotbar: an empty table) run. The fight in progress
-# goes on (its counter kept), the pending encounter is cancelled, the victory is paid and
+# 16 (items.rechargeable), 17 (the hotbar: an empty table) and 18 (the maps towns sell)
+# run. The fight in progress goes on (its counter kept), the pending encounter is cancelled, the victory is paid and
 # kept for its page; nobody else changes.
 V14_DB="$MIG/v14.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V14_DB\"#" "$CONFIG" > "$MIG/v14.lua"
@@ -1255,6 +1256,9 @@ grep -qF "Migrating to version 15: GETs don't change the game" "$T/migrate.log" 
 grep -qF "Migrating to version 16: items that cast a spell may be single use" "$T/migrate.log" && t_ok || t_fail "step 16 not reported"
 mig_eq "SELECT group_concat(DISTINCT rechargeable) FROM items" "1" "every item rechargeable (16)"
 grep -qF "Migrating to version 17: the hotbar" "$T/migrate.log" && t_ok || t_fail "step 17 not reported"
+grep -qF "Migrating to version 18: towns sell only some maps" "$T/migrate.log" && t_ok || t_fail "step 18 not reported"
+mig_eq "SELECT group_concat(town_id || '>' || map_id, ' ') FROM (SELECT * FROM town_maps ORDER BY town_id, map_id)" \
+	"1>2 2>1 2>3 3>2 3>4 4>3 4>5 5>4 5>6 6>5 6>7 7>6 7>8 8>7" "each town sells its neighbours' maps (18)"
 mig_eq "SELECT count(*) FROM user_hotbar" "0" "no hotbar yet (17): the next fight fills it"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
 [ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {

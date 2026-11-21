@@ -297,6 +297,22 @@ INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoin
 INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoints) VALUES (7, 'Gilead', 200, -200, 100, 3000, 110);
 INSERT INTO towns (id, name, latitude, longitude, innprice, mapprice, travelpoints) VALUES (8, 'Endworld', -250, -250, 125, 9000, 160);
 
+-- town_maps: each town sells its neighbours' maps along the road (the towns before and after it)
+INSERT INTO town_maps (town_id, map_id) VALUES (1, 2);
+INSERT INTO town_maps (town_id, map_id) VALUES (2, 1);
+INSERT INTO town_maps (town_id, map_id) VALUES (2, 3);
+INSERT INTO town_maps (town_id, map_id) VALUES (3, 2);
+INSERT INTO town_maps (town_id, map_id) VALUES (3, 4);
+INSERT INTO town_maps (town_id, map_id) VALUES (4, 3);
+INSERT INTO town_maps (town_id, map_id) VALUES (4, 5);
+INSERT INTO town_maps (town_id, map_id) VALUES (5, 4);
+INSERT INTO town_maps (town_id, map_id) VALUES (5, 6);
+INSERT INTO town_maps (town_id, map_id) VALUES (6, 5);
+INSERT INTO town_maps (town_id, map_id) VALUES (6, 7);
+INSERT INTO town_maps (town_id, map_id) VALUES (7, 6);
+INSERT INTO town_maps (town_id, map_id) VALUES (7, 8);
+INSERT INTO town_maps (town_id, map_id) VALUES (8, 7);
+
 -- town_items: the original items lists (Bris: its full list, fixed), plus Herbs everywhere
 -- and Potions and Ethers from Roma on (new in 2.1), and the Wand in Midworld (new in 2.4)
 INSERT INTO town_items (town_id, item_id) VALUES (1, 1);

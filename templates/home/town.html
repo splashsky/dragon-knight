@@ -1,14 +1,12 @@
-{#- Town screen (legacy templates/towns.php + index.php dotown()). -#}
+{#- Town screen (legacy templates/towns.php + index.php dotown()): the town's title, then its
+		places as banners (3.1: public/images/buildings/): the Inn (its price) and the Market
+		(the shop and the map store in one: GET /shop). -#}
 <section class="box">
 <h1 class="title page-title">{{{ art("town_" .. town.id, "Welcome to " .. town.name) }}}</h1>
-<div class="box-body">
-<b>Town Options:</b><br>
-<ul>
-<li><a href="/inn">Rest at the Inn</a></li>
-<li><a href="/shop">Buy Weapons/Armor</a></li>
-<li><a href="/maps">Buy Maps</a></li>
-</ul>
-</div>
+<nav class="town-banners" aria-label="Town">
+<a class="town-banner town-banner-inn" href="/inn"><img src="/static/images/buildings/tavern.png" width="96" height="96" alt=""><span class="town-banner-text"><b>The Inn</b><span>Rest for {{ town.innprice }} gold: your HP, MP and TP back to full</span></span></a>
+<a class="town-banner town-banner-market" href="/shop"><img src="/static/images/buildings/market.png" width="96" height="96" alt=""><span class="town-banner-text"><b>The Market</b><span>Weapons, armor, shields, supplies and maps</span></span></a>
+</nav>
 </section>
 {%- if news then %}
 <section class="panel">

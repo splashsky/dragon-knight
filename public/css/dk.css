@@ -409,7 +409,9 @@ input[type="image"] { vertical-align: middle; }
 .form-table td:first-child { white-space: nowrap; }
 
 /* ---- town page panels ---- */
-.panel { width: 95%; margin: 0 auto; }
+/* (the town page's Latest News and Who's Online: the column's width, no inner padding) */
+.panel { margin: 0; }
+.panel .box-body { padding: 0; }
 .panel + .panel { margin-top: 12px; }
 .panel-row { display: flex; width: 95%; margin: 12px auto 0; gap: 6px; }
 .panel-row > div { flex: 1 1 50%; min-width: 0; }

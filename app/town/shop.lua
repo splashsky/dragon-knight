@@ -1,7 +1,8 @@
 -- town/shop.lua :: legacy towns.php buy() / buy2() / buy3(), with the bag: the town's
--- items (town_items) and selling bag items back.
---   GET  /shop               the town's items (icon buttons by group) + the Sell section
---                            (sellable bag items)
+-- market (3.1: the shop and the map store, town/maps.lua): its items (town_items), its maps
+-- (town_maps) and selling bag items back.
+--   GET  /shop               the town's items (icon buttons by group), its maps + the Sell
+--                            section (sellable bag items)
 --   GET  /shop/buy/#id       confirmation; POST: gear (weapons, armor, shields) "bag" (into
 --                            the bag; what is worn stays), "keep" (worn; the old item goes
 --                            into the bag: needs a free slot) or "sell" (worn; the old item
@@ -14,6 +15,7 @@
 -- again and again, as far as the gold and the bag allow (2.4: a copy of the weapon you
 -- wear too; the old one is kept in the bag or sold, as always).
 local common = require("town.common")
+local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
@@ -71,8 +73,10 @@ local GROUPS = { { key = "weapon", label = "Weapons" }, { key = "armor", label =
 -- GET /shop: the town's items as icon buttons in groups ({ key, label, items = { item,
 -- icon (URL: its picture or the default one), label, tip (tips.shop: the price is in it),
 -- short (the gold doesn't cover it now: greyed out; the purchase page says why) } }; empty
--- groups left out) and the Sell section (sellable bag entries: { entry, price (each),
--- icon, label, tip (tips.sell) }).
+-- groups left out), the maps the town sells (game.town_maps: { town, mapped (on the
+-- player's map already), short (the gold doesn't cover it), latitude, longitude }) and the
+-- Sell section (sellable bag entries: { entry, price (each), icon, label, tip (tips.sell)
+-- }). The town's market (3.1: the shop and the map store in one).
 function shop.list(req)
 	local user = req.user
 	local town = common.town_here(req)
@@ -101,7 +105,12 @@ function shop.list(req)
 				label = "Sell " .. e.item.name .. " for " .. price .. " gold" .. (e.qty > 1 and " each" or "") }
 		end
 	end
-	return view.page(req, "Buy Items", "town/shop", { groups = groups, sell = sell })
+	local maps = {}
+	for _, t in ipairs(game.town_maps(town.id)) do
+		maps[#maps + 1] = { town = t, mapped = php.in_list(user.towns, t.id), short = user.gold < t.mapprice,
+			latitude = game.latitude_str(t.latitude), longitude = game.longitude_str(t.longitude) }
+	end
+	return view.page(req, "Market", "town/shop", { groups = groups, maps = maps, sell = sell })
 end
 
 -- GET /shop/buy/#id: the purchase (the shop's dialog: its links have data-modal; a page

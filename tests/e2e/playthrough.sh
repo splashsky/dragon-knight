@@ -86,7 +86,7 @@ pt_admin_setting verifyemail=0
 [ "$(t_sql 'SELECT verifyemail FROM control')" = 0 ] && t_ok || t_fail "verifyemail not disabled"
 
 t_section "playthrough: town, inn, shop, maps"
-t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
+t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'class="town-banners"'
 expect_body '>Wanderer</a>'
 TC=$(t_csrf)
 pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"
@@ -98,7 +98,7 @@ t_get /shop/buy/1; expect_body '<b>Buy and equip</b>'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
 t_get /shop/buy/66; expect_body '<span class="buy-tag">15 gold each</span>'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Thank you for purchasing this item.'
-t_get /maps;     expect_body 'href="/maps/buy/2">Roma</a>'
+t_get /shop;     expect_body '<a class="market-map" href="/maps/buy/2" data-modal><b>Roma</b><span>25 gold</span></a>'
 t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
 pt_is "gold,$T_ITEMS,towns" "30|stick@weapon,herbx2|0,2" "after shopping"

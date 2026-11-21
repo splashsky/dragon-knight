@@ -356,7 +356,7 @@ routes only) is a page that takes its time.
 
 The live client changes pages smoothly (`public/js/scene.js`). Any action of the player's
 that changes the middle column (a link or form: the inn and resting there, the shop and
-selling, the map store and buying a map, the inventory, ...) fades it out (0.15 s, in the
+selling, buying a map in the market, the inventory, ...) fades it out (0.15 s, in the
 `before` hook, `html.dk-fade-out`) and the new one in (0.25 s); fight rounds (`fight.js`
 plays them: from `/fight` to `/fight`), the hotbar saved after a drag (`/hotbar` to
 `/hotbar`), refreshes, back/forward and answers that leave the
@@ -2042,6 +2042,18 @@ return {
 	costs the turn like a spell; `fight/act.lua`) per its `usable_in`, with the player as
 	caster. Refusals (already full, ...) and errors cost nothing; the item is taken from
 	the bag only when it was used.
+- The town page (`home/town.html`) shows the town's places as banners (3.1:
+	`public/images/buildings/`, `.town-banner`: the picture on a dark ground continuing its
+	own, its edges faded by a mask, in a gold frame): the Inn (`/inn`, its price) and the
+	Market (`/shop`: the shop and the map store in one, page title "Market").
+- Maps (3.1, schema version 18): `town_maps(town_id, map_id)` is the maps a town's market
+	sells (`game.town_maps`, `game.sells_map`; the admin town editor's Maps field takes town
+	names, its own left out); by default each town sells its neighbours' along the road (the
+	towns before and after it by id), so the map to a far town is bought near it. The
+	market lists them under Maps (`.market-map`: the price, or, on the player's map already,
+	where the town is and its TP); `GET/POST /maps/buy/#id` (`town/maps.lua`, in the
+	market's dialog) refuses a map the town doesn't sell; `GET /maps` redirects to the
+	market.
 - Shops: `town_items(town_id, item_id)` is what a town sells (the admin town editor takes
 	item keys; Midworld sells the Wand). Any item a town sells can be bought as often as the
 	gold and the bag allow (2.4: no more "Already purchased", a copy of the item worn

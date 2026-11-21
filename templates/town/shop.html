@@ -1,6 +1,10 @@
-{#- The town's shop (legacy towns.php buy()) and the Sell section. ctx: groups { key, label,
-		items { item, icon (URL), label, tip, short } }, sell { entry (bag entry), price (each),
-		icon, label, tip }. Items are icon buttons like the fight menu's (dk.css .spell-btn),
+{#- The town's market (legacy towns.php buy() and maps()): its items, its maps and the Sell
+		section. ctx: groups { key, label, items { item, icon (URL), label, tip, short } }, maps
+		{ town, mapped, short, latitude, longitude }, sell { entry (bag entry), price (each),
+		icon, label, tip }. Maps: a row per map the town sells (town_maps), its price, opening
+		the purchase in a dialog like the items; one already on the player's map says where
+		that town is and what travelling there costs (greyed); one the gold doesn't cover is
+		greyed out but still opens the purchase, which says why. Items are icon buttons like the fight menu's (dk.css .spell-btn),
 		each with a tooltip made for the shop (tip/shop.html: the price, the player's gold, the
 		stats against what is worn, the effects); one the gold doesn't cover is greyed out but
 		still opens the purchase page, which says why. The purchase page opens in a dialog
@@ -16,6 +20,19 @@ Weapons raise your Attack Power, armor and shields your Defense Power, while you
 <span class="spell-tip{% if e.short then %} shop-short{% end %}" data-tip><a class="spell-btn" href="/shop/buy/{{ e.item.id }}" data-modal title="{{ e.label }}" aria-label="{{ e.label }}"><img src="{{ e.icon }}" width="44" height="44" alt=""></a>{{{ include("tip/shop", e.tip) }}}</span>
 {%- end %}
 </div>
+</div>
+{%- end %}
+{%- if #maps > 0 then %}
+<div class="shop-group" role="group" aria-labelledby="shop-maps-label"><span class="shop-group-label" id="shop-maps-label">Maps</span>
+<ul class="market-maps">
+{%- for _, m in ipairs(maps) do %}
+{%- if m.mapped then %}
+<li class="market-map market-map-owned"><b>{{ m.town.name }}</b><span>On your map: {{ m.latitude }}, {{ m.longitude }} &middot; {{ m.town.travelpoints }} TP</span></li>
+{%- else %}
+<li><a class="market-map{% if m.short then %} shop-short{% end %}" href="/maps/buy/{{ m.town.id }}" data-modal><b>{{ m.town.name }}</b><span>{{ number(m.town.mapprice) }} gold</span></a></li>
+{%- end %}
+{%- end %}
+</ul>
 </div>
 {%- end %}
 {%- if #sell > 0 then %}

@@ -4,6 +4,7 @@
 -- admin/editor.lua for the spec format. Column lists here are the UPDATE whitelists.
 local auth = require("lib.auth")
 local classes = require("lib.classes")
+local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local roles = require("lib.roles")
@@ -71,6 +72,20 @@ local function item_ids(text)
 	return ids
 end
 
+-- Town names typed in the town editor's Maps (comma-separated) -> the ids of those that
+-- exist, and the first name that doesn't (nil: all do).
+local function town_ids(text)
+	local ids, unknown = {}, nil
+	for part in text:gmatch("[^,]+") do
+		local name = part:match("^%s*(.-)%s*$")
+		if name ~= "" then
+			local id = dk.db:value("SELECT id FROM towns WHERE name = ? COLLATE NOCASE", name)
+			if id then ids[#ids + 1] = id else unknown = unknown or name end
+		end
+	end
+	return ids, unknown
+end
+
 tables.towns = function()
 	return {
 		table = "towns", path = "/admin/towns", column = "name",
@@ -79,9 +94,17 @@ tables.towns = function()
 		validate = function(v, errors)
 			local _, unknown = item_ids(v.items)
 			if unknown then errors[#errors + 1] = "Items: there is no item '" .. unknown .. "'." end
+			local _, nowhere = town_ids(v.maps)
+			if nowhere then errors[#errors + 1] = "Maps: there is no town '" .. nowhere .. "'." end
 		end,
 		after_save = function(_, row, v)
 			items.set_town(row.id, item_ids(v.items))
+			-- (validated before the save: a name not found now is this town's old one)
+			local maps = {}
+			for _, id in ipairs((town_ids(v.maps))) do
+				if id ~= row.id then maps[#maps + 1] = id end   -- (not its own: you are there)
+			end
+			game.set_town_maps(row.id, maps)
 		end,
 		fields = {
 			ID,
@@ -97,6 +120,14 @@ tables.towns = function()
 				get = function(row) return table.concat(items.town_keys(row.id), ", ") end,
 				help = 'Keys of the items this town\'s shop sells, comma-separated (see <a href="/admin/items">Items</a>; ' ..
 							 'example: <span class="highlight">stick, branch, herb</span>).' },
+			{ name = "maps", label = "Maps", virtual = true, size = 60, maxlength = 2000,
+				get = function(row)
+					local names = {}
+					for _, t in ipairs(game.town_maps(row.id)) do names[#names + 1] = t.name end
+					return table.concat(names, ", ")
+				end,
+				help = 'Names of the towns whose maps this town\'s market sells, comma-separated (example: ' ..
+							 '<span class="highlight">Roma, Bris</span>).' },
 		},
 	}
 end

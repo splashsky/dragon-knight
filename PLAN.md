@@ -297,7 +297,7 @@ queued cookies), so HEAD never changes state.
 | `do=buy` / `buy2:id` / `buy3:id` | `GET /shop`, `GET /shop/buy/:id` (confirm), `POST /shop/buy/:id` (keep / sell the old item; qty for bag items) |
 | `do=sell` | (dead in legacy — towns.php has no `sell()`); new: `POST /shop/sell/:id` (a bag entry, qty) |
 | (new) | `GET /inventory`, `POST /inventory/equip/:id` (slot for accessories), `POST /inventory/unequip/:slot`, `POST /inventory/use/:id`, `GET/POST /inventory/discard/:id` |
-| `do=maps` / `maps2:id` / `maps3:id` | `GET /maps`, `GET /maps/buy/:id`, `POST /maps/buy/:id` |
+| `do=maps` / `maps2:id` / `maps3:id` | `GET /maps` (3.1: the market, `/shop`), `GET /maps/buy/:id`, `POST /maps/buy/:id` |
 | `do=gotown:id` | `POST /travel/:id` |
 | `do=move` | `POST /move` (button name north/south/east/west) |
 | `do=fight` / `victory` / `drop` / `dead` | `GET/POST /fight` (fight, spell, item, run; continue: a turn a status blocks), `GET /victory`, `GET/POST /drop` (take, leave), `GET /dead` |

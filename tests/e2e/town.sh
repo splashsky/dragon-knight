@@ -56,9 +56,9 @@ t_items_clear townie
 tu "$TOWN_HOME, gold=1000, $TOWN_BASE"
 t_get /shop;                      expect_status 200
 # icon buttons in groups (weapons, armor, shields, items), each with its tooltip (the
-# price, the gold, what it adds; nothing worn here, so nothing to compare)
+# price, the gold, what it adds; nothing worn here, so nothing to compare), then the maps
 SHOP_GROUPS=$(grep -o 'class="shop-group-label" id="shop-[a-z]*-label">[A-Za-z]*' "$BODY" | sed 's/.*>//' | tr '\n' ' ')
-[ "$SHOP_GROUPS" = "Weapons Armor Shields Items " ] && t_ok || t_fail "shop groups: $SHOP_GROUPS"
+[ "$SHOP_GROUPS" = "Weapons Armor Shields Items Maps " ] && t_ok || t_fail "shop groups: $SHOP_GROUPS"
 expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1" data-modal title="Stick (10 gold)" aria-label="Stick (10 gold)"><img src="/static/images/items/stick.png" width="44" height="44" alt=""></a><template class="tip">'
 expect_body '<b class="shop-tip-gold">10 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table>'
 expect_body 'href="/shop/buy/17" data-modal title="Skivvies (25 gold)"'
@@ -94,7 +94,7 @@ t_post /shop/buy/1 "csrf=$TC&cancel=No" -H 'X-DK-Modal: 1'
 expect_status 200; expect_header '^x-dk-go: /'$'\r''?$'; [ -s "$BODY" ] && t_fail "X-DK-Go has a body" || t_ok
 t_post /shop/buy/4 "csrf=$TC&submit=Yes" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body 'Cheat attempt detected.'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'
-expect_body 'Thank you for purchasing this item.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the shop</button></div>'
+expect_body 'Thank you for purchasing this item.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the market</button></div>'
 expect_no_body 'direction buttons'
 expect_db "gold,$T_ITEMS" "970|herbx2" "bought in the dialog"
 t_get /shop/buy/1; expect_body '<html'; expect_body 'compass'
@@ -291,27 +291,41 @@ t_items_clear townie
 tu "$TOWN_BASE"
 
 t_section "town: maps"
+# the market sells the maps of town_maps (by default a town's neighbours along the road:
+# Midworld only Roma's); /maps is the market's now
 tu "$TOWN_HOME, towns='0,1', gold=100"
-t_get /maps;                      expect_status 200
-expect_body 'href="/maps/buy/2">Roma</a>'; expect_body 'Price: 25 gold'
-expect_body '<span class="light">Midworld</span>'; expect_body 'Location: 0N, 0E'
+t_get /maps;                      expect_redirect /shop
+t_get /shop;                      expect_status 200; expect_body '<title>Market</title>'
+expect_body '<span class="shop-group-label" id="shop-maps-label">Maps</span>'
+expect_body '<li><a class="market-map" href="/maps/buy/2" data-modal><b>Roma</b><span>25 gold</span></a></li>'
+expect_no_body 'href="/maps/buy/3"'      # Bris's map isn't sold in Midworld
+t_get /maps/buy/3;                expect_body 'Cheat attempt detected.'
 t_get /maps/buy/2;                expect_body 'You are buying the Roma map. Is that ok?'
-t_post /maps/buy/2 "csrf=$TC&cancel=No"; expect_redirect /
+expect_body '<input type="submit" name="cancel" value="No" data-modal-close>'
+t_post /maps/buy/2 "csrf=$TC&cancel=No"; expect_redirect /shop
 t_post /maps/buy/2 "submit=Yes";  expect_status 403
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
 expect_db "towns,gold" "0,1,2|75" "buy roma map"
-t_get /maps;                      expect_body 'Location: 30N, 30E'; expect_body 'TP: 5'
+expect_body 'the <a href="/shop">market</a>'
+t_get /shop;                      expect_body '<li class="market-map market-map-owned"><b>Roma</b><span>On your map: 30N, 30E &middot; 5 TP</span></li>'
+t_get /maps/buy/2 -H 'X-DK-Modal: 1'; expect_body 'Cheat attempt detected.'   # mapped
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 t_post /maps/buy/99 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
 t_get /maps/buy/99;               expect_body 'Cheat attempt detected.'
 expect_db "towns,gold" "0,1,2|75" "map cheats"
-tu "gold=10"
+# in Roma: Midworld's and Bris's maps (Midworld's on the map already); the gold short
+tu "latitude=30, longitude=30, gold=10"
+t_get /shop;                      expect_body '<li><a class="market-map shop-short" href="/maps/buy/3" data-modal><b>Bris</b><span>50 gold</span></a></li>'
+expect_body '<li class="market-map market-map-owned"><b>Midworld</b>'; expect_no_body 'href="/maps/buy/4"'
 t_get /maps/buy/3;                expect_body 'You do not have enough gold to buy this map.'
 t_post /maps/buy/3 "csrf=$TC&submit=Yes"; expect_body 'You do not have enough gold to buy this map.'
-tu "currentaction='Exploring', latitude=3, longitude=3, gold=1000"
+t_get /maps/buy/3 -H 'X-DK-Modal: 1'; expect_body 'You do not have enough gold to buy this map.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the market</button></div>'
+tu "gold=1000"
+t_post /maps/buy/4 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'   # Kalle's: not sold in Roma
+tu "currentaction='Exploring', latitude=3, longitude=3"
 t_get /maps;                      expect_body 'Cheat attempt detected.'
 t_post /maps/buy/3 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'
-expect_db "towns" "0,1,2" "map bought outside town"
+expect_db "towns" "0,1,2" "map bought outside town, or not sold there"
 
 t_section "town: travel"
 # the Towns box: a button per town on the map with its TP; here, out of reach or while

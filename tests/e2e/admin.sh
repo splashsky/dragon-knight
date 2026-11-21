@@ -17,7 +17,8 @@ else
 
 t_sql "CREATE TABLE adm_snap_control AS SELECT * FROM control;
 			 CREATE TABLE adm_snap_towns AS SELECT * FROM towns WHERE id = 2;
-			 CREATE TABLE adm_snap_town_items AS SELECT * FROM town_items WHERE town_id = 2;"
+			 CREATE TABLE adm_snap_town_items AS SELECT * FROM town_items WHERE town_id = 2;
+			 CREATE TABLE adm_snap_town_maps AS SELECT * FROM town_maps WHERE town_id = 2;"
 ADM_NEWS_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM news")
 ADM_FORUM_MAX=$(t_sql "SELECT coalesce(max(id), 0) FROM forum")
 
@@ -92,16 +93,21 @@ t_get /admin/monsters;     expect_body 'Monster level and map size match.'
 t_section "admin: towns"
 t_get /admin/towns/2;      expect_body 'Items:'
 expect_body 'name="items" size="60" maxlength="2000" value="branch, club, dagger, clothes, leather_armor, buckler, herb, potion, ether"'
-t_form_submit /admin/towns/2 "items=stick, nope" latitude=north
+expect_body 'name="maps" size="60" maxlength="2000" value="Midworld, Bris"'   # its neighbours' maps (schema 18)
+t_form_submit /admin/towns/2 "items=stick, nope" latitude=north "maps=Midworld, Atlantis"
 expect_body "Items: there is no item &#39;nope&#39;."; expect_body 'Latitude must be a number.'
+expect_body "Maps: there is no town &#39;Atlantis&#39;."
 admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "2,3,4,18,19,29,66,67,68" "invalid town not saved"
 t_get /admin/towns/2
-t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 "items=herb,stick  club"
+t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 "items=herb,stick  club" \
+	"maps=kalle, Roma ,Endworld"   # (any case; its own name, Roma before this save, left out)
 expect_redirect '/admin/towns/2\?saved=1'
 admin_eq "SELECT name || '|' || latitude || '|' || longitude || '|' || innprice || '|' || mapprice || '|' || travelpoints FROM towns WHERE id = 2" \
 	"Newtown|-31|44|11|22|3" "town saved"
 admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "1,3,66" "shop list saved"
+admin_eq "SELECT group_concat(map_id) FROM (SELECT map_id FROM town_maps WHERE town_id = 2 ORDER BY map_id)" "4,8" "maps saved"
 t_get /admin/towns/2;      expect_body 'name="items" size="60" maxlength="2000" value="stick, club, herb"'
+expect_body 'name="maps" size="60" maxlength="2000" value="Kalle, Endworld"'
 
 t_section "admin: monsters"
 # monster files app/content/monsters/*.lua; admins override the stats, MP, uses_mp, the
@@ -428,5 +434,7 @@ t_sql "DELETE FROM control; INSERT INTO control SELECT * FROM adm_snap_control; 
 			 DELETE FROM towns WHERE id = 2; INSERT INTO towns SELECT * FROM adm_snap_towns; DROP TABLE adm_snap_towns;
 			 DELETE FROM town_items WHERE town_id = 2; INSERT INTO town_items SELECT * FROM adm_snap_town_items;
 			 DROP TABLE adm_snap_town_items;
+			 DELETE FROM town_maps WHERE town_id = 2; INSERT INTO town_maps SELECT * FROM adm_snap_town_maps;
+			 DROP TABLE adm_snap_town_maps;
 			 DELETE FROM news WHERE id > $ADM_NEWS_MAX; DELETE FROM forum WHERE id > $ADM_FORUM_MAX;"
 fi

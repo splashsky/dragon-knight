@@ -1189,6 +1189,22 @@ CREATE UNIQUE INDEX user_hotbar_slot ON user_hotbar (user_id, slot);
 ]])
 end
 
+-- 18: towns sell only some maps (town_maps; every town sold every map): each its
+-- neighbours' along the road, the towns before and after it by id (the seed's rows on the
+-- original towns; an admin's towns get the same rule).
+local function v18_town_maps()
+	dk.db:exec_script([[
+CREATE TABLE town_maps (
+	town_id  INTEGER NOT NULL REFERENCES towns (id),
+	map_id   INTEGER NOT NULL REFERENCES towns (id),
+	PRIMARY KEY (town_id, map_id)
+) WITHOUT ROWID;
+INSERT INTO town_maps (town_id, map_id)
+	SELECT t.id, n.id FROM towns t JOIN towns n
+	ON n.id = (SELECT max(id) FROM towns WHERE id < t.id) OR n.id = (SELECT min(id) FROM towns WHERE id > t.id);
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1219,6 +1235,7 @@ migrations.STEPS = {
 		"are paid)", up = v15_pure_gets, after_sync = v15_after_sync },
 	{ name = "items that cast a spell may be single use (not rechargeable)", up = v16_rechargeable },
 	{ name = "the hotbar: the fight actions each character puts on number keys", up = v17_hotbar },
+	{ name = "towns sell only some maps: each its neighbours' along the road", up = v18_town_maps },
 }
 
 migrations.VERSION = #migrations.STEPS

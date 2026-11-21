@@ -33,7 +33,7 @@ lw_same /no/such/page 404
 t_register lwuser lwpass1 lw@example.com Lwuser 2
 t_login lwuser lwpass1
 LQ="WHERE username = 'lwuser'"
-for p in / /inn /shop /inventory /maps /babble /online /news /forum /character /changelog; do lw_same "$p"; done
+for p in / /inn /shop /inventory /babble /online /news /forum /character /changelog; do lw_same "$p"; done
 w_has title; w_has url; w_has hashes; w_has region root
 [ "$(w_payload url)" = /changelog ] && t_ok || t_fail "url: $(w_payload url)"
 

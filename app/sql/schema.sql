@@ -322,6 +322,15 @@ CREATE TABLE town_items (
 	PRIMARY KEY (town_id, item_id)
 ) WITHOUT ROWID;
 
+-- The maps each town's market sells (schema version 18: before, every town sold every map):
+-- map_id is the town the map leads to. By default a town sells its neighbours' along the
+-- road (the towns before and after it by id), so far towns' maps are found on the way.
+CREATE TABLE town_maps (
+	town_id  INTEGER NOT NULL REFERENCES towns (id),
+	map_id   INTEGER NOT NULL REFERENCES towns (id),
+	PRIMARY KEY (town_id, map_id)
+) WITHOUT ROWID;
+
 -- password: 'pbkdf2$<iters>$<salt hex>$<hash hex>' (see app/lib/auth.lua).
 -- verify: '1' when verified, otherwise the 8-letter code that was emailed.
 -- base_maxhp .. base_gold_bonus, strength, dexterity: the base stats (app/lib/stats.lua);

@@ -1,7 +1,7 @@
 /* themes/default.css :: the default theme: a light snow background, the red-and-black
 	 logo, near-black text, dark red links that turn bright red on hover; headings are text
 	 (no pictures: lib/themes.lua), with a hairline instead of a box, the columns are apart
-	 by space instead of lines, and the footer is a row of small print. Linked last by every
+	 by hairlines instead of thick lines, and the footer is a row of small print. Linked last by every
 	 layout when the theme is "default" (lib/themes.lua); body has class theme-default. */
 
 body {
@@ -18,10 +18,13 @@ a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }
 .highlight, .error { color: #c8141b; }
 .light { color: #5f6773; }
 
-/* the columns: space between them, no lines */
+/* the columns: a hairline between them, as under the headings (dk.css: thick black lines) */
 .dk-top { border-bottom: none; }
-.dk-cols { gap: 22px; }
+.dk-cols { gap: 0; }
 .dk-left, .dk-middle, .dk-right { border: none; padding: 3px 0; }
+.dk-left { border-right: solid 1px rgba(22, 24, 29, 0.22); padding-right: 14px; }
+.dk-right { border-left: solid 1px rgba(22, 24, 29, 0.22); padding-left: 14px; }
+.dk-middle { padding: 3px 16px; }
 
 /* headings: text in small capitals over a hairline (a panel's); the page's own larger, alone */
 .title, .box .title {

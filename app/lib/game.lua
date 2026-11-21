@@ -72,6 +72,24 @@ function game.user_towns(user)
 	return out
 end
 
+-- The maps town `town_id`'s market sells (town_maps): the towns they lead to, by id.
+function game.town_maps(town_id)
+	return dk.db:query("SELECT t.* FROM town_maps m JOIN towns t ON t.id = m.map_id WHERE m.town_id = ? ORDER BY t.id",
+		town_id)
+end
+
+function game.sells_map(town_id, map_id)
+	return dk.db:value("SELECT 1 FROM town_maps WHERE town_id = ? AND map_id = ?", town_id, map_id) ~= nil
+end
+
+-- Makes town `town_id` sell exactly the maps to `ids` (admin town editor).
+function game.set_town_maps(town_id, ids)
+	dk.db:exec("DELETE FROM town_maps WHERE town_id = ?", town_id)
+	for _, id in ipairs(ids) do
+		dk.db:exec("INSERT OR IGNORE INTO town_maps (town_id, map_id) VALUES (?, ?)", town_id, id)
+	end
+end
+
 -- 5 -> "5N", -5 -> "5S"; longitude: "E"/"W" (legacy display()).
 function game.latitude_str(lat)
 	if lat < 0 then return (-lat) .. "S" end

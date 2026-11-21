@@ -256,7 +256,7 @@ async function run(wsUrl, port) {
 	await until("!!document.querySelector('dialog[open] [name=qty]')");
 	await js("document.querySelector('dialog [name=qty]').value = '2'; document.querySelector('dialog [name=submit]').click()");
 	check("the answer in the dialog", await until("/Thank you for purchasing this item/.test(document.querySelector('dialog').textContent)"));
-	check("its button back to the shop has the focus", await js("document.activeElement.textContent === 'Back to the shop'"));
+	check("its button back to the market has the focus", await js("document.activeElement.textContent === 'Back to the market'"));
 	check("the page behind caught up", await until("!DK.busy() && !!document.querySelector('form.shop-sell-item')"));
 	check("30 gold spent", await gold() === gold0 - 30, [gold0, await gold()]);
 	await press("Escape", 27);
