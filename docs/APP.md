@@ -775,14 +775,14 @@ starting with `__` are reserved.
 	`data-modal-close`).
 - Images: `/static/images/<file>` (`public/images/`): `items/` and `skills/` (icons, see
 	[Items](#items), [Spells](#spells)), `buildings/` (the town's banners), `backgrounds/`
-	(`parchment.png`: the news posts' card; `blue.webp`, `darkstorm.jpg`, `snowstorm.jpg`),
+	(`parchment.png`, `blue.webp`, `darkstorm.jpg`, `snowstorm.jpg`),
 	`actions/` (19px framed action icons: `attack.png`, `attack_1.png` ... `attack_8.png`,
 	`creature*.png`, `relic.png`, `send_message.png`, ...), `tiles/` (grid cells: `1x1.png`,
-	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`spinner.gif`, the `indicators.png`
-	sprite), `themes/<key>/` (a theme's logo, background, pictures); at the top the
-	original's (the compass, the slot icons `icon_*.gif`, the world map, the help pages'
-	pictures). The `actions/`, `tiles/`, `ui/` pictures and all but the parchment among the
-	backgrounds aren't used yet. A link-styled submit button:
+	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`middle.png`: the news posts' scroll;
+	`spinner.gif`, the `indicators.png` sprite), `themes/<key>/` (a theme's logo,
+	background, pictures); at the top the original's (the compass, the slot icons
+	`icon_*.gif`, the world map, the help pages' pictures). The `actions/`, `tiles/` and
+	`backgrounds/` pictures and the rest of `ui/` aren't used yet. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
 	`<blink>`.
@@ -2053,7 +2053,7 @@ return {
 	the bag only when it was used.
 - The town page (`home/town.html`) shows the town's places as banners (3.1:
 	`public/images/buildings/`, `.town-banner`: the picture on a dark ground continuing its
-	own, its edges faded by a mask, in a gold frame): the Inn (`/inn`, its price) and the
+	own, its edges faded by a mask; no frame): the Inn (`/inn`, its price) and the
 	Market (`/shop`: the shop and the map store in one, page title "Market").
 - Maps (3.1, schema version 18): `town_maps(town_id, map_id)` is the maps a town's market
 	sells (`game.town_maps`, `game.sells_map`; the admin town editor's Maps field takes town
@@ -2225,9 +2225,12 @@ read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 	and `news.page(start, per)` return rows with `author` ("Unknown" when the account is gone)
 	and, when `forumtype == 1` and the thread exists, `thread_url` / `thread_label`
 	(`news.reply_label(n)`: "Reply", "1 reply", "N replies").
-- A post is drawn as a parchment card (`community/news/post.html`, `.news-post`:
-	`backgrounds/parchment.png` stretched over it, the title a link to its page, the date and
-	author under it, the text, the discussion's link): on `/news`, `/news/#id` and, with
+- A post is drawn as a strip of a scroll (`community/news/post.html`, `.news-post`:
+	`ui/middle.png`, 652px of torn-edged parchment between leather bands, centred and
+	repeated down the card, so a card wider than the parchment shows a little leather; the
+	side padding keeps the text on the parchment: `max(20px, calc(50% - 326px + 20px))`;
+	the title a link to its page, the date and author under it, the text, the discussion's
+	link): on `/news`, `/news/#id` and, with
 	`excerpt` (the first paragraph, Read more, All news), in the town's Latest News.
 - A news post and a forum reply also send live notices (see [Notices](#notices)).
 - Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,

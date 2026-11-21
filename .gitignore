@@ -7,3 +7,4 @@ data/
 *.db-wal
 /dist/
 *:Zone.Identifier
+*:sec.endpointdlp
