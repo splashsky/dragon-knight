@@ -81,8 +81,9 @@ wd_sql "UPDATE users SET gold = 200, base_maxhp = 17, currenthp = 17"
 t_get /shop; TC=$(t_csrf)
 expect_body "<a class=\"spell-btn\" href=\"/shop/buy/$WD_WAND_ITEM\" data-modal title=\"Wand (75 gold)\" aria-label=\"Wand (75 gold)\"><img src=\"/static/images/items/wand.png\" width=\"44\" height=\"44\" alt=\"\"></a><template class=\"tip\">"
 expect_body '<b class="shop-tip-gold">75 gold</b></div><div class="shop-tip-note">You have 200 gold</div><table class="shop-tip-stats"><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+2</td><td class="shop-tip-delta"></td></tr></table><ul class="shop-tip-effects"><li>Casts Magic Bolt</li><li>5 Charges</li></ul>'
-t_get "/shop/buy/$WD_WAND_ITEM"; expect_text 'You are buying the Wand, is that ok?'
-expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/wand.png" width="36" height="36" alt="">'
+t_get "/shop/buy/$WD_WAND_ITEM"; expect_body '<b>Buy and equip</b>'
+expect_body '<span class="buy-tile"><img src="/static/images/items/wand.png" width="48" height="48" alt=""></span>'
+expect_body '<ul class="buy-effects">'; expect_body '<li>Casts Magic Bolt</li>'; expect_body '<li>5 Charges</li>'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
 wd_is "gold || '|' || $T_ITEMS || '|' || $WD_CHARGES" "125|wand@weapon|weapon=5"
 expect_stats "17 10 11 5 6 7 6" "a level 2 Mage: the wand adds 2 attack power"
@@ -148,16 +149,15 @@ t_items_clear wizard
 t_give wizard wand 1 weapon
 t_sql "UPDATE user_items SET charges = 3 WHERE id = $(wd_wand)"
 # a copy of the wand you wear: the old one into the bag (with its charges), the new one full
-t_get "/shop/buy/$WD_WAND_ITEM"; expect_text 'You are buying the Wand for 75 gold. What should I do with your Wand?'
-expect_body 'name="keep" value="Buy (keep my Wand in the bag)"'
+t_get "/shop/buy/$WD_WAND_ITEM"; expect_body 'name="keep" value="Keep"><b>Buy and equip</b><span>Your Wand goes into the bag.'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&keep=x"; expect_body 'Thank you for purchasing this item.'
 wd_is "gold || '|' || $WD_CHARGES" "925|bag=3,weapon=5"
 # fill the bag (12 slots: 11 more wands kept), then only "sell" is offered
 for _ in $(seq 1 11); do t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&keep=x"; done
 wd_is "(SELECT count(*) FROM user_items WHERE user_id = users.id AND equipped IS NULL) || '|' || gold" "12|100"
 t_get /; expect_body '<span class="invpanel-count"><b>12</b>/12</span>'
-t_get "/shop/buy/$WD_WAND_ITEM"; expect_body "Your bag is full, so you can't keep your Wand."
-expect_body 'name="sell" value="Buy and sell my Wand for 38 gold"'
+t_get "/shop/buy/$WD_WAND_ITEM"; expect_body '<b>Buy and equip</b><span>No room in your bag for your Wand.</span>'
+expect_body 'name="sell" value="Sell"><b>Buy and sell my Wand</b><span>You wear the Wand; the shop pays 38 gold'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&keep=x"; expect_body 'Your bag is full.'
 t_post "/shop/buy/$WD_WAND_ITEM" "csrf=$TC&sell=x"; expect_body 'Thank you for purchasing this item.'
 wd_is "gold || '|' || (SELECT count(*) FROM user_items WHERE user_id = users.id)" "63|13"
@@ -165,7 +165,7 @@ wd_is "gold || '|' || (SELECT count(*) FROM user_items WHERE user_id = users.id)
 t_get /shop/buy/66; expect_body 'Your bag is full.'
 t_items_clear wizard
 wd_sql "UPDATE users SET gold = 10000"
-t_get /shop/buy/66; expect_body '(1 to 10)'
+t_get /shop/buy/66; expect_body 'max="10"'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=10"; expect_body 'Thank you for purchasing this item.'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=10"; expect_body 'Thank you for purchasing this item.'
 wd_is "$T_ITEMS" "herbx10,herbx10"

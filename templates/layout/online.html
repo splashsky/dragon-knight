@@ -1,6 +1,6 @@
 {#- Who's online (lib/presence.lua); live.js keeps it up to date (a name joining: the
 	online-name prototype, layout/online_list.html's markup). ctx: online (the names listed),
 	online_count (everyone online), online_limit (nil on the full /online page). -#}
-<div class="title">Who's Online</div>
+<h2 class="title">Who's Online</h2>
 <div class="box-body">There are <b data-online-count>{{ online_count }}</b> user(s) online:<span data-online-list{% if online_limit then %} data-online-limit="{{ online_limit }}"{% end %}>{{{ include("layout/online_list") }}}</span><span data-online-more{% if online_count <= #online then %} hidden{% end %}> and <a href="/online"><span data-online-more-count>{{ online_count - #online }}</span> more</a></span></div>
 <template data-proto="online-name"><a data-slot-attr="data-id:id href:url" data-slot="name"></a></template>

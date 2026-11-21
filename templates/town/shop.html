@@ -8,7 +8,7 @@
 		"Already purchased"). Selling: a button per bag entry the shop buys (a stack's size on
 		a badge, a quantity field), its tooltip saying what the shop pays. -#}
 <div class="town-message">
-Buying weapons will increase your Attack Power. Buying armor and shields will increase your Defense Power. Other items go into your bag.<br><br>Click an item to purchase it; point at it (or focus it) to see what it does.<br><br>The following items are available at this town:
+Weapons raise your Attack Power, armor and shields your Defense Power, while you wear them: buy them to wear or to keep in your bag. Other items go into your bag.<br><br>Click an item to purchase it; point at it (or focus it) to see what it does.<br><br>The following items are available at this town:
 {%- for _, g in ipairs(groups) do %}
 <div class="shop-group" role="group" aria-labelledby="shop-{{ g.key }}-label"><span class="shop-group-label" id="shop-{{ g.key }}-label">{{ g.label }}</span>
 <div class="spell-grid">

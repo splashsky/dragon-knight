@@ -31,7 +31,22 @@ local function has(s, text, what)
 	if not tostring(s):find(text, 1, true) then error((what or "text") .. ": no '" .. text .. "' in: " .. tostring(s), 2) end
 end
 
-local function lines(t) return table.concat(t or {}, "|") end
+-- (a monster's speech, fight/speech.lua, is new: the 2.1 fight had none)
+local function lines(t)
+	local out = {}
+	for _, l in ipairs(t or {}) do
+		if l:sub(1, 1) ~= "\31" then out[#out + 1] = l end
+	end
+	return table.concat(out, "|")
+end
+
+local function no_speech(list)
+	local out = {}
+	for _, e in ipairs(list) do
+		if e.type ~= "speech" then out[#out + 1] = e end
+	end
+	return out
+end
 
 -- A seeded rand with php.rand's argument handling that records the (cast) ranges.
 local function recorder(seed)
@@ -136,7 +151,7 @@ function T.fights_play_as_in_2_1()
 					local page = {}
 					for _, line in ipairs(r.player) do page[#page + 1] = line end
 					for _, line in ipairs(r.enemies) do page[#page + 1] = line end
-					eq(lines(events.lines(events.build(f.trace))), lines(page), what .. ": events")
+					eq(lines(events.lines(no_speech(events.build(f.trace)))), lines(page), what .. ": events")
 				end
 				eq(lines(r.player), lines(o.yourturn), what .. ": your turn")
 				eq(lines(r.enemies), lines(o.monsterturn), what .. ": the monster's turn")

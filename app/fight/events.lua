@@ -7,7 +7,8 @@
 --   { part = "player" | "allies" | "enemies" | "ending",   -- the page's paragraph
 --     actor = "player" | "ally" | "enemy", actor_id, actor_name,   -- who acts (a status: its bearer)
 --     type = "attack" | "spell" | "item" | "status" | "summon" | "blocked" | "run" | "ambush"
---            | "wave" | "say" (any other line) | "victory" | "death" | "escape" (the outcome),
+--            | "wave" | "speech" (a monster speaking: fight/speech.lua) | "say" (any other line)
+--            | "victory" | "death" | "escape" (the outcome),
 --     text,                                     -- absent for a change without a line
 --     hp = { { who, id, name, from, to, max } },   -- who: "player" | "ally" | "enemy"
 --     mp = { ... }, tp = { ... },               -- (an enemy's MP only where the page shows it)
@@ -52,7 +53,7 @@ function events.build(trace, opts)
 	end
 	for _, x in ipairs(trace or {}) do
 		if x.line then
-			new(x).text = x.line
+			new(x).text = (x.line:gsub("^\31", ""))   -- (speech's mark: the type says it)
 		elseif x.change then
 			local hidden = x.change == "mp" and x.side == "enemy" and opts.hide_mp and opts.hide_mp(x.id)
 			if not hidden then

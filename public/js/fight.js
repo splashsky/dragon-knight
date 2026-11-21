@@ -220,7 +220,7 @@
 			} else {
 				p.appendChild(el("br"));
 			}
-			p.appendChild(el("span", "fight-line fight-by-" + (e.actor || "none"), e.text));
+			p.appendChild(el("span", "fight-line fight-by-" + (e.actor || "none") + (e.type === "speech" ? " fight-speech" : ""), e.text));
 		}
 		(e.hp || []).forEach(function (c) { stat("hp", c); });
 		(e.mp || []).forEach(function (c) { stat("mp", c); });

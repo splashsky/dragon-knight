@@ -490,7 +490,7 @@ fi
 t_section "public pages, static, errors"
 t_get /login;            expect_status 200; expect_body 'name="username"'; expect_header '^set-cookie: dk_csrf='
 t_get /;                 expect_redirect /login
-t_get /static/images/logo.gif; expect_status 200
+t_get /static/images/themes/retro/logo.gif; expect_status 200
 t_get /static/css/dk.css;      expect_status 200; expect_body 'dk-page'
 t_get /no/such/page;     expect_status 404
 t_get /logout;           expect_status 405; expect_header '^allow: POST'

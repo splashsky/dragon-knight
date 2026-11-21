@@ -1,14 +1,20 @@
-{#- Victory (legacy fight.php victory()). -#}
-<section class="box victory">
-<div class="box-body">
-<p>Congratulations. You have defeated the {{ defeated }}.<br>
-You gain {{ r.exp }} experience. {{ r.warnexp }}<br>
+{#- Victory (legacy fight.php victory()), drawn like a scene's caption (public/js/scene.js;
+		docs/APP.md "Scenes"): the live client fades the fight out and this in, so the
+		transition stays on screen as the page. "Victory!" large, who fell, what it paid, a
+		level-up's gains, a drop, the way on. ctx: encounter.victory_page. -#}
+<section class="dk-scene-page dk-scene-victory victory">
+<h1 class="dk-scene-title">Victory!</h1>
+<p class="dk-scene-detail">You have defeated the {{ defeated }}.</p>
+{%- if said then %}
+<p class="dk-scene-quote">{{ said.by }}: &ldquo;{{ said.text }}&rdquo;</p>
+{%- end %}
+<p>You gain {{ r.exp }} experience. {{ r.warnexp }}<br>
 You gain {{ r.gold }} gold. {{ r.warngold }}</p>
 {%- if levelup then %}
 {%- if levelup.levels == 1 then %}
-<p><b>You have gained a level!</b></p>
+<p class="dk-scene-levelup"><b>You have gained a level!</b></p>
 {%- else %}
-<p><b>You have gained {{ levelup.levels }} levels!</b></p>
+<p class="dk-scene-levelup"><b>You have gained {{ levelup.levels }} levels!</b></p>
 {%- end %}
 <p>You gain {{ levelup.hp }} hit points.<br>
 You gain {{ levelup.mp }} magic points.<br>
@@ -20,11 +26,10 @@ You have learned a new spell.
 {%- elseif levelup.learned > 1 then %}<br>
 You have learned {{ levelup.learned }} new spells.
 {%- end %}</p>
-<p>You can now continue <a href="/">exploring</a>.</p>
+<p class="dk-scene-next">You can now continue <a href="/">exploring</a>.</p>
 {%- elseif dropped then %}
-<p>This monster has dropped an item. <a href="/drop">Click here</a> to reveal and take the item, or you may also move on and continue <a href="/">exploring</a>.</p>
+<p class="dk-scene-next">This monster has dropped an item. <a href="/drop">Click here</a> to reveal and take the item, or you may also move on and continue <a href="/">exploring</a>.</p>
 {%- else %}
-<p>You can now continue <a href="/">exploring</a>.</p>
+<p class="dk-scene-next">You can now continue <a href="/">exploring</a>.</p>
 {%- end %}
-</div>
 </section>

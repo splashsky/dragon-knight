@@ -28,7 +28,7 @@ t_section "fight: monster selection"
 # is picked by the level band, its first strike (when quicker) played
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
 t_fight_new fighter
-t_get /fight;   expect_status 200; expect_body 'title_fighting.gif'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
+t_get /fight;   expect_status 200; expect_body '<h1 class="title page-title">Fighting</h1>'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 expect_no_body 'action="/move"'                       # no compass while fighting
 f_is "$T_ROUND" 2
@@ -85,7 +85,7 @@ expect_redirect /victory
 [ "$(f_col "$T_MONSTER_HP")" -le 0 ] && t_ok || t_fail "the monster is not defeated"
 t_get /fight; expect_redirect /victory                # a won fight goes on to the victory
 t_get /victory; expect_status 200
-expect_body 'Congratulations. You have defeated the'; expect_body 'You have gained a level!'
+expect_body '<h1 class="dk-scene-title">Victory!</h1>'; expect_body 'You have defeated the'; expect_body 'You have gained a level!'
 expect_body 'You gain 2 hit points.'; expect_body 'You gain 4 magic points.'; expect_body 'You have learned a new spell.'
 expect_body '<title>Courage and Wit have served thee well!</title>'
 f_is level 2; f_is base_maxhp 502; f_is base_maxmp 4; f_is base_maxtp 11; f_is strength 7; f_is dexterity 6

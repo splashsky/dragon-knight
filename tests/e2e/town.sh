@@ -37,8 +37,13 @@ t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You do not have enough gold'
 expect_db "gold" "4" "inn too poor"
 tu "gold=100, currentaction='Exploring', latitude=5, longitude=5"
 t_get /inn;                       expect_body 'Cheat attempt detected.'
+# the Location panel says where (its heading in the default theme) and the coordinates
+expect_body '<h2 class="title">Exploring</h2>'; expect_body '>5N, 5E</span>'
+tu "latitude=-3, longitude=-7"; t_get /; expect_body '>3S, 7W</span>'
+tu "latitude=5, longitude=5"
 tu "currentaction='Fighting'"
 t_get /inn;                       expect_redirect /fight
+t_get /fight;                     expect_body '<h2 class="title">Fighting</h2>'
 t_get /shop;                      expect_redirect /fight
 t_get /maps;                      expect_redirect /fight
 
@@ -76,9 +81,14 @@ t_section "town: the purchase in the shop's dialog (X-DK-Modal)"
 t_get /shop/buy/1 -H 'X-DK-Modal: 1'; expect_status 200
 expect_header '^x-dk-modal: 1'; expect_header '^vary: X-DK-Live, X-DK-Modal'
 expect_body '<h2 class="dk-modal-title" id="dk-modal-title">Buy Items</h2>'
-expect_body '<div class="dk-modal-content"><div class="town-message shop-buy">'
-expect_text 'You are buying the Stick, is that ok?'
-expect_body '<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No" data-modal-close>'
+expect_body '<div class="dk-modal-content"><div class="town-message buy">'
+expect_body '<span class="buy-name"><b>Stick</b><span class="buy-kind">Weapon</span></span>'
+expect_body '<span class="buy-tag">10 gold</span>'; expect_body '<li>Attack Power <b>+2</b></li>'   # nothing worn: what it gives
+# nothing worn: into the bag, or worn
+expect_body '<button class="buy-choice" type="submit" name="bag" value="Bag"><b>Buy to bag</b><span>You'"'"'ll have 990 gold left.</span></button>'
+expect_body '<button class="buy-choice" type="submit" name="submit" value="Yes"><b>Buy and equip</b><span>You'"'"'ll have 990 gold left.</span></button>'
+expect_no_body 'name="sell"'
+expect_body '<button class="buy-cancel" type="submit" name="cancel" value="No" data-modal-close>Not now</button>'
 expect_no_body '<html'; expect_no_body 'compass'; expect_no_body 'Babble'
 t_post /shop/buy/1 "csrf=$TC&cancel=No" -H 'X-DK-Modal: 1'
 expect_status 200; expect_header '^x-dk-go: /'$'\r''?$'; [ -s "$BODY" ] && t_fail "X-DK-Go has a body" || t_ok
@@ -93,7 +103,7 @@ t_get /shop; expect_body 'href="/shop/buy/1" data-modal title="Stick (10 gold)"'
 t_items_clear townie; tu "gold=1000"
 
 t_section "town: shop weapon, keep or sell the old one"
-t_get /shop/buy/1;                expect_text 'You are buying the Stick, is that ok?'; expect_body 'action="/shop/buy/1"'
+t_get /shop/buy/1;                expect_body '<b>Buy and equip</b>'; expect_body 'action="/shop/buy/1"'
 t_post /shop/buy/1 "submit=Yes";  expect_status 403
 t_post /shop/buy/1 "csrf=$TC&cancel=No"; expect_redirect /
 expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "shop cancel"
@@ -104,7 +114,7 @@ t_get /;                          expect_body 'Weapon: Stick'
 # a copy of the weapon you wear can be bought too (2.4: no more "Already purchased"): the
 # old one is kept in the bag or sold, as with any other
 t_get /shop;                      expect_no_body 'Already purchased'; expect_body 'href="/shop/buy/1" data-modal title="Stick (10 gold)"'
-t_get /shop/buy/1;                expect_text 'You are buying the Stick for 10 gold. What should I do with your Stick?'
+t_get /shop/buy/1;                expect_body '<b>Buy and sell my Stick</b>'
 t_post /shop/buy/1 "csrf=$TC&keep=x"; expect_body 'Thank you for purchasing this item.'
 expect_db "gold,$T_ITEMS" "980|stick,stick@weapon" "a second stick, the first kept"
 t_post /shop/buy/1 "csrf=$TC&sell=x"  # 980 - 10 + 5
@@ -112,8 +122,20 @@ expect_db "gold,$T_ITEMS" "975|stick,stick@weapon" "a third stick, the second so
 t_sql "DELETE FROM user_items WHERE equipped IS NULL AND user_id = (SELECT id FROM users WHERE username = 'townie')"
 tu "gold=990"
 t_get /shop/buy/2
-expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'
-expect_body 'name="keep" value="Buy (keep my Stick in the bag)"'; expect_body 'name="sell" value="Buy and sell my Stick for 5 gold"'
+# side by side with what is worn; three choices, each saying what it leaves: into the bag
+# (the Stick stays on), worn (the Stick into the bag), worn with the Stick sold
+expect_body '<thead><tr><td></td><th scope="col">Your Stick</th><th scope="col">The Branch</th></tr></thead>'
+expect_body '<tr><th scope="row">Attack Power</th><td>+2</td><td>+4 <span class="buy-up">(+2)</span></td></tr>'
+expect_body 'name="bag" value="Bag"><b>Buy to bag</b><span>You keep wearing your Stick. You'"'"'ll have 960 gold left.</span>'
+expect_body 'name="keep" value="Keep"><b>Buy and equip</b><span>Your Stick goes into the bag. You'"'"'ll have 960 gold left.</span>'
+expect_body 'name="sell" value="Sell"><b>Buy and sell my Stick</b><span>You wear the Branch; the shop pays 5 gold for your Stick. You'"'"'ll have 965 gold left.</span>'
+t_post /shop/buy/2 "csrf=$TC&bag=x"; expect_body 'Thank you for purchasing this item.'
+expect_db "gold,$T_ITEMS" "960|stick@weapon,branch" "branch into the bag, the stick still worn"
+expect_stats "15 0 10 5 5 7 5" "still the stick"
+t_post /shop/buy/2 "csrf=$TC&bag=x" -H 'X-DK-Modal: 1'; expect_body 'Thank you for purchasing this item.'   # (in the dialog too)
+expect_db "gold,$T_ITEMS" "930|stick@weapon,branch,branch" "another branch into the bag"
+t_sql "DELETE FROM user_items WHERE equipped IS NULL AND user_id = (SELECT id FROM users WHERE username = 'townie')"
+tu "gold=990"
 t_post /shop/buy/2 "csrf=$TC&keep=x"
 expect_db "gold,$T_ITEMS" "960|stick,branch@weapon" "branch, stick kept"
 expect_stats "15 0 10 5 5 9 5" "branch"
@@ -141,7 +163,7 @@ t_post /shop/buy/17 "csrf=$TC&submit=Yes"     # Skivvies: 25 gold, def 2, gold b
 expect_db "gold,$T_ITEMS" "905|branch@weapon,skivvies@armor" "skivvies"
 expect_stats "15 0 10 5 5 9 7" "skivvies"
 t_get /character;                 expect_body 'Gold: 905 <span class="light">(+10%)</span>'
-t_get /shop/buy/18;               expect_body 'Buy and sell my Skivvies for 13 gold'
+t_get /shop/buy/18;               expect_body 'the shop pays 13 gold for your Skivvies'
 t_post /shop/buy/18 "csrf=$TC&sell=x"         # Clothes: 905 + ceil(25/2) - 50
 expect_db "gold,$T_ITEMS" "868|branch@weapon,clothes@armor" "clothes sells skivvies"
 expect_stats "15 0 10 5 5 9 10" "clothes"
@@ -159,8 +181,9 @@ expect_stats "20 10 10 5 5 9 12" "reed shield"
 for k in dagger hatchet axe brand poleaxe broadsword battle_axe claymore dark_axe dark_sword bright_sword magic_sword; do
 	t_give townie "$k"
 done
-t_get /shop/buy/29;               expect_body "Your bag is full, so you can't keep your Reed Shield."
-expect_no_body 'name="keep"'; expect_body 'Buy and sell my Reed Shield for 25 gold'
+t_get /shop/buy/29;               expect_body '<div class="buy-choice buy-choice-off"><b>Buy to bag</b><span>Your bag is full.</span></div>'
+expect_body '<div class="buy-choice buy-choice-off"><b>Buy and equip</b><span>No room in your bag for your Reed Shield.</span></div>'
+expect_no_body 'name="keep"'; expect_no_body 'name="bag"'; expect_body '<b>Buy and sell my Reed Shield</b><span>You wear the Buckler; the shop pays 25 gold'
 t_post /shop/buy/29 "csrf=$TC&keep=x"; expect_body 'Your bag is full.'
 expect_db "gold" "13450" "keep refused"
 t_post /shop/buy/29 "csrf=$TC&sell=x"   # Buckler 100/4: 13450 + 25 - 100
@@ -192,8 +215,9 @@ t_post /shop/buy/19 "csrf=$TC&sell=x"; expect_body 'You do not have enough gold 
 expect_db "gold" "5" "shop too poor"
 # sell-back counts toward the price: 50 gold + 25 for the Clothes covers Leather Armor (75)
 tu "gold=50"
-t_get /shop/buy/19;               expect_body 'Buy and sell my Clothes for 25 gold'
-expect_body "You don't have enough gold to buy it and keep your Clothes."; expect_no_body 'name="keep"'
+t_get /shop/buy/19;               expect_body '<b>Buy and sell my Clothes</b><span>You wear the Leather Armor; the shop pays 25 gold'
+expect_body '<b>Buy and equip</b><span>Not enough gold without selling your Clothes.</span>'; expect_no_body 'name="keep"'
+expect_body '<b>Buy to bag</b><span>Not enough gold without selling your Clothes.</span>'; expect_no_body 'name="bag"'
 t_post /shop/buy/19 "csrf=$TC&keep=x"; expect_body 'You do not have enough gold to buy this item.'
 t_post /shop/buy/19 "csrf=$TC&sell=x"
 expect_db "gold,$T_ITEMS" "0|buckler@shield,club@weapon,leather_armor@armor" "sell-back covers price"
@@ -223,23 +247,23 @@ t_post "/shop/sell/$HERB_E" "csrf=$TC&submit=Sell"; expect_body 'Cheat attempt d
 t_section "town: consumables in the shop"
 t_items_clear townie
 tu "currentaction='In Town', latitude=30, longitude=30, gold=1000"     # Roma
-t_get /shop/buy/67;               expect_text 'You are buying the Potion for 60 gold each. It goes into your bag.'
-expect_body 'name="qty"'; expect_body '(1 to 10)'
+t_get /shop/buy/67;               expect_body '<span class="buy-tag">60 gold each</span>'; expect_body 'Consumable, into your bag'
+expect_body 'name="qty" value="1" min="1" max="10"'; expect_body 'up to 10;'
 for q in 0 11 abc -1; do
 	t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=$q"; expect_body 'Please enter a quantity from 1 to 10.'
 done
 expect_db "gold,coalesce($T_ITEMS, '')" "1000|" "no bad quantities"
 t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=4"; expect_body 'Thank you for purchasing this item.'
 expect_db "gold,$T_ITEMS" "760|potionx4" "4 potions"
-t_get /shop/buy/67;               expect_body '(1 to 6)'                   # room on the stack
+t_get /shop/buy/67;               expect_body 'max="6"'                    # room on the stack
 t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=6"
 expect_db "gold,$T_ITEMS" "400|potionx10" "a full stack"
-t_get /shop/buy/67;               expect_body '(1 to 6)'                   # a new stack: 400 gold buys 6
+t_get /shop/buy/67;               expect_body 'max="6"'                    # a new stack: 400 gold buys 6
 t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=2"
 expect_db "gold,$T_ITEMS" "280|potionx10,potionx2" "a second stack"
 # the gold limit
 tu "gold=100"
-t_get /shop/buy/68;               expect_text 'You are buying the Ether for 80 gold.'; expect_no_body 'name="qty"'
+t_get /shop/buy/68;               expect_body '<b>Buy the Ether</b>'; expect_body '<span class="buy-tag">80 gold</span>'; expect_no_body 'name="qty"'
 t_post /shop/buy/68 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Please enter a quantity from 1 to 1.'
 t_post /shop/buy/68 "csrf=$TC&submit=Buy"
 expect_db "gold,$T_ITEMS" "20|potionx10,potionx2,ether" "one ether"
@@ -250,7 +274,7 @@ tu "gold=1000"
 for k in stick branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
 t_get /shop/buy/66;               expect_body 'Your bag is full.'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy"; expect_body 'Your bag is full.'
-t_get /shop/buy/67;               expect_body '(1 to 8)'
+t_get /shop/buy/67;               expect_body 'max="8"'
 t_post /shop/buy/67 "csrf=$TC&submit=Buy&qty=8"
 expect_db "gold" "520" "topped up a stack in a full bag"
 t_get /shop/buy/67;               expect_body 'Your bag is full.'
@@ -299,7 +323,7 @@ t_post /travel/99 "csrf=$TC";     expect_body 'Cheat attempt detected.'
 t_post /travel/1 "csrf=$TC";      expect_body 'You are already in this town.'
 expect_db "currenttp" "20" "no tp for staying"
 t_post /travel/2 "";              expect_status 403
-t_post /travel/2 "csrf=$TC";      expect_body 'You have travelled to Roma. You may now <a href="/">enter this town</a>.'
+t_post /travel/2 "csrf=$TC";      expect_redirect /    # the town's page at once (3.0: no page in between)
 expect_db "currentaction,latitude,longitude,currenttp,towns" "In Town|30|30|15|0,1,2" "travel to roma"
 t_get /;                          expect_body 'Welcome to Roma'
 tu "currentaction='Fighting'"
@@ -336,7 +360,7 @@ for dir in "north 250 5 250|5" "south -250 5 -250|5" "east 5 250 5|250" "west 5 
 	expect_db "latitude||'|'||longitude" "$want" "clamp $d"
 done
 tu "currentaction='Exploring', latitude=0, longitude=1, towns='0', currenttp=4"
-t_post /move "csrf=$TC&west=West"; expect_body 'You have travelled to Midworld.'
+t_post /move "csrf=$TC&west=West"; expect_redirect /
 expect_db "currentaction,latitude,longitude,currenttp,towns" "In Town|0|0|4|0,1" "walk into midworld"
 tu "currentaction='In Town', latitude=-250, longitude=-250"
 t_post /move "csrf=$TC&south=South"; expect_body 'You are already in this town.'

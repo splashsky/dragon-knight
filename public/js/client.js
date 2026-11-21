@@ -9,7 +9,10 @@
 // wrong, the page is loaded natively (GETs never change the game, so loading the address
 // again is always safe). Other scripts use window.DK: visit(url), refresh(), on(name, fn)
 // ("events:<kind>": a player of an answer's events, returning a promise, run before the
-// regions apply; "applied": after an answer is on screen), touched(el) (a script changed
+// regions apply; "before": then, with { regions (the names coming), from, to (the
+// addresses), user (a link or form of the player's, not a refresh or back/forward) },
+// returning a promise too (scene.js fades the page out); "applied": after an answer is
+// on screen), touched(el) (a script changed
 // the region el is in), view() ({ url, post }: the address on screen, a POST's own page?),
 // busy().
 (function () {
@@ -389,7 +392,7 @@
 		});
 		if (a.go != null) return native(a.go || view.url);
 		if (a.doc != null) { showDocument(a.doc); return; }
-		return play(a.events).then(function () {
+		return play(a.events).then(function () { return before(a, o); }).then(function () {
 			var focused = document.activeElement;
 			parked = {};
 			for (var i = 0; i < a.regions.length; i++) {
@@ -407,6 +410,19 @@
 			if (a.title != null) document.title = a.title;
 			finish(a, o, focused);
 		});
+	}
+
+	// The "before" hooks, in turn, once the answer's events have played.
+	function before(a, o) {
+		var info = { regions: a.regions.map(function (r) { return r.name; }), from: view.url,
+			to: a.url != null ? a.url : view.url, user: o.history !== "none" && !o.keep };
+		var p = Promise.resolve();
+		(hooks.before || []).forEach(function (fn) {
+			p = p.then(function () {
+				try { return fn(info); } catch (e) { if (window.console) console.error(e); }
+			});
+		});
+		return p;
 	}
 
 	function play(events) {

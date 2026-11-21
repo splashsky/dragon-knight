@@ -2,13 +2,15 @@
 -- items (town_items) and selling bag items back.
 --   GET  /shop               the town's items (icon buttons by group) + the Sell section
 --                            (sellable bag items)
---   GET  /shop/buy/#id       confirmation; POST: gear in a slot that holds something:
---                            "keep" (the old item goes into the bag: needs a free slot) or
---                            "sell" (the old item is sold back, its value counts toward the
---                            price); otherwise "submit" (bag items: qty)
+--   GET  /shop/buy/#id       confirmation; POST: gear (weapons, armor, shields) "bag" (into
+--                            the bag; what is worn stays), "keep" (worn; the old item goes
+--                            into the bag: needs a free slot) or "sell" (worn; the old item
+--                            is sold back, its value counts toward the price); "submit"
+--                            alone wears it (selling the old one, as the original did); bag
+--                            items: "submit" with qty
 --   POST /shop/sell/#id      a bag entry (qty for stacks), for items.sell_price each
--- Weapons, armor and shields are equipped when bought; everything else (consumables,
--- accessories, ...) goes into the bag, stacking. Any item the town sells can be bought
+-- Weapons, armor and shields are worn when bought or put into the bag (3.0: the player
+-- chooses); everything else (consumables, accessories, ...) goes into the bag, stacking. Any item the town sells can be bought
 -- again and again, as far as the gold and the bag allow (2.4: a copy of the weapon you
 -- wear too; the old one is kept in the bag or sold, as always).
 local common = require("town.common")
@@ -23,8 +25,8 @@ local shop = {}
 -- the group of an item by its slot (accessories, consumables, ...: "other")
 local SLOT_GROUP = { weapon = "weapon", armor = "armor", shield = "shield" }
 
--- Shared buy checks. Returns the offer (item, slot, old entry, sellback, can_keep,
--- can_sell, max qty) or nil, error response.
+-- Shared buy checks. Returns the offer (item, slot, old entry, sellback, can_bag, bag_full,
+-- can_keep, keep_full, can_sell, max qty) or nil, error response.
 local function check(req, id)
 	local user = req.user
 	local town = common.town_here(req)
@@ -47,6 +49,8 @@ local function check(req, id)
 		end
 		o.keep_full = old ~= nil and inventory.room(old.item, bag, size) == 0
 		o.can_keep = old ~= nil and not o.keep_full and user.gold >= item.price
+		o.bag_full = inventory.room(item, bag, size) == 0
+		o.can_bag = not o.bag_full and user.gold >= item.price
 		if old and not o.can_sell and not o.can_keep then
 			return nil, common.message(req, "Buy Items", o.keep_full and "shop_bag_full" or "shop_poor")
 		end
@@ -100,12 +104,27 @@ function shop.list(req)
 	return view.page(req, "Buy Items", "town/shop", { groups = groups, sell = sell })
 end
 
--- GET /shop/buy/#id (the shop's dialog: its links have data-modal)
+-- GET /shop/buy/#id: the purchase (the shop's dialog: its links have data-modal; a page
+-- of its own without JavaScript), templates/town/shop_buy.html: check()'s offer, and icon
+-- (URL), kind, gold, stats (what it gives, as text: { label, new, old, delta, better }; old
+-- and delta against the item worn in its slot), effects (a consumable's, the spell it
+-- casts), description (gear's), after ({ buy, keep, sell }: the gold each choice leaves).
 function shop.confirm(req, params)
 	local o, err = check(req, params.id)
 	if not o then return err end
-	o.card = tips.shop(o.item, { gold = req.user.gold, old = o.old, sellback = o.sellback })
-	o.card.inline = true
+	local it, gold = o.item, req.user.gold
+	o.icon, o.kind, o.gold = items.icon_url(it), items.category_label(it), gold
+	o.stats = {}
+	for _, c in ipairs(items.compare(it, o.old and o.old.item)) do
+		o.stats[#o.stats + 1] = { label = c.label, new = c.new and items.signed(c.stat, c.new) or "—",
+			old = c.old and items.signed(c.stat, c.old) or "—",
+			delta = c.delta ~= 0 and items.signed(c.stat, c.delta) or nil, better = c.delta > 0 }
+	end
+	o.effects = {}
+	if it.category == "consumable" and (it.description or "") ~= "" then o.effects[1] = it.description end
+	for _, l in ipairs(items.charge_lines(it)) do o.effects[#o.effects + 1] = l end
+	if it.category ~= "consumable" then o.description = it.description end
+	o.after = { buy = gold - it.price, keep = gold - it.price, sell = gold - it.price + (o.sellback or 0) }
 	return view.page(req, "Buy Items", "town/shop_buy", o)
 end
 
@@ -119,12 +138,19 @@ function shop.buy(req, params)
 
 	if o.slot then
 		local mode = "new"
-		if o.old then
+		if form.bag ~= nil then
+			mode = "bag"
+		elseif o.old then
 			-- "submit" alone (the original form's Yes) sells the old item, as the original did
 			mode = form.keep ~= nil and "keep" or "sell"
 		end
 		local gold = user.gold - item.price
-		if mode == "keep" and not o.can_keep then
+		if mode == "bag" then
+			if not o.can_bag then return common.message(req, "Buy Items", o.bag_full and "shop_bag_full" or "shop_poor") end
+			if not inventory.add(user.id, item, 1) then return common.message(req, "Buy Items", "shop_bag_full") end
+			dk.db:exec("UPDATE users SET gold = ? WHERE id = ?", gold, user.id)
+			return common.message(req, "Buy Items", "shop_done")
+		elseif mode == "keep" and not o.can_keep then
 			return common.message(req, "Buy Items", o.keep_full and "shop_bag_full" or "shop_poor")
 		elseif mode == "sell" then
 			if not o.can_sell then return common.cheat(req) end

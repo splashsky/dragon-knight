@@ -1,8 +1,11 @@
 /* fight.css :: fight pages. Linked by every layout. */
-.fight .box-body p, .victory .box-body p, .drop .box-body p { margin: 0 0 1em; }
+.fight .box-body p, .drop .box-body p { margin: 0 0 1em; }
 .fight-command p { margin: 0 0 1em; }
 .fight-command input[type="submit"] { min-width: 4.5em; }
 .fight-stale { font-style: italic; }
+/* a monster speaking (fight/speech.lua): its line set apart from the action's */
+.fight-speech { font-style: italic; }
+.fight-taunt { font-size: 16px; }
 /* the actions (Attack, the equipped gear's abilities, Run: dk.css .action-btn/.spell-btn),
 	then the spells and the items: rows of icon buttons under a small label; Spells and Items
 	only show when there is something in them */

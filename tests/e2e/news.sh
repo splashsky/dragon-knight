@@ -131,7 +131,7 @@ t_sql "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 
 			 INSERT INTO news (postdate, title, content, author_id) SELECT 1000 + n, 'Bulk news ' || n, 'bulk ' || n || '.', $NEWS_ADMIN_ID FROM c"
 NEWS_TOTAL=$(t_sql "SELECT count(*) FROM news")
 t_jar newsplayer
-t_get /news;    expect_status 200; expect_body '<div class="title news-heading">News</div>'
+t_get /news;    expect_status 200; expect_body '<h1 class="title page-title news-heading">News</h1>'
 [ "$(news_count 'class="box news-post"')" = 10 ] && t_ok || t_fail "10 posts on the first page"
 expect_body '>Bulk news 12</a>'; expect_body '>Bulk news 3</a>'; expect_no_body '>Bulk news 2</a>'
 expect_body '<b>[1]</b>'; expect_body 'href="/news?start=10"'

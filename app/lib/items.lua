@@ -28,6 +28,16 @@ items.STAT_LABELS = {
 	gold_bonus_pct = "Gold Bonus",
 }
 
+-- An item's kind as the pages say it (its category).
+items.CATEGORY_LABELS = {
+	weapon = "Weapon", armor = "Armor", shield = "Shield", accessory = "Accessory", consumable = "Consumable",
+	quest = "Quest item", misc = "Item",
+}
+
+function items.category_label(item)
+	return items.CATEGORY_LABELS[item.category] or items.CATEGORY_LABELS.misc
+end
+
 function items.decode(row)
 	if row then
 		row.modifiers = stats.decode_modifiers(row.modifiers)
@@ -159,10 +169,47 @@ function items.rechargeable(item)
 	return item.rechargeable ~= 0 and item.rechargeable ~= false
 end
 
+-- A stat's amount as shown: "+5", "-3", "+10%" (the bonuses are percentages).
+function items.signed(stat, n)
+	local pct = stat == "exp_bonus_pct" or stat == "gold_bonus_pct"
+	return (n >= 0 and "+" or "") .. n .. (pct and "%" or "")
+end
+
+-- What a piece of gear gives, in order: { { stat, amount }, ... } (attack, defense, then
+-- its stat modifiers).
+local function stat_amounts(it)
+	local out = {}
+	if (it.attack or 0) ~= 0 then out[#out + 1] = { "attack", it.attack } end
+	if (it.defense or 0) ~= 0 then out[#out + 1] = { "defense", it.defense } end
+	for _, m in ipairs(type(it.modifiers) == "table" and it.modifiers or {}) do
+		if m.kind == "stat" then out[#out + 1] = { m.stat, m.amount } end
+	end
+	return out
+end
+
+-- Wearing `it` instead of `old` (nil: nothing), stat by stat: { stat, label, new, old,
+-- delta } (the amounts; new or old nil where that item hasn't the stat; delta = new - old),
+-- its own stats first, then those only `old` has.
+function items.compare(it, old)
+	local rows, olds, seen = {}, {}, {}
+	local old_list = old and stat_amounts(old) or {}
+	for _, a in ipairs(old_list) do olds[a[1]] = a[2] end
+	for _, a in ipairs(stat_amounts(it)) do
+		seen[a[1]] = true
+		rows[#rows + 1] = { stat = a[1], label = items.STAT_LABELS[a[1]] or a[1], new = a[2], old = olds[a[1]],
+			delta = a[2] - (olds[a[1]] or 0) }
+	end
+	for _, a in ipairs(old_list) do
+		if not seen[a[1]] then
+			rows[#rows + 1] = { stat = a[1], label = items.STAT_LABELS[a[1]] or a[1], old = a[2], delta = -a[2] }
+		end
+	end
+	return rows
+end
+
 -- "Max HP +10", "Gold Bonus +10%", "Strength -5".
 function items.stat_line(stat, amount)
-	local pct = stat == "exp_bonus_pct" or stat == "gold_bonus_pct"
-	return (items.STAT_LABELS[stat] or stat) .. " " .. (amount >= 0 and "+" or "") .. amount .. (pct and "%" or "")
+	return (items.STAT_LABELS[stat] or stat) .. " " .. items.signed(stat, amount)
 end
 
 -- What equipping it does: attack and defense, then the modifiers, as stat lines.

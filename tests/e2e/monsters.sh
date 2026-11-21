@@ -18,6 +18,11 @@ mo_is() {  # mo_is EXPR EXPECTED (an SQL expression on the users row)
 	if [ "$got" = "$2" ]; then t_ok; else t_fail "$1: expected '$2', got '$got'"; fi
 }
 mon() { t_sql "SELECT id FROM monsters WHERE key = '$1'"; }
+# the outcome of the fight ("", "victory", "death"); with an argument: whether there is one
+mo_outcome() {
+	if [ -n "${1:-}" ]; then t_sql "SELECT 1 FROM fights WHERE user_id = (SELECT id FROM users $MQ)"
+	else t_sql "SELECT coalesce((SELECT outcome FROM fights WHERE user_id = (SELECT id FROM users $MQ)), '')"; fi
+}
 # the monster (combatant 2) of the fight: a column
 MO_ENEMY="(SELECT c.%s FROM fight_combatants c WHERE c.user_id = users.id AND c.id = 2)"
 enemy() { printf "$MO_ENEMY" "$1"; }
@@ -46,7 +51,7 @@ mo_enemy_set "mp = 0, maxmp = 17"   # no MP for its spells: the potion is all it
 t_get /fight; CS=$(t_csrf)
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Goblin Shaman<template class="tip">'; expect_body "Monster's MP: 0"
 t_round "csrf=$CS&fight=Fight"
-expect_body 'class="fight-monsterturn">The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '
+expect_body 'The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '   # (it may speak first)
 mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "immune=i:0
 stock_1=i:1"
 mo_enemy_set "hp = 10"
@@ -67,7 +72,7 @@ t_section "monsters: the Goblin Shaman casts Hurt (MP)"
 t_fight monsterer "$SHAMAN" 40   # full HP: no heal, no potion; 17 MP
 t_get /fight; expect_body "Monster's MP: 17"
 t_round "csrf=$CS&fight=Fight"
-expect_body 'class="fight-monsterturn">The monster casts Hurt on you for '; expect_body "Monster's MP: 12"
+expect_body 'The monster casts Hurt on you for '; expect_body "Monster's MP: 12"
 mo_is "$(enemy mp)" 12
 hp=$(t_sql "SELECT currenthp FROM users $MQ")
 [ "$hp" -ge 485 ] && [ "$hp" -le 488 ] && t_ok || t_fail "Hurt damage: HP $hp"
@@ -111,6 +116,47 @@ mo_enemy_set "hp = 40"
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Bandit Captain uses the Herb.<br>The Bandit Captain recovers 30 Hit Points.'
 t_fight_clear monsterer
 t_sql "UPDATE users SET currentaction = 'Exploring' $MQ"
+
+t_section "monsters: speech"
+# the Blue Slime gets a line for each point in the test copy of its file, as likely as a
+# moment may be (chance 99: nothing is certain) (fight/speech.lua;
+# read when the fight runs, no sync): the fight page shows them as speech, the victory
+# page its last words, the death page its last word over the player
+MO_SLIME="$T/app/content/monsters/blue_slime.lua"
+cp "$MO_SLIME" "$T/blue_slime.lua.orig"
+sed -i 's/^}$/\tspeech = { start = { "Blub, {player}!", chance = 99 }, turn = { "Blub.", chance = 99 }, hurt = { "Blub?!", chance = 99 }, death = { "Bluuub...", chance = 99 }, victory = { "Blub blub blub!", chance = 99 } },\n}/' "$MO_SLIME"
+"$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check with the slime's speech: $(cat "$T/content.log")"
+t_fight monsterer 1 50
+t_get /fight; CS=$(t_csrf)
+t_round "csrf=$CS&fight=Fight"
+expect_body '<span class="fight-speech">Blue Slime: “Blub'
+grep -o '<span class="fight-speech">[^<]*</span>' "$BODY" | grep -qvE 'Blub\?!|Blub\.' && t_fail "an unexpected line" || t_ok
+WON=
+for _ in $(seq 1 20); do
+	mo_enemy_set "hp = 1"
+	t_round "csrf=$CS&fight=Fight"
+	if [ "$(mo_outcome)" = victory ]; then WON=1; break; fi
+done
+[ -n "$WON" ] && t_ok || t_fail "the slime never fell"
+t_get /victory; expect_body '<p class="dk-scene-quote">Blue Slime: &ldquo;Bluuub...&rdquo;</p>'
+t_fight_clear monsterer
+t_sql "UPDATE users SET currentaction = 'Exploring', dexterity = 5, base_maxhp = 500 $MQ"
+# (a slime that hits hard and can't be killed: the player falls at its first blow that lands)
+MO_SLIME_DAM=$(t_sql "SELECT maxdam FROM monsters WHERE id = 1")
+t_sql "UPDATE monsters SET maxdam = 100000 WHERE id = 1"
+t_fight monsterer 1 100000
+DIED=
+for _ in $(seq 1 30); do
+	t_sql "UPDATE users SET currenthp = 1 $MQ"
+	t_round "csrf=$CS&fight=Fight"
+	if [ "$(mo_outcome)" = death ]; then DIED=1; break; fi
+done
+t_sql "UPDATE monsters SET maxdam = $MO_SLIME_DAM WHERE id = 1"
+[ -n "$DIED" ] && t_ok || t_fail "the slime never won"
+t_get /fight; expect_body '<p class="fight-taunt"><span class="fight-speech">Blue Slime: &ldquo;Blub blub blub!&rdquo;</span></p>'
+cp "$T/blue_slime.lua.orig" "$MO_SLIME"
+t_fight_clear monsterer
+t_sql "UPDATE users SET currentaction = 'Exploring', base_maxhp = 500, currenthp = 500, dexterity = 22500, latitude = 20, longitude = 0 $MQ"
 
 t_section "monsters: the help page"
 t_get /help/monsters; expect_status 200

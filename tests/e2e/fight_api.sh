@@ -54,7 +54,7 @@ raw = open(path, "rb").read()
 text = raw.decode("utf-8")
 
 ACTORS = {"player", "ally", "enemy"}
-TYPES = {"attack", "spell", "item", "status", "summon", "blocked", "run", "ambush", "wave", "say",
+TYPES = {"attack", "spell", "item", "status", "summon", "blocked", "run", "ambush", "wave", "speech", "say",
 	"victory", "death", "escape"}
 PARTS = {"player", "allies", "enemies", "ending"}
 EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon"}
@@ -72,6 +72,7 @@ def answer():
 	for op, args, payload in frames(path):
 		p = payload.decode("utf-8")
 		if op == "events" and args == ["fight"]: d["events"] = json.loads(p)
+		elif op == "events" and args == ["scene"]: d["scene"] = json.loads(p)
 		elif op == "title": d["title"] = p
 		elif op == "url": d["url"] = p
 		elif op == "region": regions[args[0]] = p
@@ -128,7 +129,7 @@ def check(d):
 if cmd == "lines-html":
 	for p in re.findall(r'<p class="fight-(?:yourturn|allyturn|monsterturn|roundend)">(.*?)</p>', text, re.S):
 		for line in p.split("<br>"):
-			print(html.unescape(line))
+			print(html.unescape(re.sub(r'</?span[^>]*>', '', line)))   # (a monster's speech is a span)
 elif cmd == "lines-json":
 	for e in answer()["events"]:
 		if "text" in e:
@@ -225,23 +226,25 @@ for seed in 1 2 3 4 5 6; do
 done
 [ -n "$FA_HIT" ] && t_ok || t_fail "no attack's damage in the events"
 fa_expect 'd["round"] == 3 and d["url"] == "/fight" and d["title"] == "Fighting"' "the fight page's address (Post/Redirect/Get)"
-fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "Latitude:" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
+fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "class=\"loc-coords\"" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
 fa_expect '"name=\"round\" value=\"3\"" in d["fragments"]["main"] and "<html" not in d["fragments"]["main"]'
 fa_expect 'not any("data" in e or "step" in e for e in d["events"])' "no internal state"
 # the winning blow: the same redirect, and with fetch its lines too
 fa_win() { fa_player; t_fight fapi 2 1; fa_sql "UPDATE users SET base_attack = 500"; }
 fa_both victory 7 fa_win "fight=Fight&round=2"
 fa_expect 'd["redirect"] == "/victory" and d["events"][-1]["type"] == "victory"'
+# the fight's end is a scene after its events (lib/scene.lua; public/js/scene.js)
+fa_expect 'd["scene"].get("page") is True and d["scene"]["kind"] == "victory" and d["scene"]["title"] == "Victory!" and d["scene"]["detail"].startswith("You defeated the Red Slime: +")'
 fa_expect 'any(e["text"].startswith("You attack the monster for") and e["hp"][0]["to"] <= 0 for e in d["events"] if "hp" in e)'
 fa_is "$T_MONSTER_HP <= 0" 1
 
 t_section "fight api: the victory page as a fragment"
 fa_live GET /victory; expect_status 200; fa_check
-fa_expect '"Congratulations. You have defeated the Red Slime." in d["fragments"]["main"] and d["url"] == "/victory"'
+fa_expect '"<p class=\"dk-scene-detail\">You have defeated the Red Slime.</p>" in d["fragments"]["main"] and d["url"] == "/victory"'
 fa_expect 'd["title"] in ("Victory!", "Courage and Wit have served thee well!") and d["events"] == []'
 fa_is currentaction Exploring; fa_is "$T_ROUND" 0
 EXP=$(t_sql "SELECT experience FROM users $FAQ")
-fa_live GET /victory; fa_check; fa_expect '"Congratulations." in d["fragments"]["main"]' "shown again"
+fa_live GET /victory; fa_check; fa_expect '"<h1 class=\"dk-scene-title\">Victory!</h1>" in d["fragments"]["main"]' "shown again"
 fa_is experience "$EXP"
 
 t_section "fight api: running away"
@@ -253,6 +256,7 @@ fa_expect 'd["events"][0]["type"] == "run" and d["events"][0]["text"] == "You tr
 fa_escape() { fa_player; t_fight fapi 2 50; fa_sql "UPDATE users SET dexterity = 10000"; }
 fa_both escape 5 fa_escape "run=Run&round=2"
 fa_expect 'd["redirect"] == "/" and [e["type"] for e in d["events"]] == ["escape"]'
+fa_expect 'd["scene"] == {"kind": "escape", "title": "You got away", "detail": "The Red Slime is left behind."}'
 
 t_section "fight api: the Attack and Run buttons, form and fetch alike"
 # Attack and Run are icon buttons (2.4) sending what the text buttons sent: fight.js
@@ -441,6 +445,7 @@ t_section "fight api: death"
 fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 151 30000; }
 fa_both death 1 fa_doomed "fight=Fight&round=2"
 fa_expect 'd["events"][-1]["type"] == "death" and "<b>You have died.</b>" in d["fragments"]["main"] and "round" not in d'
+fa_expect 'd["scene"]["kind"] == "death" and d["scene"]["title"] == "You have died" and d["scene"]["detail"].endswith("defeated you. Half your gold is lost.")'
 fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and d["url"] == "/fight"'
 fa_is currentaction "In Town"
 fa_live GET /dead; expect_status 200; fa_check

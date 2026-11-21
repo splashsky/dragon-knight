@@ -23,10 +23,7 @@ function tips.spell(s)
 	}
 end
 
-local CATEGORY = {
-	weapon = "Weapon", armor = "Armor", shield = "Shield", accessory = "Accessory", consumable = "Consumable",
-	quest = "Quest item", misc = "Item",
-}
+local CATEGORY = items.CATEGORY_LABELS
 
 -- An item: its icon (when it has one) and name; its kind (and where a consumable works);
 -- what equipping it does or a consumable's power, and the spell it casts with its charges
@@ -65,45 +62,18 @@ function tips.consumable(it, qty)
 	return t
 end
 
--- What a piece of gear does, in order: { { stat, amount }, ... } (attack, defense, then
--- its stat modifiers).
-local function stat_amounts(it)
-	local out = {}
-	if it.attack ~= 0 then out[#out + 1] = { "attack", it.attack } end
-	if it.defense ~= 0 then out[#out + 1] = { "defense", it.defense } end
-	for _, m in ipairs(type(it.modifiers) == "table" and it.modifiers or {}) do
-		if m.kind == "stat" then out[#out + 1] = { m.stat, m.amount } end
-	end
-	return out
-end
-
-local function signed(stat, n)
-	local pct = stat == "exp_bonus_pct" or stat == "gold_bonus_pct"
-	return (n >= 0 and "+" or "") .. n .. (pct and "%" or "")
-end
-
 -- The rows of templates/tip/shop.html's stats table: { label, value, delta, better }; with
 -- `old` (the item worn in that slot), every stat either has, the change if one replaces
 -- the other ("—": the new one hasn't it; "+0" with `better` nil: no change).
 local function stat_rows(it, old)
-	local rows, seen = {}, {}
-	local function row(stat, n, o)
-		local r = { label = items.STAT_LABELS[stat] or stat, value = n and signed(stat, n) or "—" }
+	local rows = {}
+	for _, c in ipairs(items.compare(it, old)) do
+		local r = { label = c.label, value = c.new and items.signed(c.stat, c.new) or "—" }
 		if old then
-			local d = (n or 0) - (o or 0)
-			r.delta = signed(stat, d)
-			if d ~= 0 then r.better = d > 0 end
+			r.delta = items.signed(c.stat, c.delta)
+			if c.delta ~= 0 then r.better = c.delta > 0 end
 		end
 		rows[#rows + 1] = r
-	end
-	local olds = {}
-	for _, a in ipairs(old and stat_amounts(old) or {}) do olds[a[1]] = a[2] end
-	for _, a in ipairs(stat_amounts(it)) do
-		seen[a[1]] = true
-		row(a[1], a[2], olds[a[1]])
-	end
-	for _, a in ipairs(old and stat_amounts(old) or {}) do
-		if not seen[a[1]] then row(a[1], nil, a[2]) end
 	end
 	return rows
 end
@@ -120,13 +90,13 @@ end
 local function kind_line(it)
 	local kind = CATEGORY[it.category] or CATEGORY.misc
 	if it.category == "consumable" then return kind .. " · " .. (USABLE[it.usable_in] or USABLE.fight) end
-	if items.is_gear(it) and it.slot ~= "accessory" then return kind .. " · worn when bought" end
+	if items.is_gear(it) and it.slot ~= "accessory" then return kind end   -- worn or into the bag: the player's choice
 	return kind .. " · goes into your bag"
 end
 
 -- An item for sale (the shop's buttons; templates/tip/shop.html): name, picture and kind;
 -- the price and the player's gold (what is missing, when it is short); the stats, compared
--- with what is worn in its slot; its effects; what it replaces and that sells back for;
+-- with what is worn in its slot; its effects; what the worn item sells back for;
 -- its description (a consumable's is its effect). o: { gold, old (the equipped entry it
 -- replaces), sellback (what that sells back for, 0: nothing), short }.
 function tips.shop(it, o)
@@ -138,9 +108,8 @@ function tips.shop(it, o)
 	else
 		t.note = "You have " .. php.number_format(o.gold) .. " gold"
 	end
-	if old then
-		t.replaces = "Replaces your " .. old.name ..
-			((o.sellback or 0) > 0 and (", which sells back for " .. php.number_format(o.sellback) .. " gold") or "")
+	if old and (o.sellback or 0) > 0 then
+		t.replaces = "Your " .. old.name .. " sells back for " .. php.number_format(o.sellback) .. " gold"
 	end
 	if it.category ~= "consumable" then t.body = it.description end
 	return t

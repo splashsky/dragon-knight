@@ -1,7 +1,7 @@
 {#- Character sheet boxes (legacy templates/showchar.php, onlinechar.php). full = own sheet
 		(bonuses, next level, spells). -#}
 <section class="box">
-<div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
+<h2 class="title">{{{ art("character", "Character") }}}</h2>
 <div class="box-body">
 <b>{{ u.charname }}</b><br><br>
 
@@ -32,7 +32,7 @@ Defense Power: {{ s.defense }}<br>
 </section>
 
 <section class="box">
-<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<h2 class="title">{{{ art("inventory", "Inventory") }}}</h2>
 <div class="box-body">
 <table class="inventory">
 <tr><td><img src="/static/images/icon_weapon.gif" alt="Weapon" title="Weapon"></td><td>Weapon: {{ equipment.weapon }}</td></tr>
@@ -47,7 +47,7 @@ Slot 3: {{ equipment.accessory3 }}
 {%- if full then %}
 
 <section class="box">
-<div class="title"><img src="/static/images/button_spells.gif" alt="Spells" title="Spells"></div>
+<h2 class="title">{{{ art("spells", "Spells") }}}</h2>
 <div class="box-body">
 {%- if #spells == 0 then %}
 None

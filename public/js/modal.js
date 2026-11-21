@@ -16,7 +16,7 @@
 	var SLOW = 250;   // ms before the dialog opens with "Loading" while its page is on the way
 	var dlg = null, box = null;
 	var opener = null;       // the element focused when it opened (focused again when it closes)
-	var req = null;          // { ctl, post } in flight
+	var req = null;          // { ctl, post, inside (asked from the open dialog) } in flight
 	var dirty = false;       // a POST happened: the page behind is out of date
 	var lastButton = null;   // the submit button last clicked (browsers without ev.submitter)
 	var downOnBackdrop = false, slowTimer = 0;
@@ -66,9 +66,15 @@
 
 	function close() { if (isOpen()) dlg.close(); }
 
+	// (the close event comes a moment after the dialog closed: it may have opened again since,
+	// and a request to open it may be on its way)
 	function closed() {
-		clearTimeout(slowTimer);
-		if (req && !req.post) { req.ctl.abort(); req = null; }   // (a POST runs on: it changes the game)
+		if (dlg.open) return;
+		if (req && !req.post && req.inside) {   // (a POST runs on: it changes the game)
+			req.ctl.abort();
+			req = null;
+			clearTimeout(slowTimer);
+		}
 		box.textContent = "";
 		if (window.dkTip) window.dkTip.hide();
 		if (dirty) {
@@ -93,7 +99,7 @@
 			if (req.post) return;   // never cancel what changes the game; a second submit is a double click
 			req.ctl.abort();
 		}
-		var ctl = new AbortController(), mine = req = { ctl: ctl, post: !!post };
+		var ctl = new AbortController(), mine = req = { ctl: ctl, post: !!post, inside: isOpen() };
 		var headers = { "X-DK-Modal": "1" };
 		if (window.DK && window.DK.tab) headers["X-DK-Tab"] = window.DK.tab;   // (live.js: this tab knows)
 		clearTimeout(slowTimer);

@@ -14,7 +14,7 @@
 		(consumables: item=<items id>, a quantity badge, disabled when their can_use refuses
 		now), icon buttons like the spells. -#}
 <section class="box fight">
-<div class="title"><img src="/static/images/title_fighting.gif" alt="Fighting"></div>
+<h1 class="title page-title">{{{ art("fighting", "Fighting") }}}</h1>
 <div class="box-body">
 {%- if stale then %}
 <p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
@@ -40,7 +40,7 @@
 <div class="fight-log" data-fight-log>
 {%- for _, part in ipairs({ { "fight-yourturn", yourturn }, { "fight-allyturn", allyturn }, { "fight-monsterturn", monsterturn }, { "fight-roundend", roundend } }) do %}
 {%- if #part[2] > 0 then %}
-<p class="{{ part[1] }}">{% for i, line in ipairs(part[2]) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
+<p class="{{ part[1] }}">{% for i, line in ipairs(part[2]) do %}{% if i > 1 then %}<br>{% end %}{% if line.speech then %}<span class="fight-speech">{{ line.text }}</span>{% else %}{{ line.text }}{% end %}{% end %}</p>
 {%- end %}
 {%- end %}
 </div>

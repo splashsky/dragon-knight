@@ -20,11 +20,15 @@
 -- same death as ever); the current wave defeated brings the next wave on, or is the
 -- victory when none is left; allies at 0 HP leave. Fights without summons or new statuses
 -- consume exactly the random numbers of the original game, in the same order
--- (tests/lua/test_round.lua compares them with a frozen copy of the 2.1 fight).
+-- (tests/lua/test_round.lua compares them with a frozen copy of the 2.1 fight). Monsters
+-- may speak along the way (fight/speech.lua: a turn's chatter, a new wave's first words,
+-- and through the engine's listeners when they are hurt, healed, afflicted or fall, or
+-- win); that rolls none of the dice.
 local act = require("fight.act")
 local ai = require("fight.ai")
 local combat = require("fight.combat")
 local engine = require("fight.engine")
+local speech = require("fight.speech")
 local state = require("fight.state")
 
 local round = {}
@@ -67,6 +71,7 @@ local function over(f, r, player_struck)
 			engine.say(f, "Another monster appears: the " .. tostring(c.row.name) .. ".")
 			engine.done(f, prev)
 		end
+		speech.start(f)
 	end
 	return false
 end
@@ -77,12 +82,15 @@ local function turn(f, r, c)
 	if over(f, r) then return true end
 	if not state.get(f, c.id) or not state.alive(f, c) then return false end
 	local blocked, inst = engine.blocked(f, c)
+	f.speaker = c.id   -- (who has the last word, should the player fall: fight/speech.lua)
 	if blocked then
 		engine.blocked_line(f, c, inst)
 	else
+		if c.side == "enemy" then speech.turn(f, c) end
 		local cand, target = ai.choose(f, c)
 		if cand then cand.perform(f, c, target) end
 	end
+	f.speaker = nil
 	c.acted = true
 	return over(f, r)
 end

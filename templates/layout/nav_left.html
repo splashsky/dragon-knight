@@ -1,14 +1,18 @@
 {#- Left column (legacy templates/leftnav.php). ctx = game.nav(user). Each box is a region.
 		The compass is the original's picture (public/images/compass.png, its four pieces
 		joined) with a button over each quarter (the triangles between its diagonals: dk.css
-		.compass-rose), as named as the old text buttons; dk.js presses them for the arrow keys. -#}
+		.compass-rose), as named as the old text buttons; dk.js presses them for the arrow keys.
+		Location: where the player is as its heading ("In Midworld", "Exploring", "Fighting";
+		a theme with a picture for "location" shows that, and this as the first line), then
+		the coordinates ("3N, 5E": latitude, longitude) and the map. -#}
+{%- local where = town and ("In " .. town.name) or user.currentaction %}
 {{{ region("loc") }}}<section class="box" data-r="loc">
-<div class="title"><img src="/static/images/button_location.gif" alt="Location" title="Location"></div>
+<h2 class="title">{% if art_src("location") then %}{{{ art("location", "Location") }}}{% else %}{{ where }}{% end %}</h2>
 <div class="box-body">
-Currently: {{ user.currentaction }}<br>
-Latitude: {{ latitude }}<br>
-Longitude: {{ longitude }}<br>
-<a href="/map" target="_blank" data-popup="520x520">View Map</a><br>
+{%- if art_src("location") then %}
+<div class="loc-where">{{ where }}</div>
+{%- end %}
+<div class="loc-line"><span class="loc-coords" title="Latitude {{ latitude }}, longitude {{ longitude }}">{{ latitude }}, {{ longitude }}</span> &middot; <a href="/map" target="_blank" data-popup="520x520">View Map</a></div>
 {%- if user.currentaction ~= "Fighting" then %}
 <form class="compass" method="post" action="/move">
 {{{ csrf_field() }}}<div class="compass-rose"><img src="/static/images/compass.png" width="128" height="128" alt="">
@@ -22,7 +26,7 @@ Longitude: {{ longitude }}<br>
 </section>{{{ endregion() }}}
 
 {{{ region("towns") }}}<section class="box" data-r="towns">
-<div class="title"><img src="/static/images/button_towns.gif" alt="Towns" title="Towns"></div>
+<h2 class="title">{{{ art("towns", "Towns") }}}</h2>
 <div class="box-body">
 {%- if town then %}
 Welcome to <b>{{ town.name }}</b>.<br><br>
@@ -35,7 +39,7 @@ Travel To:<br>
 </section>{{{ endregion() }}}
 
 {{{ region("functions") }}}<section class="box" data-r="functions">
-<div class="title"><img src="/static/images/button_functions.gif" alt="Functions" title="Functions"></div>
+<h2 class="title">{{{ art("functions", "Functions") }}}</h2>
 <div class="box-body">
 <a href="/inventory">Inventory</a><br>
 {%- if forum then %}

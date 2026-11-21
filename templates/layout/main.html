@@ -11,12 +11,12 @@
 	{{{ logo() }}}
 	<nav class="dk-topnav">
 {%- if nav then %}
-		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}<input type="image" src="/static/images/button_logout.gif" alt="Log Out" title="Log Out"></form>
-		<a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
+		<form class="inline" method="post" action="/logout">{{{ csrf_field() }}}{% if art_src("logout") then %}<input type="image" src="{{ art_src("logout") }}" alt="Log Out" title="Log Out">{% else %}<button class="link">Log Out</button>{% end %}</form>
+		<a href="/help">{{{ art("help", "Help") }}}</a>
 {%- else %}
-		<a href="/login"><img src="/static/images/button_login.gif" alt="Log In" title="Log In"></a>
-		<a href="/register"><img src="/static/images/button_register.gif" alt="Register" title="Register"></a>
-		<a href="/help"><img src="/static/images/button_help.gif" alt="Help" title="Help"></a>
+		<a href="/login">{{{ art("login", "Log In") }}}</a>
+		<a href="/register">{{{ art("register", "Register") }}}</a>
+		<a href="/help">{{{ art("help", "Help") }}}</a>
 {%- end %}
 	</nav>
 </header>
@@ -46,8 +46,8 @@
 	<div>&copy; 2003-2006 by renderse7en</div>
 	{{{ region("foot-time") }}}<div data-r="foot-time">{{ elapsed() }} Seconds, {{ queries() }} Queries</div>{{{ endregion() }}}
 	<div><a href="/changelog">Version {{ version }}</a> {{ build }}</div>
+	{{{ region("themes") }}}<div class="dk-themes" data-r="themes">{{{ theme_picker() }}}</div>{{{ endregion() }}}
 </footer>{{{ endregion() }}}
-{{{ region("themes") }}}<div class="dk-themes small" data-r="themes">{{{ theme_picker() }}}</div>{{{ endregion() }}}
 {{{ include("layout/protos") }}}
 </body>{{{ endregion() }}}
 </html>

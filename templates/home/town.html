@@ -1,6 +1,6 @@
 {#- Town screen (legacy templates/towns.php + index.php dotown()). -#}
 <section class="box">
-<div class="title"><img src="/static/images/town_{{ town.id }}.gif" alt="Welcome to {{ town.name }}" title="Welcome to {{ town.name }}"></div>
+<h1 class="title page-title">{{{ art("town_" .. town.id, "Welcome to " .. town.name) }}}</h1>
 <div class="box-body">
 <b>Town Options:</b><br>
 <ul>
@@ -12,7 +12,7 @@
 </section>
 {%- if news then %}
 <section class="panel">
-<div class="title">Latest News</div>
+<h2 class="title">Latest News</h2>
 <div class="box-body"><a href="/news/{{ news.id }}"><b>{{ news.title }}</b></a> <span class="light">[{{ date(news.postdate) }} by {{ news.author }}]</span><br>{{{ nl2br(news.excerpt) }}}
 {%- if news.more then %} <a href="/news/{{ news.id }}">Read more</a>{% end %}
 <p class="news-links">

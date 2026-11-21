@@ -2345,7 +2345,7 @@ int main(int argc, char **argv)
 	if (O.threads > O.clients)
 		O.threads = O.clients;
 	static const char *const default_paths[] = { "/static/css/dk.css", "/static/js/dk.js",
-												 "/static/images/logo.gif" };
+												 "/static/images/themes/retro/logo.gif" };
 	if (!O.npaths)
 		for (size_t i = 0; i < sizeof default_paths / sizeof *default_paths; i++)
 			O.paths[O.npaths++] = strdup(default_paths[i]);

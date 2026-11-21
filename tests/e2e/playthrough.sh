@@ -40,7 +40,7 @@ pt_walk_home() {
 		t_post /move "csrf=$TC&$dir=$dir"
 		if [ "$STATUS" = 302 ] && grep -qiE '^location: /fight' "$HEADERS"; then pt_fight; fi
 	done
-	expect_body 'You have travelled to Midworld.'
+	expect_redirect /   # straight to the town (3.0)
 	pt_is "currentaction,latitude,longitude" "In Town|0|0" "walked home"
 }
 # Fight the current encounter until the victory page.
@@ -55,7 +55,7 @@ pt_fight() {
 		expect_status 200; expect_no_body 'You have died.'
 	done
 	expect_redirect /victory
-	t_get /victory; expect_status 200; expect_body 'Congratulations. You have defeated the'
+	t_get /victory; expect_status 200; expect_body '<h1 class="dk-scene-title">Victory!</h1>'; expect_body 'You have defeated the'
 	pt_is "currentaction,$T_ROUND" "Exploring|0" "after victory"
 }
 
@@ -94,9 +94,9 @@ pt_is "currentmp,base_maxmp,$T_KNOWN" "5|5|25" "a new Mage: 5 MP and Magic Bolt"
 t_get /inn;      expect_body 'Resting at the inn'
 t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed and ready for action.'
 t_get /shop;     expect_body 'href="/shop/buy/1" data-modal title="Stick (10 gold)"'
-t_get /shop/buy/1; expect_text 'You are buying the Stick, is that ok?'
+t_get /shop/buy/1; expect_body '<b>Buy and equip</b>'
 t_post /shop/buy/1 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this item.'
-t_get /shop/buy/66; expect_text 'You are buying the Herb for 15 gold each.'
+t_get /shop/buy/66; expect_body '<span class="buy-tag">15 gold each</span>'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2"; expect_body 'Thank you for purchasing this item.'
 t_get /maps;     expect_body 'href="/maps/buy/2">Roma</a>'
 t_get /maps/buy/2; expect_body 'You are buying the Roma map. Is that ok?'
@@ -117,9 +117,9 @@ pt_walk_home
 
 t_section "playthrough: travel"
 pt_is "towns" "0,2,1" "maps after walking into Midworld"
-t_post /travel/2 "csrf=$TC"; expect_body 'You have travelled to Roma.'
+t_post /travel/2 "csrf=$TC"; expect_redirect /
 t_get /;         expect_body 'Welcome to Roma'
-t_post /travel/1 "csrf=$TC"; expect_body 'You have travelled to Midworld.'
+t_post /travel/1 "csrf=$TC"; expect_redirect /
 pt_is "currentaction,latitude,longitude,currenttp" "In Town|0|0|5" "back in Midworld"
 
 t_section "playthrough: second fight + item drop"

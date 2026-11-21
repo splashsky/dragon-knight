@@ -201,6 +201,7 @@ or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loa
 live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
 `tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
+`scene.js`, see [Scenes](#scenes),
 `live.js`, `fight.js`): the head is the same
 everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
@@ -302,7 +303,10 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 	(`.dk-progress`, a 2 px bar in the theme's link colour) and `data-r="main"` is
 	`aria-busy`.
 - **Applying an answer.** `events` players first (`DK.on("events:<kind>", fn)`, each
-	returning a promise), then each `region` is morphed into `[data-r=name]` (`root` into
+	returning a promise), then the `before` hooks (`DK.on("before", fn)`: `{ regions,
+	from, to, user }`, the regions' names coming, the address on screen and the answer's,
+	whether a link or form of the player's sent it rather than a refresh or back/forward;
+	a promise too: `scene.js` fades the middle column out there), then each `region` is morphed into `[data-r=name]` (`root` into
 	`<body>`), the hashes merged, the title set; after a POST the submitted form is
 	`reset()`, so it shows what the server rendered (empty after success, the values the
 	server put back after a refusal). Then the history entry: a new address is pushed (and
@@ -334,7 +338,7 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 - **For other scripts**, `window.DK`: `visit(url)`; `refresh()` (the address on screen
 	again, keeping the scroll: only what changed comes; a POST's own page keeps its middle
 	column, which no GET shows, and updates the rest); `on("applied", fn)` (after an answer
-	is on screen; `{ url, post }`); `on("events:<kind>", fn)`; `touched(el)` (the script
+	is on screen; `{ url, post }`); `on("events:<kind>", fn)`; `on("before", fn)`; `touched(el)` (the script
 	changed the region `el` is in, e.g. a chat message added from an event: the next answer
 	brings that region as the server has it); `view()`; `busy()`.
 
@@ -343,9 +347,54 @@ addresses qualify); `tests/e2e/browser.sh` drives `tests/browser/client.js` in h
 Chrome, Edge or Chromium over the DevTools protocol (node's `WebSocket`, no dependencies;
 skipped without node or a browser): logging in and out without a page load (and the event
 stream starting and stopping), links, back/forward with their scroll, typed text and a
-folded chat kept, the chat, a move, a POST's own page, the progress bar, a newer link
+folded chat kept, the chat, a move, a POST's own page (resting at the inn), the progress bar, a newer link
 winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
 routes only) is a page that takes its time.
+
+## Scenes
+
+The live client changes pages smoothly (`public/js/scene.js`). Any action of the player's
+that changes the middle column (a link or form: the inn and resting there, the shop and
+selling, the map store and buying a map, the inventory, ...) fades it out (0.15 s, in the
+`before` hook, `html.dk-fade-out`) and the new one in (0.25 s); fight rounds (`fight.js`
+plays them: from `/fight` to `/fight`), refreshes, back/forward and answers that leave the
+middle column as it is (a step while exploring) don't. When the player's state changes the
+middle column fades out through a caption instead: a fight beginning, a victory, a death,
+a getaway, arriving in a town, setting out from one.
+
+- **The server** adds a `scene` event to the redirect that ends the change:
+	`scene.add(req, res, kind, title, detail [, page])` (`app/lib/scene.lua`; live requests only),
+	`{ kind, title, detail [, page] }` as JSON. `main.lua` carries a redirect's events to the page it
+	lands on, after the round's (`events fight`). The scenes:
+
+| Where | kind | title | detail |
+|---|---|---|---|
+| `POST /move` onto a town, `POST /travel/<id>` (`town/travel.lua`) | `town` | the town's name | "You arrive in Midworld." / "You travel to Roma for 5 TP." |
+| `POST /move` out of a town (`town/explore.lua`) | `explore` | Exploring | "You leave Midworld behind." |
+| `POST /move` into an encounter | `fight` (`death` when the ambush kills) | Fight! | "A Blue Slime blocks your way." |
+| `POST /fight`, the winning round (`routes/fight.lua`) | `victory` | Victory! | "You defeated the Blue Slime: +12 experience, +5 gold." (and "You gained a level!" or "It left something behind.") |
+| `POST /fight`, the fatal round | `death` | You have died | "The Blue Slime defeated you. Half your gold is lost." |
+| `POST /fight`, a getaway | `escape` | You got away | "The Blue Slime is left behind." |
+
+- **The client** plays it after the round's events (`fight.js`) and before the regions
+	apply: the middle column fades out (0.2 s) while the caption (`.dk-scene
+	.dk-scene-<kind>`: the title large, the detail under it, over the middle column,
+	`role="status"`) fades in; the new page goes in under it, the caption lingers (0.55 s;
+	arriving in a town and setting out 0.8 s), then it fades out and the page in (0.25 s):
+	1 s in all (1.25 s). The victory is a page scene
+	(`scene.add(..., page)`, `"page": true`): the victory page is drawn like a caption
+	(`fight/victory.html`: `.dk-scene-page`, "Victory!" large in gold, who fell and what it
+	paid under it, then a level-up, a drop and the way on), so no caption goes over it: the
+	fight fades out and the victory page fades in slowly (0.6 s) and stays. A click or a key cuts any of it short;
+	with `prefers-reduced-motion` the new page just shows; if no page comes (a native load)
+	the caption goes after 4 s. Without the live client nothing plays: the redirect shows the
+	new page.
+- Arriving in a town goes straight to the town's page (3.0): the "You have travelled to
+	... You may now enter this town." page is gone; its sentence is the scene's detail.
+- Tests: `tests/e2e/live_wire.sh` (the encounter's, the town's and setting out's scenes,
+	none while exploring on or without the live client), `tests/e2e/fight_api.sh` (victory,
+	death, escape), `tests/browser/client.js` (a link: the middle column faded out and in;
+	back: no fade; walking into Midworld: the caption seen, the page back after it).
 
 ## Modals
 
@@ -649,20 +698,46 @@ starting with `__` are reserved.
 	named `north`, `west`, `east`, `south` like the old text buttons, so `POST /move` reads
 	them as before. `dk.js` presses them for the arrow keys (not while a field has the
 	keyboard or a modifier is held; a held key walks on only while the live client is free).
+- Item and skill tiles (`dk.css` "frames"): a gradient frame drawn as a background layer
+	under the tile, through a 2px transparent border, bright at the top to dark at the
+	bottom: gold (`--frame-gold`, lit on hover) for spells, items and gear, steel for the
+	fight's Attack and Run (`.action-btn`), crimson for quest items in the bag; the tile
+	itself is `--icon-bg`, a fine grain (`--icon-noise`: an SVG noise filter in a `data:`
+	URL, no image file) over a warm off-white a little darker at the edges
+	(`--icon-ground`, radial), which item pictures without a ground of their own sit on
+	everywhere (the bag, lists, the Inventory panel, tooltips, the purchase dialog). The
+	bag's cards are light (`--tile`) in a thin gold frame. Retro sets the frames to plain
+	black (quest items red).
 - Icon buttons for items (`.spell-btn` with an `.item-badge`): the fight menu's Items and
 	Gear, the shop's wares (`town/shop.html`: grouped Weapons, Armor, Shields, Items;
 	greyed, `.shop-short`, when the gold, with what the worn piece sells back for, doesn't
 	cover it — still a link: the purchase page says why) and its Sell buttons (a stack's
 	size, `.item-badge-qty`, and how many to sell). The shop's prices are in its tooltips,
-	`tip/shop.html` (below). The wares' links open the purchase page
-	(`town/shop_buy.html`: the item's card, the same `tip/shop.html` with `inline`, then the
-	question and its buttons) in a dialog, `data-modal` (see [Modals](#modals)).
+	`tip/shop.html` (below). The wares' links open the purchase in a dialog, `data-modal`
+	(see [Modals](#modals)); without JavaScript it is a page of its own.
+- The purchase (`town/shop_buy.html`, `.buy`; `shop.confirm` builds its ctx) has its own
+	look, made to decide rather than to inform: the item in a framed tile (`.buy-tile`, 48px)
+	with its name, its kind ("Weapon", "Consumable, into your bag") and a gold
+	price tag (`.buy-tag`, "15 gold each"); gear's description, small; what it changes
+	side by side with the item worn in its slot (`.buy-compare`: "Your Stick" and "The
+	Club" columns, the change green or red; `items.compare`), or what it gives with nothing
+	worn (`.buy-gives`), or what it does (`.buy-effects`: a consumable's effect, the spell it
+	casts and its charges); then the choices as large buttons (`.buy-choice`: what to do in
+	bold, what happens to what is worn and what it leaves in the purse under it; one that
+	can't be taken is shown dashed with the reason, `.buy-choice-off`): for gear "Buy to
+	bag" (`bag`), "Buy and equip" (`keep`: the old piece into the bag; `submit` with
+	nothing worn) and "Buy and sell my Stick" (`sell`), for the rest a quantity for stacks
+	(`.buy-qty`) and "Buy" (`submit`, `qty`); and "Not now" (`.buy-cancel`, `cancel`,
+	`data-modal-close`).
 - Images: `/static/images/<file>`. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
 	`<blink>`.
-- Shared CSS classes: `.title`, `.box` / `.box-body`, `.small`, `.light`, `.highlight`,
-	`.error`, `.copyright`, `button.link`, `form.inline`.
+- Shared CSS classes: `.title` (headings: `<h1 class="title page-title">` the page's own,
+	once, first in the middle column; `<h2 class="title">` a panel's; the browser's heading
+	sizes don't apply, the theme styles them), `.box` / `.box-body`, `.small`, `.light`,
+	`.highlight`, `.error`, `.copyright`, `button.link`, `form.inline`. A heading the theme
+	may draw as a picture goes through `{{{ art(key, text) }}}` (see [Themes](#themes)).
 
 ### Helpers `h`
 
@@ -673,6 +748,7 @@ starting with `__` are reserved.
 | `csrf_field()` / `csrf_token()` | hidden input / raw token |
 | `logo()` | the theme's logo, linked to `/` → HTML |
 | `theme_picker()` | the theme selector (a POST form to `/theme` that comes back to this page) → HTML |
+| `art(key, text)`, `art_src(key)` | a label of the layout: the theme's picture for `key` or the text (see [Themes](#themes)) → HTML; the picture's URL or nil |
 | `url(path, seg..., [query_table])` | `url("/forum/thread", 7, {start = 15})` → `/forum/thread/7?start=15` (segments urlencoded) |
 | `number(n)` | PHP `number_format($n)`: `1234567` → `1,234,567` |
 | `date(ts)` | PHP `date("F j, Y")` (legacy `prettydate`) |
@@ -686,13 +762,13 @@ starting with `__` are reserved.
 
 ## Themes
 
-A theme is a stylesheet and a logo; the layout (columns, sizes, boxes) is the same in
-every theme. `app/lib/themes.lua` lists them:
+A theme is a stylesheet, a logo and, optionally, pictures for the layout's labels (`art`);
+the page's structure is the same in every theme. `app/lib/themes.lua` lists them:
 
-| Key | Name | Stylesheet | Logo |
-|---|---|---|---|
-| `default` | Default | `/static/css/themes/default.css`: the snow background (`public/images/themes/default/background.jpg`), near-black text and borders, dark red links with a bright red hover, translucent white title boxes | `/static/images/themes/default/logo.png` (shown at 355×120) |
-| `retro` | Retro | `/static/css/themes/retro.css`: the original tiled `background.jpg` and colours | `/static/images/logo.gif` (409×108) |
+| Key | Name | Stylesheet | Logo | Labels |
+|---|---|---|---|---|
+| `default` | Default | `/static/css/themes/default.css`: the snow background (`public/images/themes/default/background.jpg`), near-black text, dark red links with a bright red hover; headings as text in small capitals over a hairline (the page's title larger, without one), no lines between the columns but 22px of space, the chat in light stripes, the footer a row of small print without a box | `/static/images/themes/default/logo.png` (shown at 355×120) | text |
+| `retro` | Retro | `/static/css/themes/retro.css`: the original tiled `background.jpg`, the grey heading boxes and black column lines of `dk.css` | `/static/images/themes/retro/logo.gif` (409×108) | the original's pictures (`public/images/themes/retro/`: `button_*.gif`, `title_*.gif`, `town_N.gif`) |
 
 ```lua
 -- an entry of themes.list (the selector lists them in this order)
@@ -700,13 +776,15 @@ every theme. `app/lib/themes.lua` lists them:
 	key = "retro",                                  -- [a-z0-9_]: the cookie value, body class theme-retro
 	name = "Retro",                                 -- shown in the selector
 	stylesheet = "/static/css/themes/retro.css",
-	logo = { src = "/static/images/logo.gif", width = 409, height = 108,
+	logo = { src = "/static/images/themes/retro/logo.gif", width = 409, height = 108,
 		alt = "Dragon Knight" },                    -- the logo's alt text is the game's name; this if it has none
+	art = { location = "button_location.gif", town_1 = "town_1.gif", ... },   -- optional
+	art_dir = "/static/images/themes/retro/",
 }
 ```
 
 - **Choosing.** Every page with a footer (main and admin layouts, help and changelog
-	pages) ends with the selector, `{{{ theme_picker() }}}` ("Theme: Default · Retro", the
+	pages) has the selector in its footer's row, `{{{ theme_picker() }}}` ("Theme: Default · Retro", the
 	current one in bold): a POST form to `/theme` (`app/routes/theme.lua`) with the CSRF
 	field (the session's token, or the pre-session token when logged out, as on the login
 	form), `theme` (the key, from the button pressed) and `back` (the page's path and query
@@ -722,10 +800,23 @@ every theme. `app/lib/themes.lua` lists them:
 	the class `theme-<key>` (before `body_class`), and `{{{ logo() }}}`
 	(`templates/layout/logo.html`) draws `theme.logo` linked to `/` (main layout header, admin
 	menu, help and changelog pages). The 500 and 503 pages link the theme's stylesheet too.
+- **Labels** (`art`): the panels' headings (`<h2 class="title">`), the page titles
+	(`<h1 class="title page-title">`) and the top links are written with `{{{ art(key,
+	text) }}}`: the theme's picture for `key` (`<img>` with `text` as alt and title), or
+	`text`, escaped. `art_src(key)` is the picture's URL or nil (the Log Out button: an
+	image button or a link-styled one). Keys: `location`, `towns`, `functions`,
+	`character`, `inventory`, `fastspells`, `spells`, `exploring`, `fighting`,
+	`town_<id>` ("Welcome to <town>"), `login`, `logout`, `register`, `help`. A key the
+	theme has no picture for is text, so a ninth town reads "Welcome to ..." in Retro too.
+	The Location panel's heading is where the player is ("In Midworld", "Exploring",
+	"Fighting") when the theme draws it as text; a theme with a `location` picture shows
+	that, and where the player is as the panel's first line (`.loc-where`). Then the
+	coordinates, latitude first (`.loc-coords`, "3N, 5W"), and the map link on one line.
 - **Theme CSS** only overrides `dk.css` and the feature stylesheets: background, colours,
-	borders, logo effects. Since only the current theme's file is linked, plain selectors
-	(`body`, `a`) are enough; `body.theme-<key>` is there for feature CSS that needs to
-	differ by theme. Keep sizes and layout in `dk.css` so every theme fits the same.
+	borders, the headings' and columns' look, logo effects. Since only the current theme's
+	file is linked, plain selectors (`body`, `a`) are enough; `body.theme-<key>` is there
+	for feature CSS that needs to differ by theme. Keep the columns' widths and the page's
+	structure in `dk.css` so every theme fits the same.
 - **Adding a theme**: put its images under `public/images/themes/<key>/`, write
 	`public/css/themes/<key>.css` (copy `default.css`), add an entry to `themes.list`, and
 	add it to `tests/e2e/theme.sh`. No restart: the next page lists it.
@@ -819,8 +910,7 @@ for sale and the Sell buttons (`tips.shop(item, { gold, old, sellback, short })`
 at a glance: the price set large with the player's gold or what is missing, the stats as
 a table of figures with the change against the item worn in that slot, green or red, a
 gray "+0" when it doesn't change, and the stats a swap loses, the effects (a consumable's, the spell gear casts, its charges),
-the trade-in, then the description; no lore); the purchase page's item and
-the one it replaces; the discard confirmation), the monster's name on the fight page (name,
+the trade-in, then the description; no lore); the discard confirmation), the monster's name on the fight page (name,
 level, description, lore) and the class names on the registration page (starting HP/MP, the
 description's points, lore). Names that aren't links get `class="tip-term" tabindex="0"`.
 
@@ -1548,7 +1638,8 @@ stock, immunity).
 	type = "spell",                -- attack, spell, item, status (a status's tick or hook, or the
 	                               -- turn's countdown), summon (an ally acting, joining, leaving),
 	                               -- blocked (a status blocks the turn), run, ambush, wave (the next
-	                               -- enemy), say (anything else); the last event of a round that
+	                               -- enemy), speech (a monster speaking: "Troll: “Tickles.”", see
+	                               -- [Monster speech](#monster-speech)), say (anything else); the last event of a round that
 	                               -- ended: victory, death or escape (no text)
 	text = "The monster casts Hurt on you for 14 damage.",   -- absent: a change without a line
 	hp = { { who = "player", id = 1, name = "Fapi", from = 300, to = 286, max = 300 } },
@@ -1713,6 +1804,82 @@ items, spells }` with item and spell rows, read once per request; a row may carr
 `monsters.effective(row)` (a copy with the equipment counted, base values in `base`),
 `monsters.reload()`.
 
+### Monster speech
+
+Monsters may speak in a fight (`app/fight/speech.lua`): a `speech` table in the file holds
+lists of lines for moments of the fight. Nothing is ever certain: each moment speaks by
+chance, and lines may be held back for conditions, or to once a fight. The Goblin Shaman
+(the commented example), the Troll, the Necromancer and the Red Dragon have some.
+
+```lua
+-- app/content/monsters/red_dragon.lua (abridged)
+speech = {
+	start = {                                   -- it appears
+		"You smell of ash already, little knight.", "Kneel, and I may yet make it quick.",
+		{ text = "Another thief come for my gold?", weight = 2 },   -- twice as likely
+		chance = 70,                            -- percent; 0 to 99: never for certain
+	},
+	turn = {                                    -- its turn, before it acts
+		"Burn.",
+		{ text = "You sway on your feet, {player}.", when = { foe_hp_below = 25 }, once = "condition" },
+		chance = 15,
+	},
+	winning = { "Your armor is melting, {player}.", once = true, chance = 40 },   -- the list: once a fight
+	losing = { { text = "Enough!", once = true, when = { hp_below = 15 } }, chance = 45 },   -- the line: once a fight
+	hurt = { "A scratch.", { text = "Poison... in MY veins?", once = true, when = { has = { "poison" } } } },
+	status = { sleep = { "Zzz..." } },          -- a status put on it, by key
+	death = { "My hoard... my... hoard...", chance = 80 },   -- the victory page shows it
+	victory = { "Another bauble for the hoard." },           -- the death page shows it
+},
+```
+
+- **Moments**: `start` (it appears: the encounter begins, or its wave comes on), `turn`
+	(its turn, before it acts; not while a status blocks it), `winning` / `losing` (its
+	turn, its share of HP 25 points above / below the player's; tried before `turn`),
+	`hurt` (it took damage and lives), `healed`, `status` (by the status's key), `death`,
+	`victory` (the player fell).
+- **Chance**: a list's `chance` (percent, 0 to 99) is how often the moment speaks; without
+	it, the moment's default (`SPEECH_CHANCE` in `content/kinds/monsters.lua`: start 50,
+	turn 15, winning and losing 25, hurt 20, healed 30, status 40, death and victory 50).
+	`once = true` on a list: it speaks once a fight at most.
+- **Lines**: a string (weight 1) or `{ text, weight, when, once }`. When the moment speaks,
+	a line is picked by weight among those that may be said now; when none may, it stays
+	quiet. The line said last at a moment isn't picked next time when another may be.
+	`once = true`: once a fight; `once = "condition"`: once each time its `when` comes
+	true (it may come again after the condition no longer held at a moment of its list).
+	"{player}" is the player's name, "{name}" the monster's.
+- **Conditions** (`when`): a table whose conditions must all hold: `has` / `lacks` (status
+	keys the monster has all of / none of), `foe_has` / `foe_lacks` (the player's),
+	`hp_below` / `hp_above` (the monster's share of HP, percent: below / at least),
+	`foe_hp_below` / `foe_hp_above` (the player's), `from_round`; or a `function(m)` like a
+	loadout entry's `when` (`m.hp`, `m:has_status(key)`, `m.target`, `m.round`, ...: see
+	[Monsters](#monsters); an error counts as false, logged). Combinations are just more
+	keys: `{ has = { "poison", "sleep" }, foe_hp_below = 30 }`.
+- **One line a round**: a monster says at most one line a round (the first moment that
+	speaks), but its death and its victory may always. What it said and what it may not say
+	again is kept in the fight's data (`said_<id>_<moment>`, `once_...`).
+- **No dice**: the chance and the pick are hashes of the fight's voice (`f.data.voice`,
+	drawn from the clock when the encounter begins), the round, the monster and the moment.
+	The fight rolls the same dice with speech or without (`tests/lua/test_round.lua`'s 2.1
+	fight and `test_speech.lua` check it), and the form and the live client say the same.
+- **Where it shows**: in the round's lines, as "Troll: “Tickles.”" (`.fight-speech`,
+	italic; a `speech` event for `fight.js`; in `fights.log` the line starts with
+	`speech.MARK`, "\31"). The start comes first on the encounter's page (before an
+	ambush); a wave's monsters speak when it comes on. Its death line is also on the
+	victory page (`.dk-scene-quote`, `fights.result.said`), its victory line on the death
+	page (`.fight-taunt`, `fights.result.taunt`).
+- **Hooks**: `fight/round.lua` calls `speech.turn` before an enemy acts (not while a status
+	blocks it) and `speech.start` for a new wave; `fight/encounter.lua` the start of an
+	encounter; the engine tells it of HP changes and new statuses through
+	`engine.listeners` (hurt, healed, death, the player's death: the monster acting has the
+	last word, else the first standing).
+- **Checked** by `dk check` (`content/kinds/monsters.lua`): known moments, lines of one line
+	of text up to 200 characters, weights from 1, `chance` 0 to 99, `once` true (or
+	"condition" on a line with a `when`), known conditions with sensible values, and every
+	status key it names (a `status` list's, a condition's) a status file (the flat form's
+	`speech.statuses`). Speech isn't synced or overridable: it is read from the file when
+	the fight runs (`load.module`), so editing it takes effect on the next round.
+
 Adding a monster: copy `app/content/monsters/goblin_shaman.lua` (or an original's file for
 one that only attacks) to `<key>.lua`, edit it, run `./dk check`. With `roams = true` (the
 default) it is met at random in its level band on the next page load (mind the admin
@@ -1832,9 +1999,9 @@ return {
 	item keys; Midworld sells the Wand). Any item a town sells can be bought as often as the
 	gold and the bag allow (2.4: no more "Already purchased", a copy of the item worn
 	included); the server checks that the town sells it, the gold and the bag's room.
-	Weapons, armor and shields are equipped when bought: with an old item in the slot the
-	player either keeps it in the bag (needs a free slot) or sells it back (its value counts
-	toward the price). Everything else goes into the bag (`qty`, up to the room on a stack or
+	Weapons, armor and shields go into the bag (3.0; what is worn stays) or are worn at
+	once, the player's choice: with an old item in the slot it goes into the bag (needs a
+	free slot) or is sold back (its value counts toward the price). Everything else goes into the bag (`qty`, up to the room on a stack or
 	a new one, and the gold). The Sell section buys any sellable bag item.
 - Drops: a victory without a level-up drops an item 1 in 30 times, picked uniformly among
 	the non-retired droppable items with `drop_level` at or below the monster's level (the
@@ -1855,6 +2022,7 @@ and `messages` and `data` into tables.
 | `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
 | `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
+| `items.signed(stat, n)`, `items.compare(item, old)`, `items.category_label(item)` | `"+5"`, `"+10%"`; wearing `item` instead of `old` stat by stat (`{ stat, label, new, old, delta }`: the shop's tooltips and the purchase); "Weapon", "Consumable" |
 | `items.icon(item)`, `items.icon_url(item)` | its picture's URL, or nil / the default icon |
 | `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])`, `items.rechargeable(item)` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "3/5 Charges" [, "Single use"] }`; an inn refills it |
 

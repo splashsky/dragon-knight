@@ -3,7 +3,7 @@
 		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's, and its
 		picture when it has one (else the slot's icon). Each box is a region. -#}
 {{{ region("charpanel") }}}<section class="box" data-r="charpanel">
-<div class="title"><img src="/static/images/button_character.gif" alt="Character" title="Character"></div>
+<h2 class="title">{{{ art("character", "Character") }}}</h2>
 <div class="box-body charpanel" data-player-stats>
 <div class="charpanel-head"><b>{{ user.charname }}</b> <span class="charpanel-level">Level {{ user.level }}</span></div>
 <dl class="charpanel-meta">
@@ -22,7 +22,7 @@
 </section>{{{ endregion() }}}
 
 {{{ region("invpanel") }}}<section class="box" data-r="invpanel">
-<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<h2 class="title">{{{ art("inventory", "Inventory") }}}</h2>
 <div class="box-body invpanel">
 <a class="invpanel-bag{% if bag_used >= bag_size then %} full{% end %}" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>{{ bag_used }}</b>/{{ bag_size }}</span></a>
 <ul class="invpanel-gear">
@@ -36,7 +36,7 @@
 </section>{{{ endregion() }}}
 
 {{{ region("spellpanel") }}}<section class="box" data-r="spellpanel">
-<div class="title"><img src="/static/images/button_fastspells.gif" alt="Fast Spells" title="Fast Spells"></div>
+<h2 class="title">{{{ art("fastspells", "Fast Spells") }}}</h2>
 <div class="box-body spellpanel">
 {%- if #spells == 0 then %}
 <span class="light">None</span>

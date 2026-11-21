@@ -11,6 +11,7 @@ local game = require("lib.game")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
+local speech = require("fight.speech")
 local spells = require("lib.spells")
 local state = require("fight.state")
 
@@ -82,6 +83,8 @@ function encounter.die(user, r)
 	-- fixed: legacy kept the uber buffs and didn't write currentmp, refunding the MP of a
 	-- spell cast on the fatal turn. The fight (and its statuses) ends.
 	f.outcome, f.log = "death", encounter.log_of(r)
+	-- the monster's last word over the player, for the death page (fight/speech.lua)
+	f.result = f.taunt and { taunt_by = f.taunt.by, taunt = f.taunt.text } or {}
 	state.save(f)
 	dk.db:exec([[UPDATE users SET currenthp = ?, currentmp = ?, currentaction = 'In Town', latitude = 0,
 		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
@@ -135,6 +138,7 @@ function encounter.win(user, f, r)
 
 	-- level-ups grow the base stats (lib/stats.lua). experience/gold were MEDIUMINT
 	-- UNSIGNED: a bonus below -100% made them negative and MySQL stored 0.
+	if f.last_words then res.said_by, res.said = f.last_words.by, f.last_words.text end
 	f.outcome, f.result = "victory", res
 	if r then f.log = encounter.log_of(r) end
 	state.save(f)
@@ -149,6 +153,7 @@ end
 function encounter.victory_page(res)
 	local ctx = { defeated = res.defeated or "", r = {
 		exp = res.exp or 0, gold = res.gold or 0, warnexp = res.warnexp or "", warngold = res.warngold or "" } }
+	if (res.said or "") ~= "" then ctx.said = { by = res.said_by or "", text = res.said } end
 	if res.levelup then
 		ctx.levelup = { levels = res.levels, hp = res.hp, mp = res.mp, tp = res.tp, strength = res.strength,
 			dexterity = res.dexterity, learned = res.learned }
@@ -163,7 +168,8 @@ end
 -- HP): any older fight goes, a monster of the level band where they stand is picked (each
 -- enemy's HP rolled), and when it is quicker its first strike is played (an ambush). Saved.
 -- Returns "fight" (go on fighting), "death" (the ambush killed the player: see
--- encounter.die) or nil when no monster can be met there (nothing changed).
+-- encounter.die), each with the monster's row, or nil when no monster can be met there
+-- (nothing changed).
 function encounter.begin(user_id)
 	local user = game.user(user_id)
 	local monster = encounter.pick(user.latitude, user.longitude)
@@ -177,19 +183,30 @@ function encounter.begin(user_id)
 	state.add_monster(f, monster, 1)
 	f.rand = rand
 	f.max_allies = game.control().max_allies or 1
-	if not round.start(f) then
+	-- the fight's voice: what its monsters say is picked by it, not by the dice
+	f.data.voice = (os.time() * 7919 + math.floor((dk.clock() % 1) * 1000000)) % 2147483647
+	local player_first = round.start(f)
+	-- the monster's first words open the page (before its first strike, if it is quicker)
+	local opening = {}
+	f.out, f.part = opening, "player"
+	speech.start(f)
+	f.out, f.part = nil, nil
+	if not player_first then
 		local r = round.play(f, { kind = "ambush" })
+		for i = #opening, 1, -1 do table.insert(r.player, 1, opening[i]) end
 		if r.died then
 			encounter.die(user, r)
-			return "death"
+			return "death", monster
 		end
 		f = r.f
 		f.log = encounter.log_of(r)
+	else
+		f.log = encounter.log_of({ player = opening })
 	end
 	f.round = f.round + 1
 	state.save(f)
 	encounter.save_player(user.id, f.st)
-	return "fight"
+	return "fight", monster
 end
 
 return encounter

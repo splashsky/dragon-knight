@@ -116,8 +116,17 @@ local function logo(req)
 	return view.render("layout/logo", { theme = theme, gamename = name }, req)
 end
 
+-- A label of the layout (a panel's heading, a page title, a top link): the theme's picture
+-- for `key` (themes.art; `text` its alt text and title) or the text, escaped.
+local function art(req, key, text)
+	local src = themes.art(themes.current(req), key)
+	if not src then return dk.html(text) end
+	return '<img src="' .. dk.html(src) .. '" alt="' .. dk.html(text) .. '" title="' .. dk.html(text) .. '">'
+end
+
 -- Renders templates/<name>.html with ctx. Per-render helpers: include(name [, ctx])
--- (defaults to this ctx), csrf_field(), csrf_token(), theme_picker(), logo(), req.
+-- (defaults to this ctx), csrf_field(), csrf_token(), theme_picker(), logo(), art(key,
+-- text) and art_src(key) (the theme's picture for a label, or its text / nil), req.
 function view.render(name, ctx, req)
 	ctx = ctx or {}
 	local h = setmetatable({ req = req }, { __index = base })
@@ -126,6 +135,8 @@ function view.render(name, ctx, req)
 	function h.csrf_token() return csrf.token(req) end
 	function h.theme_picker() return theme_picker(req) end
 	function h.logo() return logo(req) end
+	function h.art(key, text) return art(req, key, text) end
+	function h.art_src(key) return themes.art(themes.current(req), key) end
 	-- tip("spell", row [, extra]): the tooltip content of a spell, item, monster or class
 	-- (lib/tips.lua, templates/tip/tip.html; docs/APP.md "Tooltips"; extra: an item's
 	-- { charges = n }) -> HTML

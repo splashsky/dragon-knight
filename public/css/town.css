@@ -50,25 +50,92 @@ h3.inv-heading { font-size: 1em; margin: 1em 0 0.3em; }
 table.inv-equipped td { padding: 1px 6px 1px 0; vertical-align: top; }
 table.inv-equipped td.inv-slot { white-space: nowrap; }
 .inv-bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-.inv-cell { border: 1px solid #999; padding: 4px; min-height: 4em; }
+/* a bag entry: a gold frame (dk.css --frame-gold; crimson for quest items), a dashed one
+	for a free slot */
+.inv-cell {
+	padding: 4px;
+	min-height: 4em;
+	border: solid 1px transparent;
+	border-radius: 4px;
+	background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--frame-gold) border-box;
+}
 .inv-icon { float: left; margin: 0 6px 2px 0; border-radius: 3px; }
-.inv-cell.inv-free { border-style: dashed; text-align: center; }
-.inv-cell.inv-quest { border-color: #c00; }
+.inv-cell.inv-free { border: dashed 1px #999999; background: none; text-align: center; }
+.inv-cell.inv-quest { background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--frame-crimson) border-box; }
 .inv-actions { clear: left; margin-top: 3px; }
 
-/* item pictures in lists (equipped slots) and the purchase page */
+/* item pictures in lists (equipped slots) */
 img.item-icon { vertical-align: middle; border-radius: 3px; }
-/* the purchase page (town/shop_buy.html; in the shop's dialog too): the item's card (the
-	shop's tooltip, tip/shop.html), the question, the buttons */
-.shop-buy .shop-tip {
-	max-width: 360px;
-	padding: 8px 10px;
-	border: solid 1px rgba(0, 0, 0, 0.25);
-	border-radius: 4px;
-	background-color: rgba(255, 255, 255, 0.6);
+
+/* the purchase (town/shop_buy.html; the shop's dialog, or a page): the item in a framed
+	tile with a price tag; what it changes, side by side with what is worn; the choices as
+	large buttons, each saying what it leaves in the purse */
+.buy { max-width: 420px; font-variant-numeric: lining-nums; }
+.buy-head { display: flex; align-items: center; gap: 12px; }
+.buy-tile {
+	flex: none;
+	padding: 3px;
+	border: solid 2px transparent;
+	border-radius: 6px;
+	background: var(--icon-noise) padding-box, var(--icon-ground) padding-box, var(--frame-gold) border-box;
+	line-height: 0;
 }
-.shop-buy-form p { margin: 10px 0 0; }
-.shop-buy-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.buy-name { flex: 1 1 auto; min-width: 0; }
+.buy-name b { display: block; font-size: 19px; line-height: 1.2; }
+.buy-kind { font-size: 13px; color: #5f5a50; }
+.buy-tag {
+	flex: none;
+	padding: 2px 10px;
+	border: solid 1px #b08a2e;
+	border-radius: 999px;
+	background-color: #fbefc6;
+	color: #6b4a00;
+	font-weight: bold;
+	white-space: nowrap;
+	font-variant-numeric: lining-nums;
+}
+.buy-about { margin-top: 8px; font-size: 13px; font-style: italic; color: #55504a; }
+.buy-about p { margin: 0; }
+.buy-compare { margin-top: 10px; border-collapse: collapse; font-size: 14px; font-variant-numeric: lining-nums tabular-nums; }
+.buy-compare th, .buy-compare td { padding: 1px 16px 1px 0; text-align: left; }
+.buy-compare thead th { font-size: 12px; font-weight: normal; color: #5f5a50; }
+.buy-compare tbody th { font-weight: normal; }
+.buy-compare td { font-weight: bold; }
+.buy-up { color: #2e7d22; }
+.buy-down { color: #c8141b; }
+.buy-gives, .buy-effects { list-style: none; margin: 10px 0 0; padding: 0; font-size: 14px; font-variant-numeric: lining-nums; }
+.buy-choices { display: grid; gap: 6px; margin-top: 12px; }
+.buy-choice {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 7px 12px;
+	border: solid 1px rgba(0, 0, 0, 0.35);
+	border-radius: 6px;
+	background-color: rgba(255, 255, 255, 0.85);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+button.buy-choice:hover { border-color: currentColor; background-color: #ffffff; }
+button.buy-choice:focus-visible { outline: solid 2px currentColor; outline-offset: 1px; }
+.buy-choice b, .buy-choice span { display: block; }
+.buy-choice span { font-size: 13px; color: #5f5a50; font-variant-numeric: lining-nums; }
+.buy-choice-off { border-style: dashed; background-color: transparent; opacity: 0.65; cursor: default; }
+.buy-qty { margin: 12px 0 0; }
+.buy-qty input { width: 4.5em; }
+.buy-qty-note { font-size: 13px; color: #5f5a50; }
+.buy-cancel {
+	margin-top: 10px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-decoration: underline;
+	cursor: pointer;
+}
 
 /* the shop (town/shop.html): groups of item buttons (dk.css .spell-btn); one the gold
 	doesn't cover greyed out (still a link: the purchase page says why); the Sell buttons

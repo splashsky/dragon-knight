@@ -91,8 +91,9 @@ app/                  Lua application (hot-reloaded)
 templates/            *.html templates (hot-reloaded): layout/ (main, minimal, admin, head,
                       nav), auth/, home/, town/, fight/, community/{forum,help}/, admin/, errors/
 public/               served at /static/ (images/, css/, js/: dk.js popups and the compass's keys,
-                      tooltip.js, modal.js dialogs, client.js the live client, live.js the
-                      event stream, fight.js the fight player)
+                      tooltip.js, modal.js dialogs, client.js the live client, scene.js the
+                      fades between states, live.js the event stream, fight.js the fight
+                      player)
 tests/c/              C unit tests (one main() per file, built by `make test`)
 tests/lua/            Lua unit tests (run inside a dk VM by tests/run.sh)
 tests/run.sh          end-to-end harness + core checks (bash + curl against a temp server;

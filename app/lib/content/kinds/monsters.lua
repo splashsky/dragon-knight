@@ -10,11 +10,14 @@
 -- the flat form only notes that there is one ("items.1.when" = 1). Flat fields:
 -- "equipment.weapon" = "broadsword", "items.1.item" = "potion", "items.1.weight",
 -- "items.1.stock" (absent: no limit), "spells.1.spell" = "hurt", "spells.1.weight".
+-- `speech` (what it says in a fight: fight/speech.lua) stays in the file too, read when the
+-- fight runs; it is checked here, and the statuses it answers or its conditions name are
+-- noted in the flat form ("speech.statuses" = "poison,sleep": they must exist).
 local schema = require("lib.content.schema")
 
 local monsters = {
 	name = "monsters", table = "monsters", dir = "content.monsters", label = "monster",
-	extra_keys = { equipment = true, items = true, spells = true },
+	extra_keys = { equipment = true, items = true, spells = true, speech = true },
 }
 
 -- Equipment slots (a character's) -> the item category that fits.
@@ -55,6 +58,15 @@ monsters.fields = {
 local by_name = {}
 for _, f in ipairs(monsters.fields) do by_name[f.name] = f end
 
+-- The points of a fight a monster may speak at (fight/speech.lua), and how often each
+-- speaks when its list doesn't say (`chance`, percent: never for certain).
+monsters.SPEECH_POINTS = { "start", "turn", "winning", "losing", "hurt", "healed", "status", "death", "victory" }
+monsters.SPEECH_CHANCE = { start = 50, turn = 15, winning = 25, losing = 25, hurt = 20, healed = 30, status = 40,
+	death = 50, victory = 50 }
+local SPEECH = {}
+for _, p in ipairs(monsters.SPEECH_POINTS) do SPEECH[p] = true end
+local LINE_MAX = 200
+
 local WEIGHT = { type = "int", min = 1, max = STAT }
 local STOCK = { type = "int", min = 1, max = 10000 }
 local WHEN = { type = "int", min = 1, max = 1 }
@@ -67,6 +79,7 @@ end
 function monsters.field(name)
 	name = tostring(name)
 	if by_name[name] then return by_name[name] end
+	if name == "speech.statuses" then return key_spec(name, "statuses", "Speech: statuses") end
 	local slot = name:match("^equipment%.([%w_]+)$")
 	if slot and monsters.SLOT_CATEGORY[slot] then return key_spec(name, "items", "Equipment " .. slot) end
 	local list, i, param = name:match("^(%a+)%.(%d+)%.(%a+)$")
@@ -146,7 +159,120 @@ local function entries(data, list, ref, allowed, flat, err)
 	end
 end
 
+-- A condition (a line's `when`): a function(m), or a table of has / lacks / foe_has /
+-- foe_lacks (status keys, noted in `answered`), hp_below / hp_above / foe_hp_below /
+-- foe_hp_above (percents) and from_round.
+local WHEN_LISTS = { has = true, lacks = true, foe_has = true, foe_lacks = true }
+local WHEN_PERCENTS = { hp_below = true, hp_above = true, foe_hp_below = true, foe_hp_above = true }
+local function speech_when(w, at, answered, err)
+	if type(w) == "function" then return end
+	if type(w) ~= "table" then
+		err(at .. " must be a table like { has = { \"poison\" }, hp_below = 30 } or a function(m)")
+		return
+	end
+	for _, k in ipairs(sorted_keys(w)) do
+		local v = w[k]
+		if WHEN_LISTS[k] then
+			if type(v) ~= "table" or #v == 0 then
+				err(at .. "." .. tostring(k) .. " must be a list of status keys like { \"poison\", \"sleep\" }")
+			else
+				for _, key in ipairs(v) do
+					if not check_key(key) then err(at .. "." .. k .. ": '" .. tostring(key) .. "' must be the key of a status")
+					else answered[key] = true end
+				end
+			end
+		elseif WHEN_PERCENTS[k] then
+			if math.type(v) ~= "integer" or v < 0 or v > 100 then
+				err(at .. "." .. k .. " must be an integer from 0 to 100 (a percent of HP)")
+			end
+		elseif k == "from_round" then
+			if math.type(v) ~= "integer" or v < 1 then err(at .. ".from_round must be an integer from 1") end
+		else
+			err(at .. ": unknown condition '" .. tostring(k) .. "' (has, lacks, foe_has, foe_lacks, hp_below, hp_above, " ..
+				"foe_hp_below, foe_hp_above, from_round)")
+		end
+	end
+end
+
+-- A list of lines (speech.<point>): strings or { text, weight, when, once }, and the
+-- list's chance (0-99) and once.
+local function speech_list(v, at, answered, err)
+	local example = '{ "Grr!", { text = "You will regret this.", weight = 2 }, chance = 30 }'
+	if type(v) ~= "table" then
+		err(at .. " must be a list of lines like " .. example)
+		return
+	end
+	for _, k in ipairs(sorted_keys(v)) do
+		local x = v[k]
+		if k == "chance" then
+			if math.type(x) ~= "integer" or x < 0 or x > 99 then
+				err(at .. ".chance must be an integer from 0 to 99 (how often it speaks, in percent: never for certain)")
+			end
+		elseif k == "once" then
+			if x ~= true then err(at .. ".once must be true (it speaks once a fight)") end
+		elseif math.type(k) ~= "integer" or k < 1 or k > #v then
+			err(at .. " must be a list of lines like " .. example .. " (unexpected key " .. tostring(k) .. ")")
+		end
+	end
+	for i, e in ipairs(v) do
+		local here = at .. "[" .. i .. "]"
+		local text, w = e, 1
+		if type(e) == "table" then
+			for _, k in ipairs(sorted_keys(e)) do
+				if k ~= "text" and k ~= "weight" and k ~= "when" and k ~= "once" then
+					err(here .. ": unknown field '" .. tostring(k) .. "'")
+				end
+			end
+			text, w = e.text, e.weight == nil and 1 or e.weight
+			if e.when ~= nil then speech_when(e.when, here .. ".when", answered, err) end
+			if e.once ~= nil and e.once ~= true and e.once ~= "condition" then
+				err(here .. ".once must be true (once a fight) or \"condition\" (once each time its `when` comes true)")
+			elseif e.once == "condition" and e.when == nil then
+				err(here .. ".once = \"condition\" needs a `when`")
+			end
+		end
+		if type(text) ~= "string" or text == "" or #text > LINE_MAX or text:find("%c") then
+			err(here .. " must be one line of text of at most " .. LINE_MAX .. " characters")
+		end
+		if math.type(w) ~= "integer" or w < 1 or w > STAT then
+			err(here .. ".weight must be an integer from 1 (how likely, next to the others)")
+		end
+	end
+end
+
+local function validate_speech(sp, flat, err)
+	if sp == nil then return end
+	if type(sp) ~= "table" then
+		err("field 'speech' must be a table like { start = { \"Grr!\", chance = 40 }, hurt = { \"Ow!\" } }")
+		return
+	end
+	local answered = {}
+	for _, point in ipairs(sorted_keys(sp)) do
+		if not SPEECH[point] then
+			err("speech: unknown point '" .. tostring(point) .. "' (points: " .. table.concat(monsters.SPEECH_POINTS, ", ") .. ")")
+		elseif point == "status" then
+			if type(sp.status) ~= "table" then
+				err('speech.status must be a table of lists by status key, like { sleep = { "Zzz..." } }')
+			else
+				for _, key in ipairs(sorted_keys(sp.status)) do
+					if not check_key(key) then
+						err("speech.status: '" .. tostring(key) .. "' must be the key of a status (like \"sleep\")")
+					else
+						answered[key] = true
+						speech_list(sp.status[key], "speech.status." .. key, answered, err)
+					end
+				end
+			end
+		else
+			speech_list(sp[point], "speech." .. point, answered, err)
+		end
+	end
+	local keys = sorted_keys(answered)
+	if #keys > 0 then flat["speech.statuses"] = table.concat(keys, ",") end
+end
+
 function monsters.validate_extra(data, flat, err)
+	validate_speech(data.speech, flat, err)
 	local eq = data.equipment
 	if eq ~= nil then
 		if type(eq) ~= "table" then

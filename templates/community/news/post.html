@@ -1,6 +1,6 @@
 {#- One news post; ctx.post from lib/news.lua (news.get / news.page). -#}
 <section class="box news-post">
-<div class="title"><a href="/news/{{ post.id }}">{{ post.title }}</a></div>
+<h2 class="title"><a href="/news/{{ post.id }}">{{ post.title }}</a></h2>
 <div class="box-body">
 <span class="light">[{{ date(post.postdate) }} by {{ post.author }}]</span><br>
 {{{ nl2br(post.content) }}}

@@ -49,11 +49,13 @@ t_section "theme: static files"
 t_get /static/css/dk.css;                 expect_status 200; expect_body '@font-face'
 expect_body 'font-family: Vollkorn;'; expect_body 'Vollkorn, Georgia, "Times New Roman", serif'
 t_get /static/css/themes/default.css;     expect_status 200; expect_body '/static/images/themes/default/background.jpg'
-t_get /static/css/themes/retro.css;       expect_status 200; expect_body '/static/images/background.jpg'
+t_get /static/css/themes/retro.css;       expect_status 200; expect_body '/static/images/themes/retro/background.jpg'
 t_get /static/images/themes/default/background.jpg; expect_status 200; expect_header '^content-type: image/jpeg'
 t_get /static/images/themes/default/logo.png;       expect_status 200; expect_header '^content-type: image/png'
-t_get /static/images/logo.gif;            expect_status 200
-t_get /static/images/background.jpg;      expect_status 200
+t_get /static/images/themes/retro/logo.gif;         expect_status 200
+t_get /static/images/themes/retro/background.jpg;   expect_status 200
+t_get /static/images/themes/retro/town_8.gif;       expect_status 200
+t_get /static/images/logo.gif;                      expect_status 404   # moved to the Retro theme
 for w in Regular Italic Bold BoldItalic; do
 	t_get "/static/fonts/vollkorn/Vollkorn-$w.ttf"; expect_status 200; expect_header '^content-length: [1-9][0-9]{4,}'
 done
@@ -73,11 +75,11 @@ theme_post retro /help
 expect_redirect /help
 expect_header '^set-cookie: dk_theme=retro; Path=/; Max-Age=31536000; SameSite=Lax'$'\r''?$'
 t_get /help;       theme_is retro; expect_body '<body class="minimal theme-retro help">'
-expect_body '<a class="dk-logo" href="/"><img src="/static/images/logo.gif" width="409" height="108" alt="Dragon Knight" title="Dragon Knight"></a>'
+expect_body '<a class="dk-logo" href="/"><img src="/static/images/themes/retro/logo.gif" width="409" height="108" alt="Dragon Knight" title="Dragon Knight"></a>'
 expect_body '<b aria-current="true">Retro</b>'
 expect_body '<button class="link" type="submit" name="theme" value="default">Default</button>'
 t_get /login;      theme_is retro; expect_body '<body class="theme-retro">'
-expect_body 'src="/static/images/logo.gif"'; expect_no_body 'themes/default/logo.png'
+expect_body 'src="/static/images/themes/retro/logo.gif"'; expect_no_body 'themes/default/logo.png'
 t_get /changelog;  theme_is retro
 
 t_section "theme: return paths"
@@ -121,10 +123,24 @@ expect_body 'src="/static/images/themes/default/logo.png"'
 
 t_section "theme: logged in, kept across login"
 t_jar themeplayer
-t_get /
+t_get /;           expect_status 200; theme_is default
+# Default writes them as text
+expect_body '<h1 class="title page-title">Welcome to Midworld</h1>'
+# the Location panel: where the player is as its heading, then the coordinates and the map
+expect_body '<h2 class="title">In Midworld</h2>'; expect_no_body 'class="loc-where"'
+expect_body '<div class="loc-line"><span class="loc-coords" title="Latitude 0N, longitude 0E">0N, 0E</span> &middot; <a href="/map"'
+expect_body '<button class="link">Log Out</button></form>'; expect_body '<a href="/help">Help</a>'
+expect_no_body 'images/themes/retro/'
 theme_post retro /;                      expect_redirect /
 t_get /;           expect_status 200; theme_is retro; expect_body '<body class="theme-retro" data-live'
-expect_body 'src="/static/images/logo.gif"'
+expect_body 'src="/static/images/themes/retro/logo.gif"'
+# Retro draws the original's pictures for the headings and top links (lib/themes.lua art)
+expect_body '<h2 class="title"><img src="/static/images/themes/retro/button_location.gif" alt="Location" title="Location"></h2>'
+expect_body '<div class="loc-where">In Midworld</div>'   # the picture says "Location": where, below it
+expect_body '<h1 class="title page-title"><img src="/static/images/themes/retro/town_1.gif" alt="Welcome to Midworld" title="Welcome to Midworld"></h1>'
+expect_body '<input type="image" src="/static/images/themes/retro/button_logout.gif" alt="Log Out" title="Log Out">'
+expect_body '<a href="/help"><img src="/static/images/themes/retro/button_help.gif" alt="Help" title="Help"></a>'
+expect_body '<h2 class="title">Latest News</h2>'   # no picture: text
 t_get /character;  theme_is retro; expect_body '<body class="minimal theme-retro" data-live data-csrf="'
 t_logout
 t_get /login;      theme_is retro
@@ -132,6 +148,6 @@ t_login themer themepw1; t_get /; theme_is retro
 t_jar themeadmin
 t_get /admin
 theme_post retro /admin;                 expect_redirect /admin
-t_get /admin;      theme_is retro; expect_body '<body class="admin theme-retro" data-live'; expect_body 'src="/static/images/logo.gif"'
+t_get /admin;      theme_is retro; expect_body '<body class="admin theme-retro" data-live'; expect_body 'src="/static/images/themes/retro/logo.gif"'
 theme_post default /admin;               expect_redirect /admin
 t_get /admin;      theme_is default

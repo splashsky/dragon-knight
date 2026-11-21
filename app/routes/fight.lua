@@ -21,6 +21,8 @@
 -- or on the redirect the server follows), which fight.js plays before the page's regions
 -- apply. Every fight form carries the round it was shown at: a POST /fight with another
 -- round (a second click, an older tab) plays nothing and shows the fight as it is now.
+-- A round that ends the fight (a victory, a death, a getaway) adds a scene after its
+-- events (lib/scene.lua; public/js/scene.js): the fight fades out into the page it ends on.
 local act = require("fight.act")
 local auth = require("lib.auth")
 local encounter = require("fight.encounter")
@@ -28,6 +30,8 @@ local events = require("fight.events")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
+local scene = require("lib.scene")
+local speech = require("fight.speech")
 local json = require("lib.json")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
@@ -56,11 +60,27 @@ local function show(req, title, template, ctx)
 end
 
 -- A redirect; t.events: the round's, carried to the page it lands on (main.lua follows
--- a live request's redirects on the server).
+-- a live request's redirects on the server); t.scene: { kind, title, detail [, page =
+-- true] } after them (lib/scene.lua).
 local function go(req, url, t)
 	local res = view.redirect(url)
 	res.events = fight_events(req, t and t.events)
+	if t and t.scene then scene.add(req, res, t.scene[1], t.scene[2], t.scene[3], t.scene.page) end
 	return res
+end
+
+-- The name of the enemy still standing (the first of them), for a scene's details.
+local function foe(f)
+	local c = state.side(f, "enemy", true)[1]
+	return c and c.row.name or "monster"
+end
+
+-- A victory's scene details: who fell and what it paid (encounter.win's result).
+local function victory_detail(res)
+	local s = "You defeated the " .. (res.defeated or "monster") .. ": +" .. php.number_format(res.exp or 0) ..
+		" experience, +" .. php.number_format(res.gold or 0) .. " gold."
+	if res.levelup then s = s .. " You gained a level!" elseif res.dropped then s = s .. " It left something behind." end
+	return s
 end
 
 -- The fight menu's item buttons: consumables in the bag usable in fights, one per item with
@@ -203,10 +223,21 @@ end
 -- The fight page of fight f (in progress, or as it ended in a death): its combatants, the
 -- lines of its last round and the note about the last command (lines: encounter.lines),
 -- and the commands with the round they carry.
+-- A part's lines for the page: { text, speech (a monster speaking: fight/speech.lua) }.
+local function page_lines(list)
+	local out = {}
+	for i, l in ipairs(list or {}) do
+		if l:sub(1, 1) == speech.MARK then out[i] = { text = l:sub(2), speech = true } else out[i] = { text = l } end
+	end
+	return out
+end
+
 local function fight_page(req, f, lines)
 	local user = req.user
-	local page = { yourturn = lines.yourturn, allyturn = lines.allyturn, monsterturn = lines.monsterturn,
-		roundend = lines.roundend, stale = lines.stale, note = lines.note, dead = f.outcome == "death" }
+	local page = { yourturn = page_lines(lines.yourturn), allyturn = page_lines(lines.allyturn),
+		monsterturn = page_lines(lines.monsterturn), roundend = page_lines(lines.roundend), stale = lines.stale,
+		note = lines.note, dead = f.outcome == "death" }
+	if page.dead and (f.result.taunt or "") ~= "" then page.taunt = { by = f.result.taunt_by or "", text = f.result.taunt } end
 	local shown = view_of(f)
 	for k, v in pairs(shown) do page[k] = v end
 	local first = shown.enemies[1]
@@ -302,14 +333,16 @@ local function fight(req)
 		state.clear(user.id)
 		encounter.save_player(user.id, f.st)
 		dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
-		return go(req, "/", { events = evs })
+		return go(req, "/", { events = evs, scene = { "escape", "You got away", "The " .. foe(f) .. " is left behind." } })
 	elseif r.victory then
 		encounter.save_player(user.id, f.st)
 		encounter.win(user, f, r)
-		return go(req, "/victory", { events = evs })
+		return go(req, "/victory", { events = evs, scene = { "victory", "Victory!", victory_detail(f.result), page = true } })
 	elseif r.died then
+		local by = foe(f)
 		encounter.die(user, r)
-		return go(req, "/fight", { events = evs })
+		return go(req, "/fight", { events = evs,
+			scene = { "death", "You have died", "The " .. by .. " defeated you. Half your gold is lost." } })
 	end
 	f.round = f.round + 1
 	f.log = encounter.log_of(r)

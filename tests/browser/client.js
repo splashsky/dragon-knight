@@ -107,14 +107,20 @@ async function run(wsUrl, port) {
 
 	section = "navigation";
 	var loadsBefore = tab.loads;
+	// (scene.js: a link of the player's fades the middle column out and the new one in)
+	await js("window.__fades = []; new MutationObserver(function () { window.__fades.push(document.documentElement.className); })" +
+		".observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })");
 	await js("document.querySelector('a[href=\"/inventory\"]').click()");
 	check("inventory page", await until("location.pathname === '/inventory' && document.title === 'Inventory'"), await js("document.title"));
 	check("no reload", await js("window.__dk === 1") && tab.loads === loadsBefore);
+	check("the middle column faded out and in", await until("window.__fades.some(function (c) { return /dk-fade-out/.test(c); }) && !/dk-fade-out/.test(document.documentElement.className)"),
+		await js("window.__fades"));
 	check("the middle column", await js("!!document.querySelector('[data-r=main]').textContent.match(/bag/i)"));
 	check("one region of each", await js("[...document.querySelectorAll('[data-r]')].map(e => e.dataset.r).every((n, i, a) => a.indexOf(n) === i)"));
-	await js("history.back()");
+	await js("window.__fades = []; history.back()");
 	check("back: town again", await until("location.pathname === '/' && document.title === 'In Town' && !DK.busy()"), await js("document.title"));
 	check("back: no reload", await js("window.__dk === 1"));
+	check("back: no fade", await js("!window.__fades.some(function (c) { return /dk-fade-out/.test(c); })"), await js("window.__fades"));
 	await js("history.forward()");
 	check("forward", await until("location.pathname === '/inventory' && !DK.busy()"));
 
@@ -182,13 +188,14 @@ async function run(wsUrl, port) {
 	check("a dialog opens", await until("!!document.querySelector('dialog.dk-modal[open] [name=qty]')"));
 	check("over the shop", await js("location.pathname === '/shop' && window.__dk === 1"));
 	check("its title", await js("document.querySelector('dialog .dk-modal-title').textContent === 'Buy Items'"));
-	check("the item's card", await js("/Price 15 gold/.test(document.querySelector('dialog .shop-tip-price').textContent)"));
+	check("the item and its price tag", await js("document.querySelector('dialog .buy-name b').textContent === 'Herb' && document.querySelector('dialog .buy-tag').textContent === '15 gold each'"));
 	check("the focus in it", await js("document.activeElement === document.querySelector('dialog [name=qty]')"), await js("document.activeElement.outerHTML.slice(0, 80)"));
 	await js("document.querySelector('dialog [name=submit]').focus()");
 	await press("ArrowUp", 38);
 	await sleep(400);
 	check("the arrow keys don't walk", await js("document.querySelector('[data-r=loc]').textContent") === loc0 && await js("!DK.busy()"));
-	await js("dkTip.show(document.querySelector('dialog .tip-term'))");
+	await js("var t = document.createElement('span'); t.setAttribute('data-tip', 'A tip in a dialog'); t.textContent = 'tip';" +
+		"document.querySelector('dialog .dk-modal-box').appendChild(t); dkTip.show(t)");
 	check("a tooltip in it shows over it", await js("document.getElementById('dk-tooltip').parentElement === document.querySelector('dialog') && !document.getElementById('dk-tooltip').hidden"));
 	await js("dkTip.hide()");
 	await js("document.querySelector('dialog [name=cancel]').click()");
@@ -211,18 +218,30 @@ async function run(wsUrl, port) {
 	await until("location.pathname === '/'");
 	// walk out of town (a POST answered by the page it redirects to)
 	await js("document.querySelector('form.compass button[name=north]').click()");
-	check("moved", await until("/Latitude: 1/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"),
+	check("moved", await until("/\\b1N,/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"),
 		await js("document.querySelector('[data-r=loc]').textContent"));
 	check("no reload after a POST", await js("window.__dk === 1"));
 	var fighting = await js("location.pathname === '/fight'");
 	check("exploring or fighting", await js("/^(Exploring|Fighting)$/.test(document.title)"), await js("document.title"));
 	if (!fighting) {
+		// walking into a town: its page at once, through a scene (scene.js: the caption seen)
+		await js("window.__scenes = []; new MutationObserver(function (l) { l.forEach(function (m) { m.addedNodes.forEach(function (n) {" +
+			" if (n.classList && n.classList.contains('dk-scene')) window.__scenes.push(n.className + '|' + n.textContent); }); }); })" +
+			".observe(document.body, { childList: true })");
 		await js("document.querySelector('form.compass button[name=south]').click()");
-		check("back in Midworld", await until("document.title === 'Travel To' || location.pathname === '/fight'"), await js("document.title"));
-		// "You have travelled to Midworld" is the POST's own page: no address shows it, the
-		// address stays, and a reload shows the town
-		if (await js("document.title === 'Travel To'")) {
-			check("the address stays", await js("location.pathname === '/'"), await js("location.pathname"));
+		check("back in Midworld: the town's page", await until("document.title === 'In Town' && location.pathname === '/' && !DK.busy() || location.pathname === '/fight'"), await js("document.title"));
+		if (await js("location.pathname === '/'")) {
+			check("through the town's scene", await js("window.__scenes.join(';')") === "dk-scene dk-scene-town|MidworldYou arrive in Midworld.", await js("window.__scenes"));
+			check("the page shows again after it", await until("!document.documentElement.classList.contains('dk-scene-out') && !document.querySelector('.dk-scene')"));
+		}
+		// a POST's own page (resting at the inn): no address shows it, the address stays, and
+		// a reload shows the inn's form
+		await js("DK.visit('/inn')");
+		await until("location.pathname === '/inn' && !DK.busy()");
+		if (await js("!!document.querySelector('[data-r=main] form [name=submit]')")) {
+			await js("document.querySelector('[data-r=main] form [name=submit]').click()");
+			check("rested", await until("/You wake up/.test(document.querySelector('[data-r=main]').textContent) && !DK.busy()"));
+			check("the address stays", await js("location.pathname === '/inn'"), await js("location.pathname"));
 			check("marked as a POST's page", await js("history.state.post === true && DK.view().post === true"));
 		}
 	}
@@ -232,7 +251,7 @@ async function run(wsUrl, port) {
 	// on the east arm walks east; the arrow keys walk, but not while typing
 	await js("DK.visit('/')");
 	await until("!DK.busy()");
-	function where() { return js("(function(){var t=document.querySelector('[data-r=loc]').textContent;return [(t.match(/Latitude: (\\d+[NS]?)/)||[])[1],(t.match(/Longitude: (\\d+[EW]?)/)||[])[1],location.pathname].join('|')})()"); }
+	function where() { return js("(function(){var t=document.querySelector('[data-r=loc]').textContent;return [(t.match(/(\\d+[NS]), /)||[])[1],(t.match(/, (\\d+[EW])/)||[])[1],location.pathname].join('|')})()"); }
 	if (await js("!!document.querySelector('form.compass')")) {
 		check("one picture", await js("document.querySelectorAll('.compass-rose img').length === 1 && /compass\\.png$/.test(document.querySelector('.compass-rose img').src)"));
 		var start = await where();
@@ -241,7 +260,7 @@ async function run(wsUrl, port) {
 		check("the east arm is the east button", await js("document.elementFromPoint(" + x + "," + y + ").name === 'east'"));
 		await send("Input.dispatchMouseEvent", { type: "mousePressed", x: x, y: y, button: "left", clickCount: 1 });
 		await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: x, y: y, button: "left", clickCount: 1 });
-		check("a click walks east", await until("!DK.busy() && /Longitude: 1E/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
+		check("a click walks east", await until("!DK.busy() && /, 1E\\b/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
 		if (await js("location.pathname !== '/fight'")) {
 			await js("document.activeElement && document.activeElement.blur()");
 			var key = function (k, code) {
@@ -249,7 +268,7 @@ async function run(wsUrl, port) {
 					.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
 			};
 			await key("ArrowUp", 38);
-			check("the up arrow walks north", await until("!DK.busy() && /Latitude: 1N/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
+			check("the up arrow walks north", await until("!DK.busy() && /\\b1N,/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
 			if (await js("location.pathname !== '/fight'")) {
 				var here2 = await where();
 				await js("document.querySelector('[data-chat-form] [name=babble]').focus()");
@@ -260,7 +279,7 @@ async function run(wsUrl, port) {
 				await key("ArrowDown", 40);
 				await until("!DK.busy()");
 				await key("ArrowLeft", 37);
-				check("down and left: back to Midworld", await until("!DK.busy() && document.title === 'Travel To' || location.pathname === '/fight'"), await where());
+				check("down and left: back to Midworld", await until("!DK.busy() && document.title === 'In Town' || location.pathname === '/fight'"), await where());
 			}
 			check("no reload", await js("window.__dk === 1"));
 		}
@@ -274,14 +293,14 @@ async function run(wsUrl, port) {
 	await other.until("document.readyState === 'complete' && !!window.DK");
 	await other.js("window.__dk2 = 1");
 	await until("!DK.busy()");
-	var lat = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
+	var lat = await js("(document.querySelector('[data-r=loc]').textContent.match(/(\\d+[NS]), /) || [])[1]");
 	var where = await js("location.pathname");
 	if (where === "/" && await js("!!document.querySelector('form.compass')")) {
 		await js("document.querySelector('form.compass button[name=north]').click()");
 		await until("!DK.busy()");
-		var lat2 = await js("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1]");
+		var lat2 = await js("(document.querySelector('[data-r=loc]').textContent.match(/(\\d+[NS]), /) || [])[1]");
 		check("moved here", lat2 !== lat, [lat, lat2]);
-		check("the other tab follows", await other.until("(document.querySelector('[data-r=loc]').textContent.match(/Latitude: (-?\\d+)/) || [])[1] === " + JSON.stringify(lat2), 6000),
+		check("the other tab follows", await other.until("(document.querySelector('[data-r=loc]').textContent.match(/(\\d+[NS]), /) || [])[1] === " + JSON.stringify(lat2), 6000),
 			await other.js("document.querySelector('[data-r=loc]').textContent"));
 		// (where it is now is the server's call: a move into a fight takes it to the fight too)
 		check("the other tab: no page load", await other.js("window.__dk2 === 1"), await other.js("location.pathname"));
@@ -357,7 +376,7 @@ async function run(wsUrl, port) {
 	await until("location.pathname === '/' && !DK.busy()");
 
 	section = "logging out";
-	await js("document.querySelector('.dk-topnav form[action=\"/logout\"] input[type=image]').click()");
+	await js("document.querySelector('.dk-topnav form[action=\"/logout\"] button, .dk-topnav form[action=\"/logout\"] input[type=image]').click()");
 	check("the login page", await until("location.pathname === '/login' && !DK.busy()"), await js("location.pathname"));
 	check("no player any more", await js("!document.body.hasAttribute('data-live')"));
 	check("the stream stopped", await until("!localStorage.getItem('dk-live-leader')"), await js("localStorage.getItem('dk-live-leader')"));

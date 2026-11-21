@@ -1,7 +1,10 @@
 -- town/travel.lua :: legacy towns.php travelto($id, $usepoints): Travel To menu (costs TP,
--- town must be on your map) and arriving by walking onto a town (explore.lua, free).
+-- town must be on your map) and arriving by walking onto a town (explore.lua, free). The
+-- arrival goes straight to the town's page (3.0: no "You have travelled to ..." page in
+-- between), a scene for the live client (lib/scene.lua).
 local common = require("town.common")
 local php = require("lib.php")
+local scene = require("lib.scene")
 local state = require("fight.state")
 local view = require("lib.view")
 
@@ -31,7 +34,9 @@ function travel.go(req, id, usepoints)
 
 	dk.db:exec("UPDATE users SET currentaction = 'In Town', towns = ?, currenttp = ?, latitude = ?, longitude = ? WHERE id = ?",
 						 towns, newtp, town.latitude, town.longitude, user.id)
-	return common.message(req, "Travel To", "travel_done", { town = town })
+	return scene.add(req, view.redirect("/"), "town", town.name, usepoints
+		and ("You travel to " .. town.name .. " for " .. town.travelpoints .. " TP.")
+		or ("You arrive in " .. town.name .. "."))
 end
 
 -- POST /travel/#id

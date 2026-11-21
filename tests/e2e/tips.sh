@@ -155,9 +155,9 @@ expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'a
 # for sale too (2.4); the Sell buttons say what the shop pays
 t_get /shop; expect_status 200
 expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/2" data-modal title="Branch (30 gold)" aria-label="Branch (30 gold)"><img src="/static/images/items/branch.png" width="44" height="44" alt=""></a><template class="tip"><div class="shop-tip">'
-expect_body '<div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt=""><div><div class="tip-title">Branch</div><div class="tip-meta">Weapon · worn when bought</div></div></div>'
+expect_body '<div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt=""><div><div class="tip-title">Branch</div><div class="tip-meta">Weapon</div></div></div>'
 expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Price</span> <b class="shop-tip-gold">30 gold</b></div><div class="shop-tip-note">You have 1,000 gold</div><table class="shop-tip-stats"><tr><td></td><td></td><td class="shop-tip-vs">vs Stick</td></tr><tr><th scope="row">Attack Power</th><td class="shop-tip-value">+4</td><td class="shop-tip-delta shop-tip-up">+2</td></tr></table>'
-expect_body '<div class="shop-tip-replaces">Replaces your Stick, which sells back for 5 gold</div>'
+expect_body '<div class="shop-tip-replaces">Your Stick sells back for 5 gold</div>'
 expect_body '<div class="shop-tip-body"><p>&lt;img src=x onerror=alert(3)&gt;</p></div></div></template></span>'
 tp_no_xss; expect_no_body 'alert(4)'      # the lore stays out of the shop
 # the Stick worn: the same figures, no change
@@ -173,15 +173,15 @@ expect_body '<div class="tip-title">Herb</div><div class="tip-meta">Consumable</
 expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Sells for</span> <b class="shop-tip-gold">8 gold</b> <span class="shop-tip-label">each</span></div><div class="shop-tip-note">You have 3: 24 gold for all</div><ul class="shop-tip-effects"><li>Restores 30 hit points, in a fight or out of it.</li></ul>'
 expect_body 'title="Sell Branch for 15 gold" aria-label="Sell Branch for 15 gold"><img src="/static/images/items/branch.png"'
 expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold"><img src="/static/images/skills/default.png"'   # no picture: the default
-# the purchase page: the item bought and the one it replaces
+# the purchase (its own design, no tooltips): the item's picture, its description escaped
 t_get /shop/buy/2; expect_status 200
-expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</span> for 30 gold. What should I do with your <span class="tip-term" data-tip tabindex="0"'"$TP_STICK"'</span>?'
-expect_text 'You are buying the Branch for 30 gold. What should I do with your Stick?'; tp_no_xss
-expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/branch.png" width="36" height="36" alt="">'
+expect_body '<span class="buy-tile"><img src="/static/images/items/branch.png" width="48" height="48" alt=""></span>'
+expect_body '<div class="buy-about"><p>&lt;img src=x onerror=alert(3)&gt;</p></div>'; tp_no_xss; expect_no_body 'alert(4)'
+expect_text 'Buy and sell my Stick'
 t_get /shop/buy/66
-expect_body '<div class="shop-tip"><div class="shop-tip-head"><img class="shop-tip-icon" src="/static/images/items/herb.png" width="36" height="36" alt="">'
-expect_body 'You are buying the <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"
-expect_text 'You are buying the Herb for 15 gold each. It goes into your bag.'
+expect_body '<span class="buy-tile"><img src="/static/images/items/herb.png" width="48" height="48" alt=""></span>'
+expect_body '<ul class="buy-effects">'; expect_body '<li>Restores 30 hit points, in a fight or out of it.</li>'
+expect_body '<span class="buy-tag">15 gold each</span>'
 # the discard confirmation
 t_get "/inventory/discard/$TP_HERB_E"
 expect_body 'You have 3 x <span class="tip-term" data-tip tabindex="0"'"$TP_HERB"

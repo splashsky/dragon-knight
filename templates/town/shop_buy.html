@@ -1,38 +1,74 @@
-{#- Purchase confirmation (legacy towns.php buy2()), a page of its own or the shop's dialog
-		(public/js/modal.js: the shop's links open it there; "No" just closes the dialog). ctx:
-		the offer of town/shop.lua's check(): item, slot (gear that is equipped when bought),
-		old (the entry in that slot), sellback, can_keep, keep_full, can_sell; max (bag items:
-		how many); card (tips.shop: the shop's tooltip, shown as a card: the price, the gold,
-		the stats against what is worn). The items' names in the text carry their tooltips. -#}
-<div class="town-message shop-buy">
-{{{ include("tip/shop", card) }}}
-<form class="shop-buy-form" action="/shop/buy/{{ item.id }}" method="post">
-{{{ csrf_field() }}}
-{%- if slot and old then %}
-<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold. What should I do with your <span class="tip-term" data-tip tabindex="0">{{ old.item.name }}{{{ tip("item", old.item, old) }}}</span>?</p>
-{%- if keep_full then %}
-<p class="light">Your bag is full, so you can't keep your {{ old.item.name }}.</p>
-{%- elseif not can_keep then %}
-<p class="light">You don't have enough gold to buy it and keep your {{ old.item.name }}.</p>
-{%- end %}
-<div class="shop-buy-actions">
-{%- if can_keep then %}
-<input type="submit" name="keep" value="Buy (keep my {{ old.item.name }} in the bag)">
-{%- end %}
-{%- if can_sell then %}
-<input type="submit" name="sell" value="Buy and sell my {{ old.item.name }} for {{ sellback }} gold">
-{%- end %}
-<input type="submit" name="cancel" value="No" data-modal-close>
+{#- The purchase (legacy towns.php buy2()): the shop's dialog (public/js/modal.js: its
+		links open it there; "Not now" just closes it), or a page of its own. Its own look,
+		made to decide: the item (its picture, name, kind) with a price tag; what it changes,
+		side by side with the item worn in its slot (or what it gives, or does); then the
+		choices as large buttons, each saying what it leaves in the purse: gear goes into the
+		bag, is worn (the old piece into the bag) or is worn with the old piece sold; one that
+		can't be taken shows why. ctx: town/shop.lua confirm(): item, slot, old, sellback,
+		can_bag, bag_full, can_keep, keep_full, can_sell, max, icon, kind, gold, stats,
+		effects, description, after. -#}
+<div class="town-message buy">
+<div class="buy-head">
+<span class="buy-tile"><img src="{{ icon }}" width="48" height="48" alt=""></span>
+<span class="buy-name"><b>{{ item.name }}</b><span class="buy-kind">{{ kind }}{% if not slot then %}, into your bag{% end %}</span></span>
+<span class="buy-tag">{{ number(item.price) }} gold{% if not slot and max > 1 then %} each{% end %}</span>
 </div>
-{%- elseif slot then %}
-<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span>, is that ok?</p>
-<div class="shop-buy-actions"><input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No" data-modal-close></div>
+{%- if description and description ~= "" then %}
+<div class="buy-about">{{{ paragraphs(description) }}}</div>
+{%- end %}
+{%- if #stats > 0 and old then %}
+<table class="buy-compare">
+<thead><tr><td></td><th scope="col">Your {{ old.item.name }}</th><th scope="col">The {{ item.name }}</th></tr></thead>
+<tbody>
+{%- for _, r in ipairs(stats) do %}
+<tr><th scope="row">{{ r.label }}</th><td>{{ r.old }}</td><td>{{ r.new }}{% if r.delta then %} <span class="buy-{{ r.better and "up" or "down" }}">({{ r.delta }})</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+{%- elseif #stats > 0 then %}
+<ul class="buy-gives">
+{%- for _, r in ipairs(stats) do %}
+<li>{{ r.label }} <b>{{ r.new }}</b></li>
+{%- end %}
+</ul>
+{%- end %}
+{%- if #effects > 0 then %}
+<ul class="buy-effects">
+{%- for _, e in ipairs(effects) do %}
+<li>{{ e }}</li>
+{%- end %}
+</ul>
+{%- end %}
+<form class="buy-form" action="/shop/buy/{{ item.id }}" method="post">
+{{{ csrf_field() }}}
+{%- if slot then %}
+<div class="buy-choices">
+{%- if can_bag then %}
+<button class="buy-choice" type="submit" name="bag" value="Bag"><b>Buy to bag</b><span>{% if old then %}You keep wearing your {{ old.item.name }}. {% end %}You'll have {{ number(after.buy) }} gold left.</span></button>
 {%- else %}
-<p>You are buying the <span class="tip-term" data-tip tabindex="0">{{ item.name }}{{{ tip("item", item) }}}</span> for {{ item.price }} gold{% if max > 1 then %} each{% end %}. It goes into your bag.</p>
+<div class="buy-choice buy-choice-off"><b>Buy to bag</b><span>{% if bag_full then %}Your bag is full.{% else %}Not enough gold without selling your {{ old.item.name }}.{% end %}</span></div>
+{%- end %}
+{%- if not old then %}
+<button class="buy-choice" type="submit" name="submit" value="Yes"><b>Buy and equip</b><span>You'll have {{ number(after.buy) }} gold left.</span></button>
+{%- elseif can_keep then %}
+<button class="buy-choice" type="submit" name="keep" value="Keep"><b>Buy and equip</b><span>Your {{ old.item.name }} goes into the bag. You'll have {{ number(after.keep) }} gold left.</span></button>
+{%- else %}
+<div class="buy-choice buy-choice-off"><b>Buy and equip</b><span>{% if keep_full then %}No room in your bag for your {{ old.item.name }}.{% else %}Not enough gold without selling your {{ old.item.name }}.{% end %}</span></div>
+{%- end %}
+{%- if old and can_sell then %}
+<button class="buy-choice" type="submit" name="sell" value="Sell"><b>Buy and sell my {{ old.item.name }}</b><span>You wear the {{ item.name }}; the shop pays {{ number(sellback) }} gold for your {{ old.item.name }}. You'll have {{ number(after.sell) }} gold left.</span></button>
+{%- elseif old then %}
+<div class="buy-choice buy-choice-off"><b>Buy and sell my {{ old.item.name }}</b><span>The shop doesn't buy it.</span></div>
+{%- end %}
+</div>
+{%- else %}
 {%- if max > 1 then %}
-<p><label>How many? <input type="text" name="qty" size="3" value="1" inputmode="numeric" aria-label="Quantity"></label> (1 to {{ max }})</p>
+<p class="buy-qty"><label for="buy-qty">How many?</label> <input id="buy-qty" type="number" name="qty" value="1" min="1" max="{{ max }}" inputmode="numeric"> <span class="buy-qty-note">up to {{ max }}; you have {{ number(gold) }} gold</span></p>
 {%- end %}
-<div class="shop-buy-actions"><input type="submit" name="submit" value="Buy"> <input type="submit" name="cancel" value="No" data-modal-close></div>
+<div class="buy-choices">
+<button class="buy-choice" type="submit" name="submit" value="Buy"><b>Buy{% if max <= 1 then %} the {{ item.name }}{% end %}</b><span>{% if max > 1 then %}{{ number(item.price) }} gold each.{% else %}You'll have {{ number(after.buy) }} gold left.{% end %}</span></button>
+</div>
 {%- end %}
+<button class="buy-cancel" type="submit" name="cancel" value="No" data-modal-close>Not now</button>
 </form>
 </div>

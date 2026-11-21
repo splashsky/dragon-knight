@@ -25,6 +25,10 @@ local summons = require("lib.summons")
 
 local engine = {}
 
+-- Who is told of what happens to combatants (fight/speech.lua sets them): hp(f, c, before,
+-- after) after c's HP changed; status(f, c, key) after a status was put on c.
+engine.listeners = {}
+
 engine.MAX_STATUSES = 10
 engine.MAX_TICKS = 100
 
@@ -318,6 +322,7 @@ function engine.afflict(f, c, key, params, source)
 	c.statuses[#c.statuses + 1] = inst
 	trace_status(f, c, inst, "add")
 	engine.status_hook(f, c, inst, "on_apply")
+	if engine.listeners.status and present(c, inst) then engine.listeners.status(f, c, key) end
 end
 
 function engine.cure(f, c, key)
@@ -480,7 +485,7 @@ end
 
 -- (monsters have HP and MP, summons only HP: other stats are ignored)
 local function add_stat(f, c, stat, n)
-	local before = f.trace and stat_of(f, c, stat)
+	local before = (f.trace or (stat == "hp" and engine.listeners.hp)) and stat_of(f, c, stat)
 	if c.side == "player" then
 		local col = "current" .. stat
 		f.st[col] = f.st[col] + n
@@ -494,6 +499,7 @@ local function add_stat(f, c, stat, n)
 		local after, max = stat_of(f, c, stat)
 		if after ~= before then
 			trace(f, { change = stat, id = c.id, side = c.side, name = name_of(f, c), from = before, to = after, max = max })
+			if stat == "hp" and engine.listeners.hp then engine.listeners.hp(f, c, before, after) end
 		end
 	end
 end

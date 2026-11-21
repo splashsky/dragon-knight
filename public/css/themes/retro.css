@@ -1,14 +1,23 @@
 /* themes/retro.css :: the original look (legacy templates/primary.php): the tiled
-	 background and logo.gif. The colours are dk.css's. Linked last by every layout when the
+	 background, logo.gif and the original's pictures for the headings and top links
+	 (public/images/themes/retro/; lib/themes.lua's art). The colours and boxes are dk.css's. Linked last by every layout when the
 	 theme is "retro" (lib/themes.lua); body has class theme-retro. */
 
 body {
-	background: url(/static/images/background.jpg);
+	background: url(/static/images/themes/retro/background.jpg);
 }
 
-/* spell buttons: the original grey title boxes */
-.spell-btn, .action-btn { background-color: #eeeeee; border-color: black; }
-.spell-btn:hover, .action-btn:hover { border-color: #663300; }
+/* item and skill tiles: the original grey title boxes in plain black frames (dk.css's
+	frames are gradients: a single colour here), brown when lit */
+:root {
+	--tile: #eeeeee;
+	--frame-gold: linear-gradient(#000000, #000000);
+	--frame-gold-lit: linear-gradient(#663300, #663300);
+	--frame-steel: linear-gradient(#000000, #000000);
+	--frame-steel-lit: linear-gradient(#663300, #663300);
+	--frame-crimson: linear-gradient(#cc0000, #cc0000);
+}
+.spell-btn, .action-btn { border-width: 1px; }
 
 /* tooltips: the original grey boxes with black borders */
 .dk-tip, .dk-tip-arrow { border-color: black; }

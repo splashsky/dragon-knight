@@ -4,7 +4,7 @@
 		slots to draw), u (fresh users row), s (effective stats), notice (lines) or nil. Item
 		names carry the item's tooltip (docs/APP.md "Tooltips"). -#}
 <section class="box inv">
-<div class="title"><img src="/static/images/button_inventory.gif" alt="Inventory" title="Inventory"></div>
+<h1 class="title page-title">{{{ art("inventory", "Inventory") }}}</h1>
 <div class="box-body">
 {%- if notice then %}
 <p class="inv-notice">{% for i, line in ipairs(notice) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>

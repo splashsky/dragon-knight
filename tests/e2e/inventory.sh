@@ -169,7 +169,7 @@ t_post "/inventory/discard/$KEY" "csrf=$TC&submit=Discard"; expect_body 'Quest i
 t_post /inventory/unequip/accessory1 "csrf=$TC"; expect_body 'Your bag is full. Make room in it before you take off the Dragon&#39;s Wing.'
 iv_is "(SELECT equipped FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE ui.user_id = users.id AND i.key = 'dragons_wing')" "accessory1"
 # topping up a stack works in a full bag (a Herb from the shop), a new stack doesn't
-t_get /shop/buy/66;               expect_text 'You are buying the Herb for 15 gold. It goes into your bag.'
+t_get /shop/buy/66;               expect_body '<b>Buy the Herb</b>'; expect_body '<span class="buy-tag">15 gold</span>'
 grep -qF 'name="qty"' "$BODY" && t_fail "a stack with room for 1 offers a quantity" || t_ok
 t_post /shop/buy/66 "csrf=$TC&submit=Buy"; expect_body 'Thank you for purchasing this item.'
 t_get /shop/buy/66;               expect_body 'Your bag is full.'

@@ -1,7 +1,8 @@
 /* themes/default.css :: the default theme: a light snow background, the red-and-black
-	 logo, near-black text and borders, dark red links that turn bright red on hover.
-	 Linked last by every layout when the theme is "default" (lib/themes.lua); body has
-	 class theme-default. Only colours and images: the layout is dk.css's. */
+	 logo, near-black text, dark red links that turn bright red on hover; headings are text
+	 (no pictures: lib/themes.lua), with a hairline instead of a box, the columns are apart
+	 by space instead of lines, and the footer is a row of small print. Linked last by every
+	 layout when the theme is "default" (lib/themes.lua); body has class theme-default. */
 
 body {
 	background: #e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
@@ -12,20 +13,51 @@ a:hover, button.link:hover { color: #d0161e; }
 .highlight, .error { color: #c8141b; }
 .light { color: #5f6773; }
 
-/* translucent white panels over the snow */
-.title, .copyright {
-	border-color: #16181d;
-	background-color: rgba(255, 255, 255, 0.75);
+/* the columns: space between them, no lines */
+.dk-top { border-bottom: none; }
+.dk-cols { gap: 22px; }
+.dk-left, .dk-middle, .dk-right { border: none; padding: 3px 0; }
+
+/* headings: text in small capitals over a hairline (a panel's); the page's own larger, alone */
+.title, .box .title {
+	margin: 0 0 6px;
+	padding: 0 0 3px;
+	border: none;
+	border-bottom: solid 1px rgba(22, 24, 29, 0.22);
+	background: none;
+	font-size: 15px;
+	font-weight: bold;
+	font-variant-caps: small-caps;
+	letter-spacing: 0.05em;
+	line-height: 1.3;
 }
-.dk-top { border-bottom-color: #16181d; }
-.dk-left { border-right-color: #16181d; }
-.dk-right { border-left-color: #16181d; }
+.title.page-title {
+	margin-bottom: 10px;
+	padding-bottom: 0;
+	border-bottom: none;
+	font-size: 26px;
+	font-variant-caps: normal;
+	letter-spacing: 0;
+	line-height: 1.2;
+}
+
+/* the top links: text */
+.dk-topnav { gap: 18px; }
+.dk-topnav a, .dk-topnav button.link { font-size: 16px; font-weight: bold; text-decoration: none; }
+
+/* the footer: a row of small print (the theme picker in it), no box */
+.copyright { border: none; background-color: transparent; }
+
+/* the chat: light stripes instead of a box around each message */
+.babble-post { margin: 0; padding: 3px 6px; border: none; border-radius: 3px; }
+.babble-post:nth-last-child(odd) { background-color: rgba(255, 255, 255, 0.7); }
+.babble-post:nth-last-child(even) { background-color: transparent; }
 
 .dk-top .dk-logo img { filter: drop-shadow(0 2px 3px rgba(22, 24, 29, 0.25)); }
 
-/* spell buttons: the links' red for keyboard focus */
-.spell-btn, .action-btn { background-color: rgba(255, 255, 255, 0.8); border-color: rgba(22, 24, 29, 0.45); }
-.spell-btn:hover, .action-btn:hover { border-color: #6b1510; }
+/* item and skill tiles: dk.css's gold frames on a near-white tile; the links' red for
+	keyboard focus */
+:root { --tile: #fbfbf9; }
 .spell-btn:focus-visible, .action-btn:focus-visible { outline-color: #d0161e; }
 
 /* tooltips: near-black border, a touch of the snow's blue in the shadow */
@@ -37,6 +69,9 @@ a:hover, button.link:hover { color: #d0161e; }
 
 /* dialogs: the tooltips' paper and border */
 .dk-modal-box { background-color: #fdfdfb; color: #16181d; border-color: #16181d; }
+
+/* monsters speaking in a fight: the links' dark red */
+.fight-speech { color: #6b1510; }
 
 /* the live client's progress bar: the links' red */
 .dk-progress { background-color: #d0161e; }
