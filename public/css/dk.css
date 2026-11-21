@@ -103,6 +103,26 @@ a:hover, button.link:hover {
 	align-items: center;
 	gap: 4px;
 }
+/* the way back to / (layout/main.html): a button in a gold frame (--frame-gold, black in
+	Retro) on a dark brown ground */
+.dk-topnav .dk-home {
+	display: inline-block;
+	margin-right: 6px;
+	padding: 4px 14px;
+	border: solid 2px transparent;
+	border-radius: 6px;
+	background: linear-gradient(#4f2e12, #26150a) padding-box, var(--frame-gold) border-box;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+	color: #f6e7c4;
+	font-weight: bold;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.dk-topnav .dk-home:hover {
+	background: linear-gradient(#64391a, #2f1a0c) padding-box, var(--frame-gold-lit) border-box;
+	color: #ffffff;
+}
+.dk-topnav .dk-home:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
 .dk-cols {
 	display: flex;
 	align-items: stretch;

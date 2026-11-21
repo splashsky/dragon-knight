@@ -130,6 +130,7 @@ expect_body '<h1 class="title page-title">Welcome to Midworld</h1>'
 expect_body '<h2 class="title">In Midworld</h2>'; expect_no_body 'class="loc-where"'
 expect_body '<div class="loc-line"><span class="loc-coords" title="Latitude 0N, longitude 0E">0N, 0E</span> &middot; <a href="/map"'
 expect_body '<button class="link">Log Out</button></form>'; expect_body '<a href="/help">Help</a>'
+expect_body '<a class="dk-home" href="/">Back to Midworld</a>'   # the way back, named for where / is
 expect_no_body 'images/themes/retro/'
 theme_post retro /;                      expect_redirect /
 t_get /;           expect_status 200; theme_is retro; expect_body '<body class="theme-retro" data-live'

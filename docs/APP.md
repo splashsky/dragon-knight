@@ -230,7 +230,7 @@ and templates don't change for it: the same code answers both ways.
 carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
-`banner`, `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
+`banner`, `topnav` (the header's links), `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
 `spellpanel`, `online-count`), `foot` (with `foot-time`, the timing line), `themes` (with
 `theme-back`), and on `/babble` the chat's `chat` (with `chat-posts`, and `chat-form` with
 `chat-back`); `minimal` and
@@ -731,6 +731,11 @@ starting with `__` are reserved.
 - Every POST form needs `{{{ csrf_field() }}}` (the chat's and the banner's too).
 - Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
 	sized window; without JS it's a normal link).
+- The way back (`layout/main.html`, 3.1): the header's first button (`.dk-home`, a gold
+	frame on dark brown, black in Retro), on every page of the main layout, links to `/`
+	(`routes/home.lua`: the fight, the town or exploring) and is named for where that is:
+	"Back to the fight", "Back to Midworld" (the player's town), "Back to exploring". The
+	header's links are a region (`topnav`), so the name follows the state on live pages.
 - The compass (`layout/nav_left.html`): the original's picture (`public/images/compass.png`,
 	its four pieces joined) with a submit button over each quarter (`.compass-rose`: the
 	triangles between the diagonals, `clip-path`, lit within the parchment by a `mask`),
@@ -775,14 +780,16 @@ starting with `__` are reserved.
 	`data-modal-close`).
 - Images: `/static/images/<file>` (`public/images/`): `items/` and `skills/` (icons, see
 	[Items](#items), [Spells](#spells)), `buildings/` (the town's banners), `backgrounds/`
-	(`parchment.png`, `blue.webp`, `darkstorm.jpg`, `snowstorm.jpg`),
+	(`parchment_tile.jpg`: the news posts' card, seamless, made from VWolfdog's
+	"WarmParchment" on OpenGameArt, CC0; `parchment.png`, `blue.webp`, `darkstorm.jpg`,
+	`snowstorm.jpg`),
 	`actions/` (19px framed action icons: `attack.png`, `attack_1.png` ... `attack_8.png`,
 	`creature*.png`, `relic.png`, `send_message.png`, ...), `tiles/` (grid cells: `1x1.png`,
-	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`middle.png`: the news posts' scroll;
-	`spinner.gif`, the `indicators.png` sprite), `themes/<key>/` (a theme's logo,
-	background, pictures); at the top the original's (the compass, the slot icons
-	`icon_*.gif`, the world map, the help pages' pictures). The `actions/`, `tiles/` and
-	`backgrounds/` pictures and the rest of `ui/` aren't used yet. A link-styled submit button:
+	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`spinner.gif`, the `indicators.png`
+	sprite), `themes/<key>/` (a theme's logo, background, pictures); at the top the
+	original's (the compass, the slot icons `icon_*.gif`, the world map, the help pages'
+	pictures). The `actions/`, `tiles/`, `ui/` pictures and all but the parchment tile among
+	the backgrounds aren't used yet. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
 	`<blink>`.
@@ -2225,12 +2232,10 @@ read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 	and `news.page(start, per)` return rows with `author` ("Unknown" when the account is gone)
 	and, when `forumtype == 1` and the thread exists, `thread_url` / `thread_label`
 	(`news.reply_label(n)`: "Reply", "1 reply", "N replies").
-- A post is drawn as a strip of a scroll (`community/news/post.html`, `.news-post`:
-	`ui/middle.png`, 652px of torn-edged parchment between leather bands, centred and
-	repeated down the card, so a card wider than the parchment shows a little leather; the
-	side padding keeps the text on the parchment: `max(20px, calc(50% - 326px + 20px))`;
-	the title a link to its page, the date and author under it, the text, the discussion's
-	link): on `/news`, `/news/#id` and, with
+- A post is drawn as a parchment card (`community/news/post.html`, `.news-post`:
+	`backgrounds/parchment_tile.jpg` tiled at its size, 800x600, seamless; a thin brown
+	edge; the title a link to its page, the date and author under it, the text, the
+	discussion's link): on `/news`, `/news/#id` and, with
 	`excerpt` (the first paragraph, Read more, All news), in the town's Latest News.
 - A news post and a forum reply also send live notices (see [Notices](#notices)).
 - Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,

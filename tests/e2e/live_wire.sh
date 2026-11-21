@@ -69,7 +69,7 @@ for _ in $(seq 1 30); do
 	t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring' $LQ"; t_live GET /
 done
 expect_status 200; [ "$(w_payload url)" = / ] && t_ok || t_fail "move: url $(w_payload url)"
-w_has region loc; w_lacks region towns; w_lacks region main; w_lacks region right
+w_has region loc; w_lacks region towns; w_lacks region main; w_lacks region right; w_lacks region topnav
 w_payload region loc | grep -q 'class="loc-coords"' && t_ok || t_fail "loc payload"
 # an encounter: the move lands on the fight page, the monster's first strike included
 t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring' $LQ"; t_live GET /
@@ -80,6 +80,7 @@ done
 [ "$(w_payload url)" = /fight ] && t_ok || t_fail "no encounter in 60 moves"
 [ "$(w_payload title)" = Fighting ] && t_ok || t_fail "title: $(w_payload title)"
 w_payload region main | grep -q 'You are fighting a' && t_ok || t_fail "fight page in main"
+w_payload region topnav | grep -q '>Back to the fight</a>' && t_ok || t_fail "topnav while fighting"
 # a change of state is a scene for the live client (lib/scene.lua): the fight beginning...
 w_has events scene
 w_payload events scene | grep -qE '"kind": ?"(fight|death)"' && t_ok || t_fail "encounter scene: $(w_payload events scene)"
@@ -87,6 +88,7 @@ w_payload events scene | grep -qE '"kind": ?"(fight|death)"' && t_ok || t_fail "
 t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring', latitude = 0, longitude = 1 $LQ"; t_live GET /
 t_live POST /move "csrf=$LW_CS&west=West"
 [ "$(w_payload url)" = / ] && [ "$(w_payload title)" = "In Town" ] && t_ok || t_fail "into Midworld: $(w_payload url) $(w_payload title)"
+w_payload region topnav | grep -q '>Back to Midworld</a>' && t_ok || t_fail "topnav in town"
 [ "$(w_payload events scene)" = '{"detail":"You arrive in Midworld.","kind":"town","title":"Midworld"}' ] && t_ok \
 	|| t_fail "town scene: $(w_payload events scene)"
 for _ in $(seq 1 30); do   # (an encounter right outside the gate is a fight scene instead)
