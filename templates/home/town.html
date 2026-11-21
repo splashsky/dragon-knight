@@ -11,11 +11,7 @@
 {%- if news then %}
 <section class="panel">
 <h2 class="title">Latest News</h2>
-<div class="box-body"><a href="/news/{{ news.id }}"><b>{{ news.title }}</b></a> <span class="light">[{{ date(news.postdate) }} by {{ news.author }}]</span><br>{{{ nl2br(news.excerpt) }}}
-{%- if news.more then %} <a href="/news/{{ news.id }}">Read more</a>{% end %}
-<p class="news-links">
-{%- if news.thread_url then %}<a href="{{ news.thread_url }}">{{ news.thread_label }}</a> &middot; {% end -%}
-<a href="/news">All news</a></p></div>
+{{{ include("community/news/post", { post = news, excerpt = true }) }}}
 </section>
 {%- end %}
 {%- if online then %}

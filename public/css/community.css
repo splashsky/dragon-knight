@@ -28,7 +28,25 @@ table.forum td { overflow-wrap: anywhere; }
 /* ---- news (archive pages and the town news box) ---- */
 .news-heading { margin-bottom: 12px; }
 .news-crumbs { margin: 0 0 6px; }
-.news-links { margin: 6px 0 0; }
+/* a post (community/news/post.html): a parchment card (images/backgrounds/parchment.png
+	stretched over it, its darker edges framing the post), the title in dark brown, the date
+	and author in small italics, the links under the text */
+.news-post {
+	margin: 0 0 14px;
+	padding: 14px 20px 13px;
+	border: solid 1px rgba(92, 58, 18, 0.45);
+	border-radius: 3px;
+	background: #e6d3a3 url(/static/images/backgrounds/parchment.png) center / 100% 100% no-repeat;
+	box-shadow: 0 2px 6px rgba(60, 38, 10, 0.28), inset 0 0 22px rgba(120, 78, 24, 0.22);
+	color: #33240f;
+	overflow-wrap: anywhere;
+}
+.news-title { margin: 0; font-size: 19px; line-height: 1.25; }
+.news-title a { color: #4a2508; }
+.news-title a:hover { color: #7a2e08; }
+.news-meta { margin: 2px 0 8px; color: #75582f; font-size: 13px; font-style: italic; }
+.news-body { line-height: 1.45; }
+.news-links { margin: 8px 0 0; font-size: 13px; }
 
 /* ---- help pages (legacy standalone pages: minimal layout, body_class "help") ---- */
 body.minimal.help { text-align: left; }

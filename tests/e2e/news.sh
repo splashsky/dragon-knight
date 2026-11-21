@@ -51,8 +51,9 @@ t_jar newsplayer; t_reset_jar
 t_register newsy newspw1 newsy@example.com Newsy; t_login newsy newspw1
 NEWSY_ID=$(t_sql "SELECT id FROM users WHERE username = 'newsy'")
 t_get /;        expect_body 'Latest News'
-expect_body "<a href=\"/news/$N1\"><b>Single paragraph headline that is definitely longer than six...</b></a>"
-expect_body 'by Admin]'; expect_body 'second line'; expect_no_body '>Read more</a>'
+expect_body "<article class=\"news-post\">
+<h2 class=\"news-title\"><a href=\"/news/$N1\">Single paragraph headline that is definitely longer than six...</a></h2>"
+expect_body '&middot; by Admin</p>'; expect_body 'second line'; expect_no_body '>Read more</a>'
 expect_body "<a href=\"/forum/thread/$T1\">Reply</a> &middot; <a href=\"/news\">All news</a>"
 expect_body '<a href="/news">News</a><br>'
 
@@ -68,7 +69,7 @@ news_eq "SELECT board || '|' || title FROM forum WHERE id = $T2" "2|<script>t()<
 t_section "news: town box, first paragraph + Read more"
 t_jar newsplayer
 t_get /
-expect_body "<a href=\"/news/$N2\"><b>&lt;script&gt;t()&lt;/script&gt; Patch &amp; notes</b></a>"; expect_no_body '<script>t()'
+expect_body "<h2 class=\"news-title\"><a href=\"/news/$N2\">&lt;script&gt;t()&lt;/script&gt; Patch &amp; notes</a></h2>"; expect_no_body '<script>t()'
 expect_body 'First &lt;b&gt;para&lt;/b&gt;<br />'; expect_body 'still first'
 expect_no_body 'Second &lt;i&gt;para'; expect_no_body 'Third'
 expect_body "still first <a href=\"/news/$N2\">Read more</a>"
@@ -94,11 +95,11 @@ t_get "/news/$N2"; expect_status 200
 expect_body '<title>&lt;script&gt;t()&lt;/script&gt; Patch &amp; notes</title>'
 expect_body "<a href=\"/news/$N2\">&lt;script&gt;t()&lt;/script&gt; Patch &amp; notes</a>"
 expect_body 'Second &lt;i&gt;para&lt;/i&gt;'; expect_body 'Third'; expect_no_body '<i>para'
-expect_body 'by Admin]'; expect_body '<a href="/news">All news</a>'; expect_no_body 'Read more'
+expect_body '&middot; by Admin</p>'; expect_body '<a href="/news">All news</a>'; expect_no_body 'Read more'
 t_get /news/999999; expect_status 404; expect_body 'That news post doesn&#39;t exist.'
 t_get /news/abc;    expect_status 404
 t_sql "UPDATE news SET author_id = 999999 WHERE id = $N1"
-t_get "/news/$N1"; expect_body 'by Unknown]'
+t_get "/news/$N1"; expect_body '&middot; by Unknown</p>'
 t_sql "UPDATE news SET author_id = $NEWS_ADMIN_ID WHERE id = $N1"
 
 t_section "news: the News board"
@@ -132,13 +133,13 @@ t_sql "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 
 NEWS_TOTAL=$(t_sql "SELECT count(*) FROM news")
 t_jar newsplayer
 t_get /news;    expect_status 200; expect_body '<h1 class="title page-title news-heading">News</h1>'
-[ "$(news_count 'class="box news-post"')" = 10 ] && t_ok || t_fail "10 posts on the first page"
+[ "$(news_count 'class="news-post"')" = 10 ] && t_ok || t_fail "10 posts on the first page"
 expect_body '>Bulk news 12</a>'; expect_body '>Bulk news 3</a>'; expect_no_body '>Bulk news 2</a>'
 expect_body '<b>[1]</b>'; expect_body 'href="/news?start=10"'
 # bulk posts have no thread: no link for them
 [ "$(news_count 'href="/forum/thread/')" = 0 ] && t_ok || t_fail "thread links for posts without threads"
 t_get "/news?start=10"
-[ "$(news_count 'class="box news-post"')" = $((NEWS_TOTAL - 10 < 10 ? NEWS_TOTAL - 10 : 10)) ] && t_ok || t_fail "second page size"
+[ "$(news_count 'class="news-post"')" = $((NEWS_TOTAL - 10 < 10 ? NEWS_TOTAL - 10 : 10)) ] && t_ok || t_fail "second page size"
 expect_body '>Bulk news 2</a>'; expect_body '<b>[2]</b>'; expect_body 'href="/news">1</a>'
 t_get "/news?start=abc"; expect_status 200; expect_body '<b>[1]</b>'
 t_sql "DELETE FROM news WHERE title LIKE 'Bulk news %'"

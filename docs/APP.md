@@ -773,7 +773,16 @@ starting with `__` are reserved.
 	nothing worn) and "Buy and sell my Stick" (`sell`), for the rest a quantity for stacks
 	(`.buy-qty`) and "Buy" (`submit`, `qty`); and "Not now" (`.buy-cancel`, `cancel`,
 	`data-modal-close`).
-- Images: `/static/images/<file>`. A link-styled submit button:
+- Images: `/static/images/<file>` (`public/images/`): `items/` and `skills/` (icons, see
+	[Items](#items), [Spells](#spells)), `buildings/` (the town's banners), `backgrounds/`
+	(`parchment.png`: the news posts' card; `blue.webp`, `darkstorm.jpg`, `snowstorm.jpg`),
+	`actions/` (19px framed action icons: `attack.png`, `attack_1.png` ... `attack_8.png`,
+	`creature*.png`, `relic.png`, `send_message.png`, ...), `tiles/` (grid cells: `1x1.png`,
+	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`spinner.gif`, the `indicators.png`
+	sprite), `themes/<key>/` (a theme's logo, background, pictures); at the top the
+	original's (the compass, the slot icons `icon_*.gif`, the world map, the help pages'
+	pictures). The `actions/`, `tiles/`, `ui/` pictures and all but the parchment among the
+	backgrounds aren't used yet. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
 	`<blink>`.
@@ -2216,6 +2225,10 @@ read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 	and `news.page(start, per)` return rows with `author` ("Unknown" when the account is gone)
 	and, when `forumtype == 1` and the thread exists, `thread_url` / `thread_label`
 	(`news.reply_label(n)`: "Reply", "1 reply", "N replies").
+- A post is drawn as a parchment card (`community/news/post.html`, `.news-post`:
+	`backgrounds/parchment.png` stretched over it, the title a link to its page, the date and
+	author under it, the text, the discussion's link): on `/news`, `/news/#id` and, with
+	`excerpt` (the first paragraph, Read more, All news), in the town's Latest News.
 - A news post and a forum reply also send live notices (see [Notices](#notices)).
 - Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,
 	start, per, total)` builds the links that `include("community/forum/pager")` renders.

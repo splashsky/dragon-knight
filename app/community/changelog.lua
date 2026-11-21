@@ -15,6 +15,7 @@ changelog.RELEASES = {
 			"The Babble Box's messages sit on the window's own background: yours on the right in red, everyone else's on the left in black, administrators' in gold and moderators' in green.",
 			"The town's places are banners with pictures: the Inn and the Market. The Market is the shop and the map store in one.",
 			"A town sells only the maps of its neighbours along the road, the towns just before and after it: to buy the map to a far town, get near it first. Administrators choose which maps a town sells in the town editor (schema version 18, run dk migrate).",
+			"News posts look like parchment: the title, the date and who posted it, then the post, the same in the town and on the news pages.",
 			"The gold frames of items, skills, the town's banners and the market are a warmer, more orange gold.",
 			"The Default theme draws thin lines between the three columns; Latest News and Who's Online use the column's full width.",
 			"Several messages in a row from the same player show their name only once.",

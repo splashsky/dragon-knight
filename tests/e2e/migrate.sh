@@ -280,8 +280,8 @@ t_section "migrate: the game works on the migrated database"
 "$BIN" user --config "$MIG/config.lua" passwd oldplayer migpass2 >/dev/null && t_ok || t_fail "dk user passwd"
 t_jar migadmin
 t_login oldadmin migpass1; expect_redirect /
-t_get /;              expect_status 200; expect_body '<b>Old news &lt;b&gt;title&lt;/b&gt;</b></a>'
-expect_body 'by Oldadmin]'; expect_body '>Read more</a>'; expect_body 'href="/forum/thread/6">Reply</a>'
+t_get /;              expect_status 200; expect_body '">Old news &lt;b&gt;title&lt;/b&gt;</a></h2>'
+expect_body '&middot; by Oldadmin</p>'; expect_body '>Read more</a>'; expect_body 'href="/forum/thread/6">Reply</a>'
 t_get /forum;         expect_status 200; expect_body 'href="/forum/1"><b>General</b>'; expect_body 'href="/forum/2"><b>News</b>'
 t_get /forum/1;       expect_body 'href="/forum/thread/1">Old thread</a>'
 t_get /forum/thread/1; expect_body 'reply by a deleted player'

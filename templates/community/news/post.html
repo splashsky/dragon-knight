@@ -1,11 +1,17 @@
-{#- One news post; ctx.post from lib/news.lua (news.get / news.page). -#}
-<section class="box news-post">
-<h2 class="title"><a href="/news/{{ post.id }}">{{ post.title }}</a></h2>
-<div class="box-body">
-<span class="light">[{{ date(post.postdate) }} by {{ post.author }}]</span><br>
-{{{ nl2br(post.content) }}}
-{%- if post.thread_url then %}
-<p class="news-links"><a href="{{ post.thread_url }}">{{ post.thread_label }}</a></p>
+{#- One news post as a parchment card (3.1: public/images/backgrounds/parchment.png;
+		community.css .news-post): its title (a link to its page), the date and author, the
+		text and its discussion's link. The town page's (excerpt): the first paragraph with
+		Read more when there is more, and All news. ctx: post (lib/news.lua: news.get,
+		news.page, news.latest), excerpt. -#}
+<article class="news-post">
+<h2 class="news-title"><a href="/news/{{ post.id }}">{{ post.title }}</a></h2>
+<p class="news-meta">{{ date(post.postdate) }} &middot; by {{ post.author }}</p>
+<div class="news-body">{{{ nl2br(excerpt and post.excerpt or post.content) }}}
+{%- if excerpt and post.more then %} <a href="/news/{{ post.id }}">Read more</a>{% end %}</div>
+{%- if post.thread_url or excerpt then %}
+<p class="news-links">
+{%- if post.thread_url then %}<a href="{{ post.thread_url }}">{{ post.thread_label }}</a>{% end -%}
+{%- if post.thread_url and excerpt then %} &middot; {% end -%}
+{%- if excerpt then %}<a href="/news">All news</a>{% end %}</p>
 {%- end %}
-</div>
-</section>
+</article>
