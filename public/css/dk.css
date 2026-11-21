@@ -305,8 +305,8 @@ input[type="image"] { vertical-align: middle; }
 	--icon-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.32 0 0 0 0 0.27 0 0 0 0 0.2 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 	--icon-ground: radial-gradient(circle at 50% 42%, #fefcf7 0%, #f3eee4 55%, #ddd4c4 100%);
 	--icon-bg: var(--icon-noise), var(--icon-ground);
-	--frame-gold: linear-gradient(to bottom, #fff3c4 0%, #ecc55a 30%, #b8861e 62%, #6b4708 100%);
-	--frame-gold-lit: linear-gradient(to bottom, #fffbe6 0%, #f7d877 30%, #d0a031 62%, #855a0d 100%);
+	--frame-gold: linear-gradient(to bottom, #ffe2b0 0%, #f2a33c 30%, #c2660f 62%, #6a2f03 100%);
+	--frame-gold-lit: linear-gradient(to bottom, #fff0d4 0%, #f9bd5a 30%, #dc8424 62%, #874207 100%);
 	--frame-steel: linear-gradient(to bottom, #ffffff 0%, #cfd4d9 30%, #8a9199 62%, #3f454c 100%);
 	--frame-steel-lit: linear-gradient(to bottom, #ffffff 0%, #e3e7ea 30%, #a3aab2 62%, #555c64 100%);
 	--frame-crimson: linear-gradient(to bottom, #ffc9bb 0%, #e0604a 30%, #a8251a 62%, #560a06 100%);
