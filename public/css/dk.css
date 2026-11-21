@@ -612,8 +612,10 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 }
 
 /* ---- the chat window (chatbox.js; docs/APP.md "Chat"): a small box floating over the page
-	and its dialogs, moved by its top strip (the close button at its right), resized by its
-	corner; the chat's log fills it, the message bar at its foot (town.css: the chat) ---- */
+	and its dialogs (the theme gives it the page's background), moved by its top strip (the
+	close button at its right), resized by its corner; the chat's log fills it, and the
+	message bar is its foot: flush with its sides and bottom, square on top, its bottom
+	corners the window's (town.css: the chat) ---- */
 .dk-chatbox {
 	position: fixed;
 	left: 0;
@@ -628,7 +630,7 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 	min-height: 220px;
 	max-width: calc(100vw - 16px);
 	max-height: calc(100vh - 16px);
-	padding: 0 8px 8px;
+	padding: 0;
 	border: solid 1px rgba(0, 0, 0, 0.45);
 	border-radius: 8px;
 	background-color: #fffdf7;
@@ -643,7 +645,6 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 	position: relative;
 	flex: none;
 	height: 18px;
-	margin: 0 -8px;
 	cursor: move;
 	touch-action: none;
 }
@@ -680,6 +681,10 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 .dk-chatbox-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .dk-chatbox .chat { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
 .dk-chatbox .chat-scroll { flex: 1 1 auto; height: auto; min-height: 0; border: none; background: transparent; }
+.dk-chatbox .chat-form { display: flex; flex-direction: column; margin: 0; }
+.dk-chatbox .chat-status { order: -1; margin: 0; padding: 2px 8px; }
+.dk-chatbox .chat-bar { border: none; border-top: solid 1px rgba(0, 0, 0, 0.3); border-radius: 0 0 7px 7px; }
+.dk-chatbox .chat-bar:focus-within { box-shadow: none; border-top-color: #663300; }
 
 /* ---- the live client (client.js; docs/APP.md "Live client"): a thin bar at the top while a
 	request takes longer than a moment (<html class="dk-busy">), and the announcer of new

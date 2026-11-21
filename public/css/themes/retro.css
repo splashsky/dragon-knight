@@ -3,7 +3,7 @@
 	 (public/images/themes/retro/; lib/themes.lua's art). The colours and boxes are dk.css's. Linked last by every layout when the
 	 theme is "retro" (lib/themes.lua); body has class theme-retro. */
 
-body {
+body, .dk-chatbox {
 	background: url(/static/images/themes/retro/background.jpg);
 }
 
@@ -22,6 +22,7 @@ body {
 /* tooltips: the original grey boxes with black borders */
 .dk-tip, .dk-tip-arrow { border-color: black; }
 .dk-tip { background-color: #eeeeee; color: black; border-radius: 0; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35); }
-.dk-modal-box, .dk-chatbox { background-color: #eeeeee; color: black; border-color: black; border-radius: 0; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35); }
-.chat-bar { border-color: black; border-radius: 0; }
+.dk-modal-box { background-color: #eeeeee; }
+.dk-modal-box, .dk-chatbox { color: black; border-color: black; border-radius: 0; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35); }
+.chat-bar, .dk-chatbox .chat-bar { border-color: black; border-radius: 0; }
 .tip-meta, .tip-lore { color: #555555; }

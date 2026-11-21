@@ -4,7 +4,7 @@
 	 by space instead of lines, and the footer is a row of small print. Linked last by every
 	 layout when the theme is "default" (lib/themes.lua); body has class theme-default. */
 
-body {
+body, .dk-chatbox {
 	background: #e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 	color: #16181d;
 }
@@ -69,9 +69,11 @@ a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }
 .tip-term:focus-visible, .invpanel-gear li:focus-visible { outline-color: #d0161e; }
 
 /* dialogs and the chat window: the tooltips' paper and border; the message bar in the links' red */
-.dk-modal-box, .dk-chatbox { background-color: #fdfdfb; color: #16181d; border-color: #16181d; }
+.dk-modal-box { background-color: #fdfdfb; }
+.dk-modal-box, .dk-chatbox { color: #16181d; border-color: #16181d; }
 .chat-send { color: #6b1510; }
 .chat-bar:focus-within { border-color: #d0161e; box-shadow: 0 0 0 2px rgba(208, 22, 30, 0.15); }
+.dk-chatbox .chat-bar:focus-within { border-top-color: #d0161e; box-shadow: none; }
 
 /* monsters speaking in a fight: the links' dark red */
 .fight-speech { color: #6b1510; }
