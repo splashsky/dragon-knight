@@ -89,11 +89,27 @@
 			});
 			list.insertBefore(li, next);
 			while (list.children.length > HISTORY) list.removeChild(list.firstElementChild);
+			group(list);
 			touched(list);
 		});
 	}
 	function removePost(id) {
-		$$('[data-chat-posts] [data-id="' + Number(id) + '"]').forEach(function (li) { touched(li); li.remove(); });
+		$$('[data-chat-posts] [data-id="' + Number(id) + '"]').forEach(function (li) {
+			var list = li.parentNode;
+			touched(li);
+			li.remove();
+			if (list) group(list);
+		});
+	}
+	// a message right after one by the same author doesn't show the name again (babble-cont,
+	// as layout/chat_posts.html renders it)
+	function group(list) {
+		var prev = null;
+		Array.prototype.forEach.call(list.children, function (li) {
+			var a = li.querySelector(".babble-author"), name = a ? a.textContent : null;
+			li.classList.toggle("babble-cont", name !== null && name === prev);
+			prev = name;
+		});
 	}
 	function chatStatus(form, msg) {
 		var s = form.querySelector("[data-chat-status]");

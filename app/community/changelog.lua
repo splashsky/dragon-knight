@@ -13,6 +13,7 @@ changelog.RELEASES = {
 			"The page is at most 1200 pixels wide, so it stays together on wide screens.",
 			"The Babble Box is a small chat window you open and close from the Functions box, instead of a panel in the right column and the town page. Drag it by its top edge wherever you like and resize it by its corner: it stays open, where you put it, from page to page until you close it, and stays usable over the shop's dialog. It has the game's own background; its messages fill it, each with the name above the message, and you type in a bar that forms its foot, with the send button inside. The chat also has a page of its own, /babble.",
 			"The Babble Box's messages sit on the window's own background: yours on the right in red, everyone else's on the left in black, administrators' in gold and moderators' in green.",
+			"Several messages in a row from the same player show their name only once.",
 			"A new role, Moderator, set by administrators in the user editor: moderators may delete Babble Box messages.",
 			"The Towns box lists each town on your map with what the trip costs in TP. The town you are in, the towns your TP don't cover (hover for how many more you need) and, during a fight, all of them are greyed out. Without maps it tells you where to buy them.",
 			"The fight menu is a hotbar: press 1 to attack and 0 to run away, and 2 to 9 for your spells, your potions and the gear that casts spells (or click them, as before). Each button shows its key. When you can't act, any number key presses Continue.",

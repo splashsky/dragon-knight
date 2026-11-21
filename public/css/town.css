@@ -41,6 +41,17 @@ table.inventory td + td { width: 100%; }
 	white-space: pre-wrap;
 }
 .babble-author { display: block; font-size: 12px; }
+/* the next message of the same author: no name (for the eyes: screen readers read it), and
+	close to the one before */
+.babble-post.babble-cont { padding-top: 0; }
+.babble-cont .babble-author {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
 .babble-text { display: block; }
 .babble-admin { color: #9a7200; }
 .babble-moderator { color: #2e7d22; }

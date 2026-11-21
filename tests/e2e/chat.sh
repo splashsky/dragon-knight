@@ -1,7 +1,8 @@
 # tests/e2e/chat.sh :: the Babble Box, live (lib/chat.lua, town/babble.lua, live.js): two
 # players with event streams: a message posted with fetch (JSON) reaches the other stream,
 # stays text (JSON-escaped data, escaped history), the rate limit (429), the length limit,
-# blank messages, the no-JS form path, admin deletes, its page and window, roles, and
+# blank messages, the no-JS form path, admin deletes, its page and window, roles, runs of
+# one author's messages, and
 # well-formed frames. Sourced by tests/run.sh (live_* and t_fetch helpers there).
 
 chat_unlimit() { t_sql "UPDATE babble SET posttime = posttime - 10"; }
@@ -169,6 +170,24 @@ t_get /babble; expect_body "<li class=\"babble-post\" data-id=\"$MOD_MSG\""
 t_jar chatadmin
 t_get "/admin/users/$(t_sql "SELECT id FROM users WHERE username = 'chatmod'")"
 expect_body '<option value="3">Moderator</option>'; expect_body 'A moderator may delete Babble Box messages'
+
+t_section "chat: a run of messages shows the name once"
+# a message right after one by the same author is babble-cont (no name shown again); one
+# by someone else in between ends the run; the first of a run deleted, the next shows it
+chat_msg() { chat_unlimit; t_fetch /babble "babble=$1"; grep -o '"id":[0-9]*' "$BODY" | cut -d: -f2; }
+t_jar chatb; t_get /babble
+R1=$(chat_msg first+of+a+run); R2=$(chat_msg second+of+a+run)
+t_jar chatadmin; t_get /babble; R3=$(chat_msg in+between)
+t_jar chatb; t_get /babble; R4=$(chat_msg after+that)
+t_get /babble
+expect_body "<li class=\"babble-post babble-mine\" data-id=\"$R1\""
+expect_body "<li class=\"babble-post babble-mine babble-cont\" data-id=\"$R2\""
+expect_body "<li class=\"babble-post babble-admin\" data-id=\"$R3\""
+expect_body "<li class=\"babble-post babble-mine\" data-id=\"$R4\""
+expect_body "data-id=\"$R2\" title=\""; expect_body '<b class="babble-author">ChatB</b><span class="babble-text">second of a run</span>'   # (the name is there, for screen readers)
+t_jar chatadmin; t_get /babble; t_fetch "/babble/$R1/delete"; expect_status 200
+t_jar chatb; t_get /babble
+expect_body "<li class=\"babble-post babble-mine\" data-id=\"$R2\""
 
 t_section "chat: well-formed frames"
 live_stop

@@ -170,6 +170,12 @@ async function run(wsUrl, port) {
 	check("the box keeps its height", await js(CB + ".querySelector('.chat-scroll').offsetHeight") === chatHeight);
 	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop();" +
 		"return li.querySelector('.babble-text').getBoundingClientRect().top >= li.querySelector('.babble-author').getBoundingClientRect().bottom - 1; })()"));
+	// a second one right after it: the same author, so no name shown again (babble-cont)
+	await sleep(2100);   // (one message every 2 seconds)
+	await js("var f = " + CB + ".querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'and again'; f.requestSubmit()");
+	check("the second in the window", await until("/and again/.test(" + CB + ".querySelector('[data-chat-posts]').textContent)"));
+	check("without the name again", await js("(function () { var li = [...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop();" +
+		"return li.classList.contains('babble-cont') && li.querySelector('.babble-author').getBoundingClientRect().height <= 1; })()"));
 	var mine = await js("[...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop().outerHTML");
 	// from page to page: the same window, open
 	await js("window.__cb = " + CB + "; DK.visit('/inventory')");

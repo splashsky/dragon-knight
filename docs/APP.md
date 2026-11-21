@@ -620,7 +620,11 @@ message pointed at), on the box's own ground: the viewer's messages on the right
 (`.babble-mine`: the author is the list's `data-me`), the others on the left, black, an
 administrator's gold (`.babble-admin`) and a moderator's green (`.babble-moderator`), by the
 author's role now ([Roles](#roles); `chat.history` joins it, the event carries it; live.js
-gives the prototype the same classes). Then the message bar (`.chat-bar`): the field across the box, the send button
+gives the prototype the same classes). A message right after one by the same author (the
+same name) doesn't show the name again (`.babble-cont`, last of its classes: the name stays
+in the markup, hidden but for screen readers, and the message sits close to the one
+before); live.js groups a list again (`group`) after a message comes or goes, so deleting
+the first of a run shows the name on the next. Then the message bar (`.chat-bar`): the field across the box, the send button
 (`.chat-send`, an SVG arrow, `aria-label="Send"`) inside it. live.js sends the chat's forms
 itself (its submit listener captures: no dialog or live client takes them) and adds the
 messages that come to every list on the page (the window's too).
