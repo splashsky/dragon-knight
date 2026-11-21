@@ -15,6 +15,11 @@ end
 return {
 	name = "Withering",
 	description = "Loses hit points every turn; the caster gains what it loses.",
+	lore = [[
+A dark working that pulls the life out of a creature and into the caster. The victim
+shrivels a little more each turn, and the caster's wounds close by the same amount. Those
+who study such magic in the old libraries say it was banned for a reason, and that the
+reason is still standing in the road to Endworld.]],
 	kind = "harmful",
 	tick_on = "turn_end",
 	turns = 3,

@@ -10,6 +10,11 @@ end
 return {
 	name = "Bear",
 	description = "Mauls the monster every round.",
+	lore = [[
+A brown bear from the woods north of Midworld, called out of the trees with a horn and a
+few words the caster would rather not repeat. It is slow to tire and not fussy about what
+it hits. Trappers say it is more bad-tempered than hungry, which is some comfort, and it
+never lingers after the fight is done.]],
 	hp = 80,
 	attack = 22,
 	defense = 8,

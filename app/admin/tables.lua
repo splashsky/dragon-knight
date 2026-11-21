@@ -61,15 +61,15 @@ local function world_summary(user_id)
 	return st ~= "" and st or "None"
 end
 
--- Item keys typed in the town editor -> item ids, or nil and the unknown key.
-local function item_ids(text)
-	local ids = {}
+-- Item keys typed in the town editor -> the keys, or nil and the first key no item has
+-- (a typo; shop lists store keys, town_items.item_key).
+local function item_keys(text)
+	local keys = {}
 	for key in text:gmatch("[^,%s]+") do
-		local id = dk.db:value("SELECT id FROM items WHERE key = ?", key)
-		if not id then return nil, key end
-		ids[#ids + 1] = id
+		if not dk.db:value("SELECT 1 FROM items WHERE key = ?", key) then return nil, key end
+		keys[#keys + 1] = key
 	end
-	return ids
+	return keys
 end
 
 -- Town names typed in the town editor's Maps (comma-separated) -> the ids of those that
@@ -92,13 +92,13 @@ tables.towns = function()
 		heading = "Edit Towns", saved = "Town updated.",
 		list_intro = "Click an town's name to edit it.", none = "No towns found.",
 		validate = function(v, errors)
-			local _, unknown = item_ids(v.items)
+			local _, unknown = item_keys(v.items)
 			if unknown then errors[#errors + 1] = "Items: there is no item '" .. unknown .. "'." end
 			local _, nowhere = town_ids(v.maps)
 			if nowhere then errors[#errors + 1] = "Maps: there is no town '" .. nowhere .. "'." end
 		end,
 		after_save = function(_, row, v)
-			items.set_town(row.id, item_ids(v.items))
+			items.set_town(row.id, item_keys(v.items))
 			-- (validated before the save: a name not found now is this town's old one)
 			local maps = {}
 			for _, id in ipairs((town_ids(v.maps))) do

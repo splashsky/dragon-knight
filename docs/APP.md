@@ -1010,8 +1010,8 @@ it). Synced into the kinds' `lore` columns (schema version 13), overridable in t
 panel (a textarea on every content admin page), escaped wherever it shows
 (`paragraphs(text)`): in the tooltips (`.tip-lore`) and on the help pages under each entry
 (`.help-lore`: classes on `/help`, spells, statuses and allies on `/help/spells`, items on
-`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. Every class, item, monster and spell has some
-(3.1; the statuses and allies don't yet). The voice is plain and concrete (a place, a
+`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. Every class, item, monster, spell, status and ally has
+some (3.1). The voice is plain and concrete (a place, a
 habit, a rumour, who uses it), and only the upper echelon sounds legendary: monsters from
 level 42, the dragons and demon lords, the Destiny gear and the Dragon's, Angel's, Seraph's
 and Demon's accessories, the strongest spells:
@@ -2006,7 +2006,16 @@ retires it.
 Items are content (see [Content](#content)): `app/content/items/<key>.lua`, synced into
 `items` (`lib/content/kinds/items.lua`). The original items keep ids 1-33 (keys from the
 names: `stick`, `battle_axe`, `destiny_blade`, ...), the original drops are accessories
-34-65 (`life_pebble` ... `fortune_drop`), and the Herb, Potion and Ether are 66-68.
+34-65 (`life_pebble` ... `fortune_drop`), and the Herb, Potion and Ether are 66-68; the
+Antidote, the Regen Potion and the Wand 69-71, and the 3.1 items after them (numbered by
+the sync, by key). 3.1 added 60: plain steps in the weapon, armor and shield ladders and
+pieces with a trade-off (the Warhammer's attack for dexterity, the Glass Blade's for max
+HP, the Tower Shield, Ironclad Plate), staves and maces that cast with charges (Spark Rod,
+Frost Staff, Ember Staff, Dawn Mace, Storm Lance; the Vigil Cuirass and Ward Shield cast
+protection), consumables for every town (Trail Snack, Travel Tea for TP, Sleep Powder, Fire
+Flask, Acid Vial, Hi-Potion, Hi-Ether, Elixir, tonics, Cure-All, Weakening Dust, Bitter
+Draught, Void Flask), market rings and charms, and drops at every level band (TP pieces,
+the four-piece Thornwood set with a cost on each, charms that cast).
 
 ```lua
 -- app/content/items/destiny_blade.lua (gear: equipped in its slot)
@@ -2123,8 +2132,13 @@ return {
 	where the town is and its TP); `GET/POST /maps/buy/#id` (`town/maps.lua`, in the
 	market's dialog) refuses a map the town doesn't sell; `GET /maps` redirects to the
 	market.
-- Shops: `town_items(town_id, item_id)` is what a town sells (the admin town editor takes
-	item keys; Midworld sells the Wand). Any item a town sells can be bought as often as the
+- Shops: `town_items(town_id, item_key)` is what a town sells, by item key (schema version
+	19; before, by id): a list may name an item the content sync hasn't added yet, and one
+	that is gone or retired isn't sold (`items.town`, `items.sold_in` join on the key). The
+	admin town editor takes keys (it refuses one no item has: a typo); `seed.sql` lists a
+	fresh install's by key, and a migration that adds wares to existing databases names keys
+	too (step 19 adds the 3.1 wares and, at last, the Antidote and Regen Potion), so nothing
+	depends on the order ids are given in. Any item a town sells can be bought as often as the
 	gold and the bag allow (2.4: no more "Already purchased", a copy of the item worn
 	included); the server checks that the town sells it, the gold and the bag's room.
 	Weapons, armor and shields go into the bag (3.0; what is worn stays) or are worn at

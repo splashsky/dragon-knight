@@ -10,6 +10,11 @@ end
 return {
 	name = "Charging",
 	description = "Gathering power: can't act until the charged action is released.",
+	lore = [[
+The stillness before a big spell. The caster draws in light or sun over a turn or two and
+can do nothing else while it builds. Everyone in the fight can see it coming, which is why
+the wise keep a healer close by. Once it is ready the spell goes off whether or not the
+target has moved.]],
 	kind = "neutral",
 	tick_on = "turn_start",
 	turns = 1,

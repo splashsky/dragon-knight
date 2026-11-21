@@ -1151,8 +1151,8 @@ local function v14_after_sync()
 	end
 	db:exec("UPDATE user_items SET charges = (SELECT i.charges FROM items i WHERE i.id = user_items.item_id) " ..
 		"WHERE item_id IN (SELECT id FROM items WHERE charges > 0)")
-	db:exec("INSERT OR IGNORE INTO town_items (town_id, item_id) SELECT t.id, i.id FROM towns t, items i " ..
-		"WHERE t.id = 1 AND i.key = 'wand' AND i.retired = 0")
+	-- (after the sync: the latest schema, where shop lists name items by key)
+	db:exec("INSERT OR IGNORE INTO town_items (town_id, item_key) SELECT id, 'wand' FROM towns WHERE id = 1")
 end
 
 -- 15: pure GETs (3.0): a fight keeps its outcome, its last round's lines and a victory's
@@ -1220,6 +1220,59 @@ INSERT INTO town_maps (town_id, map_id)
 ]])
 end
 
+-- 19: shop lists name items by key (town_items.item_key; before, by id), so a list can
+-- name an item the content sync hasn't added yet and nothing depends on the order ids are
+-- given in; and the towns (by their original ids) sell the 3.1 wares, plus the Antidote and
+-- the Regen Potion, which no shop sold. The same lists as a fresh install's (seed.sql).
+local V19_WARES = {
+	[1] = { "antidote", "copper_ring", "trail_snack", "travel_tea" },
+	[2] = { "antidote", "apprentice_robe", "copper_ring", "fire_flask", "parry_buckler",
+		"scouts_jerkin", "sickle", "sleep_powder", "spark_rod", "trail_snack", "travel_tea",
+		"traveller_ring" },
+	[3] = { "acid_vial", "antidote", "apprentice_robe", "fire_flask", "hi_potion", "lucky_charm",
+		"parry_buckler", "regen_potion", "scouts_jerkin", "sickle", "sleep_powder", "spiked_targe",
+		"trail_snack", "travel_tea", "traveller_ring" },
+	[4] = { "acid_vial", "antidote", "fire_flask", "frost_staff", "hi_potion", "ironclad_plate",
+		"lamellar_armor", "lucky_charm", "regen_potion", "sleep_powder", "spiked_targe",
+		"strength_tonic", "travel_tea", "traveller_ring", "war_pick", "weakening_dust" },
+	[5] = { "acid_vial", "bitter_draught", "cure_all", "ember_staff", "fire_flask", "guard_tonic",
+		"hi_ether", "hi_potion", "ironclad_plate", "lamellar_armor", "lucky_charm", "strength_tonic",
+		"ward_charm", "warhammer", "weakening_dust" },
+	[6] = { "bitter_draught", "cure_all", "greatsword", "guard_tonic", "hi_ether", "hi_potion",
+		"ironclad_plate", "lifeward_shield", "ogre_hide_cuirass", "strength_tonic", "vigil_cuirass",
+		"war_sabre", "ward_charm", "ward_shield", "warhammer", "weakening_dust" },
+	[7] = { "bitter_draught", "cure_all", "dawn_mace", "elixir", "glass_blade", "guard_tonic",
+		"hi_ether", "lifeward_shield", "ogre_hide_cuirass", "sunsteel_mail", "tower_shield",
+		"vigil_cuirass", "void_flask", "war_sabre", "ward_shield" },
+	[8] = { "cure_all", "dragonhide_shield", "elixir", "starsteel_sword", "storm_lance",
+		"void_flask" },
+}
+
+local function v19_shop_keys()
+	local db = dk.db
+	db:exec_script([[
+CREATE TABLE town_items_new (
+	town_id   INTEGER NOT NULL REFERENCES towns (id),
+	item_key  TEXT    NOT NULL,
+	PRIMARY KEY (town_id, item_key)
+) WITHOUT ROWID;
+INSERT INTO town_items_new (town_id, item_key) SELECT t.town_id, i.key FROM town_items t JOIN items i ON i.id = t.item_id;
+DROP TABLE town_items;
+ALTER TABLE town_items_new RENAME TO town_items;
+]])
+	-- the items after the original drops get the ids a fresh install gives them (seed.sql),
+	-- where those ids and keys are free (before, the sync numbered them by key after the
+	-- originals, which only matched while no other new key sorted among theirs)
+	for _, it in ipairs({ { 69, "antidote", "Antidote" }, { 70, "regen_potion", "Regen Potion" }, { 71, "wand", "Wand" } }) do
+		db:exec("INSERT OR IGNORE INTO items (id, key, name) VALUES (?, ?, ?)", it[1], it[2], it[3])
+	end
+	for town, keys in ipairs(V19_WARES) do
+		for _, key in ipairs(keys) do
+			db:exec("INSERT OR IGNORE INTO town_items (town_id, item_key) SELECT id, ? FROM towns WHERE id = ?", key, town)
+		end
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1251,6 +1304,8 @@ migrations.STEPS = {
 	{ name = "items that cast a spell may be single use (not rechargeable)", up = v16_rechargeable },
 	{ name = "the hotbar: the fight actions each character puts on number keys", up = v17_hotbar },
 	{ name = "towns sell only some maps: each its neighbours' along the road", up = v18_town_maps },
+	{ name = "shop lists name items by key; the towns sell the 3.1 wares (and the Antidote and the Regen Potion)",
+		up = v19_shop_keys },
 }
 
 migrations.VERSION = #migrations.STEPS

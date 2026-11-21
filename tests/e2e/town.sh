@@ -223,11 +223,12 @@ expect_stats "20 10 10 5 5 10 14" "club"
 tu "gold=5"
 # what the gold doesn't cover is greyed out (with what the worn piece sells back for):
 # 5 + 25 for the Clothes buys the Skivvies, not the Clothes again; nothing else but the Stick
+# (Midworld's 3.1 wares, the Antidote, Copper Ring, Trail Snack and Travel Tea, are short too)
 t_get /shop
 expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/17"'
 expect_body '<span class="spell-tip shop-short" data-tip><a class="spell-btn" href="/shop/buy/18"'
 expect_body '<span class="spell-tip" data-tip><a class="spell-btn" href="/shop/buy/1"'
-[ "$(grep -o 'spell-tip shop-short' "$BODY" | wc -l)" = 7 ] && t_ok || t_fail "short items: $(grep -o 'spell-tip shop-short' "$BODY" | wc -l)"
+[ "$(grep -o 'spell-tip shop-short' "$BODY" | wc -l)" = 11 ] && t_ok || t_fail "short items: $(grep -o 'spell-tip shop-short' "$BODY" | wc -l)"
 # the tooltips say what is missing (the Clothes: 50 - 5 - 25), and what a swap loses
 expect_body 'title="Clothes (50 gold)"'; expect_body '<div class="shop-tip-note shop-tip-short">You need 20 more gold</div>'
 expect_body '<tr><td></td><td></td><td class="shop-tip-vs">vs Clothes</td></tr>'

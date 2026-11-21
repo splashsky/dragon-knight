@@ -10,6 +10,11 @@ end
 return {
 	name = "Spirit",
 	description = "Strikes the monster with a cold touch every round.",
+	lore = [[
+The restless shade of someone who died with unfinished business, bound for a few turns to
+the caster's side. It is quick and hard to pin down, and a blade passes through it more
+often than not. It is courteous in the way of the dead, which is to say rarely. Its touch
+leaves a chill on the skin that lasts a while after the fight.]],
 	hp = 90,
 	attack = 30,
 	defense = 40,

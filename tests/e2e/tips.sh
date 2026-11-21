@@ -207,7 +207,8 @@ expect_body '<div class="help-lore help-lore-class"><p>Warriors learn their trad
 expect_body '<div class="help-lore help-lore-class"><p>The Paladins keep an oath sworn before the first dragon fell'
 t_get /help/spells
 expect_body '<div class="help-lore"><p>'"$TP_HEAL_LORE"'</p></div></td>'
-[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT count(*) FROM spells WHERE lore <> '' AND retired = 0")" ] && t_ok || t_fail "the spells with lore have a lore block on /help/spells, no one else"
+[ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT (SELECT count(*) FROM spells WHERE lore <> '' AND retired = 0) + (SELECT count(*) FROM statuses WHERE lore <> '' AND retired = 0) + (SELECT count(*) FROM summons WHERE lore <> '' AND retired = 0)")" ] \
+	&& t_ok || t_fail "the spells, statuses and allies with lore have a lore block on /help/spells, no one else"
 t_get /help/items
 expect_body '>Herb<br><span class="small">Restores 30 hit points, in a fight or out of it.</span><div class="help-lore"><p>A bitter green leaf'
 [ "$(grep -o 'class="help-lore"' "$BODY" | wc -l)" = "$(t_sql "SELECT count(*) FROM items WHERE lore <> '' AND retired = 0")" ] && t_ok || t_fail "the items with lore have a lore block on /help/items, no one else"
@@ -261,8 +262,8 @@ tp_has '<textarea name="lore" rows="6" cols="40">In the towers of Midworld the o
 whisper that closes wounds'
 t_get /admin/monsters/1; expect_body '<textarea name="lore" rows="6" cols="40">The humblest monster of the land'
 t_get /admin/items/66;   expect_body '<textarea name="lore" rows="6" cols="40">A bitter green leaf'
-t_get /admin/statuses/1; expect_body '<textarea name="lore" rows="6" cols="40"></textarea>'
-t_get /admin/summons/1;  expect_body '<textarea name="lore" rows="6" cols="40"></textarea>'
+t_get /admin/statuses/1; expect_body '<textarea name="lore" rows="6" cols="40">'; expect_no_body '<textarea name="lore" rows="6" cols="40"></textarea>'
+t_get /admin/summons/1;  expect_body '<textarea name="lore" rows="6" cols="40">'; expect_no_body '<textarea name="lore" rows="6" cols="40"></textarea>'
 
 t_section "tips: lore in content files is validated"
 TP_FILE="$T/app/content/summons/tipdog.lua"

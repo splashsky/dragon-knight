@@ -315,11 +315,13 @@ CREATE TABLE towns (
 );
 CREATE INDEX towns_location ON towns (latitude, longitude);
 
--- What each town's shop sells (replaces the old towns.itemslist).
+-- What each town's shop sells (replaces the old towns.itemslist), by item key (schema
+-- version 19: before, by id): a list may name an item before the content sync adds it, and
+-- one that is gone or retired isn't sold.
 CREATE TABLE town_items (
-	town_id  INTEGER NOT NULL REFERENCES towns (id),
-	item_id  INTEGER NOT NULL REFERENCES items (id),
-	PRIMARY KEY (town_id, item_id)
+	town_id   INTEGER NOT NULL REFERENCES towns (id),
+	item_key  TEXT    NOT NULL,
+	PRIMARY KEY (town_id, item_key)
 ) WITHOUT ROWID;
 
 -- The maps each town's market sells (schema version 18: before, every town sold every map):

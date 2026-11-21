@@ -1,0 +1,30 @@
+-- app/content/items/fire_flask.lua :: a thrown flask of lamp oil that sets the monster
+-- alight (the burning status). Fights only; some monsters are immune.
+return {
+	name = "Fire Flask",
+	description = "Throws burning oil that sets the monster alight for a few turns. Some monsters are immune.",
+	lore = [[
+Lamp oil in a clay flask with a rag stuffed in the neck, sold by the lamplighters' guild
+at a price that is never quite explained. The thrower lights the rag and throws it. The
+flask breaks on the monster and the oil keeps burning on its hide until it is spent. A
+guild man in Roma says the trick is to throw it before the thing is close enough to step
+on your feet.]],
+	category = "consumable",
+	price = 50,
+	max_stack = 10,
+	usable_in = "fight",
+	power = 4,                      -- how many turns it burns
+	data = { amount = 7 },          -- hit points it burns away each turn
+	messages = {
+		used = "You throw the %s. The monster catches fire and burns for %d turns.",
+		immune = "You throw the %s, but the monster is immune to it.",
+	},
+	uses = { statuses = { "burning" } },
+	can_use = function(u)
+		if u.target.immune ~= 0 then return u:refuse("immune", u.name) end
+	end,
+	use = function(u)
+		u.target:afflict("burning", { turns = u.power, amount = u.data.amount })
+		u:say("used", u.name, u.power)
+	end,
+}

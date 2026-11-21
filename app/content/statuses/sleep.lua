@@ -12,6 +12,12 @@ end
 return {
 	name = "Asleep",
 	description = "Can't act. Each turn there is a chance in 15 (its strength) that it stays asleep.",
+	lore = [[
+A sleeping spell, or a dose of sleepwort in a drink, lays a creature down where it stands.
+Sleep takes hold quickly and lets go slowly, and each turn there is a small chance of
+waking. A sleeping monster is no less dangerous when it wakes, and a sleeping adventurer
+is the first thing a bandit looks for. Strong sleepers are harder to put down, and some
+never sleep at all.]],
 	kind = "harmful",
 	tick_on = "turn_start",
 	blocks_action = true,

@@ -51,7 +51,7 @@ local function detail(req, it, opts)
 	for _, f in ipairs(kind.fields) do current[f.name] = it[f.name] end
 	local towns = {}
 	for _, t in ipairs(dk.db:query("SELECT t.name FROM town_items ti JOIN towns t ON t.id = ti.town_id " ..
-																 "WHERE ti.item_id = ? ORDER BY t.id", it.id)) do
+																 "WHERE ti.item_key = ? ORDER BY t.id", it.key)) do
 		towns[#towns + 1] = t.name
 	end
 	return common.page(req, "Edit Item", "admin/item", {

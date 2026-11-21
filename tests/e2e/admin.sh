@@ -92,19 +92,21 @@ t_get /admin/monsters;     expect_body 'Monster level and map size match.'
 
 t_section "admin: towns"
 t_get /admin/towns/2;      expect_body 'Items:'
-expect_body 'name="items" size="60" maxlength="2000" value="branch, club, dagger, clothes, leather_armor, buckler, herb, potion, ether"'
+expect_body 'name="items" size="60" maxlength="2000" value="branch, club, dagger, clothes, leather_armor, buckler, herb, potion, ether, antidote, '
+expect_body ', spark_rod, '   # (and the 3.1 wares: schema 19)
 expect_body 'name="maps" size="60" maxlength="2000" value="Midworld, Bris"'   # its neighbours' maps (schema 18)
 t_form_submit /admin/towns/2 "items=stick, nope" latitude=north "maps=Midworld, Atlantis"
 expect_body "Items: there is no item &#39;nope&#39;."; expect_body 'Latitude must be a number.'
 expect_body "Maps: there is no town &#39;Atlantis&#39;."
-admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "2,3,4,18,19,29,66,67,68" "invalid town not saved"
+admin_eq "SELECT group_concat(item_key) FROM (SELECT item_key FROM town_items WHERE town_id = 2 ORDER BY item_key)" \
+	"$(t_sql "SELECT group_concat(item_key) FROM (SELECT item_key FROM adm_snap_town_items ORDER BY item_key)")" "invalid town not saved"
 t_get /admin/towns/2
 t_form_submit /admin/towns/2 name=Newtown latitude=-31 longitude=44 innprice=11 mapprice=22 travelpoints=3 "items=herb,stick  club" \
 	"maps=kalle, Roma ,Endworld"   # (any case; its own name, Roma before this save, left out)
 expect_redirect '/admin/towns/2\?saved=1'
 admin_eq "SELECT name || '|' || latitude || '|' || longitude || '|' || innprice || '|' || mapprice || '|' || travelpoints FROM towns WHERE id = 2" \
 	"Newtown|-31|44|11|22|3" "town saved"
-admin_eq "SELECT group_concat(item_id) FROM (SELECT item_id FROM town_items WHERE town_id = 2 ORDER BY item_id)" "1,3,66" "shop list saved"
+admin_eq "SELECT group_concat(item_key) FROM (SELECT item_key FROM town_items WHERE town_id = 2 ORDER BY item_key)" "club,herb,stick" "shop list saved (by key)"
 admin_eq "SELECT group_concat(map_id) FROM (SELECT map_id FROM town_maps WHERE town_id = 2 ORDER BY map_id)" "4,8" "maps saved"
 t_get /admin/towns/2;      expect_body 'name="items" size="60" maxlength="2000" value="stick, club, herb"'
 expect_body 'name="maps" size="60" maxlength="2000" value="Kalle, Endworld"'
@@ -228,7 +230,8 @@ t_get /admin/items;        expect_status 200; expect_body '<a href="/admin/items
 expect_body '<td>stick</td><td>weapon</td><td>10</td><td>Attack Power +2</td>'
 expect_body '<td>demons_sin</td><td>accessory</td><td>0</td><td>Max HP -50, Strength +50</td><td></td>'
 expect_body '<td>herb</td><td>consumable</td><td>15</td><td></td><td>Power 30</td>'
-expect_body 'items: 71 files, 71 in the database (0 retired), 0 overrides.'
+ADM_IT=$(ls "$ROOT/app/content/items" | wc -l)
+expect_body "items: $ADM_IT files, $ADM_IT in the database (0 retired), 0 overrides."
 expect_body '<td class="admin-icon-cell"><img src="/static/images/items/herb.png" width="20" height="20" alt=""></td><td><a href="/admin/items/66">Herb</a>'
 expect_body '<td class="admin-icon-cell"><img src="/static/images/items/stick.png" width="20" height="20" alt=""></td><td><a href="/admin/items/1">Stick</a>'
 expect_body '<td class="admin-icon-cell"><img src="/static/images/skills/default.png" width="20" height="20" alt=""></td><td><a href="/admin/items/4">Dagger</a>'

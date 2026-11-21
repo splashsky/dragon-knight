@@ -70,31 +70,33 @@ function items.all()
 	return decode_all(dk.db:query("SELECT * FROM items ORDER BY id"))
 end
 
--- The (not retired) items town `town_id` sells, by id.
+-- The (not retired) items town `town_id` sells, by id. Shop lists name items by key
+-- (town_items.item_key): one the content doesn't have (yet) isn't sold.
 function items.town(town_id)
-	return decode_all(dk.db:query("SELECT i.* FROM town_items t JOIN items i ON i.id = t.item_id " ..
+	return decode_all(dk.db:query("SELECT i.* FROM town_items t JOIN items i ON i.key = t.item_key " ..
 																"WHERE t.town_id = ? AND i.retired = 0 ORDER BY i.id", town_id))
 end
 
 function items.sold_in(town_id, item_id)
-	return dk.db:value("SELECT 1 FROM town_items t JOIN items i ON i.id = t.item_id " ..
-										 "WHERE t.town_id = ? AND t.item_id = ? AND i.retired = 0", town_id, item_id) ~= nil
+	return dk.db:value("SELECT 1 FROM town_items t JOIN items i ON i.key = t.item_key " ..
+										 "WHERE t.town_id = ? AND i.id = ? AND i.retired = 0", town_id, item_id) ~= nil
 end
 
--- Makes town `town_id` sell exactly `ids` (admin town editor).
-function items.set_town(town_id, ids)
+-- Makes town `town_id` sell exactly the items `keys` (admin town editor).
+function items.set_town(town_id, keys)
 	dk.db:exec("DELETE FROM town_items WHERE town_id = ?", town_id)
-	for _, id in ipairs(ids) do
-		dk.db:exec("INSERT OR IGNORE INTO town_items (town_id, item_id) VALUES (?, ?)", town_id, id)
+	for _, key in ipairs(keys) do
+		dk.db:exec("INSERT OR IGNORE INTO town_items (town_id, item_key) VALUES (?, ?)", town_id, key)
 	end
 end
 
--- Item keys of a town's shop, by id (retired ones too).
+-- The item keys of a town's shop list (retired and unknown ones too), by item id, unknown
+-- keys last.
 function items.town_keys(town_id)
 	local keys = {}
-	for _, r in ipairs(dk.db:query("SELECT i.key FROM town_items t JOIN items i ON i.id = t.item_id " ..
-																 "WHERE t.town_id = ? ORDER BY i.id", town_id)) do
-		keys[#keys + 1] = r.key
+	for _, r in ipairs(dk.db:query("SELECT t.item_key FROM town_items t LEFT JOIN items i ON i.key = t.item_key " ..
+																 "WHERE t.town_id = ? ORDER BY i.id IS NULL, i.id, t.item_key", town_id)) do
+		keys[#keys + 1] = r.item_key
 	end
 	return keys
 end
