@@ -1,46 +1,136 @@
 /* community.css :: forum, news and help pages. Linked by every layout. */
 
-/* ---- forum (legacy: black 1px grid, #dddddd headers, white/#eeeeee rows) ---- */
-table.forum {
-	width: 100%;
-	border-collapse: separate;
-	border-spacing: 1px;
-	background-color: black;
-}
-table.forum th,
-table.forum td {
-	padding: 3px;
-	background-color: #ffffff;
-	vertical-align: top;
-}
-table.forum th { background-color: #dddddd; }
-table.forum tbody tr:nth-child(even) td { background-color: #eeeeee; }
-table.forum .forum-new { text-align: center; }
-table.forum .forum-thread-title { text-align: left; }
-table.forum .forum-col-thread { width: 50%; }
-table.forum .forum-col-replies { width: 10%; }
-table.forum .forum-author { width: 25%; }
-table.forum td { overflow-wrap: anywhere; }
-.forum-crumbs { margin: 0 0 6px; }
-.forum-pages { margin: 6px 0; }
-.forum-pages a, .forum-pages b { margin-right: 4px; }
-
-/* ---- news (archive pages and the town news box) ---- */
-.news-heading { margin-bottom: 12px; }
-.news-crumbs { margin: 0 0 6px; }
-/* a post (community/news/post.html): a parchment card (images/backgrounds/parchment_tile.jpg,
-	seamless, tiled at its size), a thin brown edge, the title in dark brown, the date and
-	author in small italics, the links under the text */
-.news-post {
-	margin: 0 0 14px;
-	padding: 14px 20px 13px;
+/* ---- parchment (images/backgrounds/parchment_tile.jpg: seamless, tiled at its size): the
+	news posts and the forum's sheets; on it, lines are engraved (a dark hairline over a
+	light one: --engrave), fields pressed in and buttons raised, all in the ink's browns ---- */
+.news-post, .forum-sheet, .forum-button {
 	border: solid 1px rgba(110, 72, 26, 0.4);
 	border-radius: 3px;
 	background: #f0dcb0 url(/static/images/backgrounds/parchment_tile.jpg);
 	box-shadow: 0 1px 4px rgba(60, 38, 10, 0.25);
 	color: #33240f;
-	overflow-wrap: anywhere;
 }
+:root {
+	--ink-line: rgba(110, 72, 26, 0.3);
+	--ink-light: rgba(255, 250, 236, 0.6);
+	--engrave: inset 0 1px 0 var(--ink-light);
+}
+
+/* ---- forum (community/forum/*): over the sheet a bar with the way back (the current
+	place as text) and New Thread; the boards and threads as rows on the sheet, the columns'
+	names small and light, an engraved line between rows; a thread's posts under its title,
+	who and when over each; the pages and the forms at the sheet's foot ---- */
+.forum-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 28px;
+	margin: 2px 0 8px;
+}
+.forum-crumbs { font-size: 15px; }
+.forum-crumbs a { font-weight: bold; }
+.forum-sheet { padding: 8px 18px 12px; overflow-wrap: anywhere; }
+.forum-sheet a { color: #5a2a08; }
+.forum-sheet a:hover { color: #8a3208; }
+.forum-about { margin: 4px 0 6px; color: #6a5030; font-size: 13px; font-style: italic; }
+
+table.forum { width: 100%; border-collapse: separate; border-spacing: 0; }
+table.forum th {
+	padding: 4px 8px 5px;
+	color: #7a5c34;
+	font-size: 12px;
+	font-variant-caps: all-small-caps;
+	letter-spacing: 0.08em;
+	text-align: left;
+	white-space: nowrap;
+	overflow-wrap: normal;
+}
+table.forum td {
+	padding: 8px;
+	border-top: solid 1px var(--ink-line);
+	box-shadow: var(--engrave);
+	vertical-align: top;
+}
+table.forum th:first-child, table.forum td:first-child { padding-left: 2px; }
+table.forum th:last-child, table.forum td:last-child { padding-right: 2px; }
+table.forum td + td { color: #5a4528; font-size: 13px; font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+table.forum .forum-col-main { width: 60%; }
+table.forum .forum-col-num { width: 9%; }
+table.forum td .small { color: #75582f; }
+table.forum tbody tr:hover td { background-color: rgba(255, 250, 236, 0.28); }
+table.forum .forum-empty { color: #6a5030; font-style: italic; }
+
+.forum-title { margin: 6px 0 10px; color: #4a2508; font-size: 21px; line-height: 1.25; }
+.forum-post { padding: 10px 0 12px; border-top: solid 1px var(--ink-line); box-shadow: var(--engrave); }
+.forum-post-head { margin-bottom: 5px; }
+.forum-post-head b { color: #4a2508; }
+.forum-post-date { margin-left: 6px; color: #75582f; font-size: 13px; font-style: italic; }
+.forum-post-body { line-height: 1.45; }
+
+/* the pages: small raised boxes, the current one pressed in */
+.forum-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0 2px; font-size: 13px; }
+.forum-pages-label { margin-right: 4px; color: #7a5c34; font-variant-caps: all-small-caps; letter-spacing: 0.08em; }
+.forum-pages a, .forum-page-current {
+	min-width: 14px;
+	padding: 1px 6px;
+	border: solid 1px var(--ink-line);
+	border-radius: 3px;
+	text-align: center;
+	text-decoration: none;
+	font-variant-numeric: lining-nums;
+}
+.forum-pages a { box-shadow: var(--engrave), 0 1px 0 rgba(60, 38, 10, 0.12); }
+.forum-pages a:hover { background-color: rgba(255, 250, 236, 0.35); }
+.forum-page-current { background-color: rgba(110, 72, 26, 0.12); box-shadow: inset 0 1px 2px rgba(60, 38, 10, 0.3); font-weight: bold; }
+
+/* the forms: a field pressed into the sheet, the button raised */
+.forum-form { margin-top: 14px; padding-top: 10px; border-top: solid 1px var(--ink-line); box-shadow: var(--engrave); }
+.forum-form-new { margin-top: 0; padding-top: 0; border-top: none; box-shadow: none; }
+.forum-form-title { margin: 0 0 8px; color: #4a2508; font-size: 16px; }
+.forum-label { display: block; margin: 8px 0 3px; color: #7a5c34; font-size: 13px; font-variant-caps: all-small-caps; letter-spacing: 0.08em; }
+.forum-form input[type="text"], .forum-form textarea {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 6px 8px;
+	border: solid 1px rgba(110, 72, 26, 0.38);
+	border-radius: 3px;
+	background-color: rgba(255, 251, 240, 0.45);
+	box-shadow: inset 0 1px 2px rgba(60, 38, 10, 0.2), 0 1px 0 var(--ink-light);
+	color: #2a1c0a;
+	font: inherit;
+	resize: vertical;
+}
+.forum-form input[type="text"]:focus, .forum-form textarea:focus {
+	outline: none;
+	border-color: rgba(110, 60, 15, 0.75);
+	background-color: rgba(255, 251, 240, 0.7);
+}
+.forum-form-actions { margin-top: 8px; text-align: right; }
+.forum-button {
+	display: inline-block;
+	padding: 3px 12px;
+	box-shadow: inset 0 1px 0 rgba(255, 252, 242, 0.7), 0 1px 2px rgba(60, 38, 10, 0.3);
+	color: #4a2508;
+	font: inherit;
+	font-size: 14px;
+	font-weight: bold;
+	line-height: 1.4;
+	text-decoration: none;
+	cursor: pointer;
+}
+a.forum-button { color: #4a2508; }
+.forum-button:hover { border-color: rgba(110, 60, 15, 0.7); color: #7a2e08; }
+.forum-button:active { box-shadow: inset 0 1px 2px rgba(60, 38, 10, 0.35); }
+.forum-button:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
+
+/* ---- news (archive pages and the town news box) ---- */
+.news-heading { margin-bottom: 12px; }
+.news-crumbs { margin: 0 0 6px; }
+/* a post (community/news/post.html): a parchment card (above), the title in dark brown, the
+	date and author in small italics, the links under the text */
+.news-post { margin: 0 0 14px; padding: 14px 20px 13px; overflow-wrap: anywhere; }
 .news-title { margin: 0; font-size: 19px; line-height: 1.25; }
 .news-title a { color: #4a2508; }
 .news-title a:hover { color: #7a2e08; }

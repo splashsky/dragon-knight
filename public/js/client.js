@@ -501,7 +501,7 @@
 		if (button && button.form) lastButton = button;
 		if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
 		var a = closest(ev.target, "a[href]");
-		if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download") || a.hasAttribute("data-popup") ||
+		if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download") ||
 			closest(a, "[data-native]")) return;
 		var path = livePath(a.href, location.href, here());
 		if (!path) return;

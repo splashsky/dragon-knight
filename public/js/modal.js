@@ -2,8 +2,8 @@
 // its address in one: the request says X-DK-Modal: 1 and the server answers with the
 // page's title and content alone (lib/view.lua, layout/modal.html), shown in a <dialog>
 // over a backdrop with the page behind made inert (Escape closes, focus stays inside), but
-// for what scripts own (data-client): the chat window (chatbox.js) stays usable and over
-// it. A browser without `inert` gets showModal() (the chat window is inert then too).
+// for what scripts own (data-client): the floating windows (windows.js) stay usable and over
+// it. A browser without `inert` gets showModal() (the windows are inert then too).
 // Forms in it submit into it; a redirect (X-DK-Go) closes it and the page goes there; a link in it
 // closes it and goes on like any link (the live client takes it). An element with
 // data-modal-close closes it, a submit button too (no request; without JavaScript it
@@ -229,10 +229,10 @@
 		}
 	});
 
-	// Escape closes it (showModal does that itself), but not from the chat window
+	// Escape closes it (showModal does that itself), but not from a floating window
 	document.addEventListener("keydown", function (ev) {
 		if (ev.key !== "Escape" || ev.defaultPrevented || !isOpen() || !ownInert) return;
-		if (ev.target && ev.target.closest && ev.target.closest("[data-chatbox-window]")) return;
+		if (ev.target && ev.target.closest && ev.target.closest(".dk-window")) return;
 		ev.preventDefault();
 		close();
 	});

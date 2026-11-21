@@ -77,7 +77,7 @@ expect_body "<a href=\"/forum/thread/$T2\">Reply</a>"
 
 t_section "news: replies and their count"
 t_get "/forum/thread/$T2"; PTOKEN=$(t_csrf)
-expect_body "<a href=\"/forum\">Forum</a> &rsaquo; <a href=\"/forum/2\">News</a> &rsaquo; &lt;script&gt;t()"
+expect_body "<a href=\"/forum\">Forum</a> &rsaquo; <a href=\"/forum/2\">News</a></span></nav>"; expect_body '<h1 class="forum-title">&lt;script&gt;t()'
 expect_body 'Second &lt;i&gt;para&lt;/i&gt;'; expect_body "action=\"/forum/reply/$T2\""
 t_post "/forum/reply/$T2" "content=nope"; expect_status 403
 t_post "/forum/reply/$T2" "csrf=$PTOKEN&content=$(t_enc 'First!')"; expect_redirect "/forum/thread/$T2"
@@ -135,13 +135,13 @@ t_jar newsplayer
 t_get /news;    expect_status 200; expect_body '<h1 class="title page-title news-heading">News</h1>'
 [ "$(news_count 'class="news-post"')" = 10 ] && t_ok || t_fail "10 posts on the first page"
 expect_body '>Bulk news 12</a>'; expect_body '>Bulk news 3</a>'; expect_no_body '>Bulk news 2</a>'
-expect_body '<b>[1]</b>'; expect_body 'href="/news?start=10"'
+expect_body '<span class="forum-page-current" aria-current="page">1</span>'; expect_body 'href="/news?start=10"'
 # bulk posts have no thread: no link for them
 [ "$(news_count 'href="/forum/thread/')" = 0 ] && t_ok || t_fail "thread links for posts without threads"
 t_get "/news?start=10"
 [ "$(news_count 'class="news-post"')" = $((NEWS_TOTAL - 10 < 10 ? NEWS_TOTAL - 10 : 10)) ] && t_ok || t_fail "second page size"
-expect_body '>Bulk news 2</a>'; expect_body '<b>[2]</b>'; expect_body 'href="/news">1</a>'
-t_get "/news?start=abc"; expect_status 200; expect_body '<b>[1]</b>'
+expect_body '>Bulk news 2</a>'; expect_body '<span class="forum-page-current" aria-current="page">2</span>'; expect_body 'href="/news">1</a>'
+t_get "/news?start=abc"; expect_status 200; expect_body '<span class="forum-page-current" aria-current="page">1</span>'
 t_sql "DELETE FROM news WHERE title LIKE 'Bulk news %'"
 t_get /news
 expect_body "<a href=\"/news/$N2\">&lt;script&gt;t()&lt;/script&gt; Patch &amp; notes</a>"

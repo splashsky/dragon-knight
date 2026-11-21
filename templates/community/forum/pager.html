@@ -1,8 +1,9 @@
-{#- Page links; ctx.pages from forum.lua pager() (empty when everything fits on one page). -#}
+{#- Page links (forum boards and threads, the news archive); ctx.pages from paging.pages
+		(empty when everything fits on one page). The current page is pressed in. -#}
 {%- if #pages > 0 then %}
-<p class="forum-pages">Pages:
+<nav class="forum-pages" aria-label="Pages"><span class="forum-pages-label">Pages</span>
 {%- for _, p in ipairs(pages) do %}
-{% if p.current then %}<b>[{{ p.n }}]</b>{% else %}<a href="{{ p.url }}">{{ p.n }}</a>{% end %}
+{% if p.current then %}<span class="forum-page-current" aria-current="page">{{ p.n }}</span>{% else %}<a href="{{ p.url }}">{{ p.n }}</a>{% end %}
 {%- end %}
-</p>
+</nav>
 {%- end %}

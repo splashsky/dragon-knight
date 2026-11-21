@@ -1,7 +1,10 @@
-{#- Board list (GET /forum). -#}
+{#- Board list (GET /forum): one parchment sheet (community.css .forum-sheet), a row per
+		board. -#}
+<nav class="forum-bar" aria-label="Forum"><span class="forum-crumbs">Forum</span></nav>
+<div class="forum-sheet">
 <table class="forum">
 <thead>
-<tr><th class="forum-col-thread">Board</th><th class="forum-col-replies">Threads</th><th class="forum-col-replies">Posts</th><th>Last Post</th></tr>
+<tr><th class="forum-col-main">Board</th><th class="forum-col-num">Threads</th><th class="forum-col-num">Posts</th><th class="forum-col-last">Last Post</th></tr>
 </thead>
 <tbody>
 {%- for _, b in ipairs(boards) do %}
@@ -9,3 +12,4 @@
 {%- end %}
 </tbody>
 </table>
+</div>

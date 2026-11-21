@@ -8,8 +8,8 @@ body {
 	background: #e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 	color: #16181d;
 }
-/* the chat window: the same background, a little darker */
-.dk-chatbox {
+/* the floating windows: the same background, a little darker */
+.dk-window {
 	background: linear-gradient(rgba(22, 24, 29, 0.12), rgba(22, 24, 29, 0.12)),
 		#e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 }
@@ -76,10 +76,10 @@ a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }
 
 /* dialogs and the chat window: the tooltips' paper and border; the message bar in the links' red */
 .dk-modal-box { background-color: #fdfdfb; }
-.dk-modal-box, .dk-chatbox { color: #16181d; border-color: #16181d; }
+.dk-modal-box, .dk-window { color: #16181d; border-color: #16181d; }
 .chat-send { color: #6b1510; }
 .chat-bar:focus-within { border-color: #d0161e; box-shadow: 0 0 0 2px rgba(208, 22, 30, 0.15); }
-.dk-chatbox .chat-bar:focus-within { border-top-color: #d0161e; box-shadow: none; }
+.dk-window-chat .chat-bar:focus-within { border-top-color: #d0161e; box-shadow: none; }
 
 /* monsters speaking in a fight: the links' dark red */
 .fight-speech { color: #6b1510; }

@@ -11,7 +11,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/test.lua` (test-only routes) | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/e2e/pure.sh` (pure GETs), `tests/lua/test_{php,router}.lua` |
-| Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js`, `public/js/chatbox.js` (the chat window) | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
+| Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js`, `public/js/windows.js` (the chat, map and character windows) | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
 | Tooltips, lore | `app/lib/tips.lua`, `app/lib/view.lua` (`tip`, `paragraphs`), the kinds' `lore` field (`app/lib/content/schema.lua`) | `templates/tip/tip.html`, `public/js/tooltip.js`, `public/css/dk.css` (`.dk-tip`, `.tip-*`) | `tests/e2e/tips.sh`, `tests/js/test_tooltip.js`, `tests/lua/test_content.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
@@ -179,8 +179,8 @@ Form and query values are raw strings. Validate them, and convert them with
 
 - `nav`: show the side columns and the logged-in top nav. Defaults to true when logged
 	in. Legacy pages called with `display(..., false, false, false)` pass `nav = false`.
-- `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for popup pages
-	(`/character`, `/map`). Any other name uses
+- `layout`: `"main"` (default) or `"minimal"`. Use `"minimal"` for pages that stand alone
+	(`/character`, `/map`: the floating windows' pages without JavaScript; help). Any other name uses
 	`templates/layout/<name>.html` (the admin panel uses `layout = "admin"`).
 - `body_class`: extra class(es) on `<body>` for page-specific CSS (the layouts also add
 	`theme-<key>`, see [Themes](#themes)). The help pages pass
@@ -201,7 +201,7 @@ live.js), `side` (with `nav`: the online count for the right column,
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
 `tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
 `scene.js`, see [Scenes](#scenes),
-`live.js`, `chatbox.js`, see [Chat](#chat), `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
+`live.js`, `windows.js`, see [Windows](#windows), `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
 everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
 `<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
@@ -291,7 +291,7 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 `history.pushState`; elsewhere nothing changes.
 
 - **What it takes over.** Clicks on same-origin links (left button, no modifier keys, no
-	`target`, `download` or `data-popup`, not another `#hash` of the same page, not
+	`target` or `download`, not another `#hash` of the same page, not
 	`/static/` or `/live`) and submits of same-origin urlencoded forms (the pressed button
 	included). `data-native` on a link, a form or an ancestor keeps it native. Its click and
 	submit listeners are on `window`: the other scripts' (on `document`) come first, and a
@@ -348,7 +348,7 @@ addresses qualify); `tests/e2e/browser.sh` drives `tests/browser/client.js` in h
 Chrome, Edge or Chromium over the DevTools protocol (node's `WebSocket`, no dependencies;
 skipped without node or a browser): logging in and out without a page load (and the event
 stream starting and stopping), links, back/forward with their scroll, typed text kept,
-the chat window (sending, its fixed height, from page to page, dragged, over a dialog, after a page load), a move, a POST's own page (resting at the inn), the progress bar, a newer link
+the chat window (sending, its fixed height, from page to page, dragged, over a dialog, after a page load), the map and character windows (titled, the one pressed in front, the sheet fetched again when the panels change, kept closed), a move, a POST's own page (resting at the inn), the progress bar, a newer link
 winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
 routes only) is a page that takes its time.
 
@@ -420,10 +420,10 @@ purchase first: give the link `data-modal`.
 - **The dialog**: one `<dialog class="dk-modal">` made by the script (`data-client`: the
 	live client's morph leaves it alone), opened with `show()` over a backdrop of its own
 	(`.dk-modal-backdrop`), the page behind made `inert` by the script (each child of
-	`<body>` but those scripts own, `data-client`: the chat window stays usable and over
-	it; the live client leaves `inert` to the scripts): the game halts, Escape closes it
-	(but not from the chat window), focus stays inside. A browser without `inert` gets
-	`showModal()` (the chat window halts too). Closing cleans up at once (the close event
+	`<body>` but those scripts own, `data-client`: the floating windows stay usable and
+	over it; the live client leaves `inert` to the scripts): the game halts, Escape closes
+	it (but not from a floating window), focus stays inside. A browser without `inert` gets
+	`showModal()` (the windows halt too). Closing cleans up at once (the close event
 	comes later). Its first field or button gets
 	the focus (`autofocus` picks another); closing gives the focus back to the link. If the
 	page takes longer than 250 ms the dialog opens with "Loading…" meanwhile.
@@ -447,6 +447,39 @@ purchase first: give the link `data-modal`.
 	`X-DK-Go`, a purchase); `tests/browser/client.js` ("the shop's dialog": it opens over
 	the page, the focus, No, a purchase and the page behind catching up, Escape, a tooltip in
 	it, the arrow keys).
+
+## Windows
+
+Floating windows (3.1, `public/js/windows.js`): the Babble Box ([Chat](#chat)), the world
+map and the character sheet. A link names its window, `<a href="/map" target="_blank"
+data-window="map">` (the Location panel's View Map; the Character panel's Extended Stats
+is `stats`, the Functions box's Babble Box `chat`); a click opens or closes it, and
+without JavaScript (or with a modifier key) the link is its page (`/map` and `/character`
+on the minimal layout, in a new tab).
+
+- **What they show**: the link's address fetched as a dialog's page (`X-DK-Modal: 1`: the
+	content alone, [Modals](#modals)), without the live client's region names (`data-r`).
+	`windows.js` names each kind: its title (in the strip: "Babble Box", "World Map",
+	"Extended Stats"), where it opens the first time (the bottom right corner, the middle,
+	the top right under the header), what of the page it shows (the chat: `.chat`; else
+	`.dk-modal-content`), the field focused when the player opens it, and the regions
+	whose change makes it out of date: the sheet's are the right column's panels
+	(`charpanel`, `invpanel`, `spellpanel`, or `right`/`root` when the answer sends those
+	whole), seen in the live client's `before` hook; it is fetched again once the answer is
+	on screen (`applied`). The map is a picture and never changes.
+- **The window** (`<section class="dk-window dk-window-<kind>" role="dialog">`, not a
+	`<dialog>`: the game goes on under it, the arrow keys and the hotbar too;
+	`data-client`, so the live client's morph leaves it and it stays open from page to
+	page). Its strip (`.dk-window-grip`: the title, the close button `.dk-window-x` at the
+	right) moves it (pointer events, kept inside the viewport); its corner resizes it (CSS
+	`resize`); a press anywhere in one brings it in front (`z-index` from 950, in the order
+	pressed). Sizes at first: the chat 320 by 400, the map 460 by 490 (the picture as large
+	as the window allows), the sheet 280 by 520 (scrolling). It has the page's own
+	background (the theme's `body` image) a little darker. Whether each is open, where and
+	how big are kept in `localStorage` (`dk-window-<kind>`), so a page load opens it again
+	where it was. Escape in one closes it. A page without a window's link (logged out, the
+	admin panel) hides that window. Over a dialog it stays usable and on top (the dialog's
+	`z-index` is 901).
 
 ## Realtime (event streams)
 
@@ -608,8 +641,8 @@ reload. No toasts in popup windows (`window.opener`).
 
 The Babble Box (`lib/chat.lua`, routes in `town/babble.lua`, `layout/chat.html`) is
 `/babble` (its own page, with who's online; old links to the iframe land there) and, from
-the Functions box's Babble Box link (`<a href="/babble" data-chatbox>`), the **chat
-window** (3.1, `public/js/chatbox.js`); no other page shows it. `control.showbabble` turns
+the Functions box's Babble Box link (`<a href="/babble" data-window="chat">`), the **chat
+window** (3.1, one of the [floating windows](#windows)); no other page shows it. `control.showbabble` turns
 it off everywhere (the link too). Its messages are in a box of a fixed height
 (`.chat-scroll`, 340px on the page; the window's whole upper part: it doesn't grow or shrink
 as messages come and go) that scrolls from the bottom, the newest last; each message is
@@ -629,19 +662,11 @@ the first of a run shows the name on the next. Then the message bar (`.chat-bar`
 itself (its submit listener captures: no dialog or live client takes them) and adds the
 messages that come to every list on the page (the window's too).
 
-- **The window** (`.dk-chatbox`, `data-client`: the live client's morph leaves it, so it
-	stays open from page to page; `role="dialog"` but not a `<dialog>`: the game goes on
-	under it, the arrow keys and the hotbar too). The link opens and closes it; it fetches
-	`/babble` as a dialog's page (`X-DK-Modal: 1`: the chat alone, no heading) and drops
-	the live client's region names (`data-r`) from it. A strip at its top moves it (pointer
-	events, kept inside the window), the close button at the strip's right; its corner
-	resizes it (CSS `resize`). It has the page's own background (the theme's `body` image)
-	a little darker (a translucent layer over it), and the message bar is its foot: dark,
-	with light text and send button, flush with its sides and bottom, square on top, its
-	bottom corners the window's (an error line goes above it). Whether it is open, where and how big are kept in
-	`localStorage` (`dk-chatbox`), so a page load opens it again where it was. Escape in it
-	closes it. Pages without the link (logged out, the admin panel) hide it. Over a dialog
-	([Modals](#modals)) it stays usable and on top (`z-index` 950, the dialog 901).
+- **The window** (`.dk-window-chat`, see [Windows](#windows)): `/babble` as a dialog's
+	page, the chat alone (`.chat`, no heading), 320 by 400 at first in the bottom right
+	corner, the focus in its field when the player opens it. The message bar is its foot:
+	dark, with light text and send button, flush with its sides and bottom, square on top,
+	its bottom corners the window's (an error line goes above it).
 
 - History: the last 50 messages (`chat.HISTORY`), oldest first, rendered on the page;
 	live ones arrive as `babble` events (live.js builds the same markup).
@@ -729,8 +754,8 @@ starting with `__` are reserved.
 - **HTML-returning helpers need triple braces**: `{{{ csrf_field() }}}`,
 	`{{{ include("x") }}}`, `{{{ nl2br(text) }}}`.
 - Every POST form needs `{{{ csrf_field() }}}` (the chat's and the banner's too).
-- Popups: `<a href="/character" target="_blank" data-popup="250x600">` (`dk.js` opens a
-	sized window; without JS it's a normal link).
+- Floating windows: `<a href="/map" target="_blank" data-window="map">` (see
+	[Windows](#windows); without JS the page in a new tab).
 - The way back (`layout/main.html`, 3.1): the header's first button (`.dk-home`, a gold
 	frame on dark brown, black in Retro), on every page of the main layout, links to `/`
 	(`routes/home.lua`: the fight, the town or exploring) and is named for where that is:
@@ -851,8 +876,8 @@ the page's structure is the same in every theme. `app/lib/themes.lua` lists them
 	string; on a page answering a POST, its path). The route sets the `dk_theme` cookie
 	(`Path=/`, one year, `SameSite=Lax`) and redirects to `back` if it is a same-site path
 	with a GET route (`themes.safe_path`: no scheme, host, `//`, backslash or control
-	characters), else to `/`. An unknown key is a 400 page and changes nothing. Popups
-	(minimal layout) have no selector but use the theme. No database: the
+	characters), else to `/`. An unknown key is a 400 page and changes nothing. Pages on
+	the minimal layout have no selector but use the theme. No database: the
 	choice belongs to the browser, logged in or out.
 - **Rendering.** `themes.current(req)` is the cookie's theme, or `themes.DEFAULT`
 	(`default`) when there is none or it names no theme. The layouts get it as ctx `theme`:
@@ -2058,9 +2083,10 @@ return {
 	costs the turn like a spell; `fight/act.lua`) per its `usable_in`, with the player as
 	caster. Refusals (already full, ...) and errors cost nothing; the item is taken from
 	the bag only when it was used.
-- The town page (`home/town.html`) shows the town's places as banners (3.1:
-	`public/images/buildings/`, `.town-banner`: the picture on a dark ground continuing its
-	own, its edges faded by a mask; no frame): the Inn (`/inn`, its price) and the
+- The town page (`home/town.html`) shows the town's places as light cards (3.1:
+	`.town-banner`: a faint wash and a hairline that sit in the page, a little stronger when
+	pointed at; the picture, `public/images/buildings/`, a 64px round medallion in a thin
+	ring; the name in the links' colour, a line under it): the Inn (`/inn`, its price) and the
 	Market (`/shop`: the shop and the map store in one, page title "Market").
 - Maps (3.1, schema version 18): `town_maps(town_id, map_id)` is the maps a town's market
 	sells (`game.town_maps`, `game.sells_map`; the admin town editor's Maps field takes town
@@ -2237,6 +2263,15 @@ read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
 	edge; the title a link to its page, the date and author under it, the text, the
 	discussion's link): on `/news`, `/news/#id` and, with
 	`excerpt` (the first paragraph, Read more, All news), in the town's Latest News.
+- The forum's look (3.1, `community.css`): over each page a bar (`.forum-bar`) with the
+	way back (`Forum › General`, the current place as text) and, on a board that takes
+	them, New Thread. The rest is a parchment sheet (`.forum-sheet`, the news posts'
+	parchment): the boards and threads as rows (a thread with who started it under its
+	title), the columns' names small and light, an engraved line between rows (a dark
+	hairline over a light one: `--ink-line`, `--engrave`); a thread's title, then its posts,
+	who and when over each; the pages (`.forum-pages`: small raised boxes, the current one
+	pressed in, `aria-current="page"`; the news archive's too) and the forms at the foot,
+	their fields pressed into the sheet and their buttons (`.forum-button`) raised.
 - A news post and a forum reply also send live notices (see [Notices](#notices)).
 - Paging (`lib/paging.lua`): `paging.start(req)` reads `?start=N`; `paging.pages(base,
 	start, per, total)` builds the links that `include("community/forum/pager")` renders.

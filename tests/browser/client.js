@@ -146,18 +146,18 @@ async function run(wsUrl, port) {
 		return send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code: k, windowsVirtualKeyCode: code })
 			.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
 	}
-	// the Functions box's Babble Box opens the chat window (chatbox.js): not a dialog (the
+	// the Functions box's Babble Box opens the chat window (windows.js): not a dialog (the
 	// game goes on); live.js sends the message itself and adds it from the chat-post
 	// prototype, the server's own markup for it; the box keeps its height; the window stays
 	// open from page to page, moves by its strip, stays usable and on top over a dialog
 	// (modal.js), and comes back after a page load where it was
 	check("no chat on the page", await js("!document.querySelector('[data-chat-form]')"));
-	var CB = "document.querySelector('.dk-chatbox')";
+	var CB = "document.querySelector('.dk-window-chat')";
 	async function openChat() {
-		await js("document.querySelector('[data-r=functions] a[data-chatbox]').click()");
+		await js("document.querySelector('[data-r=functions] a[data-window=chat]').click()");
 		return until("!!" + CB + " && !" + CB + ".hidden && !!" + CB + ".querySelector('[data-chat-form]')");
 	}
-	await js("localStorage.removeItem('dk-chatbox')");
+	await js("localStorage.removeItem('dk-window-chat')");
 	check("the window", await openChat());
 	check("not a dialog", await js("!document.querySelector('dialog[open]')"));
 	check("the focus in its field", await js("document.activeElement === " + CB + ".querySelector('[name=babble]')"));
@@ -168,28 +168,28 @@ async function run(wsUrl, port) {
 	check("the input cleared", await until(CB + ".querySelector('[name=babble]').value === ''"));
 	check("still open, no reload", await js("!" + CB + ".hidden && window.__dk === 1 && location.pathname === '/'"));
 	check("the box keeps its height", await js(CB + ".querySelector('.chat-scroll').offsetHeight") === chatHeight);
-	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop();" +
+	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('.dk-window-chat [data-chat-posts] li')].pop();" +
 		"return li.querySelector('.babble-text').getBoundingClientRect().top >= li.querySelector('.babble-author').getBoundingClientRect().bottom - 1; })()"));
 	// a second one right after it: the same author, so no name shown again (babble-cont)
 	await sleep(2100);   // (one message every 2 seconds)
 	await js("var f = " + CB + ".querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'and again'; f.requestSubmit()");
 	check("the second in the window", await until("/and again/.test(" + CB + ".querySelector('[data-chat-posts]').textContent)"));
-	check("without the name again", await js("(function () { var li = [...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop();" +
+	check("without the name again", await js("(function () { var li = [...document.querySelectorAll('.dk-window-chat [data-chat-posts] li')].pop();" +
 		"return li.classList.contains('babble-cont') && li.querySelector('.babble-author').getBoundingClientRect().height <= 1; })()"));
-	var mine = await js("[...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop().outerHTML");
+	var mine = await js("[...document.querySelectorAll('.dk-window-chat [data-chat-posts] li')].pop().outerHTML");
 	// from page to page: the same window, open
 	await js("window.__cb = " + CB + "; DK.visit('/inventory')");
 	check("another page", await until("location.pathname === '/inventory' && !DK.busy()"));
 	check("the same window, open", await js(CB + " === window.__cb && !window.__cb.hidden && /hello from the browser/.test(window.__cb.textContent)"));
 	// dragged by its strip (not its close button)
-	var grip = await js("(function () { var r = document.querySelector('.dk-chatbox-grip').getBoundingClientRect(); return [r.left + 20, r.top + 8]; })()");
+	var grip = await js("(function () { var r = document.querySelector('.dk-window-chat .dk-window-grip').getBoundingClientRect(); return [r.left + 20, r.top + 8]; })()");
 	var before = await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]");
 	await send("Input.dispatchMouseEvent", { type: "mousePressed", x: grip[0], y: grip[1], button: "left", clickCount: 1 });
 	await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: grip[0] - 120, y: grip[1] - 60, button: "left", buttons: 1 });
 	await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: grip[0] - 120, y: grip[1] - 60, button: "left", clickCount: 1 });
 	var after = await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]");
 	check("dragged", after[0] === before[0] - 120 && after[1] === before[1] - 60, [before, after]);
-	check("where it is kept", await js("JSON.parse(localStorage.getItem('dk-chatbox')).x") === after[0]);
+	check("where it is kept", await js("JSON.parse(localStorage.getItem('dk-window-chat')).x") === after[0]);
 	// a dialog: the page behind halts, the window stays usable and on top
 	await js("DK.visit('/shop')");
 	await until("location.pathname === '/shop' && !DK.busy()");
@@ -207,14 +207,14 @@ async function run(wsUrl, port) {
 	await press("Escape", 27);
 	check("then the dialog", await until("!document.querySelector('dialog[open]')"));
 	check("the page back", await js("!document.querySelector('.dk-page').closest('[inert]')"));
-	check("the window stays closed", await js(CB + ".hidden && JSON.parse(localStorage.getItem('dk-chatbox')).open === false"));
+	check("the window stays closed", await js(CB + ".hidden && JSON.parse(localStorage.getItem('dk-window-chat')).open === false"));
 	// opened again: the history from the server, the message as the prototype made it
 	await js("DK.visit('/')");
 	await until("location.pathname === '/' && !DK.busy()");
 	await openChat();
 	// (a player's; an administrator's has the page's address in its delete form)
 	if (await js("!document.body.hasAttribute('data-live-admin')")) {
-		var theirs = await js("[...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop().outerHTML");
+		var theirs = await js("[...document.querySelectorAll('.dk-window-chat [data-chat-posts] li')].pop().outerHTML");
 		check("the prototype's markup is the server's", mine === theirs, [mine, theirs]);
 	}
 	// a page load: open again, where it was
@@ -222,8 +222,43 @@ async function run(wsUrl, port) {
 	await sleep(500);
 	check("after a page load", await until("!!" + CB + " && !" + CB + ".hidden && !!" + CB + ".querySelector('[data-chat-form]')"));
 	check("where it was", await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop].join()") === after.join(), await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]"));
-	await js("window.__dk = 1; document.querySelector('.dk-chatbox-x').click()");
+	await js("window.__dk = 1; document.querySelector('.dk-window-chat .dk-window-x').click()");
 	check("its close button", await until(CB + ".hidden"));
+
+	section = "the map and character windows";
+	// View Map and Extended Stats open floating windows too (windows.js), each titled, the
+	// one last pressed in front; the sheet follows the character: an answer that changes
+	// the right column's panels fetches it again
+	var SW = "document.querySelector('.dk-window-stats')", MW = "document.querySelector('.dk-window-map')";
+	await js("localStorage.removeItem('dk-window-map'); localStorage.removeItem('dk-window-stats')");
+	await js("document.querySelector('a[data-window=stats]').click()");
+	check("the character window", await until("!!" + SW + " && !" + SW + ".hidden && !!" + SW + ".querySelector('.charsheet')"));
+	check("its title", await js(SW + ".querySelector('.dk-window-title').textContent === 'Extended Stats'"));
+	await js("document.querySelector('a[data-window=map]').click()");
+	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map img')"));
+	check("the page stays", await js("location.pathname === '/' && window.__dk === 1"));
+	check("the map in front", await js("+" + MW + ".style.zIndex > +" + SW + ".style.zIndex"));
+	var title = await js("(function () { var r = " + SW + ".querySelector('.dk-window-title').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })()");
+	await send("Input.dispatchMouseEvent", { type: "mousePressed", x: title[0], y: title[1], button: "left", clickCount: 1 });
+	await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: title[0], y: title[1], button: "left", clickCount: 1 });
+	check("pressed: the sheet in front", await js("+" + SW + ".style.zIndex > +" + MW + ".style.zIndex"));
+	await js("DK.visit('/inn')");
+	await until("location.pathname === '/inn' && !DK.busy()");
+	var SHEET_GOLD = "(" + SW + ".textContent.match(/Gold: ([\\d,]+)/) || [])[1]";
+	var goldBefore = await js(SHEET_GOLD);
+	if (await js("!!document.querySelector('[data-r=main] form [name=submit]') && +document.querySelector('.charpanel-meta dd:nth-of-type(2)').textContent.replace(/,/g, '') >= " +
+		"+(document.querySelector('[data-r=main]').textContent.match(/cost you (\\d+) gold/) || [0, Infinity])[1]")) {
+		await js("document.querySelector('[data-r=main] form [name=submit]').click()");
+		await until("/You wake up/.test(document.querySelector('[data-r=main]').textContent) && !DK.busy()");
+		check("the sheet's gold follows the panel's", await until(SHEET_GOLD + " !== " + JSON.stringify(goldBefore) + " && " + SHEET_GOLD + " === " +
+			"document.querySelector('.charpanel-meta dd:nth-of-type(2)').textContent"), [goldBefore, await js(SHEET_GOLD)]);
+	}
+	check("both open on another page", await js("!" + SW + ".hidden && !" + MW + ".hidden"));
+	await js(MW + ".querySelector('.dk-window-x').click(); " + SW + ".querySelector('.dk-window-x').click()");
+	check("closed", await until(SW + ".hidden && " + MW + ".hidden"));
+	check("and kept closed", await js("!JSON.parse(localStorage.getItem('dk-window-map')).open && !JSON.parse(localStorage.getItem('dk-window-stats')).open"));
+	await js("DK.visit('/')");
+	await until("location.pathname === '/' && !DK.busy()");
 
 	section = "the shop's dialog";
 	// an item's link opens its purchase in a dialog over the shop (modal.js): the page stays

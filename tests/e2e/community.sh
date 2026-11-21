@@ -59,7 +59,7 @@ LONG=$(printf 'x%.0s' $(seq 101))
 t_post /forum/1/new "csrf=$TOKEN&title=$LONG&content=x"; expect_body 'Title must be 100 characters or less.'
 t_post /forum/1/new "csrf=$TOKEN&title=$(t_enc '<script>alert(1)</script>')&content=$(t_enc $'<b>bold</b> & co\nline two')"
 expect_redirect /forum/1
-t_get /forum/1;            expect_body '&lt;script&gt;alert(1)&lt;/script&gt;'; expect_no_body '<script>alert'
+t_get /forum/1;            expect_body '&lt;script&gt;alert(1)&lt;/script&gt;</a><br><span class="small">by Forumer</span>'; expect_no_body '<script>alert'
 expect_no_body 'NoToken'; expect_no_body 'No threads in this board.'
 t_get /forum;              expect_body 'Talk about anything.</span></td><td>1</td><td>1</td><td>20'
 t_get /forum/999;          expect_status 404; expect_body 'That board doesn&#39;t exist.'
@@ -72,7 +72,8 @@ if t_has_sql; then
 	[ "$(t_sql "SELECT title FROM forum WHERE board = 1")" = '<script>alert(1)</script>' ] && t_ok || t_fail "title stored raw"
 	XSS=$(t_sql "SELECT id FROM forum WHERE parent = 0 AND board = 1")
 	t_get "/forum/thread/$XSS"; expect_status 200
-	expect_body '<a href="/forum">Forum</a> &rsaquo; <a href="/forum/1">General</a> &rsaquo; &lt;script&gt;'
+	expect_body '<a href="/forum">Forum</a> &rsaquo; <a href="/forum/1">General</a></span></nav>'
+	expect_body '<h1 class="forum-title">&lt;script&gt;alert(1)&lt;/script&gt;</h1>'
 	expect_body '&lt;b&gt;bold&lt;/b&gt; &amp; co<br />'; expect_no_body '<b>bold</b>'
 	expect_body '<b>Forumer</b>'; expect_body "action=\"/forum/reply/$XSS\""
 
@@ -114,12 +115,12 @@ if t_has_sql; then
 				 SELECT 10, 10 + n, 'Bulk', 0, 0, 'Bulk thread ' || n, 'bulk' FROM c"
 	t_get /forum/1
 	[ "$(grep -c 'href="/forum/thread/' "$BODY")" = 20 ] && t_ok || t_fail "20 threads on the first page"
-	expect_body 'href="/forum/1?start=20"'; expect_body '<b>[1]</b>'
+	expect_body 'href="/forum/1?start=20"'; expect_body '<span class="forum-page-current" aria-current="page">1</span>'
 	t_get "/forum/1?start=20"
 	[ "$(grep -c 'href="/forum/thread/' "$BODY")" = 8 ] && t_ok || t_fail "8 threads on the second page"
-	expect_body '<b>[2]</b>'; expect_body 'href="/forum/1">1</a>'
-	t_get "/forum/1?start=-5";  expect_status 200; expect_body '<b>[1]</b>'
-	t_get "/forum/1?start=abc"; expect_status 200; expect_body '<b>[1]</b>'
+	expect_body '<span class="forum-page-current" aria-current="page">2</span>'; expect_body 'href="/forum/1">1</a>'
+	t_get "/forum/1?start=-5";  expect_status 200; expect_body '<span class="forum-page-current" aria-current="page">1</span>'
+	t_get "/forum/1?start=abc"; expect_status 200; expect_body '<span class="forum-page-current" aria-current="page">1</span>'
 	t_get /forum;             expect_body 'Talk about anything.</span></td><td>28</td><td>30</td>'
 	t_sql "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 20)
 				 INSERT INTO forum (postdate, newpostdate, author, parent, replies, title, content)

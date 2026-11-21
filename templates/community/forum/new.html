@@ -1,6 +1,10 @@
-{#- New thread form (legacy forum.php newthread()). -#}
-<p class="forum-crumbs"><a href="/forum">Forum</a> &rsaquo; <a href="/forum/{{ board.id }}">{{ board.name }}</a></p>
-<b>Make A New Post:</b><br><br>
+{#- New thread form (legacy forum.php newthread()): the way back, then the form on a
+		parchment sheet. -#}
+<nav class="forum-bar" aria-label="Forum"><span class="forum-crumbs"><a href="/forum">Forum</a> &rsaquo; <a href="/forum/{{ board.id }}">{{ board.name }}</a> &rsaquo; New Thread</span></nav>
+<div class="forum-sheet">
+<form class="forum-form forum-form-new" action="/forum/{{ board.id }}/new" method="post">
+{{{ csrf_field() }}}
+<h1 class="forum-title">Make A New Post</h1>
 {%- if errors then %}
 <p class="error">
 {%- for _, e in ipairs(errors) do %}
@@ -8,12 +12,11 @@
 {%- end %}
 </p>
 {%- end %}
-<form action="/forum/{{ board.id }}/new" method="post">
-{{{ csrf_field() }}}
-Title:<br>
-<input type="text" name="title" size="50" maxlength="{{ title_max }}" value="{{ draft.title }}" required><br><br>
-Message:<br>
-<textarea name="content" rows="7" cols="40" required>
-{{ draft.content }}</textarea><br><br>
-<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+<label class="forum-label" for="forum-new-title">Title</label>
+<input id="forum-new-title" type="text" name="title" maxlength="{{ title_max }}" value="{{ draft.title }}" required>
+<label class="forum-label" for="forum-new-content">Message</label>
+<textarea id="forum-new-content" name="content" rows="8" required>
+{{ draft.content }}</textarea>
+<div class="forum-form-actions"><button class="forum-button" type="submit" name="submit" value="Submit">Post Thread</button></div>
 </form>
+</div>

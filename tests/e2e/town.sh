@@ -22,6 +22,16 @@ t_get /;                          expect_body 'Welcome to Midworld'
 TC=$(t_csrf)
 [ -n "$TC" ] && t_ok || t_fail "no csrf token on the town page"
 
+t_section "town: the map and the character sheet (floating windows)"
+# their links open windows (windows.js), which ask for the page as a dialog's: the content
+# alone; without JavaScript, the pages in a new tab
+expect_body '<a href="/map" target="_blank" data-window="map">View Map</a>'
+expect_body '<a class="charpanel-more" href="/character" target="_blank" data-window="stats">Extended Stats</a>'
+t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'; expect_body '<div class="world-map"><img src="/static/images/map.gif" alt="Map"></div>'
+expect_no_body '<html'
+t_get /character -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body '<div class="charsheet">'; expect_body 'Travel Points:'
+expect_no_body '<html'
+
 t_section "town: inn"
 tu "$TOWN_HOME, gold=100, currenthp=1, currentmp=0, currenttp=0, base_maxhp=20, base_maxmp=10, base_maxtp=12"
 t_get /inn;                       expect_status 200; expect_body 'Resting at the inn'; expect_body '<b>5 gold</b>'

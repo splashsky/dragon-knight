@@ -9,13 +9,13 @@ chat_unlimit() { t_sql "UPDATE babble SET posttime = posttime - 10"; }
 
 t_section "chat: its page and its window"
 # the Babble Box is /babble; the Functions box's link opens it in the chat window
-# (chatbox.js), which fetches it as a dialog's page (X-DK-Modal: the chat alone); no game
+# (windows.js), which fetches it as a dialog's page (X-DK-Modal: the chat alone); no game
 # page shows it otherwise
 t_jar chata; t_reset_jar
 t_register chata chatapw1 chata@example.com ChatA; t_login chata chatapw1
 CHATA_ID=$(t_sql "SELECT id FROM users WHERE username = 'chata'")
 t_get /;      expect_status 200
-expect_no_body 'data-chat-form'; expect_body '<a href="/babble" data-chatbox>Babble Box</a><br>'
+expect_no_body 'data-chat-form'; expect_body '<a href="/babble" data-window="chat">Babble Box</a><br>'
 expect_body '<script src="/static/js/live.js" defer></script>'
 expect_body 'data-live data-csrf="'; expect_no_body 'data-live-admin'
 t_get /inn;   expect_status 200; expect_no_body 'data-chat-form'
@@ -30,7 +30,7 @@ expect_body '<div class="dk-modal-content"><section class="chat" data-r="chat" d
 <div class="chat-scroll">'
 expect_no_body "Who's Online"; expect_no_body '<h2 class="title">Babble Box</h2>'
 t_sql "UPDATE control SET showbabble = 0"
-t_get /;      expect_no_body 'href="/babble" data-chatbox'
+t_get /;      expect_no_body 'href="/babble" data-window="chat"'
 t_get /babble; expect_no_body 'data-chat-form'; expect_body 'The Babble Box is turned off.'
 t_sql "UPDATE control SET showbabble = 1"
 t_get /help;  expect_body 'data-live data-csrf="'          # minimal layout too: the stream lives on

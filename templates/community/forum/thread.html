@@ -1,17 +1,19 @@
-{#- One thread (legacy forum.php showthread()) + the reply form. -#}
-<table class="forum">
-<thead>
-<tr><th colspan="2" class="forum-thread-title"><a href="/forum">Forum</a> &rsaquo; {% if board then %}<a href="/forum/{{ board.id }}">{{ board.name }}</a> &rsaquo; {% end %}{{ thread.title }}</th></tr>
-</thead>
-<tbody>
+{#- One thread (legacy forum.php showthread()): the way back, then a parchment sheet with
+		the title, the posts (who and when over each, an engraved line between them), the pages
+		and the reply form. -#}
+<nav class="forum-bar" aria-label="Forum"><span class="forum-crumbs"><a href="/forum">Forum</a>{% if board then %} &rsaquo; <a href="/forum/{{ board.id }}">{{ board.name }}</a>{% end %}</span></nav>
+<div class="forum-sheet">
+<h1 class="forum-title">{{ thread.title }}</h1>
 {%- for _, p in ipairs(posts) do %}
-<tr><td class="forum-author"><span class="small"><b>{{ p.author }}</b><br><br>{{ date(p.postdate) }}</span></td><td>{{{ nl2br(p.content) }}}</td></tr>
+<article class="forum-post">
+<div class="forum-post-head"><b>{{ p.author }}</b> <span class="forum-post-date">{{ date(p.postdate) }}</span></div>
+<div class="forum-post-body">{{{ nl2br(p.content) }}}</div>
+</article>
 {%- end %}
-</tbody>
-</table>
 {{{ include("community/forum/pager") }}}
-<br>
-<b>Reply To This Thread:</b><br>
+<form class="forum-form" action="/forum/reply/{{ thread.id }}" method="post">
+{{{ csrf_field() }}}
+<h2 class="forum-form-title">Reply To This Thread</h2>
 {%- if errors then %}
 <p class="error">
 {%- for _, e in ipairs(errors) do %}
@@ -19,9 +21,8 @@
 {%- end %}
 </p>
 {%- end %}
-<form action="/forum/reply/{{ thread.id }}" method="post">
-{{{ csrf_field() }}}
-<textarea name="content" rows="7" cols="40" required>
-{{ draft }}</textarea><br>
-<input type="submit" name="submit" value="Submit"> <input type="reset" name="reset" value="Reset">
+<textarea name="content" rows="6" aria-label="Your reply" required>
+{{ draft }}</textarea>
+<div class="forum-form-actions"><button class="forum-button" type="submit" name="submit" value="Submit">Post Reply</button></div>
 </form>
+</div>

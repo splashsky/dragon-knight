@@ -16,7 +16,7 @@
 {%- if art_src("location") then %}
 <div class="loc-where">{{ where }}</div>
 {%- end %}
-<div class="loc-line"><span class="loc-coords" title="Latitude {{ latitude }}, longitude {{ longitude }}">{{ latitude }}, {{ longitude }}</span> &middot; <a href="/map" target="_blank" data-popup="520x520">View Map</a></div>
+<div class="loc-line"><span class="loc-coords" title="Latitude {{ latitude }}, longitude {{ longitude }}">{{ latitude }}, {{ longitude }}</span> &middot; <a href="/map" target="_blank" data-window="map">View Map</a></div>
 {%- if not fighting then %}
 <form class="compass" method="post" action="/move">
 {{{ csrf_field() }}}<div class="compass-rose"><img src="/static/images/compass.png" width="128" height="128" alt="">
@@ -54,7 +54,7 @@
 <a href="/inventory">Inventory</a><br>
 <a href="/hotbar">Hotbar</a><br>
 {%- if chat then %}
-<a href="/babble" data-chatbox>Babble Box</a><br>
+<a href="/babble" data-window="chat">Babble Box</a><br>
 {%- end %}
 {%- if forum then %}
 <a href="{{ forum }}">Forum</a><br>

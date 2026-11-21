@@ -6,11 +6,11 @@
 body {
 	background: url(/static/images/themes/retro/background.jpg);
 }
-/* the chat window: the same background, a little darker; its message bar dark brown */
-.dk-chatbox {
+/* the floating windows: the same background, a little darker; its message bar dark brown */
+.dk-window {
 	background: linear-gradient(rgba(60, 40, 10, 0.14), rgba(60, 40, 10, 0.14)), url(/static/images/themes/retro/background.jpg);
 }
-.dk-chatbox .chat-bar { background-color: #2e2418; }
+.dk-window-chat .chat-bar { background-color: #2e2418; }
 
 /* item and skill tiles: the original grey title boxes in plain black frames (dk.css's
 	frames are gradients: a single colour here), brown when lit */
@@ -28,6 +28,6 @@ body {
 .dk-tip, .dk-tip-arrow { border-color: black; }
 .dk-tip { background-color: #eeeeee; color: black; border-radius: 0; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35); }
 .dk-modal-box { background-color: #eeeeee; }
-.dk-modal-box, .dk-chatbox { color: black; border-color: black; border-radius: 0; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35); }
-.chat-bar, .dk-chatbox .chat-bar { border-color: black; border-radius: 0; }
+.dk-modal-box, .dk-window { color: black; border-color: black; border-radius: 0; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35); }
+.chat-bar, .dk-window-chat .chat-bar { border-color: black; border-radius: 0; }
 .tip-meta, .tip-lore { color: #555555; }

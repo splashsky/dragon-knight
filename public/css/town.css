@@ -15,9 +15,10 @@ table.inventory td + td { width: 100%; }
 /* world map popup */
 .world-map { text-align: center; }
 
-/* the town's places (home/town.html): banners on a dark ground that continues their
-	picture's (its glow behind the building, black at the edges), no frame, the name large
-	in light type */
+/* the town's places (home/town.html): light cards that sit in the page (a faint wash and a
+	hairline, both a little stronger when pointed at), the picture a small round medallion
+	(its own dark ground inside a thin ring), the name in the links' colour, the line under
+	it in the text's */
 .town-banners {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -28,45 +29,28 @@ table.inventory td + td { width: 100%; }
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 8px 18px 8px 10px;
-	border-radius: 8px;
-	background: var(--banner-ground);
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-	color: #f3ead6;
-	transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+	padding: 8px 14px 8px 8px;
+	border: solid 1px rgba(40, 32, 20, 0.16);
+	border-radius: 6px;
+	background-color: rgba(255, 255, 255, 0.32);
+	text-decoration: none;
+	transition: background-color 0.12s ease-out, border-color 0.12s ease-out;
 }
-.town-banner-inn { --banner-ground: radial-gradient(circle at 58px 50%, #12354a 0, #081520 62px, #020507 140px); }
-.town-banner-market { --banner-ground: radial-gradient(circle at 58px 50%, #344f0d 0, #152106 62px, #030501 140px); }
-/* (the picture's square edges fade into the ground) */
 .town-banner img {
 	display: block;
 	flex: none;
-	width: 96px;
-	height: 96px;
-	-webkit-mask-image: radial-gradient(circle, #000000 52%, transparent 71%);
-	mask-image: radial-gradient(circle, #000000 52%, transparent 71%);
-	transition: filter 0.1s ease-out;
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
 }
-.town-banner-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.town-banner-text b {
-	color: #fbe3a4;
-	font-size: 23px;
-	font-variant-caps: small-caps;
-	letter-spacing: 0.03em;
-	line-height: 1.1;
-	text-shadow: 0 1px 2px #000000;
-}
-.town-banner-text span { color: rgba(243, 234, 214, 0.82); font-size: 13px; font-weight: normal; line-height: 1.3; }
-.town-banner:hover {
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-	color: #ffffff;
-	transform: translateY(-1px);
-}
-.town-banner:hover img { filter: brightness(1.12); }
+.town-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.town-banner-text b { font-size: 18px; font-variant-caps: small-caps; letter-spacing: 0.03em; line-height: 1.15; }
+.town-banner-text span { color: #45413a; font-size: 13px; font-weight: normal; line-height: 1.3; }
+.town-banner:hover { border-color: rgba(40, 32, 20, 0.32); background-color: rgba(255, 255, 255, 0.55); }
 .town-banner:focus-visible { outline: solid 2px #663300; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
-	.town-banner, .town-banner img { transition: none; }
-	.town-banner:hover { transform: none; }
+	.town-banner { transition: none; }
 }
 
 /* the market's maps (town/shop.html): a row per map, its price on the right, in a thin gold
@@ -87,7 +71,7 @@ a.market-map:hover { background: linear-gradient(var(--tile), var(--tile)) paddi
 .market-map.shop-short { opacity: 0.55; }
 .market-map-owned { border: dashed 1px rgba(0, 0, 0, 0.25); background: none; color: #5f5a50; }
 
-/* the Babble Box (layout/chat.html): on /babble and in the chat window (dk.css .dk-chatbox:
+/* the Babble Box (layout/chat.html): on /babble and in the chat window (dk.css .dk-window-chat:
 	 the Functions box's link); a box of a fixed height (it doesn't grow or shrink as messages come and go)
 	 whose list scrolls from the bottom (column-reverse) so the newest message shows; each
 	 message compact, the author's name over the text */

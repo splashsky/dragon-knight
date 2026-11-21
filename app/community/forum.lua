@@ -91,7 +91,7 @@ function forum.board(req, params)
 	local start = paging.start(req)
 	local per = forum.THREADS_PER_PAGE
 	local threads = dk.db:query(
-		"SELECT id, title, replies, newpostdate FROM forum WHERE board = ? AND parent = 0 " ..
+		"SELECT id, title, author, replies, newpostdate FROM forum WHERE board = ? AND parent = 0 " ..
 		"ORDER BY newpostdate DESC, id DESC LIMIT ? OFFSET ?", board.id, per, start)
 	local total = dk.db:value("SELECT count(*) FROM forum WHERE board = ? AND parent = 0", board.id)
 	return view.page(req, "Forum", "community/forum/index", {
