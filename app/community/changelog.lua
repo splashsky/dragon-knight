@@ -8,7 +8,7 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
-		version = "3.0.0", date = "unreleased",
+		version = "3.0.0", date = "11.21.2026",
 		changes = {
 			"Loading a page no longer changes the game: reloading the fight page shows the last round again instead of counting a turn, and the victory page can be reloaded or revisited without losing it (schema version 15, run dk migrate).",
 			"An encounter now begins the moment you step into it, the monster's first strike included, and the rewards are paid by the blow that wins the fight.",
