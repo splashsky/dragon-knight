@@ -125,56 +125,99 @@ async function run(wsUrl, port) {
 	check("forward", await until("location.pathname === '/inventory' && !DK.busy()"));
 
 	section = "typed text survives";
-	await js("window.__inp = document.querySelector('[data-chat-form] [name=babble]'); window.__inp.value = 'half a thought';" +
+	// what a player types is theirs: an answer that brings the same form again (a refresh)
+	// leaves the field, its element and its text
+	await js("DK.visit('/changepassword')");
+	check("a form", await until("location.pathname === '/changepassword' && !DK.busy()"));
+	await js("window.__inp = document.querySelector('[data-r=main] [name=oldpass]'); window.__inp.value = 'half a thought';" +
 		"window.__mut = []; new MutationObserver(function (l) { l.forEach(function (m) { window.__mut.push(m.type + ':' + (m.target.getAttribute ? (m.target.getAttribute('data-r') || m.target.nodeName) : m.target.nodeName) + ':' + m.removedNodes.length + '/' + m.addedNodes.length + ':' + (m.attributeName || '')); }); })" +
 		".observe(document.body, { subtree: true, childList: true, attributes: true })");
-	await js("document.querySelector('a[href=\"/news\"]').click()");
-	check("news", await until("location.pathname === '/news'"));
-	check("the chat input keeps its text", await js("document.querySelector('[data-chat-form] [name=babble]').value === 'half a thought'"),
-		await js("document.querySelector('[data-chat-form] [name=babble]').value"));
+	await js("DK.refresh()");
+	await until("!DK.busy()");
+	check("the field keeps its text", await js("document.querySelector('[data-r=main] [name=oldpass]').value === 'half a thought'"),
+		await js("document.querySelector('[data-r=main] [name=oldpass]').value"));
 	check("still no reload", await js("window.__dk === 1"));
-	check("the same input element", await js("document.querySelector('[data-chat-form] [name=babble]') === window.__inp"), await js("window.__mut.slice(0, 40)"));
-
-	section = "a panel that moves";
-	// the town page has the chat in its middle column, the others in the right one: the
-	// region comes as a placeholder, and the page's own panel moves there untouched
+	check("the same input element", await js("document.querySelector('[data-r=main] [name=oldpass]') === window.__inp"), await js("window.__mut.slice(0, 40)"));
 	await js("DK.visit('/')");
 	await until("location.pathname === '/' && !DK.busy()");
-	if (await js("!!document.querySelector('[data-r=main] [data-r=chat]')")) {
-		await js("window.__chat = document.querySelector('[data-r=chat]'); document.querySelector('[data-r=chat] [name=babble]').value = 'typed in town'");
-		await js("document.querySelector('a[href=\"/inventory\"]').click()");
-		check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
-		check("the chat in the right column", await js("!!document.querySelector('[data-r=right] [data-r=chat]')"));
-		check("the same panel (moved, not rebuilt)", await js("document.querySelector('[data-r=chat]') === window.__chat"));
-		check("with what was typed", await js("document.querySelector('[data-r=chat] [name=babble]').value === 'typed in town'"));
-		check("its address field follows the page", await js("document.querySelector('[data-r=chat-form] [name=back]').value === '/inventory'"));
-		await js("document.querySelector('[data-r=chat] [name=babble]').value = ''");
-	}
 
 	section = "the chat";
-	var chatHeight = await js("document.querySelector('[data-r=chat] .chat-scroll').offsetHeight");
-	await js("var f = document.querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'hello from the browser'; f.requestSubmit()");
-	check("my message in the panel", await until("/hello from the browser/.test(document.querySelector('[data-r=chat-posts]').textContent)"));
-	check("the input cleared", await until("document.querySelector('[data-chat-form] [name=babble]').value === ''"));
-	// the message came from the page's chat-post prototype: the server's own markup for it
+	function press(k, code) {
+		return send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code: k, windowsVirtualKeyCode: code })
+			.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
+	}
+	// the Functions box's Babble Box opens the chat window (chatbox.js): not a dialog (the
+	// game goes on); live.js sends the message itself and adds it from the chat-post
+	// prototype, the server's own markup for it; the box keeps its height; the window stays
+	// open from page to page, moves by its strip, stays usable and on top over a dialog
+	// (modal.js), and comes back after a page load where it was
+	check("no chat on the page", await js("!document.querySelector('[data-chat-form]')"));
+	var CB = "document.querySelector('.dk-chatbox')";
+	async function openChat() {
+		await js("document.querySelector('[data-r=functions] a[data-chatbox]').click()");
+		return until("!!" + CB + " && !" + CB + ".hidden && !!" + CB + ".querySelector('[data-chat-form]')");
+	}
+	await js("localStorage.removeItem('dk-chatbox')");
+	check("the window", await openChat());
+	check("not a dialog", await js("!document.querySelector('dialog[open]')"));
+	check("the focus in its field", await js("document.activeElement === " + CB + ".querySelector('[name=babble]')"));
+	check("the message bar: the send button inside it", await js("!!" + CB + ".querySelector('.chat-bar [name=babble] + button.chat-send[aria-label=Send]')"));
+	var chatHeight = await js(CB + ".querySelector('.chat-scroll').offsetHeight");
+	await js("var f = " + CB + ".querySelector('[data-chat-form]'); f.querySelector('[name=babble]').value = 'hello from the browser'; f.requestSubmit()");
+	check("my message in the window", await until("/hello from the browser/.test(" + CB + ".querySelector('[data-chat-posts]').textContent)"));
+	check("the input cleared", await until(CB + ".querySelector('[name=babble]').value === ''"));
+	check("still open, no reload", await js("!" + CB + ".hidden && window.__dk === 1 && location.pathname === '/'"));
+	check("the box keeps its height", await js(CB + ".querySelector('.chat-scroll').offsetHeight") === chatHeight);
+	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop();" +
+		"return li.querySelector('.babble-text').getBoundingClientRect().top >= li.querySelector('.babble-author').getBoundingClientRect().bottom - 1; })()"));
+	var mine = await js("[...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop().outerHTML");
+	// from page to page: the same window, open
+	await js("window.__cb = " + CB + "; DK.visit('/inventory')");
+	check("another page", await until("location.pathname === '/inventory' && !DK.busy()"));
+	check("the same window, open", await js(CB + " === window.__cb && !window.__cb.hidden && /hello from the browser/.test(window.__cb.textContent)"));
+	// dragged by its strip (not its close button)
+	var grip = await js("(function () { var r = document.querySelector('.dk-chatbox-grip').getBoundingClientRect(); return [r.left + 20, r.top + 8]; })()");
+	var before = await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]");
+	await send("Input.dispatchMouseEvent", { type: "mousePressed", x: grip[0], y: grip[1], button: "left", clickCount: 1 });
+	await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: grip[0] - 120, y: grip[1] - 60, button: "left", buttons: 1 });
+	await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: grip[0] - 120, y: grip[1] - 60, button: "left", clickCount: 1 });
+	var after = await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]");
+	check("dragged", after[0] === before[0] - 120 && after[1] === before[1] - 60, [before, after]);
+	check("where it is kept", await js("JSON.parse(localStorage.getItem('dk-chatbox')).x") === after[0]);
+	// a dialog: the page behind halts, the window stays usable and on top
+	await js("DK.visit('/shop')");
+	await until("location.pathname === '/shop' && !DK.busy()");
+	await js("document.querySelector('a[data-modal][href^=\"/shop/buy/\"]').click()");
+	check("the shop's dialog", await until("!!document.querySelector('dialog.dk-modal[open] .buy')"));
+	check("the page behind is inert", await js("!!document.querySelector('.dk-page').closest('[inert]')"));
+	check("the window isn't", await js("!" + CB + ".closest('[inert]')"));
+	check("and is on top", await js("(function () { var r = " + CB + ".getBoundingClientRect(); return " + CB + ".contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); })()"));
+	await js(CB + ".querySelector('[name=babble]').focus()");
+	check("its field takes the keyboard", await js("document.activeElement === " + CB + ".querySelector('[name=babble]')"));
+	await press("Escape", 27);
+	check("Escape in it closes the window", await until(CB + ".hidden"));
+	check("not the dialog", await js("!!document.querySelector('dialog[open]')"));
+	await js("document.querySelector('dialog [name=cancel]').focus()");
+	await press("Escape", 27);
+	check("then the dialog", await until("!document.querySelector('dialog[open]')"));
+	check("the page back", await js("!document.querySelector('.dk-page').closest('[inert]')"));
+	check("the window stays closed", await js(CB + ".hidden && JSON.parse(localStorage.getItem('dk-chatbox')).open === false"));
+	// opened again: the history from the server, the message as the prototype made it
+	await js("DK.visit('/')");
+	await until("location.pathname === '/' && !DK.busy()");
+	await openChat();
 	// (a player's; an administrator's has the page's address in its delete form)
 	if (await js("!document.body.hasAttribute('data-live-admin')")) {
-		var mine = await js("[...document.querySelectorAll('[data-r=chat-posts] li')].pop().outerHTML");
-		await js("DK.refresh()");
-		await until("!DK.busy()");
-		var theirs = await js("[...document.querySelectorAll('[data-r=chat-posts] li')].pop().outerHTML");
+		var theirs = await js("[...document.querySelectorAll('.dk-chatbox [data-chat-posts] li')].pop().outerHTML");
 		check("the prototype's markup is the server's", mine === theirs, [mine, theirs]);
 	}
-	// a box of a fixed height: a message doesn't grow it; the name over the text; no fold
-	check("the box keeps its height", await js("document.querySelector('[data-r=chat] .chat-scroll').offsetHeight") === chatHeight);
-	check("the name over the text", await js("(function () { var li = [...document.querySelectorAll('[data-r=chat-posts] li')].pop();" +
-		"return li.querySelector('.babble-text').getBoundingClientRect().top >= li.querySelector('.babble-author').getBoundingClientRect().bottom - 1; })()"));
-	check("no fold", await js("!document.querySelector('[data-r=chat] summary, details[data-chat]')"));
-	await js("document.querySelector('a[href=\"/inventory\"]').click()");
-	check("inventory", await until("location.pathname === '/inventory' && !DK.busy()"));
-	check("the message is still there", await js("/hello from the browser/.test(document.querySelector('[data-r=chat-posts]').textContent)"));
-	check("the right column's box: 300px", await js("document.querySelector('[data-r=right] .chat-scroll').offsetHeight") === 300,
-		await js("document.querySelector('[data-r=right] .chat-scroll').offsetHeight"));
+	// a page load: open again, where it was
+	await js("location.reload()");
+	await sleep(500);
+	check("after a page load", await until("!!" + CB + " && !" + CB + ".hidden && !!" + CB + ".querySelector('[data-chat-form]')"));
+	check("where it was", await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop].join()") === after.join(), await js("[" + CB + ".offsetLeft, " + CB + ".offsetTop]"));
+	await js("window.__dk = 1; document.querySelector('.dk-chatbox-x').click()");
+	check("its close button", await until(CB + ".hidden"));
 
 	section = "the shop's dialog";
 	// an item's link opens its purchase in a dialog over the shop (modal.js): the page stays
@@ -184,10 +227,6 @@ async function run(wsUrl, port) {
 	await js("DK.visit('/shop')");
 	check("the shop", await until("location.pathname === '/shop' && !DK.busy()"), await js("location.pathname"));
 	function gold() { return js("+[...document.querySelectorAll('[data-r=charpanel] dt')].find(e => e.textContent === 'Gold').nextElementSibling.textContent.replace(/,/g, '')"); }
-	function press(k, code) {
-		return send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code: k, windowsVirtualKeyCode: code })
-			.then(function () { return send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: code }); });
-	}
 	var gold0 = await gold(), loc0 = await js("document.querySelector('[data-r=loc]').textContent");
 	await js("window.__item = document.querySelector('a[href=\"/shop/buy/66\"]'); window.__item.focus(); window.__item.click()");
 	check("a dialog opens", await until("!!document.querySelector('dialog.dk-modal[open] [name=qty]')"));
@@ -294,11 +333,11 @@ async function run(wsUrl, port) {
 			check("the up arrow walks north", await until("!DK.busy() && /\\b1N,/.test(document.querySelector('[data-r=loc]').textContent) || location.pathname === '/fight'"), await where());
 			if (await js("location.pathname !== '/fight'")) {
 				var here2 = await where();
-				await js("document.querySelector('[data-chat-form] [name=babble]').focus()");
+				await js("var i = document.createElement('input'); i.id = 'probe'; i.setAttribute('data-client', ''); document.querySelector('[data-r=main]').appendChild(i); i.focus()");
 				await key("ArrowDown", 40);
 				await sleep(600);
 				check("not while typing", await where() === here2, [here2, await where()]);
-				await js("document.activeElement.blur()");
+				await js("document.getElementById('probe').remove()");
 				await key("ArrowDown", 40);
 				await until("!DK.busy()");
 				await key("ArrowLeft", 37);
@@ -368,11 +407,11 @@ async function run(wsUrl, port) {
 		if (await js("!!document.querySelector('form[data-fight] button[name=fight]')")) {
 			check("the keys show", await js("getComputedStyle(document.querySelector('.hotbar .hotkey')).display !== 'none'"));
 			var round2 = await js("Number(document.querySelector('form[data-fight] [name=round]').value)");
-			await js("document.querySelector('[data-chat-form] [name=babble]').focus()");
+			await js("var i = document.createElement('input'); i.id = 'probe'; i.setAttribute('data-client', ''); document.querySelector('[data-r=main]').appendChild(i); i.focus()");
 			await press("1", 49);
 			await sleep(500);
 			check("not while typing", await js("!DK.busy() && Number(document.querySelector('form[data-fight] [name=round]').value)") === round2);
-			await js("document.activeElement.blur()");
+			await js("document.getElementById('probe').remove()");
 			await press("1", 49);
 			check("1 attacks: a round plays", await until("location.pathname !== '/fight' || !DK.busy() && Number((document.querySelector('form[data-fight] [name=round]') || {}).value) === " + (round2 + 1), 8000),
 				await js("location.pathname + ' ' + (document.querySelector('form[data-fight] [name=round]') || {}).value"));

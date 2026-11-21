@@ -1,8 +1,10 @@
 // modal.js :: dialogs over the page (docs/APP.md "Modals"). A link with data-modal opens
 // its address in one: the request says X-DK-Modal: 1 and the server answers with the
 // page's title and content alone (lib/view.lua, layout/modal.html), shown in a <dialog>
-// (showModal: the page behind is inert, Escape closes, focus stays inside). Forms in it
-// submit into it; a redirect (X-DK-Go) closes it and the page goes there; a link in it
+// over a backdrop with the page behind made inert (Escape closes, focus stays inside), but
+// for what scripts own (data-client): the chat window (chatbox.js) stays usable and over
+// it. A browser without `inert` gets showModal() (the chat window is inert then too).
+// Forms in it submit into it; a redirect (X-DK-Go) closes it and the page goes there; a link in it
 // closes it and goes on like any link (the live client takes it). An element with
 // data-modal-close closes it, a submit button too (no request; without JavaScript it
 // submits as it says). After a POST in the dialog the page behind brings itself up to
@@ -20,6 +22,10 @@
 	var dirty = false;       // a POST happened: the page behind is out of date
 	var lastButton = null;   // the submit button last clicked (browsers without ev.submitter)
 	var downOnBackdrop = false, slowTimer = 0;
+	var backdrop = null;
+	var inerted = [];        // the page's parts this script made inert
+	var shown = false;       // open, and not yet cleaned up after (closed())
+	var ownInert = "inert" in HTMLElement.prototype;
 
 	function build() {
 		dlg = document.createElement("dialog");
@@ -42,6 +48,29 @@
 		dlg.addEventListener("pointerdown", function (ev) { downOnBackdrop = ev.target === dlg; });
 		dlg.addEventListener("click", function (ev) { if (ev.target === dlg && downOnBackdrop) close(); });
 		document.body.appendChild(dlg);
+		backdrop = document.createElement("div");
+		backdrop.className = "dk-modal-backdrop";
+		backdrop.hidden = true;
+		backdrop.setAttribute("data-client", "");
+		backdrop.addEventListener("pointerdown", function () { downOnBackdrop = true; });
+		backdrop.addEventListener("click", function () { if (downOnBackdrop) close(); });
+		document.body.insertBefore(backdrop, dlg);
+	}
+
+	// The dialog over its backdrop, the page behind inert (but for what scripts own).
+	function showFixed() {
+		dlg.show();
+		backdrop.hidden = false;
+		Array.prototype.forEach.call(document.body.children, function (el) {
+			if (el === dlg || el === backdrop || el.hasAttribute("data-client") || el.inert) return;
+			el.inert = true;
+			inerted.push(el);
+		});
+	}
+	function release() {
+		inerted.forEach(function (el) { el.inert = false; });
+		inerted = [];
+		if (backdrop) backdrop.hidden = true;
 	}
 
 	function isOpen() { return !!(dlg && dlg.open); }
@@ -53,7 +82,8 @@
 		if (window.dkTip) window.dkTip.hide();
 		if (!dlg.open) {
 			if (!opener) opener = document.activeElement;
-			dlg.showModal();
+			if (ownInert) showFixed(); else dlg.showModal();
+			shown = true;
 		}
 		var f = box.querySelector("[autofocus]") ||
 			box.querySelector("input:not([type=hidden]):not([disabled]), select, textarea, button:not([disabled])");
@@ -64,12 +94,20 @@
 		f.focus();
 	}
 
-	function close() { if (isOpen()) dlg.close(); }
+	// (cleaned up at once: the close event comes a moment later, and a dialog opened with
+	// show() gives the focus back to nobody)
+	function close() {
+		if (!isOpen()) return;
+		dlg.close();
+		closed();
+	}
 
 	// (the close event comes a moment after the dialog closed: it may have opened again since,
 	// and a request to open it may be on its way)
 	function closed() {
-		if (dlg.open) return;
+		if (dlg.open || !shown) return;
+		shown = false;
+		release();
 		if (req && !req.post && req.inside) {   // (a POST runs on: it changes the game)
 			req.ctl.abort();
 			req = null;
@@ -189,6 +227,14 @@
 		} else {
 			request(u.href, params);
 		}
+	});
+
+	// Escape closes it (showModal does that itself), but not from the chat window
+	document.addEventListener("keydown", function (ev) {
+		if (ev.key !== "Escape" || ev.defaultPrevented || !isOpen() || !ownInert) return;
+		if (ev.target && ev.target.closest && ev.target.closest("[data-chatbox-window]")) return;
+		ev.preventDefault();
+		close();
 	});
 
 	// for other scripts (and tests)

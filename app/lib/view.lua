@@ -162,13 +162,12 @@ function view.elapsed()
 end
 
 -- The Babble Box's template ctx (layout/chat.html); nil when the chat is turned off.
-function view.chat(req, large)
+function view.chat(req)
 	if game.control().showbabble ~= 1 then return nil end
 	return {
 		posts = chat.history(),
 		is_admin = req.user and req.user.authlevel == 1,
 		back = view.back_path(req),
-		large = large,
 		max_chars = chat.MAX_CHARS,
 	}
 end
@@ -184,8 +183,8 @@ end
 
 -- The live parts of the layout (docs/APP.md "Live pages"): `live` (live.js runs: the user
 -- is logged in; also on the minimal layout's pages, so the stream lives on while the live
--- client shows them) and `side` (the online count and the chat in the right column).
-local function live_ctx(req, ctx, layout, nav, opts)
+-- client shows them) and `side` (the online count in the right column).
+local function live_ctx(req, ctx, layout, nav)
 	local user = req.user
 	if not user then return end
 	ctx.live = {
@@ -196,7 +195,6 @@ local function live_ctx(req, ctx, layout, nav, opts)
 	if not nav then return end
 	local side = {}
 	if game.control().showonline == 1 then side.online_count = presence.count() end
-	if not opts.chat_inline then side.chat = view.chat(req, false) end
 	ctx.side = side
 end
 
@@ -204,7 +202,6 @@ end
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
 --       body_class (extra class(es) on <body>, for page-specific CSS; the layouts add
 --       "theme-<key>"),
---       chat_inline (the page shows the chat itself: not in the right column),
 --       status, headers (extra {name, value} pairs), vars (extra layout ctx values),
 --       events ({ kind, json } list: played by the live client before the page's regions
 --       apply, docs/APP.md "Live client").
@@ -245,7 +242,7 @@ function view.layout(req, title, content, opts)
 		banner = banner.current(req),
 		back = view.back_path(req),
 	}
-	live_ctx(req, ctx, layout, nav and user ~= nil, opts)
+	live_ctx(req, ctx, layout, nav and user ~= nil)
 	for k, v in pairs(opts.vars or {}) do ctx[k] = v end
 	local body = view.render("layout/" .. layout, ctx, req)
 	if req.live then

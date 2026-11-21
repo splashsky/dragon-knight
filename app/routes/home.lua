@@ -15,9 +15,7 @@ local function town_page(req)
 	local ctx = { town = town }
 	if control.shownews == 1 then ctx.news = news.latest() end
 	ctx.online = view.online()
-	-- the town shows the Babble Box larger, instead of in the right column
-	ctx.chat = view.chat(req, true)
-	return view.page(req, "In Town", "home/town", ctx, { chat_inline = true })
+	return view.page(req, "In Town", "home/town", ctx)
 end
 
 local function home(req)

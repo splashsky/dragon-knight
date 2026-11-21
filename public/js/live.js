@@ -375,6 +375,8 @@
 	var running = false, beat = 0;
 	function live() { return body.hasAttribute("data-live"); }
 
+	// (capturing: these forms are this script's before the dialog's (modal.js) or the live
+	// client's listeners see them; the chat lives in a dialog)
 	document.addEventListener("submit", function (ev) {
 		var f = ev.target;
 		if (!running) return;
@@ -388,7 +390,7 @@
 			ev.preventDefault();
 			dismissBanner(f.elements.id.value);
 		}
-	});
+	}, true);
 	if (bc) {
 		bc.onmessage = function (ev) {
 			var m = ev.data || {};

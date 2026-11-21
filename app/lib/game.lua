@@ -160,6 +160,7 @@ function game.nav(user)
 		town = town,
 		towns = game.user_towns(user),
 		forum = game.forum_link(),
+		chat = game.control().showbabble == 1,   -- the Functions box's Babble Box link (the chat window)
 		is_admin = user.authlevel == 1,
 		experience = php.number_format(user.experience),
 		gold = php.number_format(user.gold),

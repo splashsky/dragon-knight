@@ -20,15 +20,8 @@
 <a href="/news">All news</a></p></div>
 </section>
 {%- end %}
-<div class="panel-row">
-<div>
 {%- if online then %}
+<section class="panel">
 {{{ include("layout/online", online) }}}
+</section>
 {%- end %}
-</div>
-<div>
-{%- if chat then %}
-{{{ include("layout/chat", chat) }}}
-{%- end %}
-</div>
-</div>

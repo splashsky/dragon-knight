@@ -7,10 +7,10 @@ local view = require("lib.view")
 
 local babble = {}
 
--- GET /babble: the chat on a page of its own (it was the town page's iframe).
+-- GET /babble: the chat on a page of its own (it was the town page's iframe); the
+-- Functions box's Babble Box link opens it in a dialog (data-modal: the chat alone).
 function babble.show(req)
-	return view.page(req, "Babble Box", "town/babble", { chat = view.chat(req, true), online = view.online() },
-									 { chat_inline = true })
+	return view.page(req, "Babble Box", "town/babble", { chat = view.chat(req), online = view.online() })
 end
 
 local function too_fast(req, wait)

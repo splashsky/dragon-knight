@@ -39,7 +39,7 @@ end
 function live.state(req)
 	local back = themes.safe_path(req.query.back) or "/"
 	local out = {}
-	local chat = view.chat(req, false)
+	local chat = view.chat(req)
 	if chat then
 		chat.back = back
 		out.chat = view.render("layout/chat_posts", chat, req)

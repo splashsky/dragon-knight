@@ -60,8 +60,8 @@ local function spec()
 			yesno("shownews", "Show News", "Toggle display of the Latest News box in towns."),
 			yesno("showonline", "Show Who's Online", "Toggle display of the Who's Online box in towns " ..
 						"and the count of players online on every game page."),
-			yesno("showbabble", "Show Babblebox", "Toggle display of the Babble Box (the chat): in towns, " ..
-						"in the right column of every game page and on its own page."),
+			yesno("showbabble", "Show Babblebox", "Toggle display of the Babble Box (the chat): its link in the " ..
+						"Functions box (it opens the chat window) and its own page."),
 		},
 		-- legacy main() checks, in its order
 		validate = function(v, errors)

@@ -516,7 +516,7 @@ expect_body 'Passwords don&#39;t match.'; expect_body 'Character Class is invali
 t_login alice wrongpw;   expect_status 200; expect_body 'Invalid username or password'
 t_login alice secretpw;  expect_redirect /; expect_header '^set-cookie: dk_session=[0-9a-f]{64}; Path=/; HttpOnly; SameSite=Lax'
 t_get /;                 expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
-expect_body 'Latest News'; expect_body "Who's Online"; expect_body '>Alice</a>'; expect_body 'data-chat-form'
+expect_body 'Latest News'; expect_body "Who's Online"; expect_body '>Alice</a>'; expect_body 'href="/babble" data-chatbox>Babble Box</a>'
 expect_body 'action="/move"'; expect_body 'Seconds,'
 t_post /logout "";       expect_status 403
 t_get /;                 expect_status 200

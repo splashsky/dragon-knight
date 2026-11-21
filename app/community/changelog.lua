@@ -11,8 +11,8 @@ changelog.RELEASES = {
 		version = "3.1.0", date = "unreleased",
 		changes = {
 			"The page is at most 1200 pixels wide, so it stays together on wide screens.",
-			"The Babble Box is a box of a fixed height that no longer folds away: its messages scroll inside it, each with the name above the message, more compact than before.",
-			"The Towns box lists each town on your map as a button with what the trip costs in TP. The town you are in, the towns your TP don't cover (hover for how many more you need) and, during a fight, all of them are greyed out. Without maps it tells you where to buy them.",
+			"The Babble Box is a small chat window you open and close from the Functions box, instead of a panel in the right column and the town page. Drag it by its top edge wherever you like and resize it by its corner: it stays open, where you put it, from page to page until you close it, and stays usable over the shop's dialog. Its messages fill it, each with the name above the message, and you type in a bar across its foot with the send button inside. The chat also has a page of its own, /babble.",
+			"The Towns box lists each town on your map with what the trip costs in TP. The town you are in, the towns your TP don't cover (hover for how many more you need) and, during a fight, all of them are greyed out. Without maps it tells you where to buy them.",
 			"The fight menu is a hotbar: press 1 to attack and 0 to run away, and 2 to 9 for your spells, your potions and the gear that casts spells (or click them, as before). Each button shows its key. When you can't act, any number key presses Continue.",
 			"Arrange your hotbar on the new Hotbar page (in the Functions box) when you aren't fighting: pick an action for each key, or drag them around. Nothing moves unless you move it: a spell or item you get later takes the first free key when your next fight begins, what doesn't fit waits under More in the fight menu, and a potion you've used up or gear you've taken off keeps its key, greyed out, until you have it again (schema version 17, run dk migrate).",
 		},

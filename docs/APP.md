@@ -11,7 +11,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Area | Lua | Templates / assets | Tests |
 |---|---|---|---|
 | Core | `app/main.lua`, `app/routes.lua`, `app/lib/*`, `app/routes/test.lua` (test-only routes) | `templates/layout/{main,minimal,head,nav_left,nav_right}.html`, `templates/errors/*`, `public/css/dk.css`, `public/js/dk.js`, `public/images/*` | `tests/run.sh` (core checks), `tests/e2e/pure.sh` (pure GETs), `tests/lua/test_{php,router}.lua` |
-| Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js` | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
+| Live pages: chat, who's online, notices, broadcast banner | `app/lib/{chat,presence,notices,banner}.lua`, `app/town/babble.lua`, `app/routes/live.lua`, `app/admin/broadcast.lua` | `templates/layout/{chat,chat_posts,online,online_list,side_live,banner,live_attrs}.html`, `templates/town/babble.html`, `templates/admin/broadcast.html`, `public/js/live.js`, `public/js/chatbox.js` (the chat window) | `tests/e2e/{chat,presence,notices}.sh`, `tests/lua/test_chat.lua` |
 | Tooltips, lore | `app/lib/tips.lua`, `app/lib/view.lua` (`tip`, `paragraphs`), the kinds' `lore` field (`app/lib/content/schema.lua`) | `templates/tip/tip.html`, `public/js/tooltip.js`, `public/css/dk.css` (`.dk-tip`, `.tip-*`) | `tests/e2e/tips.sh`, `tests/js/test_tooltip.js`, `tests/lua/test_content.lua` |
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
@@ -171,7 +171,7 @@ Form and query values are raw strings. Validate them, and convert them with
 | `view.text(body [, status])` | text/plain |
 | `view.json(t [, status, headers])` | `application/json` (`lib/json.lua`), `Cache-Control: no-store`; `view.wants_json(req)`: the request sent `Accept: application/json` (live.js's fetch: the chat) |
 | `view.back_path(req)` / `view.back_to(req [, fallback])` | this page's path and query (for a form's `back` field) / where to redirect after a form with `back`: that path if it is same-site with a GET route, else `fallback` (`/`) |
-| `view.chat(req, large)` / `view.online()` | ctx for `layout/chat.html` / `layout/online.html`, or nil when the Babble Box / Who's Online is turned off |
+| `view.chat(req)` / `view.online()` | ctx for `layout/chat.html` / `layout/online.html`, or nil when the Babble Box / Who's Online is turned off |
 | `view.render(name, ctx, req)` | a rendered template string (a partial for JSON; mind region markers: `wire.strip`) |
 | `view.layout(req, title, html, opts)` | wraps already-rendered HTML |
 
@@ -186,8 +186,6 @@ Form and query values are raw strings. Validate them, and convert them with
 	`theme-<key>`, see [Themes](#themes)). The help pages pass
 	`{ layout = "minimal", nav = false, body_class = "help" }` for a full-width minimal
 	page (`body.minimal.help` in `community.css`).
-- `chat_inline`: the page shows the Babble Box itself (town page, `/babble`), so the
-	right column doesn't.
 - `status`: the HTTP status.
 - `headers`: extra `{name, value}` pairs.
 
@@ -199,15 +197,15 @@ Layout ctx, if you write your own layout: `title`, `content` (HTML), `body_class
 `theme` (the request's theme, see [Themes](#themes)), `gamename`, `nav` (table or nil),
 `logged_in`, `version`, `build`, `elapsed()`, `queries()`, `banner` (the broadcast banner
 or nil), `back` (`view.back_path`), `live` (logged in, not minimal: the page loads
-live.js), `side` (with `nav`: the online count and the Babble Box for the right column,
+live.js), `side` (with `nav`: the online count for the right column,
 `layout/side_live.html`). `layout/head.html` loads every script on every page (`dk.js`,
 `tooltip.js`, see [Tooltips](#tooltips), `modal.js`, see [Modals](#modals), `client.js`,
 `scene.js`, see [Scenes](#scenes),
-`live.js`, `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
+`live.js`, `chatbox.js`, see [Chat](#chat), `fight.js`, `hotbar.js`, see [Hotbar](#hotbar)): the head is the same
 everywhere, so the live client never loads a page again for its scripts. The main layout marks the parts a script may
 swap: `<aside class="dk-left" data-nav-left>`, `<main class="dk-middle" data-main>` and
 `<div class="dk-nav-right" data-nav-right>` around `layout/nav_right` (not the whole right
-column: the chat below it keeps its scroll position and typed text). Include `{{{ include("layout/head") }}}` in `<head>` to get the
+column). Include `{{{ include("layout/head") }}}` in `<head>` to get the
 CSS links (`dk.css` + the four feature stylesheets + the theme's), `dk.js` and, with
 `live`, `live.js`; put `theme-{{ theme.key }}` in the `<body>` class followed by
 `{{{ include("layout/live_attrs") }}}`, start the body with
@@ -233,8 +231,9 @@ carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
 `banner`, `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
-`spellpanel`, `online-count`, `chat` with `chat-posts` and `chat-form` with `chat-back`),
-`foot` (with `foot-time`, the timing line), `themes` (with `theme-back`); `minimal` and
+`spellpanel`, `online-count`), `foot` (with `foot-time`, the timing line), `themes` (with
+`theme-back`), and on `/babble` the chat's `chat` (with `chat-posts`, and `chat-form` with
+`chat-back`); `minimal` and
 `admin` have `banner`, `main` (and `foot`, `themes`). The `back` fields (the page's
 address, different on every page) and the timing line (different on every request) are
 regions of their own so that their parents stay the same. `lib/wire.lua` splits a
@@ -296,7 +295,8 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 	`/static/` or `/live`) and submits of same-origin urlencoded forms (the pressed button
 	included). `data-native` on a link, a form or an ancestor keeps it native. Its click and
 	submit listeners are on `window`: the other scripts' (on `document`) come first, and a
-	form one of them handles itself (`preventDefault`: the chat) is left alone.
+	form one of them handles itself (`preventDefault`: the chat, whose listener captures) is
+	left alone.
 - **Requests.** `X-DK-Live: 1` and `X-DK-Have` (its hash map: `<html data-h>`, then every
 	answer's `hashes`). One at a time: a new GET aborts a running GET; anything started
 	while a POST runs waits for its answer (a second submit of the same form is dropped).
@@ -319,13 +319,13 @@ data-h>` and the browser has `fetch`, `AbortController`, `TextDecoder`, `DOMPars
 	(`data-r`, `id`, `data-k`, `data-id`) or by position and tag; `<template>` contents
 	compared as HTML. A placeholder (`<template data-r-keep>`) is the page's own element,
 	moved there untouched; in anything new that goes in, a region the page already shows
-	(by name) is the page's own element, moved and morphed (the chat panel moving from the
-	town page's middle column to the right one keeps its scroll and typed text). Regions
+	(by name) is the page's own element, moved and morphed (a panel moving from one column
+	to another would keep its scroll and typed text). Regions
 	taken out while an answer applies are kept aside until it is done, for a later region of
 	the same answer. It never removes elements marked `data-client` (the tooltip box, the
 	toasts, the progress bar, the announcer: give anything a script adds to the page that
 	attribute), never touches the live value of a control (typed text survives; only the
-	form `reset()` above), and leaves `open` on `<details>` and tooltip.js's
+	form `reset()` above), and leaves `inert` (modal.js), `open` on `<details>` and tooltip.js's
 	`data-tip-title` to the page's scripts.
 - **History.** `history.scrollRestoration = "manual"`; each entry has a key, and its scroll
 	is kept while the page lives (and in `history.state` for a reload). Back and forward
@@ -348,7 +348,7 @@ addresses qualify); `tests/e2e/browser.sh` drives `tests/browser/client.js` in h
 Chrome, Edge or Chromium over the DevTools protocol (node's `WebSocket`, no dependencies;
 skipped without node or a browser): logging in and out without a page load (and the event
 stream starting and stopping), links, back/forward with their scroll, typed text kept,
-the chat (its box's fixed height, the name over the text), a move, a POST's own page (resting at the inn), the progress bar, a newer link
+the chat window (sending, its fixed height, from page to page, dragged, over a dialog, after a page load), a move, a POST's own page (resting at the inn), the progress bar, a newer link
 winning, the minimal layout, a broken page loaded natively. `GET /__test/slow?ms=N` (test
 routes only) is a page that takes its time.
 
@@ -418,8 +418,13 @@ purchase first: give the link `data-modal`.
 	Templates can tell with `req.modal` (`town/message.html` offers "Back to the shop"
 	instead of the ways on). HTML answers vary by `X-DK-Live, X-DK-Modal`.
 - **The dialog**: one `<dialog class="dk-modal">` made by the script (`data-client`: the
-	live client's morph leaves it alone) and opened with `showModal()`: the page behind is
-	inert and dimmed, Escape closes it, focus stays inside. Its first field or button gets
+	live client's morph leaves it alone), opened with `show()` over a backdrop of its own
+	(`.dk-modal-backdrop`), the page behind made `inert` by the script (each child of
+	`<body>` but those scripts own, `data-client`: the chat window stays usable and over
+	it; the live client leaves `inert` to the scripts): the game halts, Escape closes it
+	(but not from the chat window), focus stays inside. A browser without `inert` gets
+	`showModal()` (the chat window halts too). Closing cleans up at once (the close event
+	comes later). Its first field or button gets
 	the focus (`autofocus` picks another); closing gives the focus back to the link. If the
 	page takes longer than 250 ms the dialog opens with "Loading…" meanwhile.
 - **Inside it**: forms submit into the dialog (`fetch`, the submitter's name and value
@@ -601,14 +606,31 @@ reload. No toasts in popup windows (`window.opener`).
 
 ### Chat
 
-The Babble Box (`lib/chat.lua`, routes in `town/babble.lua`, `layout/chat.html`): a
-panel in the right column of every in-game page, and larger in the middle of the town page
-and of `/babble` (its own page; old links to the iframe land there). `control.showbabble`
-turns it off everywhere. Its messages are in a box of a fixed height (`.chat-scroll`, 300px;
-380px when large: it doesn't grow or shrink as messages come and go) that scrolls from the
-bottom, the newest last; each message is compact, the author's name
-(`.babble-author`) over the text (`.babble-text`; `layout/chat_posts.html`, no whitespace
-between the tags since messages keep their spaces). The panel doesn't fold (3.1).
+The Babble Box (`lib/chat.lua`, routes in `town/babble.lua`, `layout/chat.html`) is
+`/babble` (its own page, with who's online; old links to the iframe land there) and, from
+the Functions box's Babble Box link (`<a href="/babble" data-chatbox>`), the **chat
+window** (3.1, `public/js/chatbox.js`); no other page shows it. `control.showbabble` turns
+it off everywhere (the link too). Its messages are in a box of a fixed height
+(`.chat-scroll`, 340px on the page; the window's whole upper part: it doesn't grow or shrink
+as messages come and go) that scrolls from the bottom, the newest last; each message is
+compact, the author's name (`.babble-author`) over the text (`.babble-text`;
+`layout/chat_posts.html`, no whitespace between the tags since messages keep their
+spaces; an administrator's delete button on the name's line, shown on the message pointed
+at). Then the message bar (`.chat-bar`): the field across the box, the send button
+(`.chat-send`, an SVG arrow, `aria-label="Send"`) inside it. live.js sends the chat's forms
+itself (its submit listener captures: no dialog or live client takes them) and adds the
+messages that come to every list on the page (the window's too).
+
+- **The window** (`.dk-chatbox`, `data-client`: the live client's morph leaves it, so it
+	stays open from page to page; `role="dialog"` but not a `<dialog>`: the game goes on
+	under it, the arrow keys and the hotbar too). The link opens and closes it; it fetches
+	`/babble` as a dialog's page (`X-DK-Modal: 1`: the chat alone, no heading) and drops
+	the live client's region names (`data-r`) from it. A strip at its top moves it (pointer
+	events, kept inside the window), the close button at the strip's right; its corner
+	resizes it (CSS `resize`). Whether it is open, where and how big are kept in
+	`localStorage` (`dk-chatbox`), so a page load opens it again where it was. Escape in it
+	closes it. Pages without the link (logged out, the admin panel) hide it. Over a dialog
+	([Modals](#modals)) it stays usable and on top (`z-index` 950, the dialog 901).
 
 - History: the last 50 messages (`chat.HISTORY`), oldest first, rendered on the page;
 	live ones arrive as `babble` events (live.js builds the same markup).

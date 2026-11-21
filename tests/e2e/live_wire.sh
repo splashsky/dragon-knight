@@ -51,9 +51,9 @@ w_has region charpanel; w_lacks region right; w_lacks region main; w_lacks regio
 w_payload region charpanel | grep -q '<section class="box" data-r="charpanel">' && t_ok || t_fail "charpanel payload"
 w_payload hashes | grep -qE '^charpanel=[0-9a-f]+( foot-time=[0-9a-f]+)?$' && t_ok \
 	|| t_fail "hashes: only what changed: $(w_payload hashes)"
-# another page: its middle column, the chat moves from the middle to the right column
+# another page: its middle column (the columns stay)
 t_live GET /inn
-w_has region main; w_has region right; w_lacks region left; w_lacks region root
+w_has region main; w_lacks region right; w_lacks region left; w_lacks region root
 [ "$(w_payload url)" = /inn ] && t_ok || t_fail "url /inn"
 # unknown hashes: the whole body
 echo "root=000000000000" > "$JAR.have"

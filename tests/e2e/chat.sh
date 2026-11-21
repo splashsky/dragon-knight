@@ -1,29 +1,36 @@
 # tests/e2e/chat.sh :: the Babble Box, live (lib/chat.lua, town/babble.lua, live.js): two
 # players with event streams: a message posted with fetch (JSON) reaches the other stream,
 # stays text (JSON-escaped data, escaped history), the rate limit (429), the length limit,
-# blank messages, the no-JS form path, admin deletes, the chat panel on game pages, and
+# blank messages, the no-JS form path, admin deletes, its page and dialog, and
 # well-formed frames. Sourced by tests/run.sh (live_* and t_fetch helpers there).
 
 chat_unlimit() { t_sql "UPDATE babble SET posttime = posttime - 10"; }
 
-t_section "chat: the panel on game pages"
+t_section "chat: its page and its window"
+# the Babble Box is /babble; the Functions box's link opens it in the chat window
+# (chatbox.js), which fetches it as a dialog's page (X-DK-Modal: the chat alone); no game
+# page shows it otherwise
 t_jar chata; t_reset_jar
 t_register chata chatapw1 chata@example.com ChatA; t_login chata chatapw1
 CHATA_ID=$(t_sql "SELECT id FROM users WHERE username = 'chata'")
 t_get /;      expect_status 200
-[ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "town page: one chat panel"
-expect_body '<section class="chat chat-large" data-r="chat" data-chat>
-<h2 class="title">Babble Box</h2>'; expect_no_body '<details'
+expect_no_body 'data-chat-form'; expect_body '<a href="/babble" data-chatbox>Babble Box</a><br>'
 expect_body '<script src="/static/js/live.js" defer></script>'
 expect_body 'data-live data-csrf="'; expect_no_body 'data-live-admin'
-t_get /inn;   expect_status 200
-expect_body '<section class="chat" data-r="chat" data-chat>'; expect_body 'name="back" value="/inn"'
+t_get /inn;   expect_status 200; expect_no_body 'data-chat-form'
 expect_body 'Online: <span data-online-count>'
-t_get /babble; expect_status 200; expect_body 'chat-large'; expect_body "Who's Online"
+t_get /babble; expect_status 200; expect_body "Who's Online"
 [ "$(grep -c 'data-chat-form' "$BODY")" = 1 ] && t_ok || t_fail "/babble: one chat panel"
+expect_body '<section class="chat" data-r="chat" data-chat>
+<h2 class="title">Babble Box</h2>'; expect_body 'name="back" value="/babble"'
+t_get /babble -H 'X-DK-Modal: 1'; expect_status 200; expect_header '^X-DK-Modal: 1'
+expect_body '<h2 class="dk-modal-title" id="dk-modal-title">Babble Box</h2>'
+expect_body '<div class="dk-modal-content"><section class="chat" data-r="chat" data-chat>
+<div class="chat-scroll">'
+expect_no_body "Who's Online"; expect_no_body '<h2 class="title">Babble Box</h2>'
 t_sql "UPDATE control SET showbabble = 0"
-t_get /inn;   expect_no_body 'data-chat-form'
-t_get /;      expect_no_body 'data-chat-form'
+t_get /;      expect_no_body 'href="/babble" data-chatbox'
+t_get /babble; expect_no_body 'data-chat-form'; expect_body 'The Babble Box is turned off.'
 t_sql "UPDATE control SET showbabble = 1"
 t_get /help;  expect_body 'data-live data-csrf="'          # minimal layout too: the stream lives on
 t_jar chatanon; t_reset_jar
@@ -52,7 +59,7 @@ live_has b "event: babble"
 live_has b "\"id\":$CHAT_ID,\"text\":\"\\u003cscript\\u003ealert(\\\"x\\\")\\u003c/script\\u003e \\u0026 \\u003c/b\\u003e\""
 live_lacks b '<script>'
 t_jar chatb
-t_get /inn
+t_get /babble
 expect_body "<li class=\"babble-post\" data-id=\"$CHAT_ID\""
 expect_body '"><b class="babble-author">ChatA</b><span class="babble-text">&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;/b&gt;</span></li>'
 expect_no_body '<script>alert'
@@ -87,7 +94,7 @@ chat_unlimit
 t_get /inn
 CC=$(t_csrf)
 t_post /babble "csrf=$CC&babble=$(t_enc 'plain form post')&back=/inn"; expect_redirect /inn
-t_get /inn;   expect_body '<b class="babble-author">ChatA</b><span class="babble-text">plain form post</span></li>'
+t_get /babble; expect_body '<b class="babble-author">ChatA</b><span class="babble-text">plain form post</span></li>'
 live_has b '"text":"plain form post"'
 chat_unlimit
 t_post /babble "csrf=$CC&babble=elsewhere&back=$(t_enc '//evil.example/')"; expect_redirect /babble
@@ -101,7 +108,7 @@ t_fetch "/babble/$CHAT_ID/delete"; expect_status 403
 [ "$(t_sql "SELECT count(*) FROM babble WHERE id = $CHAT_ID")" = 1 ] && t_ok || t_fail "a player deleted a message"
 t_jar chatadmin; t_reset_jar
 t_login "$ADMIN_USER" "$ADMIN_PASS"
-t_get /inn
+t_get /babble
 expect_body 'data-live-admin'; expect_body "action=\"/babble/$CHAT_ID/delete\""
 t_fetch "/babble/$CHAT_ID/delete"; expect_status 200; expect_body '{"deleted":true}'
 live_has b $'event: delete\ndata: {"id":'"$CHAT_ID}"
@@ -111,9 +118,9 @@ PLAIN_ID=$(t_sql "SELECT id FROM babble WHERE babble = 'plain form post'")
 t_get /inn
 t_post "/babble/$PLAIN_ID/delete" "csrf=$(t_csrf)&back=/inn"; expect_redirect /inn
 live_has b "data: {\"id\":$PLAIN_ID}"
-t_get /inn;   expect_no_body 'plain form post'
+t_get /babble; expect_no_body 'plain form post'
 t_jar chatb
-t_get /inn;   expect_no_body "data-id=\"$CHAT_ID\""; expect_no_body 'chat-delete'
+t_get /babble; expect_no_body "class=\"babble-post\" data-id=\"$CHAT_ID\""; expect_no_body 'chat-delete'
 
 t_section "chat: well-formed frames"
 live_stop

@@ -1,5 +1,13 @@
 {#- GET /babble: the Babble Box on a page of its own (it was the town page's iframe), with
-		who's online. -#}
+		who's online; in the dialog the Functions box's link opens (req.modal), the chat
+		alone. -#}
+{%- if req and req.modal then %}
+{%- if chat then %}
+{{{ include("layout/chat", chat) }}}
+{%- else %}
+<p>The Babble Box is turned off.</p>
+{%- end %}
+{%- else %}
 <div class="panel-row">
 <div>
 {%- if chat then %}
@@ -15,3 +23,4 @@
 </div>
 {%- end %}
 </div>
+{%- end %}

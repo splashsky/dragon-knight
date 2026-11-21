@@ -1,20 +1,24 @@
-{#- The Babble Box (lib/chat.lua): in the right column of in-game pages, larger on the town
-		page and /babble; a box of a fixed height whose messages scroll (the newest at the
-		bottom), always open. Without JavaScript the form posts and the page reloads; live.js posts
-		with fetch and adds and removes messages as they come, from the chat-post prototype
-		(the markup of layout/chat_posts.html, with the viewer's delete button but without the
-		page's address, which would change it with every page: live.js fills its data-slot
-		elements and sends the delete itself). ctx: view.chat(req, large). -#}
-{{{ region("chat") }}}<section class="chat{% if large then %} chat-large{% end %}" data-r="chat" data-chat>
+{#- The Babble Box (lib/chat.lua): on its own page (/babble), and in the floating chat window
+		(public/js/chatbox.js: the Functions box's Babble Box link opens it; it fetches this
+		page as a dialog's, req.modal, so without the heading). A box of a fixed height whose
+		messages scroll (the newest at the bottom), then the message bar: the field across the
+		box with the send button inside it. Without JavaScript the form posts and the page
+		reloads; live.js posts with fetch and adds and removes messages as they come (in the
+		window too), from the chat-post prototype (the markup of layout/chat_posts.html, with
+		the viewer's delete button but without the page's address, which would change it with
+		every page: live.js fills its data-slot elements and sends the delete itself). ctx:
+		view.chat(req). -#}
+{{{ region("chat") }}}<section class="chat" data-r="chat" data-chat>
+{%- if not (req and req.modal) then %}
 <h2 class="title">Babble Box</h2>
+{%- end %}
 <div class="chat-scroll">{{{ region("chat-posts") }}}<ol class="chat-posts" data-r="chat-posts" data-chat-posts>
 {{{ include("layout/chat_posts") }}}
 </ol>{{{ endregion() }}}</div>
 <template data-proto="chat-post"><li class="babble-post" data-slot-attr="data-id:id title:when">{% if is_admin then %}<form class="inline chat-delete" method="post" data-slot-attr="action:delete">{{{ csrf_field() }}}<button class="link" type="submit" title="Delete" aria-label="Delete">&times;</button></form>{% end %}<b class="babble-author" data-slot="author"></b><span class="babble-text" data-slot="text"></span></li></template>
 {{{ region("chat-form") }}}<form class="chat-form" method="post" action="/babble" data-r="chat-form" data-chat-form>
 {{{ csrf_field() }}}{{{ region("chat-back") }}}<input type="hidden" name="back" value="{{ back }}" data-r="chat-back">{{{ endregion() }}}
-<input type="text" name="babble" maxlength="{{ max_chars }}" aria-label="Message" autocomplete="off">
-<input type="submit" name="submit" value="Babble">
+<div class="chat-bar"><input type="text" name="babble" maxlength="{{ max_chars }}" placeholder="Message" aria-label="Message" autocomplete="off"><button class="chat-send" type="submit" name="submit" value="Babble" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M3 20.5 21.5 12 3 3.5 3 10l12 2-12 2z"/></svg></button></div>
 <div class="chat-status small" data-chat-status role="status" aria-live="polite"></div>
 </form>{{{ endregion() }}}
 </section>{{{ endregion() }}}

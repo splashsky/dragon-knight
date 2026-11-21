@@ -53,6 +53,9 @@
 <div class="box-body">
 <a href="/inventory">Inventory</a><br>
 <a href="/hotbar">Hotbar</a><br>
+{%- if chat then %}
+<a href="/babble" data-chatbox>Babble Box</a><br>
+{%- end %}
 {%- if forum then %}
 <a href="{{ forum }}">Forum</a><br>
 {%- end %}

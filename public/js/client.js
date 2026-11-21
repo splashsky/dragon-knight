@@ -128,9 +128,11 @@
 		return a.nodeName === b.nodeName && (a.nodeName !== "INPUT" || a.type === b.type);
 	}
 	// attributes the page's scripts own: the open state of a <details> panel the player
-	// folded, a title tooltip.js moved to data-tip-title
+	// folded, a title tooltip.js moved to data-tip-title, the page made inert behind a
+	// dialog (modal.js)
 	function ownAttr(el, name, to) {
 		if (name === "open" && el.nodeName === "DETAILS") return true;
+		if (name === "inert") return true;
 		if (name === "data-tip-title") return true;
 		if (name === "title" && el.hasAttribute("data-tip-title") && to &&
 			to.getAttribute("title") === el.getAttribute("data-tip-title")) return true;

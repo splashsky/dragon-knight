@@ -15,22 +15,21 @@ table.inventory td + td { width: 100%; }
 /* world map popup */
 .world-map { text-align: center; }
 
-/* the Babble Box (layout/chat.html): in the right column, larger on the town page and
-	 /babble; a box of a fixed height (it doesn't grow or shrink as messages come and go)
+/* the Babble Box (layout/chat.html): on /babble and in the chat window (dk.css .dk-chatbox:
+	 the Functions box's link); a box of a fixed height (it doesn't grow or shrink as messages come and go)
 	 whose list scrolls from the bottom (column-reverse) so the newest message shows; each
 	 message compact, the author's name over the text */
 .chat { margin-bottom: 12px; }
 .chat > .title { margin: 0 0 3px; }
 .chat-scroll {
 	box-sizing: border-box;
-	height: 300px;
+	height: 340px;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column-reverse;
 	border: solid 1px rgba(0, 0, 0, 0.35);
 	background-color: rgba(255, 255, 255, 0.5);
 }
-.chat-large .chat-scroll { height: 380px; }
 .chat-posts { list-style: none; margin: 0; padding: 0; }
 .babble-post {
 	padding: 2px 5px 3px;
@@ -45,11 +44,49 @@ table.inventory td + td { width: 100%; }
 /* legacy alternated from the newest post (#eeeeee) upwards */
 .babble-post:nth-last-child(odd) { background-color: #eeeeee; }
 .babble-post:nth-last-child(even) { background-color: #ffffff; }
-.chat-delete { float: right; }
+/* an administrator's delete button: on the name's line, shown on the message pointed at or focused */
+.chat-delete { float: right; visibility: hidden; }
+.babble-post:hover .chat-delete, .babble-post:focus-within .chat-delete { visibility: visible; }
 .chat-delete button.link { font-weight: normal; padding: 0 2px; }
-.chat-form { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 2px 0; }
-.chat-form input[type="text"] { flex: 1 1 6em; min-width: 0; }
-.chat-status { flex: 1 1 100%; color: red; }
+/* the message bar: the field across the box, the send button inside it */
+.chat-form { margin: 6px 0 0; }
+.chat-bar {
+	display: flex;
+	align-items: center;
+	padding: 0 3px 0 10px;
+	border: solid 1px rgba(0, 0, 0, 0.3);
+	border-radius: 8px;
+	background-color: #ffffff;
+}
+.chat-bar:focus-within { border-color: #663300; box-shadow: 0 0 0 2px rgba(102, 51, 0, 0.15); }
+.chat-bar input[type="text"] {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 7px 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+}
+.chat-send {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: #663300;
+	cursor: pointer;
+}
+.chat-send svg { display: block; fill: currentColor; }
+.chat-send:hover { background-color: rgba(0, 0, 0, 0.06); }
+.chat-send:focus-visible { outline: solid 2px currentColor; outline-offset: -2px; }
+.chat-status { margin-top: 3px; color: red; }
 .chat-status:empty { display: none; }
 .online-count { margin: 0 0 6px; }
 
