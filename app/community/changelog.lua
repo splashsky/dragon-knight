@@ -8,6 +8,11 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.1.0", date = "unreleased",
+		changes = {
+		},
+	},
+	{
 		version = "3.0.0", date = "11.21.2026",
 		changes = {
 			"Loading a page no longer changes the game: reloading the fight page shows the last round again instead of counting a turn, and the victory page can be reloaded or revisited without losing it (schema version 15, run dk migrate).",
