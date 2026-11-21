@@ -238,7 +238,7 @@ expect_status 200; expect_body 'The monster attacks you for'; expect_body '<b>Yo
 expect_no_body 'name="fight"'
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0
-t_get /; expect_status 200; expect_body 'Town Options'
+t_get /; expect_status 200; expect_body 'class="town-services"'
 # the fight as it ended stays on its page (GET /fight) until the player moves on
 t_get /fight; expect_status 200; expect_body '<b>You have died.</b>'; expect_body 'The monster attacks you for'
 expect_no_body 'name="fight"'; f_is gold 51
@@ -264,7 +264,7 @@ expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'; 
 f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0; f_is "$T_MONSTER_HP" 0
 f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0; f_is currentmp 7
-t_get /; expect_status 200; expect_body 'Town Options'
+t_get /; expect_status 200; expect_body 'class="town-services"'
 
 t_section "fight: use an item"
 # Herbs (heal_hp 30) and an Ether (heal_mp 30) in the bag; Red Slime awake, no immunity. Each

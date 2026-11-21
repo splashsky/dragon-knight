@@ -10,6 +10,11 @@ changelog.RELEASES = {
 	{
 		version = "3.1.0", date = "unreleased",
 		changes = {
+			"A new layout: a header with the game's links (Inventory, News, Forum, Admin, Help, Change Password, Log Out), a wide stage for what you are doing, and one sidebar with your character, inventory, Fast Spells and the Babble Box. The Towns and Functions boxes are gone. In a narrow window the sidebar goes under the stage.",
+			"Where you are is at the top of the stage: the compass beside your location, your coordinates, the map and Travel. Walking changes only that part of the page.",
+			"Towns show what they offer as large tiles: the Inn with its price, the shop, the Map Store and Travel.",
+			"Travel opens a list of the towns on your map over the page, each with what the trip costs (greyed out when your TP don't cover it, and the town you are in); pick one and you're on your way. Without JavaScript the list is a page of its own.",
+			"While exploring, who's online and the Babble Box are on the stage, as in towns.",
 		},
 	},
 	{

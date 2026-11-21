@@ -184,7 +184,7 @@ end
 
 -- The live parts of the layout (docs/APP.md "Live pages"): `live` (live.js runs: the user
 -- is logged in; also on the minimal layout's pages, so the stream lives on while the live
--- client shows them) and `side` (the online count and the chat in the right column).
+-- client shows them) and `side` (the online count and the chat in the sidebar).
 local function live_ctx(req, ctx, layout, nav, opts)
 	local user = req.user
 	if not user then return end
@@ -204,7 +204,7 @@ end
 -- opts: nav (default: logged in), layout ("main" | "minimal" | any templates/layout/<x>),
 --       body_class (extra class(es) on <body>, for page-specific CSS; the layouts add
 --       "theme-<key>"),
---       chat_inline (the page shows the chat itself: not in the right column),
+--       chat_inline (the page shows the chat itself: not in the sidebar),
 --       status, headers (extra {name, value} pairs), vars (extra layout ctx values),
 --       events ({ kind, json } list: played by the live client before the page's regions
 --       apply, docs/APP.md "Live client").

@@ -47,13 +47,14 @@ t_live GET /; expect_status 200
 # a change in the gold: the Character panel
 t_sql "UPDATE users SET gold = gold + 7 $LQ"
 t_live GET /
-w_has region charpanel; w_lacks region right; w_lacks region main; w_lacks region invpanel
+w_has region charpanel; w_lacks region side; w_lacks region main; w_lacks region invpanel
 w_payload region charpanel | grep -q '<section class="box" data-r="charpanel">' && t_ok || t_fail "charpanel payload"
 w_payload hashes | grep -qE '^charpanel=[0-9a-f]+( foot-time=[0-9a-f]+)?$' && t_ok \
 	|| t_fail "hashes: only what changed: $(w_payload hashes)"
-# another page: its middle column, the chat moves from the middle to the right column
+# another page: its content, the chat moves from the stage to the sidebar; the location
+# panel stays
 t_live GET /inn
-w_has region main; w_has region right; w_lacks region left; w_lacks region root
+w_has region main; w_has region side; w_lacks region loc; w_lacks region root
 [ "$(w_payload url)" = /inn ] && t_ok || t_fail "url /inn"
 # unknown hashes: the whole body
 echo "root=000000000000" > "$JAR.have"
@@ -69,7 +70,7 @@ for _ in $(seq 1 30); do
 	t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring' $LQ"; t_live GET /
 done
 expect_status 200; [ "$(w_payload url)" = / ] && t_ok || t_fail "move: url $(w_payload url)"
-w_has region loc; w_lacks region towns; w_lacks region main; w_lacks region right
+w_has region loc; w_lacks region main; w_lacks region side
 w_payload region loc | grep -q 'class="loc-coords"' && t_ok || t_fail "loc payload"
 # an encounter: the move lands on the fight page, the monster's first strike included
 t_fight_clear lwuser; t_sql "UPDATE users SET currentaction = 'Exploring' $LQ"; t_live GET /

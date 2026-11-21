@@ -54,7 +54,7 @@ t_get /;        expect_body 'Latest News'
 expect_body "<a href=\"/news/$N1\"><b>Single paragraph headline that is definitely longer than six...</b></a>"
 expect_body 'by Admin]'; expect_body 'second line'; expect_no_body '>Read more</a>'
 expect_body "<a href=\"/forum/thread/$T1\">Reply</a> &middot; <a href=\"/news\">All news</a>"
-expect_body '<a href="/news">News</a><br>'
+expect_body '<a href="/news">News</a>'   # the header's link
 
 t_section "news: admin posts several paragraphs with a title"
 t_jar newsadmin

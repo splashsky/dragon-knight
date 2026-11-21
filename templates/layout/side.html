@@ -1,7 +1,8 @@
-{#- Right column (legacy templates/rightnav.php). ctx = game.nav(user). Fast Spells: an icon
-		button per town spell (spells.buttons), each its own POST form to /spell/<id>, which
-		carries its tooltip (docs/APP.md "Tooltips"); the gear rows carry their item's, and its
-		picture when it has one (else the slot's icon). Each box is a region. -#}
+{#- The sidebar's panels (layout/main.html; legacy templates/rightnav.php). ctx =
+		game.nav(user). Fast Spells: an icon button per town spell (spells.buttons), each its
+		own POST form to /spell/<id>, which carries its tooltip (docs/APP.md "Tooltips"); the
+		gear rows carry their item's, and its picture when it has one (else the slot's icon).
+		Each box is a region. -#}
 {{{ region("charpanel") }}}<section class="box" data-r="charpanel">
 <h2 class="title">{{{ art("character", "Character") }}}</h2>
 <div class="box-body charpanel" data-player-stats>

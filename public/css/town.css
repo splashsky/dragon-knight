@@ -15,8 +15,69 @@ table.inventory td + td { width: 100%; }
 /* world map popup */
 .world-map { text-align: center; }
 
-/* the Babble Box (layout/chat.html): in the right column, larger on the town page and
-	 /babble; the list scrolls from the bottom (column-reverse) so the newest message shows */
+/* the town (home/town.html): its services as large tiles in gold frames (dk.css
+	--frame-gold), the name and a line about it */
+.town-services {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 10px;
+	margin: 0 0 18px;
+}
+.town-service {
+	display: block;
+	padding: 10px 14px 11px;
+	border: solid 2px transparent;
+	border-radius: 6px;
+	background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--frame-gold) border-box;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+	transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+}
+.town-service b { display: block; font-size: 17px; line-height: 1.25; }
+.town-service span { display: block; margin-top: 2px; font-size: 13px; font-weight: normal; color: #5f5a50; }
+.town-service:hover {
+	background: linear-gradient(var(--tile), var(--tile)) padding-box, var(--frame-gold-lit) border-box;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+	transform: translateY(-1px);
+}
+.town-service:focus-visible { outline: solid 2px currentColor; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+	.town-service { transition: none; }
+	.town-service:hover { transform: none; }
+}
+.explore-line { margin: 0 0 6px; }
+
+/* the travel list (town/travel.html; in a dialog, or a page): a large button per town, its
+	cost on the right; the town the player is in and those out of reach greyed */
+.travel { min-width: 240px; max-width: 420px; }
+.travel-tp { margin: 0; font-variant-numeric: lining-nums; }
+.travel-list { display: grid; gap: 6px; list-style: none; margin: 10px 0; padding: 0; }
+.travel-list form { margin: 0; }
+.travel-town {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 12px;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 7px 12px;
+	border: solid 1px rgba(0, 0, 0, 0.35);
+	border-radius: 6px;
+	background-color: rgba(255, 255, 255, 0.85);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.travel-town span { font-size: 13px; color: #5f5a50; white-space: nowrap; font-variant-numeric: lining-nums; }
+button.travel-town:hover:not(:disabled) { border-color: currentColor; background-color: #ffffff; }
+button.travel-town:focus-visible { outline: solid 2px currentColor; outline-offset: 1px; }
+.travel-town:disabled { border-style: dashed; background-color: transparent; cursor: default; opacity: 0.65; }
+.travel-town.travel-here:disabled { opacity: 1; }
+.travel-short span { color: #c8141b; }
+.travel-more { margin: 0; color: #5f5a50; }
+
+/* the Babble Box (layout/chat.html): in the sidebar, larger on the town and exploring
+	 pages and /babble; the list scrolls from the bottom (column-reverse) so the newest message shows */
 .chat { margin-bottom: 12px; }
 .chat > summary { cursor: pointer; margin: 0 0 3px; }
 .chat-scroll {

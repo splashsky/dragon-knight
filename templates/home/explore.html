@@ -1,6 +1,11 @@
-<section class="box">
+{#- Exploring (legacy index.php doexplore()): the location panel above has the compass and
+		where the player is (a theme with a title picture for "exploring" draws it too); under
+		it a line, then who's online and the Babble Box (as on the town page). ctx: online,
+		chat. -#}
+<section class="explore">
+{%- if art_src("exploring") then %}
 <h1 class="title page-title">{{{ art("exploring", "Exploring") }}}</h1>
-<div class="box-body">
-You are exploring the map, and nothing has happened. Continue exploring using the direction buttons or the Travel To menus.
-</div>
+{%- end %}
+<p class="explore-line">You are exploring the map, and nothing has happened. Walk on with the compass, or travel to a town on your map.</p>
 </section>
+{{{ include("home/social") }}}

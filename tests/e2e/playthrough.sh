@@ -86,7 +86,7 @@ pt_admin_setting verifyemail=0
 [ "$(t_sql 'SELECT verifyemail FROM control')" = 0 ] && t_ok || t_fail "verifyemail not disabled"
 
 t_section "playthrough: town, inn, shop, maps"
-t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'Town Options'
+t_get /;         expect_status 200; expect_body 'Welcome to Midworld'; expect_body 'class="town-services"'
 expect_body '>Wanderer</a>'
 TC=$(t_csrf)
 pt_is "gold,currenthp,base_maxhp,level" "100|15|15|1" "new character"

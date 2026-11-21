@@ -56,7 +56,7 @@ expect_no_body '<div class="tip-lore"></div>'; expect_no_body '<div class="tip-b
 # a disabled button keeps its tooltip: the span is the trigger (pointer events pass to it)
 expect_body '<span class="spell-tip spell-tip-short" data-tip><button class="spell-btn" type="submit" name="spell" value="2" title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img'
 expect_body '<span class="spell-mp" aria-hidden="true">10</span></button><template class="tip"><div class="tip-title">Revive</div><div class="tip-meta">10 MP · In fights and in town</div>'
-# Fast Spells in the right column: Heal and Revive, opening to the left
+# Fast Spells in the sidebar: Heal and Revive, opening to the left
 expect_body '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left">'
 expect_body '<form class="spell-tip spell-tip-short" method="post" action="/spell/2" data-tip data-tip-side="left">'
 [ "$(grep -o '<div class="tip-title">Heal</div>' "$BODY" | wc -l)" = 2 ] && t_ok || t_fail "Heal's tooltip in the menu and in Fast Spells"
@@ -67,8 +67,8 @@ if command -v python3 >/dev/null; then
 	python3 - "$T/tips_root.html" "$TP_HEAL_LORE" <<'PY' && t_ok || t_fail "live regions without the tooltips"
 import re, sys
 body = open(sys.argv[1], encoding="utf-8").read()
-main = re.search(r'<main class="dk-middle" data-r="main"[^>]*>(.*?)</main>', body, re.S).group(1)
-right = re.search(r'<aside class="dk-right" data-r="right"[^>]*>(.*?)</aside>', body, re.S).group(1)
+main = re.search(r'<main class="dk-main" data-r="main"[^>]*>(.*?)</main>', body, re.S).group(1)
+right = re.search(r'<aside class="dk-side" data-r="side"[^>]*>(.*?)</aside>', body, re.S).group(1)
 assert '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1"' in main
 assert '<div class="tip-lore"><p>' + sys.argv[2] + '</p></div></template></span>' in main
 assert '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div>' in main

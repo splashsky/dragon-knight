@@ -22,10 +22,11 @@ always Attack, 0 always Run, and the player puts their other actions in 2-9.
 - **Everything as before underneath.** Pages work without JavaScript; the live client,
 	scenes, dialogs, tooltips and the event stream keep working; GETs stay pure.
 
-## Y1: the frame
+## Y1: the frame — ✅ done
 
 - **Header** (`layout/main.html`): the logo; the game's links (Inventory, Hotbar, News,
-	Forum when there is one, Help, Admin for admins) and the account's (Change Password, Log
+	Forum when there is one, Admin for admins, Help: last, so Retro's 100px picture's blank
+	end falls before the account's links) and the account's (Change Password, Log
 	Out); logged out, Log In, Register and Help. Retro draws its pictures for Log Out, Log In,
 	Register and Help as before.
 - **Two columns**: the stage (`.dk-stage`: the `loc` region, then `main`) and the sidebar
@@ -40,7 +41,7 @@ always Attack, 0 always Run, and the player puts their other actions in 2-9.
 	`data-modal-leave` (new in `modal.js`: the dialog closes and the form goes as the page's
 	own), so the arrival's scene plays.
 
-## Y2: the stage
+## Y2: the stage — ✅ done
 
 - **Location panel** (`layout/place.html`, region `loc`): the compass (not while fighting)
 	beside where the player is ("In Midworld", "Exploring", "Fighting"), the coordinates, the
@@ -49,7 +50,10 @@ always Attack, 0 always Run, and the player puts their other actions in 2-9.
 	with its price, the Shop, the Map Store, Travel with the number of towns on the map), the
 	news, who's online and the chat.
 - **Exploring** (`home/explore.html`): a line about walking on, who's online and the chat
-	(on the stage, as in town, instead of the sidebar).
+	(on the stage, as in town, instead of the sidebar). Its "Exploring" title only where the
+	theme has a picture for it (Retro): the location panel names the state.
+- **Scenes**: a page change fades `main` only (the location panel stays put); a change of
+	state (a fight, a town, setting out) fades the whole stage under its caption.
 - The legacy messages that sent the player to "the direction buttons on the left" say "the
 	compass"; the help pages describe the new layout.
 

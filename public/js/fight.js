@@ -3,7 +3,7 @@
 // this script plays on the page being shown before the page's regions apply: a line every
 // STEP ms, with the HP/MP bars and numbers, the statuses and the allies they change. Then
 // the regions bring the page as the server renders it, so what stays on screen is what a
-// page load shows. A click in the middle column, any key or "Skip" finishes the round at
+// page load shows. A click on the page's content, any key or "Skip" finishes the round at
 // once; with prefers-reduced-motion there are no delays. The fight forms are disabled while
 // a round plays, and the button that sent it gets the focus back after. The monsters' and
 // allies' bars ([data-stat][data-max]) are drawn here (data-client: the live client's morph
@@ -21,7 +21,7 @@
 	var playing = false;    // a round is being played
 	var skipping = false;   // the round plays to its end at once
 	var wake = null;        // ends the current wait
-	var refocus = false;    // the keyboard was in the middle column: focus the new form
+	var refocus = false;    // the keyboard was in the page's content: focus the new form
 	var pressed = null;     // name and value of the button that sent the round (refocused after)
 
 	// ---- helpers
@@ -111,7 +111,7 @@
 		}
 	}
 
-	// the player's numbers and bars in the right column (layout/nav_right.html)
+	// the player's numbers and bars in the sidebar (layout/side.html)
 	function playerStat(kind, v, max) {
 		var value = $('[data-meter="' + kind + '"]');
 		if (value) {

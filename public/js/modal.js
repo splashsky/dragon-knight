@@ -5,7 +5,8 @@
 // submit into it; a redirect (X-DK-Go) closes it and the page goes there; a link in it
 // closes it and goes on like any link (the live client takes it). An element with
 // data-modal-close closes it, a submit button too (no request; without JavaScript it
-// submits as it says). After a POST in the dialog the page behind brings itself up to
+// submits as it says). A form with data-modal-leave closes it and goes as the page's own
+// (the live client sends it: a scene plays). After a POST in the dialog the page behind brings itself up to
 // date (DK.refresh, client.js; without it, a reload when the dialog closes). Without this
 // script (no JavaScript, no <dialog>) a data-modal link is an ordinary link to the page.
 (function () {
@@ -172,6 +173,13 @@
 		if (ev.defaultPrevented || !inside(form)) return;
 		var submitter = "submitter" in ev ? ev.submitter : (lastButton && lastButton.form === form ? lastButton : null);
 		lastButton = null;
+		if (form.hasAttribute("data-modal-leave")) {
+			// the form goes as the page's own (the live client, on window, takes it next)
+			dirty = false;
+			opener = null;
+			close();
+			return;
+		}
 		var method = (form.getAttribute("method") || "get").toLowerCase();
 		if (method !== "get" && method !== "post") return;   // (method="dialog": the browser closes it)
 		ev.preventDefault();

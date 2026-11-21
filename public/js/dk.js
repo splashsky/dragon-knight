@@ -9,7 +9,7 @@ document.addEventListener("click", function (ev) {
 	if (w) ev.preventDefault();
 });
 
-// The arrow keys press the compass's buttons (layout/nav_left.html: north, west, east,
+// The arrow keys press the compass's buttons (layout/place.html: north, west, east,
 // south), on a page that shows it, unless a field has the keyboard (typing, a list), a
 // modifier key is held or a dialog is open (modal.js). A held key walks on only while the live client (client.js) is free:
 // without it each press is a page load, and a held key would queue a pile of them.

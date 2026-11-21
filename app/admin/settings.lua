@@ -58,10 +58,10 @@ local function spec()
 			yesno("verifyemail", "Email Verification", "Make users verify their email address for " ..
 						"added security.", "Disabled", "Enabled"),
 			yesno("shownews", "Show News", "Toggle display of the Latest News box in towns."),
-			yesno("showonline", "Show Who's Online", "Toggle display of the Who's Online box in towns " ..
+			yesno("showonline", "Show Who's Online", "Toggle display of the Who's Online box in towns and while exploring " ..
 						"and the count of players online on every game page."),
-			yesno("showbabble", "Show Babblebox", "Toggle display of the Babble Box (the chat): in towns, " ..
-						"in the right column of every game page and on its own page."),
+			yesno("showbabble", "Show Babblebox", "Toggle display of the Babble Box (the chat): " ..
+						"in the sidebar of every game page (on the stage in towns and while exploring) and on its own page."),
 		},
 		-- legacy main() checks, in its order
 		validate = function(v, errors)

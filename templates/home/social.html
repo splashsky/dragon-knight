@@ -1,0 +1,14 @@
+{#- Who's online and the Babble Box side by side, on the stage (the town and exploring
+		pages show them there instead of in the sidebar: chat_inline). ctx: online, chat. -#}
+<div class="panel-row">
+<div>
+{%- if online then %}
+{{{ include("layout/online", online) }}}
+{%- end %}
+</div>
+<div>
+{%- if chat then %}
+{{{ include("layout/chat", chat) }}}
+{%- end %}
+</div>
+</div>

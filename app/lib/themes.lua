@@ -23,9 +23,10 @@ themes.list = {
 		name = "Retro",
 		stylesheet = "/static/css/themes/retro.css",
 		logo = { src = "/static/images/themes/retro/logo.gif", width = 409, height = 108, alt = "Dragon Knight" },
-		-- the original's pictures (public/images/themes/retro/<file>)
+		-- the original's pictures (public/images/themes/retro/<file>); button_towns.gif and
+		-- button_functions.gif headed the panels 3.1 replaced (the header's links, Travel)
 		art = {
-			location = "button_location.gif", towns = "button_towns.gif", functions = "button_functions.gif",
+			location = "button_location.gif",
 			character = "button_character.gif", inventory = "button_inventory.gif",
 			fastspells = "button_fastspells.gif", spells = "button_spells.gif",
 			exploring = "title_exploring.gif", fighting = "title_fighting.gif",

@@ -39,8 +39,8 @@ FA_STATE="SELECT currenthp || ',' || currentmp || ',' || currenttp || ',' || gol
 fa_state() { t_sql "$FA_STATE"; }
 
 # Live answers and HTML (python3): a live answer (the wire format, tests/wire.py's reader)
-# read as d = { events, fragments = { main, nav_left, nav_right } (the middle and side
-# columns of the page it brings), url, title, round (its form's), stale (its note),
+# read as d = { events, fragments = { main, place, side } (the page's content, the location
+# panel and the sidebar of the page it brings), url, title, round (its form's), stale (its note),
 # redirect (where the server's redirects landed, when not where the request went), error
 # (an error page's text) }; the fight lines of a page, the events' texts, a value (an
 # expression on d), and the shape of the events.
@@ -78,10 +78,10 @@ def answer():
 		elif op == "region": regions[args[0]] = p
 		elif op == "go": d["redirect"] = p
 	body = regions.get("root", "")
-	main = inner(body, r'<main class="dk-middle" data-r="main"', "main")
+	main = inner(body, r'<main class="dk-main" data-r="main"', "main")
 	if main is not None:
-		d["fragments"] = {"main": main, "nav_left": inner(body, r'<aside class="dk-left" data-r="left"', "aside") or "",
-			"nav_right": inner(body, r'<aside class="dk-right" data-r="right"', "aside") or ""}
+		d["fragments"] = {"main": main, "place": inner(body, r'<section class="place[^"]*" data-r="loc"', "section") or "",
+			"side": inner(body, r'<aside class="dk-side" data-r="side"', "aside") or ""}
 		m = re.search(r'name="round" value="(\d+)"', main)
 		if m: d["round"] = int(m.group(1))
 		if "fight-stale" in main: d["stale"] = True
@@ -203,7 +203,7 @@ expect_body '<script src="/static/js/fight.js" defer></script>'
 expect_body '<input type="hidden" name="round" value="2">'; fa_is "$T_ROUND" 2   # a GET counts nothing
 expect_body 'action="/fight" method="post" data-fight>'
 expect_body "Monster's HP: 50"; expect_no_body 'fight-stale'
-expect_body '<div class="dk-nav-right" data-nav-right>'; expect_body 'data-bar="hp"'
+expect_body '<aside class="dk-side" data-r="side">'; expect_body 'data-bar="hp"'
 t_get /;   expect_redirect /fight
 t_sql "UPDATE users SET currentaction = 'In Town' $FAQ"
 t_get /;   expect_status 200; expect_body 'fight.js'   # every page loads every script (one head for all)
@@ -226,7 +226,7 @@ for seed in 1 2 3 4 5 6; do
 done
 [ -n "$FA_HIT" ] && t_ok || t_fail "no attack's damage in the events"
 fa_expect 'd["round"] == 3 and d["url"] == "/fight" and d["title"] == "Fighting"' "the fight page's address (Post/Redirect/Get)"
-fa_expect '"data-player-stats" in d["fragments"]["nav_right"] and "class=\"loc-coords\"" in d["fragments"]["nav_left"] and "action=\"/move\"" not in d["fragments"]["nav_left"]'
+fa_expect '"data-player-stats" in d["fragments"]["side"] and "class=\"loc-coords\"" in d["fragments"]["place"] and "action=\"/move\"" not in d["fragments"]["place"]'
 fa_expect '"name=\"round\" value=\"3\"" in d["fragments"]["main"] and "<html" not in d["fragments"]["main"]'
 fa_expect 'not any("data" in e or "step" in e for e in d["events"])' "no internal state"
 # the winning blow: the same redirect, and with fetch its lines too
@@ -299,7 +299,7 @@ FA_HEAL=$(sp heal)
 fa_both "heal button" 1 fa_hurt "spell=$FA_HEAL&round=2"
 fa_expect 'any(e["type"] == "spell" and e["text"].startswith("You have cast the Heal spell") and e["mp"][0]["from"] - e["mp"][0]["to"] == 5 for e in d["events"] if "mp" in e)' "Heal button: cast"
 fa_expect "'<button class=\"spell-btn\" type=\"submit\" name=\"spell\" value=\"$FA_HEAL\" title=\"Heal (5 MP)\" aria-label=\"Heal (5 MP)\"><img src=\"/static/images/skills/heal.png\"' in d['fragments']['main']" "the fragment's spell buttons"
-fa_expect "'action=\"/spell/$FA_HEAL\"' in d['fragments']['nav_right'] and 'class=\"spell-btn\"' in d['fragments']['nav_right']" "the fragment's Fast Spells"
+fa_expect "'action=\"/spell/$FA_HEAL\"' in d['fragments']['side'] and 'class=\"spell-btn\"' in d['fragments']['side']" "the fragment's Fast Spells"
 for seed in 1 2; do
 	fa_both "heal button" "$seed" fa_hurt "spell=$FA_HEAL&round=2"
 	FA_BUTTON=$(fa_state)
@@ -510,7 +510,7 @@ t_fight_clear fapi; fa_player; fa_sql "UPDATE users SET currentaction = 'Explori
 fa_live GET /drop; expect_status 200; fa_check
 fa_expect '"<b>Life Pebble</b>" in d["fragments"]["main"] and "data-fight" in d["fragments"]["main"] and d["url"] == "/drop" and d["title"] == "Item Drop"'
 fa_live POST /drop "csrf=$FA_CS&take=Take+it"; expect_status 200; fa_check
-fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "<b>1</b>/12</span>" in d["fragments"]["nav_right"]'
+fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "<b>1</b>/12</span>" in d["fragments"]["side"]'
 fa_is dropcode 0; fa_is "$T_ITEMS" life_pebble
 fa_live GET /drop; fa_check; fa_expect 'd["redirect"] == "/"'
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"

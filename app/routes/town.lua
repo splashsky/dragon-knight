@@ -36,6 +36,7 @@ return function(r)
 	r:get("/maps/buy/#id", game_ok, not_fighting, maps.confirm)
 	r:post("/maps/buy/#id", game_ok, not_fighting, maps.buy)
 
+	r:get("/travel", game_ok, not_fighting, travel.list)
 	r:post("/travel/#id", game_ok, travel.handle)
 	r:post("/move", game_ok, explore.move)
 	r:post("/spell/#id", game_ok, heal.cast)
