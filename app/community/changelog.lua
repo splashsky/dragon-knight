@@ -11,7 +11,7 @@ changelog.RELEASES = {
 		version = "3.1.0", date = "unreleased",
 		changes = {
 			"The page is at most 1200 pixels wide, so it stays together on wide screens.",
-			"The Babble Box is a small chat window you open and close from the Functions box, instead of a panel in the right column and the town page. Drag it by its top edge wherever you like and resize it by its corner: it stays open, where you put it, from page to page until you close it, and stays usable over the shop's dialog. It has the game's own background; its messages fill it, each with the name above the message, and you type in a bar that forms its foot, with the send button inside. The chat also has a page of its own, /babble.",
+			"The Babble Box is a small chat window you open and close from the Functions box, instead of a panel in the right column and the town page. Drag it by its top edge wherever you like and resize it by its corner: it stays open, where you put it, from page to page until you close it, and stays usable over the shop's dialog. It has the game's own background, a little darker; its messages fill it, each with the name above the message, and you type in a dark bar that forms its foot, with the send button inside. The chat also has a page of its own, /babble.",
 			"The Babble Box's messages sit on the window's own background: yours on the right in red, everyone else's on the left in black, administrators' in gold and moderators' in green.",
 			"Several messages in a row from the same player show their name only once.",
 			"A new role, Moderator, set by administrators in the user editor: moderators may delete Babble Box messages.",

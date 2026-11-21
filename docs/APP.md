@@ -635,8 +635,9 @@ messages that come to every list on the page (the window's too).
 	`/babble` as a dialog's page (`X-DK-Modal: 1`: the chat alone, no heading) and drops
 	the live client's region names (`data-r`) from it. A strip at its top moves it (pointer
 	events, kept inside the window), the close button at the strip's right; its corner
-	resizes it (CSS `resize`). It has the page's own background (the theme's `body` image),
-	and the message bar is its foot: flush with its sides and bottom, square on top, its
+	resizes it (CSS `resize`). It has the page's own background (the theme's `body` image)
+	a little darker (a translucent layer over it), and the message bar is its foot: dark,
+	with light text and send button, flush with its sides and bottom, square on top, its
 	bottom corners the window's (an error line goes above it). Whether it is open, where and how big are kept in
 	`localStorage` (`dk-chatbox`), so a page load opens it again where it was. Escape in it
 	closes it. Pages without the link (logged out, the admin panel) hide it. Over a dialog

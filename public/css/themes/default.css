@@ -4,9 +4,14 @@
 	 by space instead of lines, and the footer is a row of small print. Linked last by every
 	 layout when the theme is "default" (lib/themes.lua); body has class theme-default. */
 
-body, .dk-chatbox {
+body {
 	background: #e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 	color: #16181d;
+}
+/* the chat window: the same background, a little darker */
+.dk-chatbox {
+	background: linear-gradient(rgba(22, 24, 29, 0.12), rgba(22, 24, 29, 0.12)),
+		#e8edf2 url(/static/images/themes/default/background.jpg) center top / 1024px repeat;
 }
 a, button.link, .towns-btn { color: #6b1510; }
 a:hover, button.link:hover, .towns-btn:hover:not(:disabled) { color: #d0161e; }

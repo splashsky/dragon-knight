@@ -3,9 +3,14 @@
 	 (public/images/themes/retro/; lib/themes.lua's art). The colours and boxes are dk.css's. Linked last by every layout when the
 	 theme is "retro" (lib/themes.lua); body has class theme-retro. */
 
-body, .dk-chatbox {
+body {
 	background: url(/static/images/themes/retro/background.jpg);
 }
+/* the chat window: the same background, a little darker; its message bar dark brown */
+.dk-chatbox {
+	background: linear-gradient(rgba(60, 40, 10, 0.14), rgba(60, 40, 10, 0.14)), url(/static/images/themes/retro/background.jpg);
+}
+.dk-chatbox .chat-bar { background-color: #2e2418; }
 
 /* item and skill tiles: the original grey title boxes in plain black frames (dk.css's
 	frames are gradients: a single colour here), brown when lit */
