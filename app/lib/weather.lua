@@ -280,7 +280,7 @@ function weather.change(lat, lon, now)
 	if near_now and near_now ~= was_near then say(c.near_comes, 3, near_now)
 	elseif was_near and not near_now and not (storm_now and not was_storm) then say(c.near_goes, 3, was_near) end
 	if is.ground ~= was.ground then say(variants(c.ground, was.ground, is.ground), 4) end
-	if is.time ~= was.time then say(c.time[is.time], 5) end
+	if is.time ~= was.time then say(variants(c.time, was.time, is.time), 5) end
 	return table.concat(said, " ")
 end
 

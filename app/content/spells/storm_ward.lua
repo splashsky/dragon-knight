@@ -5,6 +5,12 @@
 return {
 	name = "Storm Ward",
 	description = "Halves the lightning damage you take for 60 seconds.",
+	lore = [[
+Paladins learn Storm Ward at twenty-six, by which time the storms of the open road have
+caught most of them at least once. Mages learn it at thirty-eight, from masters who have
+seen what a bolt does to a man in plate. The ward halves the lightning that gets through
+for about a minute. Traders in Bris sell a draught for those who would rather not wait
+for the training.]],
 	icon = "storm_ward",
 	mp = 16,
 	power = 6,                  -- how many ticks the ward lasts

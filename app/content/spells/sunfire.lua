@@ -4,6 +4,12 @@
 return {
 	name = "Sunfire",
 	description = "Fills the battlefield with heat for 40 seconds: fire hits 25% harder, frost 25% weaker, and burning does half again as much.",
+	lore = [[
+Sunfire is the fire caster's field: heat shimmers over the ground for a while, fire hits
+harder, frost hits weaker, and any burning does half as much again. Mages learn it at
+twenty-six, and the Mages of Narcissa say it is the best reason to be a Mage in summer.
+The clever ones cast it in the heat of the day and let the others walk into the shimmer.
+Frost Mages are not invited.]],
 	icon = "sunfire",
 	mp = 14,
 	power = 4,                  -- how many ticks the field lasts

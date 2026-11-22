@@ -5,6 +5,12 @@
 return {
 	name = "Frost Ward",
 	description = "Halves the frost damage you take for 60 seconds.",
+	lore = [[
+Paladins learn Frost Ward at twenty-four, usually after a winter in the passes above
+Kalle has taught them why. Mages learn it at thirty-seven, from the same masters who
+tell them to keep a second cloak in the pack. The ward halves the frost that gets
+through for about a minute. It does nothing for a numbed arm, so the wise carry a warm
+cloak as well.]],
 	icon = "frost_ward",
 	mp = 16,
 	power = 6,                  -- how many ticks the ward lasts

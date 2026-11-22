@@ -13,6 +13,12 @@ end
 return {
 	name = "Deluge",
 	description = "Floods the monster for about a third of the caster's attack, whatever the armor, and brings a downpour over the battlefield for 40 seconds. Some monsters are immune.",
+	lore = [[
+A wall of water comes off the lake all at once, and the aqua things of the flooded mines
+past Gilead are said to throw it. It strikes for a third of the caster's attack,
+straight through armour, and then the sky opens over the field for a while. There is no
+wind-up to watch for. Fishers near Hambry say the first they know of it is the wet.
+Nobody has ever seen a Deluge cast by a man.]],
 	icon = "deluge",
 	mp = 30,
 	power = 4,                  -- how many ticks the downpour lasts

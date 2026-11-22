@@ -11,6 +11,12 @@ end
 return {
 	name = "Water Jet",
 	description = "Hurls a jet of water for about two fifths of the caster's attack, whatever the armor. Some monsters are immune.",
+	lore = [[
+A jet of water hits like a fist and does about two fifths of the caster's attack, armour
+or no armour. The drakefins of the Hambry marsh fire it, and so do the nymphs by the
+ponds and the aqua things of the flooded mines past Gilead. There is no wind-up. The
+splash is the warning, and by then the jet has already landed. Fishers say the nymphs
+only fire it at men who have been singing.]],
 	icon = "water_jet",
 	mp = 8,
 	data = { min = 35, max = 42 },   -- percent of the caster's attack

@@ -4,6 +4,12 @@
 return {
 	name = "Mire",
 	description = "Turns the ground to deep mud for 50 seconds: earth hits 15% harder and everyone's dexterity is 20% lower.",
+	lore = [[
+Mud is a Warrior's friend, and Mire is the spell that makes it. The ground goes to deep,
+sucking mud for a while, earth grows stronger in it, and everyone is clumsier on their
+feet. Warriors learn it at twenty-one in the training yards of Roma, where the mud is
+kept fresh for the purpose. The sergeants there say a fighter who makes the ground his
+own does not have to be the strongest man on it.]],
 	icon = "mire",
 	mp = 12,
 	power = 5,                  -- how many ticks the field lasts

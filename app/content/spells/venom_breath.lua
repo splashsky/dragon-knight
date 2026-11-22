@@ -14,6 +14,12 @@ end
 return {
 	name = "Venom Breath",
 	description = "Draws a deep breath for a tick, then breathes poison for about half the caster's attack; the target is left venomed for 30 seconds. Some monsters are immune.",
+	lore = [[
+The green dragon breathes a sour cloud that sticks to armour and lungs alike. The
+monster draws in a breath first, so the warning is the only hint you get, and anything
+caught in the cloud coughs for half a minute. The venom thickens the blood, and the
+victim hits a little softer until it wears off. Hunters in Hambry say the smell stays on
+a man's coat for a week, and that the dragon knows where he has gone.]],
 	icon = "venom_breath",
 	mp = 20,
 	-- percent of the caster's attack; the venom's ticks, hit points a tick and percent less damage dealt

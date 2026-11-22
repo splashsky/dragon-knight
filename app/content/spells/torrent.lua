@@ -10,6 +10,12 @@ end
 return {
 	name = "Torrent",
 	description = "Drenches the monster in a torrent of water. Some monsters are immune.",
+	lore = [[
+Torrent is a Hurt with water in place of the arcane, and it finds the monsters that fire
+spells cannot touch. Mages learn it at twenty-four, from the masters of Midworld, who
+warn them never to cast it while standing in a river. The student who ignores the
+warning is usually found at the next ford, still dripping and still explaining. The
+spell itself works perfectly well.]],
 	icon = "torrent",
 	mp = 14,
 	power = 38,                 -- the most damage it deals

@@ -5,6 +5,12 @@
 return {
 	name = "Storm Call",
 	description = "Calls a thunderstorm for 30 seconds: lightning hits 30% harder, fire 25% weaker and can't catch, and bolts strike at random.",
+	lore = [[
+A thunderstorm rolls out from Midworld on its own, but a Mage who calls one into the
+field does it on purpose. Lightning hits harder, fire cannot catch, and bolts come down
+on whoever happens to be standing there. Mages learn Storm Call at forty-one and are
+sent out to open ground to prove they can. The one who calls the storm does not choose
+who is struck, and the old hands say that is the first thing to learn.]],
 	icon = "storm_call",
 	mp = 30,
 	power = 3,                  -- how many ticks the field lasts

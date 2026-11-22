@@ -4,6 +4,12 @@
 return {
 	name = "Cold Snap",
 	description = "Brings snow to the battlefield for 40 seconds: frost hits 15% harder, fire 15% weaker, burning goes out sooner and everyone is a little slower.",
+	lore = [[
+Snow in the middle of a summer fight is a trick, and a Mage who learns Cold Snap at
+twenty-eight can expect to be asked for it at every feast. The flakes settle on the
+field for a while. Frost bites harder in them, fire grows weaker, and everyone moves a
+little slower. The Mages of Kalle teach it in the cold months, when their students have
+the most practice at being miserable.]],
 	icon = "cold_snap",
 	mp = 14,
 	power = 4,                  -- how many ticks the field lasts

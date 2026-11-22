@@ -4,6 +4,12 @@
 return {
 	name = "Rain Call",
 	description = "Calls rain over the battlefield for 40 seconds: water and lightning hit 15% harder, fire 25% weaker, and burning goes out sooner.",
+	lore = [[
+Mages learn Rain Call at twenty, the age at which they are expected to stop complaining
+about the weather. The rain falls over the battlefield for a while: water and lightning
+hit harder, fire is weaker, and burning goes out sooner. Mages of Roma keep the spell
+for the long summer days when the sun is the only enemy. The spell ends on its own,
+which is more than the real weather ever does.]],
 	icon = "rain_call",
 	mp = 14,
 	power = 4,                  -- how many ticks the field lasts

@@ -11,6 +11,12 @@ end
 return {
 	name = "Thunderstorm",
 	description = "Thunder and lashing rain: lightning is strong, fire weak and unable to catch, and bolts strike at random.",
+	lore = [[
+Storms form near Midworld and drift north-west toward Gilead in about two hours. The
+thunderstorm is the heart of one, where the lightning comes often enough to be counted.
+A bolt picks its target at random, friend or foe, so the wise stand at the edge of the
+fight and let the storm pass. Mages who call one with Storm Call say it is the only
+spell that asks them for a little luck.]],
 	icon = "thunderstorm",
 	group = "sky",
 	damage = { lightning = 30, fire = -25, wind = 15 },

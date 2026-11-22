@@ -14,6 +14,12 @@ end
 return {
 	name = "Shadow Breath",
 	description = "Draws a deep breath for a tick, then breathes darkness for about half the caster's attack; the target withers for 30 seconds, and the caster gains what it loses. Some monsters are immune.",
+	lore = [[
+A breath of darkness does not scorch. It fills the mouth of the one it hits and drains
+the life out of it for a while, and the breather takes what the victim loses. The
+monster draws a deep breath for a turn first, and the gathering darkness is the warning,
+though it is hard to see in the dark. Dark dragons and shadow dragons use it, and the
+watchmen of Narcissa say the weakness that follows is worse than the bite.]],
 	icon = "shadow_breath",
 	mp = 20,
 	-- percent of the caster's attack; the withering's ticks and hit points drained a tick

@@ -17,6 +17,12 @@ end
 return {
 	name = "Fire Breath",
 	description = "Draws a deep breath for a tick, then breathes fire for about half the caster's attack and sets the target alight. Some monsters are immune.",
+	lore = [[
+A drake puffs smoke and singes a coat. A dragon draws a long breath first, and the
+warning lasts one whole turn, long enough for the wise to get behind something solid.
+The fire sticks to the target and burns on for a few turns, and the higher the
+breather's level, the hotter the burn. Wardens of Roma have seen a red dragon's fire run
+down a cave wall, and they do not argue about how long the warning took.]],
 	icon = "fire_breath",
 	mp = 20,
 	data = { min = 46, max = 55, ticks = 3 },   -- percent of the caster's attack; ticks the burn lasts

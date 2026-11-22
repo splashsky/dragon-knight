@@ -4,6 +4,12 @@
 return {
 	name = "Fog Bank",
 	description = "Rolls in a fog for 40 seconds: everyone's attack is 15% weaker.",
+	lore = [[
+Fog comes off the marsh beyond Hambry the way steam comes off a kettle, thick and slow
+and far too sure of itself. The green dragon in the marsh-forest is said to call it up
+on purpose, and it works on everything that moves. Under fog every blade is a little
+duller, the monster's included. The first sign is the Battlefield line on the fight page
+changing to fog, and the second is that nobody can see the far end of the field.]],
 	icon = "fog_bank",
 	mp = 10,
 	power = 4,                  -- how many ticks the field lasts

@@ -4,6 +4,12 @@
 return {
 	name = "Nightfall",
 	description = "Brings darkness over the battlefield for 50 seconds: shadow hits 25% harder, holy light 15% weaker, and sleep lasts longer.",
+	lore = [[
+Night comes down over the field the way it does at dusk, quickly and without asking.
+Shadow hits harder under it, holy light is weaker, and sleep lasts longer, which is the
+part that worries the watchmen of Narcissa. The Shadow Dragon hunts in the hours after
+dusk, and it is said that the dark it brings is not the only thing it leaves behind.
+Watchmen shut the gates when the light goes that particular grey.]],
 	icon = "nightfall",
 	mp = 20,
 	power = 5,                  -- how many ticks the field lasts

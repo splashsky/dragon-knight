@@ -21,6 +21,7 @@ changelog.RELEASES = {
 			"New gear to face the elements: rings and charms that resist fire, frost, lightning, shadow or holy light, and others that ward off sleep or poison, a frost-lined coat and an ember shield with a weakness each, and two blades that strike with fire and holy light. The casting staves and the Dawn Mace strike with their spell's element too. Look for them in the markets past Roma, and a few as monster drops (schema version 24, run dk migrate).",
 			"25 new spells. Mages learn Rain Call, Gust, Torrent, Sunfire, Cold Snap, Storm Call and Scorch, and the wards against fire, frost and lightning; Warriors learn Mire, which bogs the field down; Paladins learn the three wards and Consecrate, which blesses the field against shadow, brimstone and miasma. Monsters have new tricks of their own: breaths they gather before they strike, heavy blows, Doom counting down on you, and spells that bring the night, the fog or the rain down on the field.",
 			"Ward draughts against fire, frost and lightning, for the fights where you know what is coming.",
+			"Every new spell, status, item and battlefield has its story in its tooltip and on the help pages, and the weather is described in many more ways, by the hour as well.",
 			"Judgement tells you how much it healed you again.",
 		},
 	},

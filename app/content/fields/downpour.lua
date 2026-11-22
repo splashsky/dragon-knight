@@ -3,6 +3,11 @@
 return {
 	name = "Downpour",
 	description = "Hard rain: fire is weak, lightning strong, no fire can catch, and wet footing slows everyone.",
+	lore = [[
+A downpour is the heart of a squall, and a Deluge brings one on a dry day. It passes
+within the hour, but the road it leaves behind is soup for days, and the carters of Bris
+say a wet road is worse than a long one. A torch in the rain is no use to anyone, so the
+sensible fighter drops it and draws steel.]],
 	group = "sky",
 	damage = { water = 15, lightning = 25, fire = -40 },
 	statuses = {

@@ -5,6 +5,12 @@
 return {
 	name = "Doom",
 	description = "When its time runs out, the bearer takes heavy shadow damage. Any cure for harmful effects lifts it.",
+	lore = [[
+A doom is a sentence with a date on it. Once it is passed, the bearer has forty seconds
+before the shadow falls, and a cure for harmful effects is the only way out of the book.
+Priests in Gilead say most of the doomed do not believe it until the count is nearly
+done. The Doomer does not wait for belief: when the count runs out, the sentence is
+carried out.]],
 	icon = "doom",
 	kind = "harmful",
 	ticks = 4,

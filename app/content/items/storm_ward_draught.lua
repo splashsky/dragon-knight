@@ -3,6 +3,11 @@
 return {
 	name = "Storm Ward Draught",
 	description = "Halves the lightning damage you take for 80 seconds.",
+	lore = [[
+A grey draught that smells of wet slate and something sharper, drunk fast before a storm
+breaks. Gilead's wardens carry a flask on every watch, and the apothecaries of Kalle say
+it is made from the same crystal as the Storm Charm, ground fine. Most travellers buy
+three or four before the high winds and keep one for the day they forget.]],
 	icon = "storm_ward_draught",
 	category = "consumable",
 	price = 240,

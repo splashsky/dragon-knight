@@ -4,6 +4,12 @@
 return {
 	name = "Brimstone",
 	description = "Fills the battlefield with brimstone for 40 seconds: fire hits 30% harder, frost and holy light are weaker.",
+	lore = [[
+Sulphur and cinders come up through the floor of a demon lord's hall, and the stink of
+the pits follows wherever the lord walks. Fire burns hotter in it, while frost and holy
+light lose their bite, so Mages who rely on the cold leave the hall alone. A Paladin who
+knows Consecrate can drive it out, and the old knights say the cinders hiss when the
+prayer is said.]],
 	icon = "brimstone",
 	mp = 30,
 	power = 4,                  -- how many ticks the field lasts

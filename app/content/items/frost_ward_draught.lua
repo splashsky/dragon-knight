@@ -3,6 +3,11 @@
 return {
 	name = "Frost Ward Draught",
 	description = "Halves the frost damage you take for 80 seconds.",
+	lore = [[
+A blue draught that tastes of snow water and tallow, sold in Bris and along the road to
+Hambry. Hambry's healers say it dulls the cold enough for a man to keep his wits in a
+blizzard. Most trappers take three bottles before a winter crossing, and most of them come
+back with two.]],
 	icon = "frost_ward_draught",
 	category = "consumable",
 	price = 240,

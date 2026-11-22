@@ -5,6 +5,12 @@
 return {
 	name = "Fire Ward",
 	description = "Halves the fire damage you take for 60 seconds.",
+	lore = [[
+Paladins learn Fire Ward at twenty-one, usually after a sergeant has seen them stand too
+close to a torch. Mages learn it at thirty-four, and call it sensible rather than
+cowardly. The ward halves the fire that gets through for about a minute, with no smell,
+sound or sign to show it is working. The apothecaries of Midworld sell a draught that
+does the same for those who would rather drink their protection.]],
 	icon = "fire_ward",
 	mp = 16,
 	power = 6,                  -- how many ticks the ward lasts

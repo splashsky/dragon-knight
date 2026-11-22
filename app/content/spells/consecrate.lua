@@ -4,6 +4,12 @@
 return {
 	name = "Consecrate",
 	description = "Hallows the battlefield for 50 seconds: holy light hits 25% harder and shadow 25% weaker; it drives out any other aura.",
+	lore = [[
+Paladins of Bris call it the ground's own blessing: a short prayer, a sprinkle of holy
+water and the field is clean. The knights learn it at thirty, once they have stood on
+enough cursed ground to appreciate it. Holy light hits harder on hallowed ground and
+shadow hits less, and any brimstone or miasma already there is driven out. Priests say
+the blessing lasts most of a minute, which is long enough for most demons to notice.]],
 	icon = "consecrate",
 	mp = 30,
 	power = 5,                  -- how many ticks the field lasts

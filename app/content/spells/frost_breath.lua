@@ -15,6 +15,12 @@ end
 return {
 	name = "Frost Breath",
 	description = "Draws a deep breath for a tick, then breathes frost for about half the caster's attack; the cold numbs the arms, so the target deals 25% less damage for 20 seconds. Some monsters are immune.",
+	lore = [[
+Frost is the fire's cold cousin, and it is worse for the fighter who has to keep his
+feet. The monster draws a deep breath for a turn first, and the frost that comes out
+numbs the arms, so the numbed target hits for a quarter less for a short while. Blue
+dragons in the Kalle peaks use it, and so do the frost wyrms in the snow above Narcissa.
+Carters say the snow goes quiet just before the breath comes.]],
 	icon = "frost_breath",
 	mp = 20,
 	data = { min = 46, max = 55, ticks = 2, pct = 25 },   -- percent of the caster's attack; ticks and percent less damage dealt

@@ -3,6 +3,11 @@
 return {
 	name = "Consecrated Ground",
 	description = "Hallowed ground: holy light is stronger and shadow weaker.",
+	lore = [[
+A Paladin's Consecrate lays a soft light over the ground, and it drives out any other
+aura already there. The Order keeps a page for every field it has held in the oath book
+at the Midworld chapel. Shadow creatures do not like to stand in the light, and the ones
+that do are easy to spot by the way they squint.]],
 	icon = "consecrated",
 	group = "aura",
 	damage = { holy = 25, shadow = -25 },

@@ -13,6 +13,13 @@ end
 return {
 	name = "Doom",
 	description = "Names the day the target dies: in 40 seconds it takes shadow damage of half the caster's attack, unless a cure for harmful effects lifts it first. Some monsters are immune.",
+	lore = [[
+The Doomers on the roads near Gilead keep the book, and Doom is how they close the page.
+A creature that is doomed has forty seconds to find a cure before the sentence is
+carried out: a heavy blow of shadow, about half the caster's attack. Any cure for
+harmful effects will lift it, and priests in Gilead keep one ready for anyone who has
+been named in the book. The Doomer does not argue the sentence. It only says that the
+page is closed.]],
 	icon = "doom",
 	mp = 30,
 	power = 4,                  -- how many ticks until the doom falls

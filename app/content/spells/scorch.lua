@@ -13,6 +13,12 @@ end
 return {
 	name = "Scorch",
 	description = "Sets the monster alight with a fierce fire: it burns for 16 hit points every 10 seconds. Some monsters are immune.",
+	lore = [[
+Scorch is the fire that Ember's masters wish they had taught first. It burns hotter than
+Ember and costs a good deal less than Inferno, and the monster it hits burns for a few
+turns. Mages learn it at forty-five, once they have set a barn alight or two and been
+told so. A scorched monster is easy to find afterwards, since the smoke goes up in a
+thin line from wherever it is standing.]],
 	icon = "scorch",
 	mp = 24,
 	power = 4,                  -- how many ticks the fire burns

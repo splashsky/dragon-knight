@@ -12,6 +12,12 @@ end
 return {
 	name = "Heavy Blow",
 	description = "Draws back for a tick, then strikes for more than half the caster's attack, whatever the armor. Some monsters are immune.",
+	lore = [[
+The knights of the dead road do not swing so much as put their whole weight behind the
+stroke. The monster draws back for a turn first, and the blow that follows takes more
+than half its attack, whatever armour is worn. Giants and daemons do the same, and
+wyverns do it with a dive off the cliffs above Bris. Carters say a swing drawn back for
+a long time is the one to get out of the way of.]],
 	icon = "heavy_blow",
 	mp = 15,
 	data = { min = 50, max = 60 },   -- percent of the caster's attack
