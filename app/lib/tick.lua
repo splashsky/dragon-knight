@@ -8,7 +8,10 @@
 --     passed is guarded; the fights_due index finds those due, the most behind first;
 --   - world statuses (lib/world.lua world.advance), the most behind first;
 --   - the open pages whose weather changed (lib/weather.lua weather.changed between the
---     last tick and this one, for the players online with an event stream).
+--     last tick and this one, for the players online with an event stream);
+--   - the World Map's weather: at every tick that begins a weather step (every tick: the
+--     weather moves on the clock), `sky` on the public channel `sky`, so the open maps
+--     fetch /map/sky (town/sky.lua).
 --
 -- A fight or a page the tick changed gets `stale` on user:<id> (the tick has no tab: every
 -- page of the player asks for itself again; public/js/live.js). The work per run is
@@ -65,7 +68,8 @@ local function world_statuses(n, out, told)
 	end
 end
 
--- The weather moves in steps (weather.STEP ticks): only a tick that begins one can change it.
+-- The weather moves in steps (weather.STEP ticks: one): only a tick that begins one can
+-- change it.
 local function weather_pushes(n, out, told)
 	if n % weather.STEP ~= 0 then return end
 	local t1 = clock.tick_start(n)
@@ -78,9 +82,17 @@ local function weather_pushes(n, out, told)
 	end
 end
 
+-- The World Map's sky moves with the weather's steps (every tick): a tick that begins one says
+-- so to every stream (`sky` { tick }); the maps open then ask for /map/sky.
+local function sky(n, out)
+	if n % weather.STEP ~= 0 then return end
+	dk.publish("sky", "sky", json.encode({ tick = n }))
+	out.sky = true
+end
+
 -- Advances everything the clock moves up to the tick `now` (unix seconds) is in. Returns {
--- tick, fights, world, weather } (how many fights and characters it advanced, and pages it
--- told of the weather).
+-- tick, fights, world, weather, sky } (how many fights and characters it advanced, and pages
+-- it told of the weather; sky true when it sent `sky`).
 function tick.run(now)
 	local n = clock.tick(now)
 	local out = { tick = n, fights = 0, world = 0, weather = 0 }
@@ -88,6 +100,7 @@ function tick.run(now)
 	fights(n, out, told)
 	world_statuses(n, out, told)
 	weather_pushes(n, out, told)
+	sky(n, out)
 	return out
 end
 

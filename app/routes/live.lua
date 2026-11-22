@@ -21,7 +21,7 @@ local view = require("lib.view")
 local live = {}
 
 live.RETRY_MS = 3000
-live.PUBLIC = { "babble", "presence", "notices" }
+live.PUBLIC = { "babble", "presence", "notices", "sky" }
 
 function live.channels(user)
 	local channels = {}

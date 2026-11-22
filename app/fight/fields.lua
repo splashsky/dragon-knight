@@ -277,11 +277,18 @@ function fields.ticking(f)
 	return false
 end
 
--- The next tick after f.tick at which the weather may move the world's fields (a weather
--- step begins), or nil when the fight has no place.
-function fields.next_change(f)
-	if not (f.st and f.st.latitude and f.st.longitude) then return nil end
-	return (f.tick // weather.STEP + 1) * weather.STEP
+-- The first tick after f.tick and before `limit` at which the world would change the fields
+-- the fight has up (the weather's, in the groups no spell holds; it moves every clock
+-- tick), or nil: none before then, or the fight has no place or isn't on the clock.
+function fields.next_change(f, limit)
+	if not (f.st and f.st.latitude and f.st.longitude) or (f.tick or 0) == 0 then return nil end
+	for k = f.tick + 1, limit - 1 do
+		local world = fields.world(f, k)
+		for _, g in ipairs(WORLD_GROUPS) do
+			if not held(f, g) and world[g] ~= f.data[slot(g)] then return k end
+		end
+	end
+	return nil
 end
 
 return fields

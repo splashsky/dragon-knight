@@ -22,7 +22,7 @@ local function town_page(req)
 end
 
 -- Exploring: the land where the player stands and other land on a tile next to theirs
--- (terrain.standing, terrain.edge); the weather's change at the player's tile in this minute
+-- (terrain.standing, terrain.edge); the weather's change at the player's tile in this tick
 -- (its step), and other weather on a tile next to it (a GET can't know where the player
 -- came from: weather.edge).
 local function explore_page(req)

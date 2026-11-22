@@ -86,19 +86,24 @@ t_get /fight; expect_body '<b>You have died.</b>'; expect_body 'You hesitate, an
 live_close tk2
 
 t_section "tick: the weather pushed to an open page"
-# on the storms' road, the first minute the weather changes (as tests/e2e/weather.sh finds it)
+# on the storms' road, the first tick the weather changes after one it didn't (as
+# tests/e2e/weather.sh finds it)
 t_sql "UPDATE users SET currentaction = 'Exploring', currenthp = 900, latitude = 100, longitude = -100 $TQ"
 t_fight_clear ticker
-TW=$((T_NOW - T_NOW % 60 + 60)); TN=
-for i in $(seq 0 90); do
-	T_NOW=$((TW + 60 * i)) t_get /
-	if grep -q 'class="explore-change"' "$BODY"; then TN=$((TW + 60 * i)); break; fi
+TW=$((T_NOW - T_NOW % 10 + 10)); TN=; tk_before=1
+for i in $(seq 0 540); do
+	T_NOW=$((TW + 10 * i)) t_get /
+	if grep -q 'class="explore-change"' "$BODY"; then
+		[ "$tk_before" = 0 ] && { TN=$((TW + 10 * i)); break; }
+	else
+		tk_before=0
+	fi
 done
 [ -n "$TN" ] && t_ok || t_fail "no change in 90 minutes on the storms' road"
 live_open tk3
-# a tick between two steps of the weather tells nobody; the one that begins the changed step does
+# the tick before, whose weather didn't change, tells nobody; the tick it changed does
 T_NOW=$((TN - 20)); t_tick; live_lacks tk3 'event: stale'
-t_tick; t_tick; live_has tk3 'event: stale'
+t_tick; live_has tk3 'event: stale'
 live_close tk3
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 $TQ"
 fi

@@ -3,7 +3,8 @@
 // holds the EventSource and forwards every event to the others over a BroadcastChannel;
 // when it closes, another tab takes over. Without BroadcastChannel or localStorage each
 // tab has its own stream. The events update the Babble Box, who's online, the broadcast
-// banner, show notices, and close the page's stream on logout. Event data is put in the
+// banner, show notices, tell the World Map its weather moved (a "dk-sky" DOM event), and
+// close the page's stream on logout. Event data is put in the
 // page with textContent only. Loaded on every page, it runs while the page is a logged-in
 // player's (<body data-live>): with the live client (client.js) the page stays while the
 // player logs in and out, so the stream starts and stops as data-live comes and goes. When
@@ -20,7 +21,7 @@
 	function isAdmin() { return body.hasAttribute("data-live-admin"); }
 	function touched(el) { if (window.DK && window.DK.touched) window.DK.touched(el); }
 	var HISTORY = 50;               // messages kept in a chat panel (lib/chat.lua HISTORY)
-	var EVENTS = ["babble", "delete", "join", "leave", "news", "reply", "banner", "clear", "logout", "stale", "resync"];
+	var EVENTS = ["babble", "delete", "join", "leave", "news", "reply", "banner", "clear", "logout", "stale", "resync", "sky"];
 	// the leader's claim is renewed every BEAT; a visible tab takes over a claim older than
 	// STALE, a hidden one (its timers may be throttled to once a minute) one older than
 	// HIDDEN_STALE
@@ -294,6 +295,9 @@
 		},
 		stale: stale,
 		resync: refresh,
+		// the World Map's weather moved (the server's tick, every tick): windows.js
+		// swaps the overlays the page shows
+		sky: function (d) { document.dispatchEvent(new CustomEvent("dk-sky", { detail: d })); },
 	};
 	function handle(name, raw, id) {
 		if (id) {

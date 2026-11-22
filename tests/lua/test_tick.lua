@@ -1,8 +1,10 @@
 -- Unit tests for the server's tick (lib/tick.lua) on the database (rows in a savepoint,
 -- dk.publish recorded): the fights due advanced (the most behind first, at most
 -- tick.FIGHTS a run, the rest on the next), a fight's change told to its player's pages
--- (`stale` on user:<id>, no tab), the fights not due left alone, world statuses counting
+-- (`stale` on user:<id>, no tab), the fights not due left alone (due at their deadline or
+-- the weather's first change of their fields), `sky` every tick, world statuses counting
 -- the clock (never the last hit point; waiting while the character fights).
+local fields = require("fight.fields")
 local game = require("lib.game")
 local monsters = require("lib.monsters")
 local state = require("fight.state")
@@ -34,11 +36,12 @@ local function user(name, action, hp)
 end
 
 -- A fight of `u` against a Blue Slime with 100 HP, on the clock at tick t (its turn runs
--- out 3 ticks later).
+-- out 3 ticks later; the world's fields up).
 local function fight(u, t)
 	local f = state.new({ user_id = u.id, round = 2, st = game.player(u), tick = t, deadline = t + 3 })
 	local c = state.add_monster(f, monsters.get(1), 1)
 	c.hp, c.maxhp = 100, 100
+	fields.start(f, t)
 	state.save(f)
 	return f
 end
@@ -52,10 +55,16 @@ function T.fights_due_are_advanced_and_told()
 		local a, b, c = user("tick_a"), user("tick_b"), user("tick_c")
 		fight(a, N - 10)   -- the most behind
 		fight(b, N - 5)
-		fight(c, N)        -- not due: its turn runs out at N + 3
-		-- due at its deadline (N + 3), or at the weather's next step when that comes first (its
-		-- fields follow the weather: fight/fields.lua)
-		eq(row(c).due, N + 2, "due at the weather's next step")
+		local fc = fight(c, N)   -- not due: its turn runs out at N + 3
+		-- due at its deadline (N + 3), or at the first tick before it at which the weather
+		-- would change its fields (they follow the weather, which moves every tick:
+		-- fight/fields.lua)
+		local up, due = fields.world(fc, N), N + 3
+		for k = N + 2, N + 1, -1 do
+			local w = fields.world(fc, k)
+			for _, g in ipairs({ "sky", "ground", "time", "terrain" }) do if w[g] ~= up[g] then due = k end end
+		end
+		eq(row(c).due, due, "due at its deadline, or the weather's first change of its fields")
 		tick.FIGHTS = 1
 		local out = tick.run(N * 10)
 		eq(out.fights, 1, "one fight a run (tick.FIGHTS)")
@@ -69,7 +78,12 @@ function T.fights_due_are_advanced_and_told()
 		eq(row(c).tick, N, "not due: untouched")
 		out = tick.run(N * 10)
 		eq(out.fights, 0, "nothing due")
-		eq(#published, 2)
+		local stale, sky = 0, 0
+		for _, p in ipairs(published) do
+			if p:find(" stale ", 1, true) then stale = stale + 1 end
+			if p == "sky sky {\"tick\":" .. N .. "}" then sky = sky + 1 end
+		end
+		eq(stale, 2, "a stale for each fight advanced"); eq(sky, 3, "the World Map's sky, every run (every tick)")
 	end)
 end
 

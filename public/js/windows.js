@@ -9,7 +9,8 @@
 // again). They aren't <dialog>s: the game goes on under them (the arrow keys, the hotbar),
 // and a dialog (modal.js) leaves them working and over it. Escape in one closes it. A page
 // without a window's link (logged out, the admin panel) doesn't show that window. Without
-// JavaScript the links are their pages.
+// JavaScript the links are their pages. The World Map's weather (the map window's, the
+// /map page's) is swapped in when the server's tick says it moved (`sky`: below).
 (function () {
 	"use strict";
 	if (typeof document === "undefined" || !window.fetch || !window.JSON || !window.Promise) return;
@@ -21,7 +22,7 @@
 	// an answer names the outermost region that changed).
 	var KINDS = {
 		chat: { title: "Babble Box", at: "corner", pick: ".chat", focus: "[name=babble]" },
-		map: { title: "World Map", at: "middle", stale: ["loc", "left", "root"] },
+		map: { title: "World Map", at: "middle", stale: ["loc", "left", "root"] },   // the player's ring
 		stats: { title: "Extended Stats", at: "top", stale: ["charpanel", "invpanel", "spellpanel", "right", "root"] },
 	};
 	var MARGIN = 8, Z = 950;
@@ -207,6 +208,59 @@
 	window.addEventListener("resize", function () {
 		Object.keys(wins).forEach(function (kind) { if (isOpen(kind)) place(wins[kind].el, wins[kind].el.offsetLeft, wins[kind].el.offsetTop); });
 	});
+	// ---- the World Map's weather (town/sky.lua): when the server's tick says the sky moved
+	// (live.js: a "dk-sky" event, every tick), every overlay the page shows (the
+	// map window's, or the /map page's: <g data-sky>) is swapped for GET /map/sky's. The
+	// server renders it all; the script only swaps it in, keeping each storm's element
+	// (data-storm) and giving it the new position, so it glides there (CSS). A hidden page
+	// does it when it shows again; with no map open, nothing happens.
+
+	var skyMissed = false, skyLoading = null;
+	function swapSky(old, fresh) {
+		var oldStorms = old.querySelector(".sky-storms"), freshStorms = fresh.querySelector(".sky-storms");
+		Array.prototype.forEach.call(fresh.children, function (part) {
+			// the patterns, the cells' skies and the time of day: the new ones in their place
+			var kind = part.tagName === "defs" ? "defs" : "." + (part.getAttribute("class") || "").split(" ")[0];
+			if (kind === ".sky-storms" || kind === ".") return;
+			var mine = old.querySelector(kind);
+			if (mine) mine.replaceWith(document.importNode(part, true));
+		});
+		if (oldStorms && freshStorms) {
+			var keep = {};
+			Array.prototype.forEach.call(oldStorms.children, function (e) { keep[e.getAttribute("data-storm")] = e; });
+			Array.prototype.forEach.call(freshStorms.children, function (e) {
+				var key = e.getAttribute("data-storm"), mine = keep[key];
+				if (mine) {
+					["class", "transform", "style"].forEach(function (name) { mine.setAttribute(name, e.getAttribute(name) || ""); });
+					delete keep[key];
+				} else {
+					oldStorms.appendChild(document.importNode(e, true));
+				}
+			});
+			Object.keys(keep).forEach(function (key) { keep[key].remove(); });
+		}
+		old.setAttribute("data-sky", fresh.getAttribute("data-sky"));
+	}
+	function refreshSky(tick) {
+		var shown = document.querySelectorAll("[data-sky]");
+		if (!shown.length) return;
+		if (document.visibilityState === "hidden") { skyMissed = true; return; }
+		if (tick != null && Array.prototype.every.call(shown, function (g) { return g.getAttribute("data-sky") === String(tick); })) return;
+		if (skyLoading) return;
+		skyLoading = fetch("/map/sky", { credentials: "same-origin" }).then(function (res) {
+			if (!res.ok) throw new Error("no sky");
+			return res.text();
+		}).then(function (text) {
+			var fresh = new DOMParser().parseFromString(text, "image/svg+xml").querySelector("[data-sky]");
+			if (!fresh) return;
+			Array.prototype.forEach.call(document.querySelectorAll("[data-sky]"), function (g) { swapSky(g, fresh); });
+		}).catch(function () { /* the next tick tries again */ }).then(function () { skyLoading = null; });
+	}
+	document.addEventListener("dk-sky", function (ev) { refreshSky(ev.detail && ev.detail.tick); });
+	document.addEventListener("visibilitychange", function () {
+		if (document.visibilityState === "visible" && skyMissed) { skyMissed = false; refreshSky(null); }
+	});
+
 	if (window.DK) {
 		window.DK.on("before", function (info) {
 			Object.keys(KINDS).forEach(function (kind) {

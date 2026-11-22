@@ -29,13 +29,20 @@ expect_body '<a href="/map" target="_blank" data-window="map">View Map</a>'
 expect_body '<a class="charpanel-more" href="/character" target="_blank" data-window="stats">Extended Stats</a>'
 t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'; expect_body '<div class="world-map">'
 expect_no_body '<html'
-# the land's picture under the towns and the player (in town at Midworld: the map's centre),
-# with a legend; the picture is a static file
+# the land's picture, the weather over it as of the render, then the towns and the player on
+# top (in town at Midworld: the map's centre), with legends of the land and the weather; the
+# picture is a static file
 expect_body '<svg class="world-map-svg" viewBox="0 0 101 101"'; expect_body '<image href="/static/images/world.svg" width="101" height="101"/>'
-expect_body '<g class="world-map-town"><circle cx="50.5" cy="50.5" r="0.9"/><text x="51.9" y="51.5" text-anchor="start">Midworld</text></g>'
-expect_body '<g class="world-map-town"><circle cx="0.5" cy="100.5" r="0.9"/><text x="1.9" y="99.1" text-anchor="start">Endworld</text></g>'
+expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+expect_body '<g class="world-map-town"><circle cx="50.5" cy="50.5" r="0.9"/><text x="52.1" y="51.5" text-anchor="start">Midworld</text></g>'
+# Endworld is on the map's corner: its mark nudged inside the frame, its name above it
+expect_body '<g class="world-map-town"><circle cx="1.4" cy="99.6" r="0.9"/><text x="3.0" y="98.0" text-anchor="start">Endworld</text></g>'
 expect_body '<circle class="world-map-you" cx="50.5" cy="50.5" r="1.7"><title>You are here (0N, 0E)</title></circle>'
-expect_body 'The Thornbog</li>'; expect_body 'Peaks</li>'
+# in that order: the picture, the sky, the towns, the player
+[ "$(grep -o '<image href="/static/images/world.svg"\|<g class="world-sky"\|<g class="world-map-town"\|<circle class="world-map-you"' "$BODY" | uniq | tr '\n' '|')" \
+	= '<image href="/static/images/world.svg"|<g class="world-sky"|<g class="world-map-town"|<circle class="world-map-you"|' ] \
+	&& t_ok || t_fail "the map's layers in order"
+expect_body 'The Thornbog</li>'; expect_body 'Lakes and ponds</li>'; expect_body 'Peaks</li>'; expect_body 'Thunderstorm</li>'; expect_body 'Night</li>'
 tu "latitude=-3, longitude=3"
 t_get /map; expect_body '<circle class="world-map-you" cx="51.1" cy="51.1" r="1.7"><title>You are here (3S, 3E)</title></circle>'
 tu "latitude=0, longitude=0"

@@ -1,6 +1,7 @@
 -- town/character.lua :: legacy index.php showchar() (own sheet, popup), onlinechar($id)
 -- (anyone's sheet, from Who's Online) and showmap() (the World Map: the land's picture,
--- public/images/world.svg, under the towns and the player; docs/APP.md "Terrain and the map").
+-- public/images/world.svg, the weather over it, the towns and the player; docs/APP.md
+-- "Terrain and the map").
 local affinities = require("lib.content.affinities")
 local classes = require("lib.classes")
 local clock = require("lib.clock")
@@ -10,6 +11,7 @@ local game = require("lib.game")
 local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
+local sky = require("town.sky")
 local spells = require("lib.spells")
 local terrain = require("lib.terrain")
 local view = require("lib.view")
@@ -81,33 +83,44 @@ local function spot(lat, lon)
 	return lon / terrain.CELL + half, half - lat / terrain.CELL
 end
 local function num(n) return ("%.1f"):format(n) end
+local EDGE = 1.4   -- how far inside the map's frame a town's mark stays (its radius and its outline)
 
--- The legend: the biomes, then the features (hills and peaks with their marks).
+-- The legend: the biomes' tints, then the water, the hills and the peaks (their marks).
 local LEGEND = {}
-for _, b in ipairs(terrain.BIOMES) do LEGEND[#LEGEND + 1] = { name = b.name, colour = b.colour } end
-for _, f in ipairs(terrain.FEATURES) do
-	LEGEND[#LEGEND + 1] = { name = f.name, colour = terrain.colour("midland", f.key), mark = not f.colour and f.key or nil }
-end
+for _, b in ipairs(terrain.BIOMES) do LEGEND[#LEGEND + 1] = { name = b.name, colour = terrain.tint(b.key) } end
+LEGEND[#LEGEND + 1] = { name = "Lakes and ponds", colour = terrain.WATER, mark = "water" }
+LEGEND[#LEGEND + 1] = { name = "Hills", colour = terrain.PAPER, mark = "hill" }
+LEGEND[#LEGEND + 1] = { name = "Peaks", colour = terrain.PAPER, mark = "peak" }
 
--- GET /map: the whole world (every town, all of the land), and where the player is.
+-- GET /map: the whole world (every town, all of the land) as the land's picture, the weather
+-- over it now (town/sky.lua), the towns and where the player is.
 function character.map(req)
 	local user = req.user
 	local side = 2 * terrain.CELLS + 1
 	local towns = {}
 	for _, t in ipairs(dk.db:query("SELECT name, latitude, longitude FROM towns ORDER BY id")) do
+		-- the mark inside the map's frame (a town on its edge nudged in), the name beside it on
+		-- the side with room: to the right but near the east edge, a little below but near
+		-- the south edge (above) or the north (lower)
 		local x, y = spot(t.latitude, t.longitude)
-		-- the name beside the dot, inward from the map's edges
+		x, y = math.min(math.max(x, EDGE), side - EDGE), math.min(math.max(y, EDGE), side - EDGE)
 		local right = x > side * 0.8
-		towns[#towns + 1] = { name = t.name, x = num(x), y = num(y), tx = num(right and x - 1.4 or x + 1.4),
-			ty = num(y > side - 4 and y - 1.4 or y + 1), anchor = right and "end" or "start" }
+		local ty = y > side - 4 and y - 1.6 or y < 4 and y + 3 or y + 1
+		towns[#towns + 1] = { name = t.name, x = num(x), y = num(y), tx = num(right and x - 1.6 or x + 1.6), ty = num(ty),
+			anchor = right and "end" or "start" }
 	end
 	local x, y = spot(user.latitude, user.longitude)
-	local cx, cy = spot(0, 0)
 	return view.page(req, "Map", "town/map", {
-		side = side, towns = towns, legend = LEGEND,
+		side = side, towns = towns, legend = LEGEND, sky = sky.markup(clock.now()),
 		player = { x = num(x), y = num(y), where = game.latitude_str(user.latitude) .. ", " .. game.longitude_str(user.longitude) },
-		centre = { x = num(cx), y = num(cy) },
 	}, { layout = "minimal", nav = false })
+end
+
+-- GET /map/sky: the weather over the World Map now, an SVG (town/sky.lua): live pages swap it
+-- in when the server's tick says the sky moved (the `sky` event).
+function character.sky(req)
+	return { status = 200, headers = { { "Content-Type", "image/svg+xml; charset=utf-8" },
+		{ "Cache-Control", "private, no-cache" } }, body = sky.svg(clock.now()) }
 end
 
 return character

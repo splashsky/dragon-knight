@@ -4,7 +4,7 @@
 -- land's climate (fog on the moors at dawn, heat in the Ashlands, the Midlands' weather as
 -- it was); snow beyond the climates' snow lines and on the peaks, never in the Dry Country,
 -- harder storms over the Barrens; mud after rain, drying; the change lines, the
--- description and the edge line; a step of a minute on the game's clock, and whether the
+-- description and the edge line; a step of a tick (10 s) on the game's clock, and whether the
 -- weather changed between two clock ticks; and what it costs.
 local clock = require("lib.clock")
 local lines = require("lib.weather_lines")
@@ -340,7 +340,7 @@ function T.the_description()
 end
 
 -- weather.changed (the server's tick asks it from one clock tick to the next): exactly
--- when what a page shows differs, never within a minute's step
+-- when what a page shows differs, never within a tick (the weather's step)
 function T.changed_between_two_clock_ticks()
 	local seen = false
 	for _, place in ipairs({ { 0, 0 }, { 100, -100 }, { 200, -200 } }) do
@@ -352,7 +352,8 @@ function T.changed_between_two_clock_ticks()
 				"changed exactly when the weather differs (" .. lat .. "," .. lon .. " " .. now .. ")")
 			if changed then
 				seen = true
-				eq(now % STEP, 0, "only as a minute begins")
+				eq(now % STEP, 0, "only as a tick begins")
+				eq(weather.changed(lat, lon, now, now + STEP - 1), false, "never within a tick")
 			end
 		end
 	end
@@ -384,13 +385,13 @@ function T.the_edge_line_names_the_direction_of_other_weather()
 end
 
 function T.the_report_stays_the_same_through_a_step()
-	eq(STEP, 60, "the weather's step: six clock ticks of 10 s")
+	eq(STEP, 10, "the weather's step: a clock tick of 10 s")
 	places(60, function(lat, lon, now)
 		local r = weather.report(lat, lon, now)
 		eq(r.name, lines.sky[r.sky], "the sky's name")
 		eq(r.time_name, lines.time[r.time], "the time's name")
 		local t = step_start(now)
-		for later = t, t + STEP - 1, clock.TICK do
+		for later = t, t + STEP - 1, 3 do
 			eq(weather.report(lat, lon, later).description, r.description, "the same all through the step")
 		end
 	end)

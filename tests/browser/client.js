@@ -238,6 +238,15 @@ async function run(wsUrl, port) {
 	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map-svg image')"));
 	check("the player and the towns on it", await js("!!" + MW + ".querySelector('.world-map-you') && " + MW +
 		".querySelectorAll('.world-map-town').length >= 8"));
+	// the server's tick says the sky moved (`sky` on its channel): the window asks for
+	// /map/sky and swaps its overlay in
+	check("the weather over it", await js("!!" + MW + ".querySelector('.world-sky[data-sky] .sky-cells')"));
+	await js(MW + ".querySelector('.sky-cells').setAttribute('data-old', '1')");
+	await js("fetch('/__test/publish', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': " +
+		"'application/x-www-form-urlencoded', 'X-CSRF-Token': document.body.getAttribute('data-csrf') }, body: " +
+		"'channel=sky&event=sky&data=' + encodeURIComponent('{\"tick\":1}') }).then(function (r) { return r.status; })");
+	check("a sky event swaps the window's overlay", await until("!!" + MW + ".querySelector('.world-sky .sky-cells') && !" + MW +
+		".querySelector('.sky-cells[data-old]')"));
 	check("the page stays", await js("location.pathname === '/' && window.__dk === 1"));
 	check("the map in front", await js("+" + MW + ".style.zIndex > +" + SW + ".style.zIndex"));
 	var title = await js("(function () { var r = " + SW + ".querySelector('.dk-window-title').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })()");

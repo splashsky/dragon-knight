@@ -17,7 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
-| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` (generated), `public/css/{dk,town}.css`, `public/js/windows.js` | `tests/lua/test_terrain.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town}.sh` |
+| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`, `/map/sky`), `app/town/sky.lua` (the weather over the map), `app/lib/tick.lua` (`sky`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` (generated), `public/css/{dk,town}.css`, `public/js/{windows,live}.js` | `tests/lua/test_{terrain,sky}.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town}.sh` |
 | The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
 | Fields (the battlefield: the weather's and spells' effects on a fight) | `app/fight/fields.lua`, `app/lib/fields.lua`, `app/lib/content/kinds/fields.lua`, `app/content/fields/*.lua`, `app/fight/{engine,round}.lua`, `app/community/help.lua` (`/help/fields`), `app/admin/effects.lua` | `templates/fight/battlefield.html`, `templates/community/help/fields.html`, `public/js/fight.js`, `public/css/fight.css`, `public/images/fields/*` | `tests/lua/test_fields.lua`, `tests/e2e/fields.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
@@ -479,15 +479,17 @@ on the minimal layout, in a new tab).
 	whole), seen in the live client's `before` hook; it is fetched again once the answer is
 	on screen (`applied`). The map's are the Location box's (`loc`, or `left`/`root`): the
 	player's ring follows a move (the land's picture is a cached static file, so only the
-	page's few kilobytes come again).
+	page comes again: the towns, the ring and the weather's overlay). Its weather moves
+	without that: when the server's tick sends `sky`, the window swaps in `GET /map/sky`
+	and its storms glide ([Terrain and the map](#terrain-and-the-map)).
 - **The window** (`<section class="dk-window dk-window-<kind>" role="dialog">`, not a
 	`<dialog>`: the game goes on under it, the arrow keys and the hotbar too;
 	`data-client`, so the live client's morph leaves it and it stays open from page to
 	page). Its strip (`.dk-window-grip`: the title, the close button `.dk-window-x` at the
 	right) moves it (pointer events, kept inside the viewport); its corner resizes it (CSS
 	`resize`); a press anywhere in one brings it in front (`z-index` from 950, in the order
-	pressed). Sizes at first: the chat 320 by 400, the map 540 by 680 (the map as large as
-	the window allows, the legend under it), the sheet 280 by 520 (scrolling). It has the page's own
+	pressed). Sizes at first: the chat 320 by 400, the map 560 by 740 (the map as large as
+	the window allows, the legends under it), the sheet 280 by 520 (scrolling). It has the page's own
 	background (the theme's `body` image) a little darker. Whether each is open, where and
 	how big are kept in `localStorage` (`dk-window-<kind>`), so a page load opens it again
 	where it was. Escape in one closes it. A page without a window's link (logged out, the
@@ -523,7 +525,7 @@ return { sse = { channels = { "babble", "user:" .. req.user.id }, retry = 3000 }
 	stream and reloads it (see [Live pages](#live-pages)).
 
 `GET /live` (`app/routes/live.lua`) is the game's stream: `babble`, `presence`,
-`notices`, `user:<id>`, plus `admin` for administrators (`live.channels(user)`).
+`notices`, `sky`, `user:<id>`, plus `admin` for administrators (`live.channels(user)`).
 
 **Publishing.** `dk.publish(channel, event, data)` from any request handler:
 
@@ -590,6 +592,7 @@ the browser sees only the name):
 | `notices` | `clear` | `{ id }` | `/admin/broadcast` (clear) |
 | `user:<id>` | `reply` | `{ thread, title, author, url }` | a reply in a forum thread the player started or posted in (not to the one replying; at most 200 players) |
 | `user:<id>` | `logout` | `{ session }` (one session's pages) or `{ all = true }` | logout; password change, lost password, a new password set in the user editor |
+| `sky` | `sky` | `{ tick }` (the clock tick) | the server's tick (`lib/tick.lua`) every tick (the weather moves every tick): the World Map's overlays fetch `GET /map/sky` ([Terrain and the map](#terrain-and-the-map)) |
 | `user:<id>` | `stale` | `{ tab }` (the sending page's `X-DK-Tab`, or `""`) | every successful POST of the player (`main.lua`), but those that set `req.quiet` (the chat's, the banner's dismissal): their other pages ask for themselves again; the server's tick (`lib/tick.lua`, `tab` `""`: every page) when it changed the player's fight or world statuses, or the weather where an online player with a stream stands |
 | (server) | `resync`, `bye` | empty | the hub: missed events are gone / shutdown |
 
@@ -625,6 +628,9 @@ reload. No toasts in popup windows (`window.opener`).
 	publishes it too, with no tab (every page of the player): a fight the clock moved (a
 	status's tick, a guard), world statuses, the weather (see [The server
 	tick](#the-server-tick)).
+- **The World Map's weather.** On `sky` live.js dispatches a `dk-sky` DOM event; windows.js
+	fetches `GET /map/sky` (the server's markup, whole) and swaps it into the overlays the
+	page shows ([Terrain and the map](#terrain-and-the-map)).
 
 - **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
 	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
@@ -745,7 +751,7 @@ new banner shows again.
 
 ### Adding a live feature
 
-1. Decide the channel: a public one (`babble`, `presence`, `notices`) or the player's
+1. Decide the channel: a public one (`babble`, `presence`, `notices`, `sky`) or the player's
 	`user:<id>` (a new public channel goes into `live.PUBLIC` in `routes/live.lua`; only add
 	private channels a player may read) and a **new event name** (names are global).
 2. Publish from the handler that commits the change, after validation:
@@ -1167,8 +1173,9 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	`clock.duration(seconds)` is a length for the page ("20s", "1m 30s"). The server runs
 	the game's tick on it ([The server tick](#the-server-tick)), and fights, statuses and
 	allies count its ticks.
-- **The weather's step** is 6 clock ticks (`weather.STEP`): it changes only as a minute
-	begins, and is the same all through one.
+- **The weather's step** is one clock tick (`weather.STEP` = 1): the weather moves in real
+	tick time, every 10 s (storms advance every tick, a change can land on any tick), and
+	is the same all through a tick. (Only a cell's base sky holds longer: `weather.SPELL`.)
 - **The grid.** The map in cells of 10 by 10 tiles (`weather.CELL`). Each cell has a base
 	sky that holds 20 minutes (`weather.SPELL`; each cell changes at its own moment), picked
 	by a hash from its place and the time of day, by the **climate of the land** at the
@@ -1249,7 +1256,7 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	sky's name with a tooltip (the name; the time of day, the storm, the ground; the
 	description; `title` without JavaScript) and the time of day. Its markup changes only
 	when the weather does. The exploring page (`home/explore.html`) shows above its line the
-	change line (`.explore-change`, in the minute the weather changed) and the edge line
+	change line (`.explore-change`, in the tick the weather changed) and the edge line
 	(`.explore-edge`), in a region of their own, `explore-weather`, there even when empty:
 	the middle column's own markup stays the same, and a move doesn't fade it
 	([Scenes](#scenes)). A GET can't know where the player came from, so the edge line
@@ -1257,12 +1264,15 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	behind is next to the player, and the line is true whichever way they came. The fight
 	page shows the battlefield: the weather's fields ([Fields](#fields)).
 - **Open pages** learn of a change from the server, never from a timer of their own: the
-	server's tick (`lib/tick.lua`), at each tick that begins a weather step, asks
-	`weather.changed` between the tick before and this one for the tiles of the players
-	online with an event stream and publishes `stale` on `user:<id>` for those whose weather
-	changed, which live.js turns into `DK.refresh()` (only what changed comes: the `weather`
-	region, and `explore-weather` on the exploring page). Until then a page shows the
-	weather of its last answer.
+	server's tick (`lib/tick.lua`), at every tick, asks `weather.changed` between the tick
+	before and this one for the tiles of the players online with an event stream and
+	publishes `stale` on `user:<id>` for those whose weather changed, which live.js turns
+	into `DK.refresh()` (only what changed comes: the `weather` region, and
+	`explore-weather` on the exploring page). Until then a page shows the weather of its
+	last answer. The check costs about 4 µs a player a tick (4 ms a tick for 1,000 online
+	with a stream), and about 1% of a player's ticks change their page (one push every 15
+	minutes or so on average, one every 8 on the storms' road; a player under a storm's
+	moving edge may get one a tick for a while).
 - **Testing.** With `test_routes = true` a request may pin the clock: `X-Test-Now: <unix
 	seconds>` (`main.lua`, `clock.pin`), for everything that asks `clock.now()`.
 	`tests/run.sh` pins every request at `$T_NOW` (4000000000), so the weather is the same on
@@ -1270,7 +1280,8 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey and
 	how often they come, the land's climate, snow beyond the snow lines and on the peaks and
 	never in the Dry Country, the storms' bands and the Barrens' harder storms,
-	mud after rain, the lines, `weather.changed` between clock ticks, the cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
+	mud after rain, the lines, `weather.changed` between clock ticks and never within one,
+	the cost), `tests/e2e/weather.sh` (the box; in the tick of a change the exploring page's
 	line, and a live answer with the weather's regions alone), `tests/e2e/tick.sh` (the push
 	to an open page).
 
@@ -1286,8 +1297,11 @@ where a player may go.
 	cell of 5 by 5 tiles (101 by 101; a town at a cell's centre): `land`, a string per row
 	from the north with a biome's letter per cell from the west (`M` midland, `R` downs, `B`
 	shoals, `K` diggings, `N` moors, `H` weald, `G` barrens, `E` ashlands, `D` drylands, `T`
-	marsh), and `relief` the same with a feature's character (`~` lake, `o` pond, `n` hill,
-	`^` peak, `.` none), so the file reads as two maps. It is **generated, committed and
+	marsh), `relief` the same with a feature's character (`~` lake, `o` pond, `n` hill,
+	`^` peak, `.` none), and `height` the same with the cell's elevation as a base-36 digit
+	(`0`-`9`, `a`-`z`: 0 to 35, the elevation from 0.20 in steps of 0.02, flattened around
+	the towns as the features are: hills from 21 to 27, peaks from 28, the towns' plateaus
+	15), so the file reads as three maps. It is **generated, committed and
 	never edited by hand**: its header names the generator and the seed. The game only
 	reads it, so nothing the game's code does moves the land.
 - **World generator v1** (`app/lib/terrain/generator_v1.lua`, seed `0x3300`) made it, and
@@ -1318,7 +1332,8 @@ where a player may go.
 	less the biome's lake shift: more in the Shoals and the Thornbog) are 0.22 or less and
 	it isn't high, so lakes are a few bodies several cells across; hills at 0.62; a pond
 	where a fine noise (step 6, plus the biome's pond shift) passes 0.89 and it is low (one
-	or two cells); else none. Its numbers (the biomes' cores, reaches, weights, shifts,
+	or two cells); else none. Its height: the flattened elevation in 36 steps (the data's
+	`height`). Its numbers (the biomes' cores, reaches, weights, shifts,
 	traits and the wild seeds) are in the file, tuned by looking at the map. The world:
 	plain 73%, hills 17%, lakes 5%, peaks 4%, ponds 1%; the Dry Country 13% and the
 	Thornbog 9%, the towns' biomes from 6% (the Ashlands) to 14% (the Greymoor, the Weald);
@@ -1340,10 +1355,11 @@ where a player may go.
 	`{ biome, feature, field }` (a biome key; `"lake"`, `"pond"`, `"hill"`, `"peak"` or nil;
 	the terrain field's key or nil), the same for the 25 tiles of a cell, a shared table
 	(two string reads and a table read: about 0.15 µs; the module loads in well under a
-	millisecond, from the code cache). `terrain.BIOMES` (key, name, map colour, field,
-	climate) and `terrain.FEATURES` (key, name, colour or how much darker than the biome,
-	field), `terrain.biome(key)`, `terrain.feature(key)`, `terrain.colour(biome,
-	feature)`.
+	millisecond, from the code cache). `terrain.height(lat, lon)` is the cell's height (0 to
+	`terrain.HEIGHTS` - 1). `terrain.BIOMES` (key, name, colour, field, climate) and
+	`terrain.FEATURES` (key, name, field), `terrain.biome(key)`, `terrain.feature(key)`; the
+	map's palette, `terrain.PAPER`, `INK`, `WATER`, `SHORE`, and `terrain.tint(biome)` (a
+	biome's colour as a tint on the paper).
 
 | Biome | Town | Field | Climate (lib/weather.lua) |
 |---|---|---|---|
@@ -1384,19 +1400,54 @@ where a player may go.
 	empty; an encounter opens with the land's line; the Battlefield line shows the terrain
 	field.
 - **The map** (`GET /map`, `town/map.html`, and the World Map window, [Windows](#windows)):
-	the land's picture under the towns and the player, and a legend; the whole world
-	(every town and all the land, whatever maps the player bought). The picture is a static
-	file, `public/images/world.svg` (about 30 KB, served and cached like any static file):
-	a cell a unit, each row's runs of one colour a stroke (a path per colour: the biomes',
-	the water's deep blues, lakes `#3f6fa3` and ponds `#5585b8`, apart from the Shoals'
-	teal; the hills' and peaks' darker shades), the hills' and peaks' cells with a
-	pattern over them (a hump; a peak with a pale cap). `app/lib/terrain/picture.lua` draws
-	it from the data; `tools/world.sh` writes it, and `tests/lua/test_terrain.lua` requires
-	the file to be that drawing (so a colour change fails until it is written again). The
-	page is an inline SVG in the picture's units: the picture as an `<image>`, thin axes
-	through Midworld, each town from the `towns` table (a dot and its name, inward from the
-	map's edges), the player's red ring and a title naming where they are; it works
-	without JavaScript.
+	the whole world (every town and all the land, whatever maps the player bought), in
+	layers in the picture's units (a cell of 5 by 5 tiles a unit, 101 by 101, north up; the
+	tile (lat, lon) at x = lon / 5 + 50.5, y = 50.5 - lat / 5): the land's picture as an
+	`<image>`, the weather over it as of the render, the towns from the `towns` table (a mark
+	and the name in the page's font, Vollkorn; a mark on the map's edge nudged inside its
+	frame, the name on the side with room: Endworld's, on the corner, above and to the
+	right) and the player's
+	red ring with a title naming where they are; under it a legend of the land and one of
+	the weather. It works without JavaScript.
+- **The land's picture** is a static file, `public/images/world.svg` (about 145 KB, served
+	and cached like any static file), a stylized topographic map on parchment drawn by
+	`app/lib/terrain/picture.lua` from the data: the biomes as muted tints (each row's runs
+	of a biome a stroke, softly blurred); contour lines from the heights (marching squares
+	over the cells' centres, smoothed by corner cutting, simplified, drawn as quadratic
+	curves: one every 3 heights from 2, every fifth an index contour, heavier); hachures
+	down the slopes of hills and peaks (a short stroke along the gradient, a little off
+	the cell's centre) and a small mark on the peaks; lakes and ponds as water with a
+	darker shoreline (marching squares over the water cells) and a ripple on the larger
+	lakes; a compass rose, a scale bar of 100 tiles and a neat border. Its text falls back
+	to the browser's serif (a picture shown as an image can't use the page's fonts); the
+	towns' names are the page's. `tools/world.sh` writes it, and `tests/lua/test_terrain.lua`
+	requires the file to be that drawing (so a change to the drawing or the palette fails
+	until it is written again).
+- **The weather over it** (`app/town/sky.lua`, `GET /map/sky`): an SVG overlay in the same
+	units, a pure function of the time (`clock.now()`), the same all through a tick (the
+	weather's step): `<g class="world-sky" data-sky="<tick>">` (the clock tick) holding its
+	patterns, `.sky-cells` (each 10-tile weather cell's sky from `weather.at` at its centre,
+	as runs of equal cells in a row: overcast a grey wash, fog a pale one, drizzle, rain and
+	downpour hatching of growing density over a darker wash, a thunderstorm's cells a bolt,
+	snow and blizzard flecks, heat a warm shimmer; the washes softly blurred into clouds),
+	`.sky-storms` (each storm alive, `weather.storms`, a soft disc at its centre and
+	radius, keyed by its birth, `data-storm`, placed by a CSS `transform` so it can glide,
+	with the same `transform` attribute for renderers without CSS) and `.sky-time
+	.sky-<phase>` (a wash for dawn, dusk and night). About 7-9 ms and 20-30 KB (2,601
+	weather cells; `weather.at` is cheap enough, no dedicated path). `/map/sky` answers it as
+	`image/svg+xml` (`auth.game`, a GET: pure); `/map` carries the same group inline.
+- **The sky in real time**: the server's tick, at every tick (the weather moves every
+	tick), publishes `sky` `{ tick }` on
+	the public channel `sky` ([Events](#events)); `live.js` turns it into a `dk-sky` DOM
+	event, and `windows.js` fetches `/map/sky` once and swaps it into every overlay the
+	page shows (the map window's, the `/map` page's: `[data-sky]`): the patterns, the
+	cells and the time of day replaced, each storm's element kept and given its new
+	position, so it glides there over the tick's 10 s (`transition: transform 10s linear`;
+	none with `prefers-reduced-motion`): the map trails the real storm by at most a tick.
+	The server renders every byte; the script only swaps it. A page already showing that
+	tick does nothing, a hidden page does it when it shows again, and with no map open
+	nothing happens. An open map costs a `/map/sky` a tick (about 9 ms of the server's
+	time and 20-30 KB).
 - **Testing**: `tests/lua/test_terrain.lua` (the data is generator v1's output byte for
 	byte, integers only, the picture is the drawing, a cell is one place, the towns plain
 	in their biomes and no feature near them, Midworld's start, the biomes' and features'
@@ -1406,7 +1457,15 @@ where a player may go.
 	`tests/lua/test_fields.lua` (the terrain field held, never a spell's),
 	`tests/e2e/terrain.sh` (the Location box, the exploring page's lines, a fight on the
 	Thornbog's field and its first line, `/help/fields`; places found in the world's data),
-	`tests/e2e/town.sh` (`/map`: the picture, the towns, the player, the legend).
+	`tests/e2e/town.sh` (`/map`: the picture, the sky, the towns and the player in that
+	order, the legends). The heights: `tests/lua/test_terrain.lua` (present, reproduced
+	byte for byte, agreeing with the features); the weather over the map:
+	`tests/lua/test_sky.lua` (the storms' discs where `weather.storms` says, snow and rain
+	where they fall, the time of day's wash, the same all through a tick and the storms
+	moving from one to the next, the cost),
+	`tests/e2e/terrain.sh` (`/map/sky` at pinned times, pure, logged in only; the tick's
+	`sky` every tick), `tests/e2e/pure.sh`, `tests/e2e/browser.sh` (the map window
+	swaps its overlay when `sky` comes).
 
 ## The server tick
 
@@ -1441,8 +1500,10 @@ connection, a closed tab) drives it.
 		behind first) count the ticks with `world.advance`: each ticks and counts down
 		(they can't take the last hit point outside a fight); while the character fights,
 		the ticks pass them by.
-	- **The weather**: at a tick that begins a weather step, the players online with an
-		event stream whose tile's weather changed since the tick before.
+	- **The weather** (it moves every tick): the players online with an event stream whose
+		tile's weather changed since the tick before (about 4 µs a player); and `sky` `{ tick }`
+		on the public channel `sky`, for every stream: the World Map's weather moved (the
+		maps open fetch `/map/sky`: [Terrain and the map](#terrain-and-the-map)).
 	A fight or world statuses the tick changed, and a changed weather, publish `stale` on
 	`user:<id>` (with no tab: every page of the player refreshes; a player gets one per
 	run).
@@ -1450,7 +1511,8 @@ connection, a closed tab) drives it.
 	the last tick it played (`fights.tick`), the tick its turn runs out at
 	(`fights.deadline`) and when the tick must advance it next (`fights.due`: the next tick
 	while anything in it counts ticks, a status, an ally, a spell's field or a field with
-	`on_tick`, else the deadline, or the weather's next step when that comes first). Advancing
+	`on_tick`, else the deadline, or the first tick before it at which the weather would
+	change the fight's fields). Advancing
 	it to tick `n` plays every tick after `fights.tick` in order; at each:
 	0. the battlefield: spells' fields count down, the world's follow the weather at the
 		player's tile, each field's `on_tick` runs ([Fields](#fields));
@@ -2425,13 +2487,15 @@ return {
 	one the land names, and those must be in the terrain group). The 21 fields are the 11
 	weather's, the 7 land's and the three auras.
 - **Changes** become lines and `field` events: when only the weather's fields changed, at
-	the weather's step, and no spell holds a group of it, the weather's change line
+	the tick, and no spell holds a group of it, the weather's change line
 	(`weather.change`) says them all; otherwise each field that went says its `ends` and each
 	that came its `begins` (a spell's too, after its own lines). A spell's field hides the
 	weather's changes in its group until it ends. Because every command catches the fight up
 	first, a spell cast just as the rain clears meets a clear sky: its burn takes hold. A
-	fight on the clock is due at the weather's next step when that comes before its deadline
-	(`state.due`), and every tick while a spell's field or a field with `on_tick` is up.
+	fight on the clock is due at the first tick before its deadline at which the weather
+	would change its fields (`fields.next_change`, looking at the ticks up to the deadline:
+	the weather moves every tick, but a fight need not be advanced unless its fields move;
+	`state.due`), and every tick while a spell's field or a field with `on_tick` is up.
 - **Combinations**: damage of an element is scaled by the sum of the fields' percents for it
 	(`fields.pct`, the formula's `field_pct`: attacks through `engine.typed`, content's
 	`:hurt` through the action context's `battlefield`, `fields.battlefield(f)`). A status

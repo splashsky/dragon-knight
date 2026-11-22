@@ -47,6 +47,7 @@ return function(r)
 	r:get("/character", game_ok, character.show)
 	r:get("/character/#id", game_ok, character.online)
 	r:get("/map", game_ok, character.map)
+	r:get("/map/sky", game_ok, character.sky)
 
 	r:get("/babble", game_ok, babble.show)
 	r:post("/babble", game_ok, babble.post)

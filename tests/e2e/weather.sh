@@ -1,6 +1,6 @@
 # tests/e2e/weather.sh :: the weather (docs/APP.md "Clock and weather", lib/weather.lua),
 # the clock pinned per request (T_NOW: X-Test-Now). The Location box shows the weather and
-# the time of day, with a tooltip, in a region of its own; in the minute the weather changes
+# the time of day, with a tooltip, in a region of its own; in the tick the weather changes
 # the exploring page says what changed, and a live answer brings the weather's regions and
 # nothing else. Sourced by tests/run.sh.
 
@@ -16,30 +16,30 @@ we_box | grep -qE 'class="wx wx-[a-z]+ wx-(dawn|day|dusk|night)"' && t_ok || t_f
 we_box | grep -qE 'data-tip tabindex="0" title="[^"]+">[A-Z][a-z ]+<template class="tip"><div class="tip-title">' \
 	&& t_ok || t_fail "the sky's name with a tooltip: $(we_box)"
 we_box | grep -qE '<span class="loc-time">(Dawn|Day|Dusk|Night)</span>' && t_ok || t_fail "the time of day: $(we_box)"
-# the same all through the weather's step (a minute)
-WS=$((T_NOW - T_NOW % 60)); WB=$(we_box)
-T_NOW=$((WS + 59)) t_get /; [ "$(we_box)" = "$WB" ] && t_ok || t_fail "the same all through a minute: $(we_box)"
+# the same all through the weather's step (a tick: it moves every 10 s)
+WS=$((T_NOW - T_NOW % 10)); WB=$(we_box)
+T_NOW=$((WS + 9)) t_get /; [ "$(we_box)" = "$WB" ] && t_ok || t_fail "the same all through a tick: $(we_box)"
 # the fight page shows it too
 t_fight weatheruser 1 10
 t_get /fight; expect_body '<div class="loc-weather" data-r="weather">'
 t_fight_clear weatheruser
 
 t_section "weather: a change, on the page and live"
-# on the storms' road, the first minute the weather changes after one it didn't
+# on the storms' road, the first tick the weather changes after one it didn't
 t_sql "UPDATE users SET currentaction = 'Exploring', latitude = 100, longitude = -100 $WQ"
 WN=; we_before=1
-for i in $(seq 0 60); do
-	T_NOW=$((WS + 60 * i)) t_get /
+for i in $(seq 0 360); do
+	T_NOW=$((WS + 10 * i)) t_get /
 	if grep -q 'class="explore-change"' "$BODY"; then
-		[ "$we_before" = 0 ] && { WN=$((WS + 60 * i)); break; }
+		[ "$we_before" = 0 ] && { WN=$((WS + 10 * i)); break; }
 	else
 		we_before=0
 	fi
 done
 [ -n "$WN" ] && t_ok || t_fail "no change in an hour on the storms' road"
 expect_body '<div class="explore-weather" data-r="explore-weather"><p class="explore-change">'
-# live: the page in the minute before, then in the minute of the change: the weather's
-# regions alone
+# live: the page in the tick before, then in the tick of the change: the weather's regions
+# alone
 T_NOW=$((WN - 1)) t_get /; expect_no_body 'class="explore-change"'
 t_live_page
 T_NOW=$((WN - 1)) t_live GET /

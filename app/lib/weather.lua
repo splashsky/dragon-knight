@@ -4,15 +4,15 @@
 -- grid of 10 x 10 tile cells, each with a base climate from the land at its centre (the
 -- biome's, lib/terrain.lua) and the time of day; every 45 minutes a storm may form near
 -- Midworld and drift to Gilead in about two hours, its position a closed-form function of
--- time. It moves in steps of weather.STEP ticks of the game's clock (lib/clock.lua): a
--- minute. The words are in lib/weather_lines.lua.
+-- time. It moves on the game's clock (lib/clock.lua), in steps of weather.STEP ticks: every
+-- tick, 10 seconds. The words are in lib/weather_lines.lua.
 local clock = require("lib.clock")
 local lines = require("lib.weather_lines")
 local terrain = require("lib.terrain")
 
 local weather = {}
 
-weather.STEP = 6               -- the weather moves every 6 clock ticks (a minute)
+weather.STEP = 1               -- the weather moves every clock tick (10 s)
 weather.SEED = 0x3200
 weather.CELL = 10              -- the grid's cells, in tiles
 weather.SPELL = 1200           -- a cell's base weather holds this long (the cells staggered)

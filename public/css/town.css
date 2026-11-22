@@ -16,21 +16,26 @@ body.minimal .charsheet { width: auto; min-width: 210px; }
 table.inventory { width: 100%; }
 table.inventory td + td { width: 100%; }
 
-/* the World Map (town/map.html): the land's picture with the towns and the player drawn on
-	it (in its units: a cell of 5 x 5 tiles each), and a legend under it */
+/* the World Map (town/map.html): the land's picture with the weather over it (town/sky.lua)
+	and the towns and the player drawn on it (in its units: a cell of 5 x 5 tiles each), and
+	legends under it. A storm's disc glides from one tick to the next (the page swaps
+	the overlay when the server's tick sends `sky`: windows.js) */
 .world-map { text-align: center; }
 .world-map-svg { display: block; width: 100%; max-width: 606px; height: auto; margin: 0 auto; }
-.world-map-axes { fill: none; stroke: #000; stroke-opacity: 0.25; stroke-width: 0.15; }
-.world-map-town circle { fill: #000; }
+.world-map-town circle { fill: #3b2a1a; stroke: #efe4c6; stroke-width: 0.3; }
 .world-map-town text {
-	font: bold 2.8px sans-serif;
-	fill: #000;
-	stroke: #fff;
-	stroke-opacity: 0.8;
-	stroke-width: 0.6px;
+	font: 700 2.9px Vollkorn, Georgia, serif;
+	fill: #2e2114;
+	stroke: #efe4c6;
+	stroke-opacity: 0.85;
+	stroke-width: 0.7px;
 	paint-order: stroke;
 }
 .world-map-you { fill: none; stroke: #c8141b; stroke-width: 0.6; }
+.world-sky .sky-storm { transition: transform 10s linear; }
+@media (prefers-reduced-motion: reduce) {
+	.world-sky .sky-storm { transition: none; }
+}
 .world-map-legend {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

@@ -122,7 +122,9 @@ admin monster editor (`resist.<element>` and `ward.<status>` overridable).
 now)` plus a fixed seed. Nothing is stored and nothing runs in the background.
 
 - **The clock** (`clock.lua`, the game's one source of time): a base tick of 10 s
-	(`clock.TICK`); the weather moves every 6 ticks (a minute). A game day lasts 2 real
+	(`clock.TICK`); the weather moves every tick, in real tick time (`weather.STEP` = 1;
+	at first every 6 ticks, a minute: changed during the work, at the owner's ask). A
+	game day lasts 2 real
 	hours, in four phases: `dawn`, `day`, `dusk`, `night` (night about a quarter of it).
 - **The grid**: the map (-250..250, `control.gamesize`) in cells of 10 x 10 tiles. Each
 	cell has a base climate from its place (fog more likely at dawn in the low south-west
@@ -144,7 +146,7 @@ now)` plus a fixed seed. Nothing is stored and nothing runs in the background.
 	where snow fell. Time is the phase. `storm` is the storm overhead (`{ size, name }`)
 	or nil, and `near` is the nearest storm within ~40 tiles that isn't overhead (`{
 	direction = "south-east", distance }`), for "thunder rumbles to the south-east".
-- **Changes**: `weather.change(lat, lon, now)` compares the weather step before with now
+- **Changes**: `weather.change(lat, lon, now)` compares the weather's step (the tick) before with now
 	and returns a flavor line when something changed (the sky, the ground, the phase, a
 	storm coming near or going). `weather.describe(w)` is the standing description. The
 	server tick asks whether a tile's weather changed between two times. The words live in
@@ -270,8 +272,9 @@ return {
 	time (`data-turn-ends`, `data-now`: the page works out its clock's offset). From 20 s
 	on, `fight.js` shows a quiet warning (a thin bar draining under the hotbar, say), and
 	nothing more. It is display only: the page never sends the timeout. The server does.
-- **Pushing**: when the tick changed a fight, or the weather at an online player's tile,
-	it publishes `stale` on `user:<id>`. live.js refreshes the page, and the fight page
+- **Pushing**: when the tick changed a fight, or the weather at an online player's tile
+	(checked every tick, since the weather moves every tick), it publishes `stale` on
+	`user:<id>`; and every tick `sky` on a public channel, for the World Map (part 7). live.js refreshes the page, and the fight page
 	shows the lines the tick added (kept in the fight's log). GETs stay pure: they show the
 	fight as the tick last left it, at most one tick old.
 - **Tests**: the clock can be pinned (test routes only). `POST /__test/tick` runs the
@@ -299,9 +302,19 @@ return {
 	suits them, never on a town.
 - **Every tile stays walkable**: lakes are waded and peaks climbed. Nothing about moving or
 	travelling changes, and no player is ever stranded where they stand.
-- **The map**: `/map` (and the World Map window) draws the grid in the biomes' colours, with
-	water, hills and mountains distinct, the towns marked and named, and the player's
-	position; it works without JavaScript and stays small.
+- **The map**: `/map` (and the World Map window) is a stylized topographic map in layers:
+	the land's picture (a static SVG drawn from the world's data, heights included: muted
+	biome tints on parchment, contour lines with index contours, hachures on hills and marks
+	on peaks, lakes and ponds with their shorelines, a compass rose, a scale bar, a neat
+	border), the weather over it, then the towns (named in the game's font) and the
+	player's position, with legends; it works without JavaScript.
+- **The weather on the map, in real time**: `GET /map/sky` (pure) is the weather now as an
+	SVG overlay (each weather cell's sky as washes, hatching and flecks, each storm alive
+	as a soft disc keyed by the storm, a wash for the time of day). The server's tick
+	publishes `sky` on a public channel every tick (the weather moves every tick); the map
+	window and the `/map` page fetch the overlay and swap it in, the storms gliding to their
+	new places over the tick's 10 s (CSS, not with reduced motion: the map trails the real
+	storm by at most a tick). The server renders every byte.
 - **Climate**: the biome under a tile leans the weather's climate (its sky and ground
 	vocabularies don't change): the base sky's chances, how long mud lasts, where snow
 	falls instead of rain (each biome's snow line), and how hard storms rain over it (the
@@ -358,10 +371,11 @@ never in the Dry Country and the Ashlands, rain instead) and on the peaks (decis
 storms rain a step harder over the Barrens (a squall's core there a thunderstorm, at most
 a thunderstorm or a blizzard). Every other biome's storms rain as their bands say.
 
-Features: lakes `#3f6fa3` and ponds `#5585b8` (deep blues, apart from the Shoals' teal;
-field `shallows`), hills (the biome's
-colour 12% darker, a hump; `hills`), peaks (30% darker, a peak with a pale cap; `peaks`).
-A tile's field is its feature's, else its biome's own.
+Features: lakes and ponds (field `shallows`; on the map water `#8fb2cc` with a darker
+shoreline `#3d6a93`, apart from the Shoals' tint), hills (`hills`; hachures down their
+slopes), peaks (`peaks`; hachures and a small peak mark). On the map the biomes are tints of
+their colours on the parchment (`#efe4c6`). A tile's field is its feature's, else its
+biome's own.
 
 | Field (group `terrain`) | Damage % | Statuses | Stats % |
 |---|---|---|---|
@@ -431,6 +445,10 @@ Cells of 5 x 5 tiles, 101 x 101, evaluated at their centres (every town at one).
 	of at most 4 cells. The widest stretch of one biome away from its town (a square 90%
 	of it, centred 50 tiles or more from the town) is 70 tiles (the Greymoor); the test
 	keeps it at 80 or less.
+- **Heights**: the data also keeps each cell's elevation (as the features see it, flattened
+	around the towns) in 36 steps of 0.02 from 0.20, a base-36 digit per cell (`height`):
+	hills are 21 to 27, peaks 28 and up, the towns' plateaus 15. The map's contours are
+	drawn from it, and anything later can read the land's height without the generator.
 - **Checking and changing it**: `tests/lua/test_terrain.lua` reruns v1 and requires the
 	committed `app/lib/terrain/world.lua` byte for byte; `tools/world.sh` writes it (and
 	the map's picture, `public/images/world.svg`, drawn from it). Until 3.2.0 is released,
@@ -460,7 +478,11 @@ Cells of 5 x 5 tiles, 101 x 101, evaluated at their centres (every town at one).
 	opposite one), so no stretch of one biome is much more than 80 tiles across away from
 	its town. The unit test checks coherence, the shares, the lakes and the widest stretch.
 8. The map reveals everything (every town and all the land), as the old picture did, and
-	marks the player.
+	marks the player. It is a topographic map (contours from the data's heights), with the
+	weather over it live: the tick's `sky` event once a weather step, the overlay
+	server-rendered (`/map/sky`), swapped in by the page. The towns' names are drawn by the
+	page over the weather (the picture as an image can't use the page's font, and the
+	names stay readable over the clouds).
 9. No terrain begins or ends lines: the Battlefield line shows the terrain field, and it
 	can't change in a fight (the player doesn't move). An encounter opens with a line of
 	the land instead.

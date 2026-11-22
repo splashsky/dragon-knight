@@ -2,8 +2,8 @@
 # the Location box names the biome and the feature; the exploring page says where the
 # player stands and what lies next door, in a region of its own; a fight on the land's
 # field (the Battlefield line, the fight's data, the encounter's first line); /help/fields
-# lists the terrain group. Places are found in the world's data (app/lib/terrain/world.lua:
-# permanent). Sourced by tests/run.sh.
+# lists the terrain group; the World Map's weather (/map/sky) and the tick's `sky` event.
+# Places are found in the world's data (app/lib/terrain/world.lua). Sourced by tests/run.sh.
 if ! t_has_sql || ! command -v python3 >/dev/null; then
 	t_section "terrain (skipped: needs sqlite3 or python3, and python3)"
 else
@@ -106,6 +106,30 @@ T_NOW=$((T_NOW + 600)) t_get /fight
 [ "$(t_sql "SELECT data FROM fights WHERE user_id = (SELECT id FROM users $TQ)")" = "$TE_DATA" ] && t_ok || t_fail "a GET moved the fight"
 t_fight_clear terrainer
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 $TQ"
+
+t_section "terrain: the World Map's weather (/map/sky)"
+t_jar terrain
+t_get /map/sky; expect_status 200; expect_header '^content-type: image/svg\+xml'
+expect_body '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 101 101"'
+expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+expect_body '<g class="sky-cells">'; expect_body '<g class="sky-storms">'
+# a pure function of the time: the same again; at night, the night's wash
+TE_SKY=$(md5sum < "$BODY"); t_get /map/sky; [ "$(md5sum < "$BODY")" = "$TE_SKY" ] && t_ok || t_fail "the same sky again"
+TE_NIGHT=$((T_START - T_START % 7200 + 6000))
+T_NOW=$TE_NIGHT t_get /map/sky; expect_body '<g class="sky-time sky-night"><rect '
+T_NOW=$((TE_NIGHT - 3000)) t_get /map/sky; expect_body '<g class="sky-time sky-day"></g>'
+t_reset_jar; t_get /map/sky; expect_redirect /login
+t_login terrainer terrainpw1
+
+t_section "terrain: the server's tick says the sky moved"
+# the weather moves every tick: every tick sends `sky` with its number on every stream, and
+# the overlay at that time shows that tick
+live_open tesky
+t_tick; live_has tesky "data: {\"tick\":$((T_NOW / 10))}"
+t_get /map/sky; expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+t_tick; live_has tesky "data: {\"tick\":$((T_NOW / 10))}"
+[ "$(live_count tesky 'event: sky')" = 2 ] && t_ok || t_fail "a sky event each tick: $(live_count tesky 'event: sky')"
+live_close tesky
 
 t_section "terrain: /help/fields"
 t_get /help/fields

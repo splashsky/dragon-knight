@@ -57,14 +57,19 @@ terrain.BIOMES = {
 			mud = 2 } },
 }
 
--- The features: key, name, colour on the map (hills and peaks: their biome's, darker), field.
--- Peaks are cold: falling weather is snow on them at any latitude, but where the climate
--- never snows (lib/weather.lua).
+-- The map's palette (the World Map, lib/terrain/picture.lua, and its legend): the paper, the
+-- ink of its lines and marks, the water and its shoreline. A biome shows as a tint of its
+-- colour on the paper (terrain.tint).
+terrain.PAPER, terrain.INK, terrain.WATER, terrain.SHORE = "#efe4c6", "#5a4630", "#8fb2cc", "#3d6a93"
+local TINT = 0.45   -- how much of a biome's colour shows over the paper
+
+-- The features: key, name, field. Peaks are cold: falling weather is snow on them at any
+-- latitude, but where the climate never snows (lib/weather.lua).
 terrain.FEATURES = {
-	{ key = "lake", name = "Lake", colour = "#3f6fa3", field = "shallows" },
-	{ key = "pond", name = "Pond", colour = "#5585b8", field = "shallows" },
-	{ key = "hill", name = "Hills", darker = 0.12, field = "hills" },
-	{ key = "peak", name = "Peaks", darker = 0.30, field = "peaks" },
+	{ key = "lake", name = "Lake", field = "shallows" },
+	{ key = "pond", name = "Pond", field = "shallows" },
+	{ key = "hill", name = "Hills", field = "hills" },
+	{ key = "peak", name = "Peaks", field = "peaks" },
 }
 
 local BIOME, FEATURE = {}, {}
@@ -76,18 +81,13 @@ function terrain.biome(key) return BIOME[key] end
 -- The feature `key` (its table above), or nil.
 function terrain.feature(key) return FEATURE[key] end
 
--- A colour `share` darker ("#adbb85", 0.12 -> "#98a575").
-local function darker(colour, share)
-	local out = {}
-	for hex in colour:gmatch("%x%x") do out[#out + 1] = ("%02x"):format(math.floor(tonumber(hex, 16) * (1 - share) + 0.5)) end
+-- A biome's tint on the map: its colour, TINT of it over the paper ("#adbb85" -> "#d1d0a7").
+function terrain.tint(biome)
+	local a, b, out = {}, {}, {}
+	for hex in BIOME[biome].colour:gmatch("%x%x") do a[#a + 1] = tonumber(hex, 16) end
+	for hex in terrain.PAPER:gmatch("%x%x") do b[#b + 1] = tonumber(hex, 16) end
+	for i = 1, 3 do out[i] = ("%02x"):format(math.floor(a[i] * TINT + b[i] * (1 - TINT) + 0.5)) end
 	return "#" .. table.concat(out)
-end
-
--- The map's colour of a biome with a feature (or none).
-function terrain.colour(biome, feature)
-	local b, f = BIOME[biome], feature and FEATURE[feature]
-	if not f then return b.colour end
-	return f.colour or darker(b.colour, f.darker)
 end
 
 -- What terrain.at returns, one table per biome and feature, by the data's characters.
@@ -102,7 +102,7 @@ for letter, key in pairs(world.biomes) do
 end
 
 local CELLS, HALF, byte = terrain.CELLS, terrain.CELL // 2, string.byte
-local LAND, RELIEF = world.land, world.relief
+local LAND, RELIEF, HEIGHT = world.land, world.relief, world.height
 
 -- The cell of a tile on one axis (-CELLS to CELLS).
 local function cell(n)
@@ -116,6 +116,15 @@ end
 function terrain.at(lat, lon)
 	local row, col = CELLS - cell(lat) + 1, cell(lon) + CELLS + 1
 	return PLACES[byte(LAND[row], col) * 256 + byte(RELIEF[row], col)]
+end
+
+terrain.HEIGHTS = 36   -- a cell's height runs from 0 to HEIGHTS - 1 (elevation 0.20 + 0.02 a step)
+
+-- The land's height at a tile: 0 to 35 (the data's base-36 digit; hills from 21, peaks from
+-- 28). The same for all 25 tiles of a cell.
+function terrain.height(lat, lon)
+	local b = byte(HEIGHT[CELLS - cell(lat) + 1], cell(lon) + CELLS + 1)
+	return b <= 57 and b - 48 or b - 87
 end
 
 -- The land's words (lib/terrain_lines.lua): a list's variant picked by a hash of the place

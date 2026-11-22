@@ -48,8 +48,30 @@ function T.the_world_is_generator_v1s_output_byte_for_byte()
 			" the world is permanent: a new world is a new generator)")
 	end
 	eq(world.generator, "v1"); eq(world.seed, 0x3300); eq(generator.SEED, world.seed)
-	eq(#world.land, 2 * CELLS + 1); eq(#world.relief, 2 * CELLS + 1)
-	for r = 1, #world.land do eq(#world.land[r], 2 * CELLS + 1); eq(#world.relief[r], 2 * CELLS + 1) end
+	eq(#world.land, 2 * CELLS + 1); eq(#world.relief, 2 * CELLS + 1); eq(#world.height, 2 * CELLS + 1)
+	for r = 1, #world.land do
+		eq(#world.land[r], 2 * CELLS + 1); eq(#world.relief[r], 2 * CELLS + 1); eq(#world.height[r], 2 * CELLS + 1)
+		assert(not world.height[r]:find("[^0-9a-z]"), "heights are base-36 digits: row " .. r)
+	end
+end
+
+-- The land's height (the data's height grid, 0 to 35) agrees with its features: hills from
+-- 21 to 27, peaks from 28, everything else below 21; it spans the range; and the towns stand
+-- on their plateaus (the elevation flattened to 0.5 around them: 15).
+function T.the_heights_agree_with_the_features()
+	local lo, hi = 99, -1
+	cells(function(i, j, here)
+		local h = terrain.height(i * CELL, j * CELL)
+		assert(math.type(h) == "integer" and h >= 0 and h < terrain.HEIGHTS, "a height from 0 to 35")
+		if h < lo then lo = h end
+		if h > hi then hi = h end
+		local where = here.biome .. "/" .. tostring(here.feature) .. " at " .. i * CELL .. "," .. j * CELL .. ": " .. h
+		if here.feature == "peak" then assert(h >= 28, where)
+		elseif here.feature == "hill" then assert(h >= 21 and h <= 27, where)
+		else assert(h <= 20, where) end
+	end)
+	assert(lo <= 2 and hi >= 33, ("heights from %d to %d"):format(lo, hi))
+	for _, t in ipairs(towns()) do eq(terrain.height(t.lat, t.lon), 15, "the plateau at " .. t.biome .. "'s town") end
 end
 
 -- public/images/world.svg is lib/terrain/picture.lua's drawing of the land (tools/world.sh
@@ -60,8 +82,11 @@ function T.the_worlds_picture_is_the_drawing_of_the_land()
 	f:close()
 	assert(svg == require("lib.terrain.picture").svg(),
 		"public/images/world.svg is not the drawing of the land: run tools/world.sh")
-	assert(#svg < 64 * 1024, "the picture stays small: " .. #svg .. " bytes")
-	for _, b in ipairs(terrain.BIOMES) do assert(svg:find(b.colour, 1, true), "the picture has " .. b.key) end
+	assert(#svg < 150 * 1024, "the picture stays small: " .. #svg .. " bytes")
+	for _, b in ipairs(terrain.BIOMES) do assert(svg:find(terrain.tint(b.key), 1, true), "the picture has " .. b.key) end
+	assert(svg:find(terrain.WATER, 1, true) and svg:find(terrain.SHORE, 1, true), "water with its shoreline")
+	assert(svg:find(">N</text>", 1, true) and svg:find(">100 tiles</text>", 1, true), "a compass rose and a scale bar")
+	assert(svg:find("viewBox=\"0 0 101 101\"", 1, true), "a cell a unit")
 end
 
 -- Integer arithmetic only, so every Lua 5.4 on every platform makes the same world.

@@ -756,11 +756,11 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 .dk-window-chat .chat-send:hover { background-color: rgba(255, 255, 255, 0.1); }
 
 /* the World Map (town/map.html): the map as large as the window allows, the legend under it */
-.dk-window-map { width: 540px; height: 680px; }
+.dk-window-map { width: 560px; height: 740px; }
 .dk-window-map .dk-modal-content { display: flex; flex: 1 1 auto; min-height: 0; padding: 6px; }
 .dk-window-map .world-map { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .dk-window-map .world-map-svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: none; }
-.dk-window-map .world-map-legend { flex: none; max-width: none; }
+.dk-window-map .world-map-legend { flex: none; max-width: none; margin-top: 4px; }
 
 /* the character sheet (town/character.html): its boxes one under the other, scrolling */
 .dk-window-stats { width: 280px; height: 520px; }

@@ -70,6 +70,10 @@ local ONE = 10 << 20
 local function hundredths(n) return n * ONE // 100 end
 local PEAK, HILL, LAKE, POND = hundredths(76), hundredths(62), hundredths(22), hundredths(89)
 local HALF = ONE // 2
+-- The heights in the data: the flattened elevation in HEIGHTS steps from HEIGHT_LOW (0.20)
+-- over HEIGHT_SPAN (0.72): 0.02 a step, the hills' line at 21, the peaks' at 28.
+local HEIGHTS, HEIGHT_LOW, HEIGHT_SPAN = 36, hundredths(20), hundredths(72)
+local DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
 local S = 4096          -- smoothstep's fixed point
 local MIDWORLD_CLEAR = { 16, 40 }   -- no feature within the first (tiles), fewer out to the second
 local TOWN_CLEAR = { 8, 24 }
@@ -283,7 +287,8 @@ local function pick(si, sj, lat, lon, borders, centres)
 	return #weights
 end
 
--- The cell at the tile (lat, lon) (a cell's centre): its biome index and feature.
+-- The cell at the tile (lat, lon) (a cell's centre): its biome index, feature and height
+-- (the flattened elevation in 36 steps of 0.02 from 0.20: 0 to 35).
 local function cell_of(lat, lon, points, elevation, basins, pools)
 	local biome
 	for i, b in ipairs(generator.BIOMES) do
@@ -303,12 +308,12 @@ local function cell_of(lat, lon, points, elevation, basins, pools)
 		end
 	end
 	-- the feature: none near a town, fewer toward one (flat: how much of the relief stays, in S)
-	local flat = S
+	local flat, clear_of_features = S, false
 	for _, b in ipairs(generator.BIOMES) do
 		if b.town then
 			local d2, clear = squared(lat, lon, b.town, 1), b.clear
-			if d2 < clear[1] * clear[1] then return biome, PLAIN end
-			if d2 < clear[2] * clear[2] then
+			if d2 < clear[1] * clear[1] then flat, clear_of_features = 0, true
+			elseif d2 < clear[2] * clear[2] then
 				local s = smooth(isqrt(d2) - clear[1], clear[2] - clear[1])
 				if s < flat then flat = s end
 			end
@@ -322,16 +327,20 @@ local function cell_of(lat, lon, points, elevation, basins, pools)
 	elev = HALF + (elev - HALF) * flat // S
 	basin = HALF + (basin - HALF) * flat // S
 	pool = HALF + (pool - HALF) * flat // S
-	if elev >= PEAK then return biome, PEAK_F end
-	if basin <= LAKE and elev < HILL then return biome, LAKE_F end
-	if elev >= HILL then return biome, HILL_F end
-	if pool >= POND and elev < HALF then return biome, POND_F end
-	return biome, PLAIN
+	local height = (elev - HEIGHT_LOW) * HEIGHTS // HEIGHT_SPAN
+	height = height < 0 and 0 or height >= HEIGHTS and HEIGHTS - 1 or height
+	if clear_of_features then return biome, PLAIN, height end
+	if elev >= PEAK then return biome, PEAK_F, height end
+	if basin <= LAKE and elev < HILL then return biome, LAKE_F, height end
+	if elev >= HILL then return biome, HILL_F, height end
+	if pool >= POND and elev < HALF then return biome, POND_F, height end
+	return biome, PLAIN, height
 end
 
--- The world: { land = { row, ... }, relief = { row, ... } }, rows from the north (latitude
--- 250) to the south, a character per cell from the west (longitude -250) to the east: the
--- biome's letter in land, the feature's character (or ".") in relief.
+-- The world: { land = { row, ... }, relief = { row, ... }, height = { row, ... } }, rows from
+-- the north (latitude 250) to the south, a character per cell from the west (longitude
+-- -250) to the east: the biome's letter in land, the feature's character (or ".") in
+-- relief, the height as a base-36 digit (0-9, a-z: 0 to 35) in height.
 function generator.world()
 	local borders = {}
 	for i = 1, #generator.BIOMES do borders[i] = noise(WIGGLE_STEP, 20 + i) end
@@ -349,17 +358,18 @@ function generator.world()
 	local elevation = { noise(48, 1), noise(24, 2), noise(12, 3) }
 	local basins = { noise(60, 4), noise(18, 5) }
 	local pools = noise(6, 6)
-	local land, relief = {}, {}
+	local land, relief, heights = {}, {}, {}
 	for i = generator.CELLS, -generator.CELLS, -1 do
-		local l, r = {}, {}
+		local l, r, h = {}, {}, {}
 		for j = -generator.CELLS, generator.CELLS do
-			local biome, feature = cell_of(i * generator.CELL, j * generator.CELL, points, elevation, basins, pools)
+			local biome, feature, height = cell_of(i * generator.CELL, j * generator.CELL, points, elevation, basins, pools)
 			l[#l + 1] = generator.BIOMES[biome].letter
 			r[#r + 1] = feature == PLAIN and "." or generator.FEATURES[feature].char
+			h[#h + 1] = DIGITS:sub(height + 1, height + 1)
 		end
-		land[#land + 1], relief[#relief + 1] = table.concat(l), table.concat(r)
+		land[#land + 1], relief[#relief + 1], heights[#heights + 1] = table.concat(l), table.concat(r), table.concat(h)
 	end
-	return { land = land, relief = relief }
+	return { land = land, relief = relief, height = heights }
 end
 
 -- The data module's text (app/lib/terrain/world.lua), as generator.world() makes it.
@@ -386,8 +396,10 @@ function generator.text()
 	for _, f in ipairs(generator.FEATURES) do chars[#chars + 1] = ("[%q] = %q"):format(f.char, f.key) end
 	out[#out + 1] = "\tfeatures = { " .. table.concat(chars, ", ") .. " },   -- \".\": none"
 	out[#out + 1] = "\t-- rows from the north (latitude 250) to the south; in a row, a cell's character from the"
-	out[#out + 1] = "\t-- west (longitude -250) to the east"
-	for _, part in ipairs({ "land", "relief" }) do
+	out[#out + 1] = "\t-- west (longitude -250) to the east: land its biome, relief its feature, height its"
+	out[#out + 1] = "\t-- elevation as a base-36 digit (0-9, a-z: 0 to 35; the elevation 0.20 + 0.02 a step,"
+	out[#out + 1] = "\t-- flattened around the towns: hills from 21, peaks from 28)"
+	for _, part in ipairs({ "land", "relief", "height" }) do
 		out[#out + 1] = "\t" .. part .. " = {"
 		for _, row in ipairs(w[part]) do out[#out + 1] = "\t\t\"" .. row .. "\"," end
 		out[#out + 1] = "\t},"

@@ -247,16 +247,14 @@ end
 
 -- The next tick the server's tick must advance fight f at: the next one while anything in
 -- it counts ticks (a status on anyone, an ally, a spell's field or one with on_tick), else
--- the player's turn's deadline, or the next step of the weather when that comes first (the
--- world's fields follow it: fight/fields.lua).
+-- the player's turn's deadline, or the first tick before it at which the weather would change
+-- the fight's fields (the world's follow it: fight/fields.lua fields.next_change).
 function state.due(f)
 	for _, c in ipairs(f.combatants) do
 		if c.side == "ally" or #c.statuses > 0 then return f.tick + 1 end
 	end
 	if fields.ticking(f) then return f.tick + 1 end
-	local change = fields.next_change(f)
-	if change and change < f.deadline then return change end
-	return f.deadline
+	return fields.next_change(f, f.deadline) or f.deadline
 end
 
 -- Writes the fight back (users' HP/MP/TP are the caller's: they belong to the users row).

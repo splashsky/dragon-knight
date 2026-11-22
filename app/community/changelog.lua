@@ -29,6 +29,7 @@ changelog.RELEASES = {
 			"Storms come less often: about one every hour and a half.",
 			"Rain and snow follow the land: the Hambry Weald and the Storm Barrens snow from further south, the Dry Country and the Ashlands never see snow, and storms break harder over the Barrens.",
 			"Each land has pockets of its neighbours' country, of a like climate: stands of the Weald in the Barrens, bog in the Shoals, ash fields in the Dry Country.",
+			"The World Map is a topographic map: contour lines, hatched hills and peaks, lakes with their shores, a compass rose and a scale. Over it the sky moves live, every ten seconds: clouds, rain, snow, fog and heat where they are, the storms gliding across the land, and the land darkening at dusk and night.",
 			"Judgement tells you how much it healed you again.",
 		},
 	},
