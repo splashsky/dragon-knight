@@ -1388,8 +1388,9 @@ mig_unserve "$MIG/v21server.log"
 
 t_section "migrate: version 22 database"
 # version 22 schema + its game data (version 21's seed: it didn't change) and a fight in
-# progress on the clock, without fields; only step 23 runs: the fields table, which the sync
-# fills, and the fight takes the weather's fields at its next tick.
+# progress on the clock, without fields; steps 23 and 24 run: the fields table, which the sync
+# fills (the fight takes the weather's fields at its next tick), and the 3.2 wares added to
+# the shops.
 V22_DB="$MIG/v22.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V22_DB\"#" "$CONFIG" > "$MIG/v22.lua"
 mig_script "$V22_DB" "$ROOT/tests/fixtures/schema_v22.sql"
@@ -1411,6 +1412,7 @@ mig_eq "PRAGMA user_version" "22" "fixture is version 22"
 "$BIN" migrate --config "$MIG/v22.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v22) failed: $(cat "$T/migrate.log")"
 grep -qE 'Migrating to version ([1-9]|1[0-9]|2[012]):' "$T/migrate.log" && t_fail "steps 1-22 ran on a version 22 database" || t_ok
 grep -qF "Migrating to version 23: fields" "$T/migrate.log" && t_ok || t_fail "step 23 not reported: $(cat "$T/migrate.log")"
+grep -qF "Migrating to version 24: the 3.2 wares" "$T/migrate.log" && t_ok || t_fail "step 24 not reported: $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v22 stamped"
 [ "$(mig_layout "$V22_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v22 schema differs from a fresh install:"
@@ -1420,6 +1422,14 @@ mig_eq "SELECT count(*) || '|' || sum(retired) FROM fields" "$(ls "$ROOT/app/con
 mig_eq "SELECT \"group\" || ':' || damage || ':' || statuses FROM fields WHERE key = 'downpour'" \
 	"sky:fire=-40,lightning=25,water=15:burning.blocked=1" "a field's data"
 mig_eq "SELECT round || ':' || data FROM fights" "3:" "the fight in progress has no fields yet"
+# step 24: the shops sell what a fresh install's do, by key, the ward draughts and gear whose files
+# come in the same release included (a key without an item is not sold, but is listed)
+[ "$(mig_sql "$V22_DB" "SELECT town_id || '|' || item_key FROM town_items ORDER BY 1")" = \
+	"$(mig_sql "$MIG/fresh.db" "SELECT town_id || '|' || item_key FROM town_items ORDER BY 1")" ] \
+	&& t_ok || t_fail "migrated v22 shops differ from a fresh install's"
+mig_eq "SELECT group_concat(item_key, ' ') FROM (SELECT item_key FROM town_items WHERE town_id = 8 AND item_key IN ('halo_charm', 'sentinel_charm', 'fire_ward_draught', 'frost_ward_draught') ORDER BY 1)" \
+	"fire_ward_draught halo_charm sentinel_charm" "Endworld's new wares"
+mig_eq "SELECT count(*) FROM items i JOIN town_items t ON t.item_key = i.key WHERE t.town_id = 4 AND i.key = 'rimefur_coat' AND i.retired = 0" "1" "a new ware is an item in its shop"
 mig_serve "$MIG/v22.lua" "$MIG/v22server.log"
 "$BIN" user --config "$MIG/v22.lua" passwd v22fight v22pass1 >/dev/null && t_ok || t_fail "dk user passwd (v22)"
 t_jar migv22; t_reset_jar

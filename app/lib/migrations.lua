@@ -1386,6 +1386,35 @@ CREATE TABLE fields (
 ]])
 end
 
+-- 24: the 3.2 wares (gear that resists elements and wards off statuses, elemental blades and the
+-- ward draughts): the same shop lists as a fresh install's (seed.sql), by key, added to the
+-- towns' (by their original ids) without touching anything else they sell. A key no item
+-- file has yet is simply not sold (items.town joins on the key).
+local V24_WARES = {
+	[2] = { "ember_ring", "serpent_ring", "wakeful_ring" },
+	[3] = { "ember_ring", "fire_ward_draught", "frost_ward_draught", "rime_ring", "serpent_ring",
+		"spark_ring", "wakeful_ring" },
+	[4] = { "fire_ward_draught", "flame_charm", "frost_charm", "frost_ward_draught", "rime_ring",
+		"rimefur_coat", "spark_ring", "storm_charm", "storm_ward_draught", "viper_charm", "wakeful_ring" },
+	[5] = { "cinder_blade", "cinder_shield", "fire_ward_draught", "flame_charm", "frost_charm",
+		"frost_ward_draught", "rimefur_coat", "shade_charm", "spark_ring", "storm_charm",
+		"storm_ward_draught", "viper_charm", "wakeful_ring" },
+	[6] = { "blessed_mace", "cinder_blade", "cinder_shield", "fire_ward_draught", "flame_charm",
+		"frost_charm", "frost_ward_draught", "halo_charm", "sentinel_charm", "shade_charm",
+		"storm_charm", "storm_ward_draught", "viper_charm" },
+	[7] = { "blessed_mace", "fire_ward_draught", "halo_charm", "sentinel_charm", "shade_charm",
+		"storm_charm", "storm_ward_draught" },
+	[8] = { "fire_ward_draught", "halo_charm", "sentinel_charm" },
+}
+
+local function v24_wares()
+	for town, keys in pairs(V24_WARES) do
+		for _, key in ipairs(keys) do
+			dk.db:exec("INSERT OR IGNORE INTO town_items (town_id, item_key) SELECT id, ? FROM towns WHERE id = ?", key, town)
+		end
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1428,6 +1457,8 @@ migrations.STEPS = {
 		up = v22_fights_on_the_clock },
 	{ name = "fields: effects on the whole battlefield (the weather's and spells'), a content kind; monsters' " ..
 		"loadout entries may weigh 0", up = v23_fields },
+	{ name = "the 3.2 wares: gear that resists elements and wards off statuses, elemental blades and ward draughts " ..
+		"in the towns' shops", up = v24_wares },
 }
 
 migrations.VERSION = #migrations.STEPS

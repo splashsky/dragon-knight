@@ -11,6 +11,7 @@ passages next, and the staff does not care whether anyone thinks that is wise.]]
 	category = "weapon",
 	price = 700,
 	attack = 6,
+	element = "frost",
 	casts = "frostbite",            -- the spell it casts (app/content/spells/frostbite.lua)
 	charges = 5,                    -- charges when full
 }

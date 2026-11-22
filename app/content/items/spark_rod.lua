@@ -11,6 +11,7 @@ the neighbours can see it.]],
 	category = "weapon",
 	price = 180,
 	attack = 3,
+	element = "lightning",
 	casts = "spark",                -- the spell it casts (app/content/spells/spark.lua)
 	charges = 8,                    -- charges when full
 }

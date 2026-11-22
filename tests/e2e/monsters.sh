@@ -202,6 +202,34 @@ t_sql "INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
 t_get /character; expect_no_body 'charsheet-affinities'
 
+t_section "monsters: gear that resists (the shops, a fire attack on a charm)"
+# Narcissa sells the Flame Charm and the Cinder Blade, with their lines; Midworld (a calm place
+# nearby) doesn't; worn, the charm's 25% shows on the sheet and the Red Slime's (override) fire
+# attack says "You resist fire."
+t_sql "UPDATE users SET currentaction = 'In Town', latitude = -130, longitude = -130 $MQ"
+t_get /shop; expect_status 200
+expect_body 'title="Flame Charm (1600 gold)"'; expect_body 'title="Cinder Blade (1400 gold)"'
+expect_body '<li>Fire Resistance +25%</li>'; expect_body '<li>Deals Fire damage</li>'
+t_sql "UPDATE users SET latitude = 0, longitude = 0 $MQ"
+t_get /shop; expect_no_body 'Flame Charm'
+t_calm monsterer
+t_sql "INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters', 'red_slime', 'attack_element', 'fire')"
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+t_items_clear monsterer; t_give monsterer flame_charm 1 accessory1
+t_sql "UPDATE users SET dexterity = 0 $MQ"
+t_get /character; expect_body '<span class="charsheet-affinities">Resists Fire (25%)</span>'
+t_fight monsterer "$(mon red_slime)" 100000
+t_get /fight; CS=$(t_csrf)
+MO_RESIST=
+for _ in $(seq 1 8); do
+	t_round "csrf=$CS&fight=Fight"
+	grep -qE 'The monster attacks you for [0-9]+ damage\.<br>You resist fire\.' "$BODY" && { MO_RESIST=1; break; }
+done
+[ -n "$MO_RESIST" ] && t_ok || t_fail "the fire attack on the Flame Charm has no line"
+t_fight_clear monsterer; t_items_clear monsterer
+t_sql "DELETE FROM content_overrides WHERE key = 'red_slime'; UPDATE users SET dexterity = 22500, currentaction = 'Exploring' $MQ"
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+
 t_section "monsters: the help page"
 t_get /help/monsters; expect_status 200
 expect_body '<th>Max MP</th><th>Affinities</th>'

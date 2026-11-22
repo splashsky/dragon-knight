@@ -2530,7 +2530,14 @@ Frost Staff, Ember Staff, Dawn Mace, Storm Lance; the Vigil Cuirass and Ward Shi
 protection), consumables for every town (Trail Snack, Travel Tea for TP, Sleep Powder, Fire
 Flask, Acid Vial, Hi-Potion, Hi-Ether, Elixir, tonics, Cure-All, Weakening Dust, Bitter
 Draught, Void Flask), market rings and charms, and drops at every level band (TP pieces,
-the four-piece Thornwood set with a cost on each, charms that cast).
+the four-piece Thornwood set with a cost on each, charms that cast). 3.2 added the gear that
+answers the elements and statuses ([Elements and wards](#elements-and-wards)): rings and
+charms that resist fire, frost, lightning, shadow or holy (+15% rings, +25% charms), rings
+and charms that ward off sleep, poison and venom (25-50%), an armor and a shield that resist
+one element and take its opposite badly (Rimefur Coat, Cinder Shield), the Cinder Blade (fire)
+and Blessed Mace (holy), and an `element` on the Ember Staff (fire), Frost Staff (frost), Spark
+Rod and Storm Lance (lightning); the towns near the monsters they answer sell them, with the
+three ward draughts (`seed.sql`, and step 24 of `migrations.lua` for existing databases).
 
 ```lua
 -- app/content/items/destiny_blade.lua (gear: equipped in its slot)

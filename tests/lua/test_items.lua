@@ -241,4 +241,52 @@ function T.display()
 	eq(#items.compare(brand), 2, "compared stat by stat: attack and strength")
 end
 
+-- The 3.2 gear: resistances and wards as modifiers, elemental weapons (key = { category, price,
+-- drop_level or 0, attack, defense, element, "its lines" }).
+local ELEMENTAL_GEAR = {
+	ember_ring = { "accessory", 300, 8, 0, 0, "neutral", "Fire Resistance +15%" },
+	rime_ring = { "accessory", 350, 12, 0, 0, "neutral", "Frost Resistance +15%" },
+	spark_ring = { "accessory", 450, 15, 0, 0, "neutral", "Lightning Resistance +15%" },
+	wakeful_ring = { "accessory", 600, 0, 0, 0, "neutral", "Sleep Ward +25%" },
+	serpent_ring = { "accessory", 450, 5, 0, 0, "neutral", "Poison Ward +25%, Venom Ward +25%" },
+	flame_charm = { "accessory", 1600, 0, 0, 0, "neutral", "Fire Resistance +25%" },
+	frost_charm = { "accessory", 1600, 0, 0, 0, "neutral", "Frost Resistance +25%" },
+	storm_charm = { "accessory", 2000, 0, 0, 0, "neutral", "Lightning Resistance +25%" },
+	shade_charm = { "accessory", 2400, 38, 0, 0, "neutral", "Shadow Resistance +25%" },
+	halo_charm = { "accessory", 2400, 0, 0, 0, "neutral", "Holy Resistance +25%" },
+	sentinel_charm = { "accessory", 2500, 0, 0, 0, "neutral", "Sleep Ward +50%" },
+	viper_charm = { "accessory", 1800, 0, 0, 0, "neutral", "Poison Ward +50%, Venom Ward +50%" },
+	rimefur_coat = { "armor", 1500, 0, 0, 75, "neutral", "Frost Resistance +40%, Fire Resistance -25%" },
+	cinder_shield = { "shield", 2200, 0, 0, 28, "neutral", "Fire Resistance +40%, Frost Resistance -25%" },
+	cinder_blade = { "weapon", 1400, 0, 55, 0, "fire", "Deals Fire damage" },
+	blessed_mace = { "weapon", 2400, 0, 70, 0, "holy", "Deals Holy damage" },
+	ember_staff = { "weapon", 1100, 0, 6, 0, "fire", "Deals Fire damage" },
+	frost_staff = { "weapon", 700, 0, 6, 0, "frost", "Deals Frost damage" },
+	spark_rod = { "weapon", 180, 0, 3, 0, "lightning", "Deals Lightning damage" },
+	storm_lance = { "weapon", 35000, 0, 150, 0, "lightning", "Deals Lightning damage" },
+}
+
+function T.resistance_ward_and_elemental_gear()
+	local k = load.kind("items")
+	local statuses = load.kind("statuses")
+	for key, o in pairs(ELEMENTAL_GEAR) do
+		local f = assert(k.by_key[key], "no item file " .. key)
+		eq(f.category, o[1], key .. " category"); eq(f.price, o[2], key .. " price")
+		eq(f.drop_level or 0, o[3], key .. " drop level"); eq(f.attack, o[4], key .. " attack")
+		eq(f.defense, o[5], key .. " defense"); eq(f.element, o[6], key .. " element")
+		eq(table.concat(items.affinity_lines({ element = f.element, modifiers = kind.modifiers(f) }), ", "), o[7],
+			key .. " lines")
+		for _, m in ipairs(kind.modifiers(f)) do
+			if m.kind == "ward" then assert(statuses.by_key[m.status], key .. ": no status " .. m.status) end
+			if m.kind == "resist" then assert(math.abs(m.amount) <= 40, key .. ": a resistance beyond 40") end
+		end
+	end
+	-- the shops sell what the migration adds (the same lists as seed.sql's)
+	local seed = io.open("app/sql/seed.sql"):read("a")
+	for _, key in ipairs({ "ember_ring", "cinder_blade", "blessed_mace", "fire_ward_draught", "frost_ward_draught",
+		"storm_ward_draught" }) do
+		assert(seed:find("'" .. key .. "');", 1, true), key .. " is in no shop in seed.sql")
+	end
+end
+
 return T

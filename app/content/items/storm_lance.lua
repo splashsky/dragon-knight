@@ -11,6 +11,7 @@ costs the Mage a turn of standing still, and the wire does not forgive a wet han
 	category = "weapon",
 	price = 35000,
 	attack = 150,
+	element = "lightning",
 	casts = "lightning_lance",      -- the spell it casts (app/content/spells/lightning_lance.lua)
 	charges = 4,                    -- charges when full
 }

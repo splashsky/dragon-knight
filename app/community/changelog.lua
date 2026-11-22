@@ -18,6 +18,7 @@ changelog.RELEASES = {
 			"A new Guard action, always on key 9: it costs your turn and softens the blows you take until your next one. Your own hotbar keys are 2 to 8.",
 			"Effects that last outside fights, like the Regen Potion's, wear off with time instead of with your steps.",
 			"The weather reaches into fights: rain dampens fire and feeds lightning, a downpour puts fires out before they catch, the heat makes burns worse, mud and ice slow everyone down, fog dulls blades, and night favours shadow. The battlefield changes as the weather moves, in the middle of a fight, and some spells and monsters change it on purpose. The fight page shows the battlefield under the monster, and a new help page lists every kind (schema version 23, run dk migrate).",
+			"New gear to face the elements: rings and charms that resist fire, frost, lightning, shadow or holy light, and others that ward off sleep or poison, a frost-lined coat and an ember shield with a weakness each, and two blades that strike with fire and holy light. The casting staves and the Dawn Mace strike with their spell's element too. Look for them in the markets past Roma, and a few as monster drops (schema version 24, run dk migrate).",
 			"Judgement tells you how much it healed you again.",
 		},
 	},

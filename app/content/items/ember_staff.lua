@@ -11,6 +11,7 @@ Most of them learn to leave the cup off by their second winter.]],
 	category = "weapon",
 	price = 1100,
 	attack = 6,
+	element = "fire",
 	casts = "ember",                -- the spell it casts (app/content/spells/ember.lua)
 	charges = 6,                    -- charges when full
 }

@@ -11,6 +11,7 @@ point out that the mace is heavy and the sun is not, so the blessing is the easy
 	category = "weapon",
 	price = 7000,
 	attack = 110,
+	element = "holy",               -- its blows strike with holy light, like the spell it casts
 	casts = "judgement",           -- the spell it casts (app/content/spells/judgement.lua)
 	charges = 3,                    -- charges when full
 }

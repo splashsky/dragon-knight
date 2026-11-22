@@ -365,3 +365,19 @@ public/images/summons/bear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characte
 public/images/summons/golem.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Giant_StoneGolem.png	-
 public/images/summons/spirit.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	-
 public/images/summons/wolf.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_07.png	-
+public/images/items/blessed_mace.png	Icons/MedievalIcons/WeponMedieval/MetalHammer2.png	--sat 0.15 --bright 1.15
+public/images/items/cinder_blade.png	Icons/MedievalIcons/WeponMedieval/OldSword.png	-
+public/images/items/cinder_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_12.png	-
+public/images/items/ember_ring.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_22_bronze_ring.png	-
+public/images/items/flame_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_15_greatredcrystal.png	-
+public/images/items/frost_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_07_pearl.png	-
+public/images/items/halo_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_17_brilliant.png	-
+public/images/items/rime_ring.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_25_little_ring.png	-
+public/images/items/rimefur_coat.png	Icons/MedievalIcons/ArmorMedieval/Vest.png	--sat 0.6
+public/images/items/sentinel_charm.png	Icons/ProfessionIcons/LootIcons/Loot_73.png	-
+public/images/items/serpent_ring.png	Icons/ArmorIcons/RingAndNeck_Icons/bracelet_b_06.png	-
+public/images/items/shade_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_09_blackcrystal.png	-
+public/images/items/spark_ring.png	Icons/ArmorIcons/RingAndNeck_Icons/bracelet_b_06.png	-
+public/images/items/storm_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_02_yellowcrystal.png	-
+public/images/items/viper_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_04_greencrystal.png	-
+public/images/items/wakeful_ring.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_22_bronze_ring.png	-
