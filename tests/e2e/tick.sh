@@ -39,7 +39,16 @@ w_has region fight-clock; w_lacks region main
 t_get /static/js/fight.js; expect_body 'data-turn-ends'
 
 t_section "tick: a turn that runs out is a Guard, told to the player's pages"
-t_get /fight; ROUND=$(t_sql "SELECT $T_ROUND FROM users $TQ"); HP=$(t_sql "SELECT currenthp FROM users $TQ")
+# a known fight, so the page's lines are known: a Blue Slime (attack only, no turn's
+# chatter) with HP to spare, at a calm place (no weather's field), with an empty log (the
+# encounter's opening words would share the guard's paragraph: the log is the lines since
+# the player's last command), put on the clock by its first POST
+t_fight_clear ticker; t_calm ticker
+t_fight ticker 1 300
+t_sql "UPDATE fight_combatants SET maxhp = 300 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $TQ)"
+t_get /fight; t_round "csrf=$(t_csrf)&continue=Continue"
+tk_is "(SELECT tick || ':' || deadline FROM fights f WHERE f.user_id = users.id)" "$TICK0:$((TICK0 + 3))"
+ROUND=$(t_sql "SELECT $T_ROUND FROM users $TQ"); HP=$(t_sql "SELECT currenthp FROM users $TQ")
 live_open tk
 # GETs show the fight as the tick left it: the time passing doesn't play the turn
 T_NOW=$((T_NOW + 60)) t_get /fight; expect_no_body 'You hesitate'; tk_is "$T_ROUND" "$ROUND"
