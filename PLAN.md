@@ -535,9 +535,10 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 server tick and fights in real time (schema version 22), ✅ C fields (schema version 23),
 	 ✅ content: new spells, statuses and gear (schema version 24), monster patterns, lore and
 	 flavor.
-11. **3.3 interactables and targeting** (`docs/plans/interactables.md`): I the target picker,
-	 objects on the field, wind, area actions, monsters aiming at objects; then the objects'
-	 content, lore and flavor.
+11. **3.3 interactables and targeting** (`docs/plans/interactables.md`): ✅ I the target picker,
+	 objects on the field, wind, area actions, monsters aiming at objects (schema version 25);
+	 ✅ K the ten objects and the barrel (schema version 26), area spells, monsters using
+	 objects; ✅ L lore.
 
 ## Definition of done
 

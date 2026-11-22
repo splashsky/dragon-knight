@@ -189,3 +189,23 @@ refuses an immune target, and the water hit is what sets it off); the Beehive's 
 are four (sun or heat on open ground, sun or heat on the hills and in the shallows, under the
 trees, the Weald's hills and shallows). Monster patterns, area spells, Gale and Knock Over
 are K2 and later.
+
+✅ **K2. Area actions** (`docs/APP.md` "Spells", "Fields"): Rockfall, Starfall, Whiteout,
+Inferno, the four breaths and Deluge hit every foe and object (`area = true`, a roll and an
+immunity check per target, the cost paid once); their weakening, venom and withering riders
+go to creatures only, burning to objects too (it lights a barrel). New: Hail and Cyclone
+(Mage 46 and 52), Whirlwind (Warrior 44), Radiance (Paladin 58), the Gale (Mage 32: a sky
+field of wind 3 that puts out no fires) and the monsters' Knock Over (aimed at an object);
+Gale and Hail switched off for the liches and the Nihilist.
+
+✅ **K3. Monsters and objects** (`tests/lua/test_object_patterns.lua` plays them in seeded
+fights): footpads and deserters place a barrel on their second turn and light it from the
+third, never in damp air or when the player couldn't take two (three) blasts; bears knock a
+hive over the player; the troll, ogre, giant and titan topple a stone (player above 45% of
+max HP) or a dead tree (above 30%) over the player; knights raise one War Standard on their
+first turn; the Aqua Elemental quenches a vent while the player is above 40% HP; the Bog
+Witch bursts a gas pocket while the player isn't poisoned. Each speaks a tell. e2e fixtures
+that must only attack use the Creature.
+
+✅ **L. Lore**: the ten objects, the four statuses, the six spells, the two items and the
+Gale.
