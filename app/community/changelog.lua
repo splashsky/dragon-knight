@@ -8,6 +8,11 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.2.0", date = "unreleased",
+		changes = {
+		},
+	},
+	{
 		version = "3.1.0", date = "11.21.2026",
 		changes = {
 			"The page is at most 1200 pixels wide, so it stays together on wide screens.",

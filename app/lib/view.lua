@@ -16,7 +16,7 @@ local wire = require("lib.wire")
 
 local view = {}
 
-view.GAME_VERSION = "3.1.0"
+view.GAME_VERSION = "3.2.0-dev"
 view.BUILD = "C/Lua"
 
 -- Base helpers. Templates see these after ctx (names resolve scratch -> ctx -> h).
