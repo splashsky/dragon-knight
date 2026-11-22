@@ -155,12 +155,11 @@ function game.gear_rows(equipped)
 	return rows
 end
 
--- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
-function game.nav(user)
-	local town = user.currentaction == "In Town" and game.current_town(user) or nil
-	local s = game.stats(user)
-	-- HP is coloured by how full it is (as the original bars were); MP and TP have their own
-	-- colours. low: the number blinks (HP and MP at or below a fifth, as in the original).
+-- The HP, MP and TP bars of a character (`s`: its effective stats, game.stats): { key =
+-- "hp"|"mp"|"tp", label, value, max, width, tone, low }. HP is coloured by how full it is
+-- (as the original bars were); MP and TP have their own colours. low: the number blinks
+-- (HP and MP at or below a fifth, as in the original).
+function game.bars(user, s)
 	local bars = {}
 	for _, b in ipairs({
 		{ key = "hp", label = "HP", value = user.currenthp, max = s.maxhp, low = game.is_low(user.currenthp, s.maxhp) },
@@ -171,6 +170,14 @@ function game.nav(user)
 		b.width, b.tone = bar.width, b.tone or bar.level
 		bars[#bars + 1] = b
 	end
+	return bars
+end
+
+-- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
+function game.nav(user)
+	local town = user.currentaction == "In Town" and game.current_town(user) or nil
+	local s = game.stats(user)
+	local bars = game.bars(user, s)
 	return {
 		user = user,
 		stats = s,

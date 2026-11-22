@@ -1,0 +1,62 @@
+{#- A drop on offer (routes/fight.lua drop_offer): the shop's purchase look (town.css .buy):
+		the item's picture and name (its tooltip), its kind; what it changes against the piece
+		worn in its slot, or what it gives, or does; then the choices as large buttons, each
+		saying what happens: equip it (into its slot, the first empty accessory slot, or with
+		all three taken in place of one: the piece there goes into the bag), into the bag
+		("Make room" when it's full: the bag in a dialog, to discard something), or leave it.
+		One that can't be taken says why. ctx: offer { drop, icon, kind, old, stats, effects,
+		description, equips { slot, label, old, ok, accessory }, bag_room, error }. -#}
+<div class="buy drop-offer">
+<div class="buy-head">
+<span class="buy-tile"><img src="{{ offer.icon }}" width="48" height="48" alt=""></span>
+<span class="buy-name"><b class="tip-term" data-tip tabindex="0">{{ offer.drop.name }}{{{ tip("item", offer.drop) }}}</b><span class="buy-kind">{{ offer.kind }}</span></span>
+</div>
+{%- if offer.description and offer.description ~= "" then %}
+<div class="buy-about">{{{ paragraphs(offer.description) }}}</div>
+{%- end %}
+{%- if #offer.stats > 0 and offer.old then %}
+<table class="buy-compare">
+<thead><tr><td></td><th scope="col">Your {{ offer.old.item.name }}</th><th scope="col">The {{ offer.drop.name }}</th></tr></thead>
+<tbody>
+{%- for _, r in ipairs(offer.stats) do %}
+<tr><th scope="row">{{ r.label }}</th><td>{{ r.old }}</td><td>{{ r.new }}{% if r.delta then %} <span class="buy-{{ r.better and "up" or "down" }}">({{ r.delta }})</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+{%- elseif #offer.stats > 0 then %}
+<ul class="buy-gives">
+{%- for _, r in ipairs(offer.stats) do %}
+<li>{{ r.label }} <b>{{ r.new }}</b></li>
+{%- end %}
+</ul>
+{%- end %}
+{%- if #offer.effects > 0 then %}
+<ul class="buy-effects">
+{%- for _, e in ipairs(offer.effects) do %}
+<li>{{ e }}</li>
+{%- end %}
+</ul>
+{%- end %}
+{%- if offer.error then %}
+<p class="error" role="alert">{{ offer.error }}</p>
+{%- end %}
+<form class="buy-form" action="/drop" method="post">
+{{{ csrf_field() }}}
+<div class="buy-choices">
+{%- for _, c in ipairs(offer.equips) do %}
+{%- local title = (c.old and c.accessory) and ("Equip it in place of your " .. c.old.item.name) or "Equip it" %}
+{%- if c.ok then %}
+<button class="buy-choice" type="submit" name="equip" value="{{ c.slot }}"><b>{{ title }}</b><span>{% if c.old then %}Your {{ c.old.item.name }} goes into your bag.{% elseif c.accessory then %}It goes into accessory {{ c.label:lower() }}.{% else %}You wear it at once.{% end %}</span></button>
+{%- else %}
+<div class="buy-choice buy-choice-off"><b>{{ title }}</b><span>No room in your bag for your {{ c.old.item.name }}.</span></div>
+{%- end %}
+{%- end %}
+{%- if offer.bag_room then %}
+<button class="buy-choice" type="submit" name="take" value="Take"><b>Put it in your bag</b><span>{% if #offer.equips > 0 then %}Equip it later from your inventory.{% else %}Use it later, in a fight or from your inventory.{% end %}</span></button>
+{%- else %}
+<a class="buy-choice" href="/drop/room" data-modal><b>Make room</b><span>Your bag is full: discard something to take the {{ offer.drop.name }}.</span></a>
+{%- end %}
+<button class="buy-choice drop-leave" type="submit" name="leave" value="Leave"><b>Leave it</b><span>It stays behind.</span></button>
+</div>
+</form>
+</div>

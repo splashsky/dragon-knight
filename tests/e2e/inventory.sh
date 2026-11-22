@@ -55,7 +55,11 @@ t_register invhero invpw1 invhero@example.com InvHero 1
 t_login invhero invpw1
 t_get /;                          expect_body 'href="/inventory">Inventory</a>'; expect_body '<span class="invpanel-count"><b>0</b>/12</span></a>'
 TC=$(t_csrf)
-t_get /inventory;                 expect_status 200; expect_body 'Bag (0 / 12)'; expect_body 'Attack Power: <b>5</b>'
+t_get /inventory;                 expect_status 200; expect_body 'Bag (0 / 12)'
+# the head: the character as the Character panel shows it, the fighting stats as tiles
+expect_body '<div class="inv-sheet">'; expect_body '<span class="meter-label">HP</span>'
+expect_body '<span class="inv-stat-value">5</span><span class="inv-stat-label">Attack</span>'
+expect_body '<dt>Next level</dt>'
 [ "$(grep -c 'inv-cell inv-free' "$BODY")" = 12 ] && t_ok || t_fail "12 free slots expected"
 for s in Weapon Armor Shield 'Slot 1' 'Slot 2' 'Slot 3'; do expect_body "<td class=\"inv-slot\">$s:</td>"; done
 iv_sql "UPDATE users SET currentaction = 'Fighting'"
@@ -84,6 +88,8 @@ expect_no_body 'is in your bag now'
 
 t_section "inventory: accessories in three slots"
 for k in life_pebble magic_pebble dragons_claw dragons_tear; do t_give invhero "$k"; done
+# while an accessory slot is free, Equip alone (it goes into the first free one)
+t_get /inventory; grep -qF 'name="slot"' "$BODY" && t_fail "a slot choice while slots are free" || t_ok
 for k in life_pebble magic_pebble dragons_claw; do
 	t_post "/inventory/equip/$(iv_entry "$k")" "csrf=$TC&slot=0"; expect_body 'You equipped the'
 done
@@ -94,6 +100,8 @@ iv_is "(SELECT group_concat(e) FROM (SELECT ui.equipped || '=' || i.key AS e FRO
 expect_stats "25 15 10 5 5 34 5" "three accessories"
 t_get /;                          expect_body 'Slot 1: Life Pebble'; expect_body 'Slot 3: Dragon&#39;s Claw'
 TEAR=$(iv_entry dragons_tear)
+# all three taken: the page offers the slots, in place of what is in each
+t_get /inventory;                 expect_body 'Equip in place of: <button type="submit" name="slot" value="1">Life Pebble</button> <button type="submit" name="slot" value="2">Magic Pebble</button>'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=0"; expect_body 'All three accessory slots are in use.'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=4"; expect_body 'Cheat attempt detected.'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=2"
@@ -174,15 +182,18 @@ grep -qF 'name="qty"' "$BODY" && t_fail "a stack with room for 1 offers a quanti
 t_post /shop/buy/66 "csrf=$TC&submit=Buy"; expect_body 'Thank you for purchasing this item.'
 t_get /shop/buy/66;               expect_body 'Your bag is full.'
 # quest items always fit, even in a full bag (a quest can't be blocked)
+t_fight_clear invhero   # (no victory page: the drop's own page)
 iv_sql "UPDATE users SET dropcode = (SELECT id FROM items WHERE key = 'test_key')"
-t_get /drop;                      expect_body 'name="take" value="Take it"'; expect_no_body 'Your bag is full'
+t_get /drop;                      expect_body 'name="take" value="Take"'; expect_no_body 'Make room'
 t_post /drop "csrf=$TC&take=x";   expect_body 'The Old Key is in your bag.'
-# a gear drop into a full bag: discard first; quest items are not offered
+# a gear drop into a full bag: make room first (the bag, to discard something); quest items
+# are not offered
 iv_sql "UPDATE users SET dropcode = (SELECT id FROM items WHERE key = 'ruby')"
-t_get /drop;                      expect_body 'Your bag is full.'; expect_no_body "value=\"$KEY\""
-t_post /drop "csrf=$TC&take=x&discard=$KEY"; expect_body '<p class="error">Select an item from your bag to discard.</p>'
+t_get /drop;                      expect_body '><b>Make room</b><span>Your bag is full: discard something to take the Ruby.</span>'
+t_get /drop/room;                 expect_body 'name="discard" value="'; expect_no_body "value=\"$KEY\""
+t_post /drop "csrf=$TC&take=x&discard=$KEY"; expect_body 'Choose an item from your bag to discard.'
 iv_is dropcode "$(t_sql "SELECT id FROM items WHERE key = 'ruby'")"
-t_post /drop "csrf=$TC&leave=x";  expect_redirect /
+t_post /drop "csrf=$TC&leave=x";  expect_body 'You left the Ruby behind.'
 # the admin setting
 t_jar invadmin; t_reset_jar
 t_login "$ADMIN_USER" "$ADMIN_PASS"

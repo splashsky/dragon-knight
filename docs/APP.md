@@ -2175,9 +2175,22 @@ return {
 	a new one, and the gold). The Sell section buys any sellable bag item.
 - Drops: a victory without a level-up drops an item 1 in 30 times, picked uniformly among
 	the non-retired droppable items with `drop_level` at or below the monster's level (the
-	original drops' odds). `users.dropcode` holds it until the player takes it into the bag
-	(`/drop`; with a full bag, after discarding a bag item) or leaves it (moving on drops it
-	too).
+	original drops' odds). `users.dropcode` holds it until the player takes it, equips it
+	or leaves it (moving on drops it too).
+- The drop card (3.1, `fight/drop_offer.html`, `routes/fight.lua` `drop_offer`): the
+	victory page shows it at once (a level-up's too): the purchase's look (`town.css .buy`:
+	the picture and name with its tooltip, its kind; what it changes against the piece worn
+	in its slot, or what it gives, or does) and the choices as large buttons, `POST /drop`:
+	**Equip it** (`equip=<slot>`: into its slot, or an accessory into the first empty
+	accessory slot; with all three taken, one choice per slot, "in place of" what is there;
+	the piece it replaces goes into the bag, so that needs room: otherwise the choice says
+	"No room in your bag for your Club"; equipping into an empty slot needs none), **Put it
+	in your bag** (`take`) or, with a full bag, **Make room** (`GET /drop/room`, a dialog:
+	the bag but quest items, each with a Discard button that throws the stack away and takes
+	the drop, `take` + `discard=<entry>`), and **Leave it** (`leave`). What became of it is
+	kept on the victory page (`fights.result.drop_note`: "The Branch is in your bag.") and
+	the answer leads back there (`/victory`); a refusal shows on the card. `GET /drop` leads
+	to the victory page; without one (its fight gone) the card has a page of its own.
 - Deleting an item file retires the item: shops stop selling it and monsters stop dropping
 	it; characters keep theirs, and equipped retired items still count (a retired
 	consumable can't be used: its code was the file).
@@ -2192,7 +2205,7 @@ and `messages` and `data` into tables.
 | `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
 | `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
-| `items.signed(stat, n)`, `items.compare(item, old)`, `items.category_label(item)` | `"+5"`, `"+10%"`; wearing `item` instead of `old` stat by stat (`{ stat, label, new, old, delta }`: the shop's tooltips and the purchase); "Weapon", "Consumable" |
+| `items.signed(stat, n)`, `items.compare(item, old)`, `items.compare_view(item, old)`, `items.category_label(item)` | `"+5"`, `"+10%"`; wearing `item` instead of `old` stat by stat (`{ stat, label, new, old, delta }`: the shop's tooltips) and as text (the purchase and the drop card); "Weapon", "Consumable" |
 | `items.icon(item)`, `items.icon_url(item)` | its picture's URL, or nil / the default icon |
 | `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])`, `items.rechargeable(item)` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "3/5 Charges" [, "Single use"] }`; an inn refills it |
 
@@ -2213,10 +2226,16 @@ an item that casts, see [Items](#items)), equipped in a slot
 	quest can't be blocked by a full bag). Topping up a stack that isn't full
 	(`qty < max_stack`) is always allowed (`inventory.room`).
 - Equipping a bag item swaps it with what is in the slot (never needs a free slot);
-	accessories pick slot 1-3 or the first free one. Unequipping needs room in the bag.
+	an accessory goes into the first empty accessory slot (the page's Equip sends no slot),
+	and only with all three taken does the page offer the slots ("Equip in place of:" a
+	button per accessory worn, `slot=1-3`). Unequipping needs room in the bag.
 	After any equipment change current HP/MP/TP are clamped to the new maxima
 	(`inventory.changed`).
-- `/inventory` (link in the left nav, and "Bag: n / 12" in the right one) shows the slots
+- `/inventory` (link in the left nav, and "Bag: n / 12" in the right one) opens with the
+	character (3.1, `.inv-sheet`: name, level and class, the HP/MP/TP bars of the Character
+	panel, `game.bars`, experience, the next level and gold with their bonuses, from
+	`town/character.lua` `character.sheet`; the fighting stats as tiles: Attack, Defense,
+	Strength, Dexterity), then shows the slots
 	and the bag grid (free slots drawn) with equip, unequip, use and discard (confirmation;
 	how many for a stack; not quest items). Every action is a POST that renders the page
 	with what happened.

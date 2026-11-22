@@ -123,12 +123,7 @@ function shop.confirm(req, params)
 	if not o then return err end
 	local it, gold = o.item, req.user.gold
 	o.icon, o.kind, o.gold = items.icon_url(it), items.category_label(it), gold
-	o.stats = {}
-	for _, c in ipairs(items.compare(it, o.old and o.old.item)) do
-		o.stats[#o.stats + 1] = { label = c.label, new = c.new and items.signed(c.stat, c.new) or "—",
-			old = c.old and items.signed(c.stat, c.old) or "—",
-			delta = c.delta ~= 0 and items.signed(c.stat, c.delta) or nil, better = c.delta > 0 }
-	end
+	o.stats = items.compare_view(it, o.old and o.old.item)
 	o.effects = {}
 	if it.category == "consumable" and (it.description or "") ~= "" then o.effects[1] = it.description end
 	for _, l in ipairs(items.charge_lines(it)) do o.effects[#o.effects + 1] = l end

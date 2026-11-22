@@ -155,12 +155,13 @@ function encounter.victory_page(res)
 	local ctx = { defeated = res.defeated or "", r = {
 		exp = res.exp or 0, gold = res.gold or 0, warnexp = res.warnexp or "", warngold = res.warngold or "" } }
 	if (res.said or "") ~= "" then ctx.said = { by = res.said_by or "", text = res.said } end
+	ctx.dropped = res.dropped
+	if (res.drop_note or "") ~= "" then ctx.drop_note = res.drop_note end   -- what became of the drop
 	if res.levelup then
 		ctx.levelup = { levels = res.levels, hp = res.hp, mp = res.mp, tp = res.tp, strength = res.strength,
 			dexterity = res.dexterity, learned = res.learned }
 		return "Courage and Wit have served thee well!", ctx
 	end
-	ctx.dropped = res.dropped
 	return "Victory!", ctx
 end
 

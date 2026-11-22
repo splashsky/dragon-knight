@@ -209,6 +209,18 @@ function items.compare(it, old)
 	return rows
 end
 
+-- items.compare as the purchase and the drop card show it: { label, new, old (as text, "—"
+-- when the item has none), delta (text, nil when 0), better }.
+function items.compare_view(it, old)
+	local out = {}
+	for _, c in ipairs(items.compare(it, old)) do
+		out[#out + 1] = { label = c.label, new = c.new and items.signed(c.stat, c.new) or "—",
+			old = c.old and items.signed(c.stat, c.old) or "—",
+			delta = c.delta ~= 0 and items.signed(c.stat, c.delta) or nil, better = c.delta > 0 }
+	end
+	return out
+end
+
 -- "Max HP +10", "Gold Bonus +10%", "Strength -5".
 function items.stat_line(stat, amount)
 	return (items.STAT_LABELS[stat] or stat) .. " " .. items.signed(stat, amount)

@@ -1,16 +1,41 @@
 {#- Inventory (town/inventory.lua). ctx: slots { slot, label, entry, attributes, icon (the
 		item's picture, or nil) }, cells (bag entries: entry, item, gear, accessory, quest,
 		usable, lines, icon: the item's picture or the default one), used, size, empty (free
-		slots to draw), u (fresh users row), s (effective stats), notice (lines) or nil. Item
-		names carry the item's tooltip (docs/APP.md "Tooltips"). -#}
+		slots to draw), u (fresh users row), s (effective stats), sheet (town/character.lua's
+		sheet, with bars: game.bars), free_accessory (an accessory slot is empty: Equip puts it
+		there; else "in place of" buttons, accessories { n, name }), notice (lines) or nil.
+		Item names carry the item's tooltip (docs/APP.md "Tooltips"). The head is the
+		character: name, level and class, the HP/MP/TP bars, experience, the next level and
+		gold (with their bonuses), then the fighting stats as tiles. -#}
 <section class="box inv">
 <h1 class="title page-title">{{{ art("inventory", "Inventory") }}}</h1>
 <div class="box-body">
 {%- if notice then %}
 <p class="inv-notice">{% for i, line in ipairs(notice) do %}{% if i > 1 then %}<br>{% end %}{{ line }}{% end %}</p>
 {%- end %}
-<p>Attack Power: <b>{{ s.attack }}</b> &middot; Defense Power: <b>{{ s.defense }}</b> &middot;
-HP: {{ u.currenthp }} / {{ s.maxhp }} &middot; MP: {{ u.currentmp }} / {{ s.maxmp }} &middot; TP: {{ u.currenttp }} / {{ s.maxtp }}</p>
+<div class="inv-sheet">
+<div class="inv-sheet-who">
+<div class="inv-sheet-name"><b>{{ u.charname }}</b> <span class="inv-sheet-class">Level {{ u.level }}{% if sheet.charclass then %} {{ sheet.charclass }}{% end %}</span></div>
+{%- for _, b in ipairs(sheet.bars) do %}
+<div class="meter">
+<span class="meter-label">{{ b.label }}</span>
+<span class="meter-track"><span class="meter-fill bar-{{ b.tone }}" style="width: {{ b.width }}%"></span></span>
+<span class="meter-value{% if b.low then %} highlight{% end %}"><b>{{ b.value }}</b>/{{ b.max }}</span>
+</div>
+{%- end %}
+<dl class="inv-sheet-meta">
+<dt>Experience</dt><dd>{{ sheet.experience }}{% if sheet.plusexp then %} <span class="light">{{ sheet.plusexp }}</span>{% end %}</dd>
+<dt>Next level</dt><dd>{% if sheet.nextlevel then %}{{ sheet.nextlevel }}{% else %}<span class="light">None</span>{% end %}</dd>
+<dt>Gold</dt><dd>{{ sheet.gold }}{% if sheet.plusgold then %} <span class="light">{{ sheet.plusgold }}</span>{% end %}</dd>
+</dl>
+</div>
+<ul class="inv-sheet-stats">
+<li><span class="inv-stat-value">{{ s.attack }}</span><span class="inv-stat-label">Attack</span></li>
+<li><span class="inv-stat-value">{{ s.defense }}</span><span class="inv-stat-label">Defense</span></li>
+<li><span class="inv-stat-value">{{ s.strength }}</span><span class="inv-stat-label">Strength</span></li>
+<li><span class="inv-stat-value">{{ s.dexterity }}</span><span class="inv-stat-label">Dexterity</span></li>
+</ul>
+</div>
 <h3 class="inv-heading">Equipped</h3>
 <table class="inv-equipped">
 {%- for _, r in ipairs(slots) do %}
@@ -35,8 +60,8 @@ HP: {{ u.currenthp }} / {{ s.maxhp }} &middot; MP: {{ u.currentmp }} / {{ s.maxm
 <div class="inv-actions">
 {%- if c.gear then %}
 <form class="inline" method="post" action="/inventory/equip/{{ c.entry.id }}">{{{ csrf_field() }}}
-{%- if c.accessory then %}<select name="slot" aria-label="Accessory slot"><option value="0">First free slot</option><option value="1">Slot 1</option><option value="2">Slot 2</option><option value="3">Slot 3</option></select> {% end -%}
-<button type="submit">Equip</button></form>
+{%- if c.accessory and not free_accessory then %}<span class="inv-replace">Equip in place of:{% for _, a in ipairs(accessories) do %} <button type="submit" name="slot" value="{{ a.n }}">{{ a.name }}</button>{% end %}</span>
+{%- else %}<button type="submit">Equip</button>{% end %}</form>
 {%- end %}
 {%- if c.usable then %}
 <form class="inline" method="post" action="/inventory/use/{{ c.entry.id }}">{{{ csrf_field() }}}<button type="submit">Use</button></form>

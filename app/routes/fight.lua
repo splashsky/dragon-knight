@@ -410,73 +410,151 @@ local function fight(req)
 	return go(req, "/fight", { events = evs })
 end
 
-local function victory(req)
-	local f = state.load(req.user, game.player(req.user))
-	if f and f.outcome == "victory" then
-		local title, ctx = encounter.victory_page(f.result)
-		return show(req, title, "fight/victory", ctx)
-	end
-	if req.user.currentaction == "Fighting" then return go(req, "/fight") end
-	return go(req, "/")
-end
-
 -- The pending drop (users.dropcode: an items.id), or nil.
 local function pending_drop(user)
 	if user.dropcode == 0 then return nil end
 	return items.get(user.dropcode)
 end
 
-local function drop_page(req, drop, ctx)
-	local user = req.user
-	local bag = inventory.bag(user.id)
-	ctx = ctx or {}
-	ctx.drop = drop
-	ctx.attributes = items.attributes(drop)
-	local room = inventory.room(drop, bag, inventory.size())
-	ctx.full = room == 0
-	if ctx.full then
-		-- what could make room: bag items that count against the size (not quest items)
-		ctx.discardable = {}
-		for _, e in ipairs(bag) do
-			if e.item.category ~= "quest" then ctx.discardable[#ctx.discardable + 1] = e end
+-- What the drop card offers (fight/drop_offer.html): the item as the shop's purchase shows
+-- it (its picture, kind, what it changes against the piece worn in its slot, its effects)
+-- and the choices: equip it (gear: into its slot; an accessory into the first empty
+-- accessory slot, or with all three taken one choice per slot), put it into the bag, or
+-- leave it. A choice that would need bag room the bag hasn't (for the drop, or for the
+-- piece it replaces) says so; with a full bag, "Make room" opens the bag (GET /drop/room).
+local function drop_offer(user, drop)
+	local size, bag = inventory.size(), inventory.bag(user.id)
+	local eq = inventory.equipped(user.id)
+	local function room_for(item) return inventory.room(item, bag, size) > 0 end
+	local o = { drop = drop, icon = items.icon_url(drop), kind = items.category_label(drop),
+		bag_room = room_for(drop), equips = {}, effects = {} }
+	if items.is_gear(drop) then
+		local slots = { drop.slot }
+		if drop.slot == "accessory" then
+			local free = inventory.free_accessory_slot(user.id)
+			slots = free and { free } or inventory.ACCESSORY_SLOTS
+		else
+			o.old = eq[drop.slot]
 		end
+		for _, slot in ipairs(slots) do
+			local old = eq[slot]
+			o.equips[#o.equips + 1] = { slot = slot, label = inventory.LABELS[slot], old = old,
+				ok = not old or room_for(old.item), accessory = drop.slot == "accessory" }
+		end
+		o.description = drop.description
+	elseif (drop.description or "") ~= "" then
+		o.effects[1] = drop.description
 	end
-	return show(req, "Item Drop", "fight/drop", ctx)
+	o.stats = items.compare_view(drop, o.old and o.old.item)
+	for _, l in ipairs(items.charge_lines(drop)) do o.effects[#o.effects + 1] = l end
+	return o
 end
 
+-- The victory page and ctx (fight/victory.html): the rewards, and the drop: its card while
+-- it waits (users.dropcode), or what became of it (fights.result.drop_note).
+local function victory_page(req, f)
+	local title, ctx = encounter.victory_page(f.result)
+	local drop = pending_drop(req.user)
+	if drop then ctx.offer = drop_offer(req.user, drop) end
+	return show(req, title, "fight/victory", ctx)
+end
+
+local function victory(req)
+	local f = state.load(req.user, game.player(req.user))
+	if f and f.outcome == "victory" then return victory_page(req, f) end
+	if req.user.currentaction == "Fighting" then return go(req, "/fight") end
+	return go(req, "/")
+end
+
+-- The won fight, when its page is still there (a drop is offered on it), or nil.
+local function won_fight(user)
+	local f = state.load(user, game.player(user))
+	if f and f.outcome == "victory" then return f end
+	return nil
+end
+
+-- A drop without its victory page (the fight's result gone): the card on a page of its own.
+local function drop_page(req, drop, note)
+	return show(req, "Item Drop", "fight/drop", { offer = drop_offer(req.user, drop), note = note })
+end
+
+-- GET /drop: the victory page shows the drop; the old address leads there.
 local function drop_get(req)
 	local drop = pending_drop(req.user)
 	if not drop then return go(req, "/") end
+	if won_fight(req.user) then return go(req, "/victory") end
 	return drop_page(req, drop)
 end
 
--- POST /drop: "take" puts the item into the bag (after discarding bag entry `discard`
--- when the bag is full); "leave" gives it up.
+-- GET /drop/room: the bag, to discard something and take the drop (the drop card's "Make
+-- room", a dialog: data-modal; a page of its own without JavaScript): every bag entry but
+-- quest items, each a POST /drop with take and discard.
+local function drop_room(req)
+	local drop = pending_drop(req.user)
+	if not drop then return go(req, "/") end
+	local bag = {}
+	for _, e in ipairs(inventory.bag(req.user.id)) do
+		if e.item.category ~= "quest" then bag[#bag + 1] = { entry = e, icon = items.icon_url(e.item) } end
+	end
+	return show(req, "Make Room", "fight/drop_room", { drop = drop, bag = bag,
+		room = inventory.room(drop, inventory.bag(req.user.id), inventory.size()) > 0 })
+end
+
+-- POST /drop: "equip" (a slot: wear it there, what was in it into the bag), "take" (into
+-- the bag; with "discard", a bag entry thrown away first to make room) or "leave". What
+-- happened goes onto the victory page (fights.result.drop_note), which the answer leads
+-- back to; without it, the drop's own page says it.
 local function drop_post(req)
 	local user = req.user
 	local drop = pending_drop(user)
 	if not drop then return go(req, "/") end
-	if req.form.leave ~= nil then
+	local f = won_fight(user)
+	local function done(note)
 		dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
-		return go(req, "/")
+		if not f then return show(req, "Item Drop", "fight/drop_taken", { note = note }) end
+		f.result.drop_note = note
+		dk.db:exec("UPDATE fights SET result = ? WHERE user_id = ?", state.encode(f.result), user.id)
+		return go(req, "/victory")
 	end
-	if req.form.take == nil then return drop_page(req, drop) end
-	local discard_id = php.intval(req.form.discard)
+	local function refused(msg)
+		if f then
+			f.result.drop_note = nil
+			local title, ctx = encounter.victory_page(f.result)
+			ctx.offer = drop_offer(user, drop)
+			ctx.offer.error = msg
+			return show(req, title, "fight/victory", ctx)
+		end
+		return drop_page(req, drop, msg)
+	end
+	local form = req.form
+	if form.leave ~= nil then return done("You left the " .. drop.name .. " behind.") end
+	if form.equip ~= nil then
+		local o = drop_offer(user, drop)
+		for _, c in ipairs(o.equips) do
+			if c.slot == form.equip then
+				if not c.ok then return refused("Your bag is full: there is no room for your " .. c.old.item.name .. ".") end
+				inventory.equip_new(user.id, drop, c.slot)
+				local note = "You equipped the " .. drop.name .. "."
+				if c.old then note = note .. " Your " .. c.old.item.name .. " is in your bag." end
+				return done(note)
+			end
+		end
+		return refused("Choose where to equip the " .. drop.name .. ".")
+	end
+	if form.take == nil then return go(req, f and "/victory" or "/drop") end
+	local discard_id = php.intval(form.discard)
 	local discarded
 	if discard_id ~= 0 then
 		local e = inventory.entry(user.id, discard_id)
-		if not e or e.equipped or e.item.category == "quest" then
-			return drop_page(req, drop, { error = "Select an item from your bag to discard." })
-		end
+		if not e or e.equipped or e.item.category == "quest" then return refused("Choose an item from your bag to discard.") end
 		inventory.take(e)
 		discarded = e
 	end
 	if not inventory.add(user.id, drop, 1) then
-		return drop_page(req, drop, { error = "Your bag is full. Choose an item to discard first, or leave the " ..
-			drop.name .. "." })
+		return refused("Your bag is full. Make room in it first, or leave the " .. drop.name .. ".")
 	end
-	dk.db:exec("UPDATE users SET dropcode = 0 WHERE id = ?", user.id)
-	return show(req, "Item Drop", "fight/drop_taken", { drop = drop, discarded = discarded })
+	return done((discarded and ("You discarded the " .. discarded.item.name .. ". ") or "") ..
+		"The " .. drop.name .. " is in your bag.")
 end
 
 -- legacy dead() built this page but never displayed it; deaths are reported on the
@@ -490,6 +568,7 @@ return function(r)
 	r:post("/fight", auth.game, fight)
 	r:get("/victory", auth.game, victory)
 	r:get("/drop", auth.game, drop_get)
+	r:get("/drop/room", auth.game, drop_room)
 	r:post("/drop", auth.game, drop_post)
 	r:get("/dead", auth.game, dead)
 end

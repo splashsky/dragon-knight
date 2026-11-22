@@ -2,6 +2,7 @@
 -- and the actions on it (equip, unequip, use, discard). The rules are lib/inventory.lua's;
 -- every action is a POST (CSRF) that renders the page again with what happened.
 local action = require("lib.action")
+local character = require("town.character")
 local common = require("town.common")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
@@ -46,9 +47,18 @@ local function page(req, notice)
 			icon = items.icon_url(it),
 		}
 	end
+	-- an accessory goes into the first empty accessory slot; only with all three taken does
+	-- the page offer the slots (in place of what is in each)
+	local accessories = {}
+	for n, slot in ipairs(inventory.ACCESSORY_SLOTS) do
+		if eq[slot] then accessories[#accessories + 1] = { n = n, name = eq[slot].item.name } end
+	end
+	local sheet = character.sheet(user)
+	sheet.bars = game.bars(user, sheet.s)
 	return view.page(req, "Inventory", "town/inventory", {
 		slots = slots, cells = cells, used = inventory.used(bag), size = size,
-		empty = free, u = user, s = game.stats(user), notice = notice,
+		empty = free, u = user, s = sheet.s, sheet = sheet, notice = notice,
+		free_accessory = inventory.free_accessory_slot(user.id) ~= nil, accessories = accessories,
 	})
 end
 
@@ -65,7 +75,8 @@ local function bag_entry(req, id)
 end
 
 -- POST /inventory/equip/#id: gear from the bag into its slot (accessories: slot=1-3, or
--- 0/absent for the first free one); what was there goes into the bag.
+-- 0/absent for the first free one: the page sends no slot while one is free, and one of
+-- its "in place of" buttons when all three are taken); what was there goes into the bag.
 function inv.equip(req, params)
 	local user = req.user
 	local e = bag_entry(req, params.id)

@@ -17,7 +17,10 @@ local function bonus(n)
 	return nil
 end
 
-local function sheet(user)
+-- A character's sheet (the Extended Stats window, someone's sheet from Who's Online, and
+-- the inventory page's head): the users row, effective stats, equipment names, the numbers
+-- as text, bonuses ("(+10%)"), the next level's experience, class name, spells, statuses.
+function character.sheet(user)
 	local class = classes.get(user.charclass)
 	local s = game.stats(user)
 	local nextlevel
@@ -47,7 +50,7 @@ end
 
 -- GET /character
 function character.show(req)
-	local ctx = sheet(req.user)
+	local ctx = character.sheet(req.user)
 	ctx.full = true
 	return view.page(req, "Character Information", "town/character", ctx,
 									 { layout = "minimal", nav = false })
@@ -57,7 +60,7 @@ end
 function character.online(req, params)
 	local user = game.user(params.id)
 	if not user then return common.message(req, "Error", "no_user") end
-	return view.page(req, "Character Information", "town/onlinechar", sheet(user))
+	return view.page(req, "Character Information", "town/onlinechar", character.sheet(user))
 end
 
 -- GET /map

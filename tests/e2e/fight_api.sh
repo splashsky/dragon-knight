@@ -509,18 +509,18 @@ t_req POST /drop --data "take=Take+it" -H 'X-DK-Live: 1'; expect_status 403
 t_section "fight api: item drops"
 t_fight_clear fapi; fa_player; fa_sql "UPDATE users SET currentaction = 'Exploring', dropcode = $(it life_pebble)"
 fa_live GET /drop; expect_status 200; fa_check
-fa_expect '"<b>Life Pebble</b>" in d["fragments"]["main"] and "data-fight" in d["fragments"]["main"] and d["url"] == "/drop" and d["title"] == "Item Drop"'
+fa_expect '">Life Pebble<template" in d["fragments"]["main"] and "drop-offer" in d["fragments"]["main"] and d["url"] == "/drop" and d["title"] == "Item Drop"'
 fa_live POST /drop "csrf=$FA_CS&take=Take+it"; expect_status 200; fa_check
 fa_expect '"The Life Pebble is in your bag." in d["fragments"]["main"] and "<b>1</b>/12</span>" in d["fragments"]["nav_right"]'
 fa_is dropcode 0; fa_is "$T_ITEMS" life_pebble
 fa_live GET /drop; fa_check; fa_expect 'd["redirect"] == "/"'
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"
-fa_live POST /drop "csrf=$FA_CS&leave=Leave+it"; fa_check; fa_expect 'd["redirect"] == "/"'; fa_is dropcode 0
+fa_live POST /drop "csrf=$FA_CS&leave=Leave+it"; fa_check; fa_expect '"You left the Life Pebble behind." in d["fragments"]["main"]'; fa_is dropcode 0
 for k in stick branch club dagger hatchet axe brand poleaxe broadsword battle_axe claymore; do t_give fapi "$k"; done
 fa_sql "UPDATE users SET dropcode = $(it life_pebble)"
 fa_live POST /drop "csrf=$FA_CS&take=x&discard=999999"; fa_check
-fa_expect '"Select an item from your bag to discard." in d["fragments"]["main"]'
-fa_live POST /drop "csrf=$FA_CS&take=x"; fa_check; fa_expect '"Your bag is full. Choose an item to discard first" in d["fragments"]["main"]'
+fa_expect '"Choose an item from your bag to discard." in d["fragments"]["main"]'
+fa_live POST /drop "csrf=$FA_CS&take=x"; fa_check; fa_expect '"Your bag is full. Make room in it first" in d["fragments"]["main"]'
 fa_is dropcode "$(it life_pebble)"
 t_items_clear fapi; fa_sql "UPDATE users SET dropcode = 0"
 

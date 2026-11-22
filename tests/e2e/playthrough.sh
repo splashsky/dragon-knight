@@ -127,10 +127,12 @@ t_post /inn "csrf=$TC&submit=Yes"; expect_body 'You wake up feeling refreshed'
 pt_is "currentmp" "10" "inn restores mp"
 pt_explore
 pt_fight
-if grep -qF 'This monster has dropped an item' "$BODY"; then t_ok; else pu "dropcode = 34"; fi
+if grep -qF 'It left something behind:' "$BODY"; then t_ok; else pu "dropcode = 34"; fi
 DROP=$(pq dropcode)
-t_get /drop;     expect_status 200; expect_body 'name="take" value="Take it"'
-t_post /drop "csrf=$TC&take=Take+it"; expect_body 'is in your bag.'
+# the drop's card on the victory page: taken there, the page says so
+t_get /victory;  expect_status 200; expect_body 'name="take" value="Take"'
+t_post /drop "csrf=$TC&take=Take"; expect_redirect /victory
+t_get /victory;  expect_body 'is in your bag.'
 [ "$(pq "dropcode = 0 AND (SELECT count(*) FROM user_items WHERE user_id = users.id AND item_id = $DROP AND equipped IS NULL)")" = 1 ] \
 	&& t_ok || t_fail "drop not in the bag"
 

@@ -140,8 +140,9 @@ t_get /inn; expect_no_body 'recharge'
 
 t_section "wand: obtained full (drop, shop), copies up to the bag's room"
 t_items_clear wizard
+t_fight_clear wizard   # (no victory page: the drop's own page)
 wd_sql "UPDATE users SET dropcode = $WD_WAND_ITEM, currentaction = 'Exploring'"
-t_get /drop; expect_body '<b>Wand</b>'
+t_get /drop; expect_body '>Wand<template class="tip">'
 t_post /drop "csrf=$TC&take=Take+it"; expect_body 'The Wand is in your bag.'
 wd_is "$WD_CHARGES" "bag=5"
 wd_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, gold = 1000"

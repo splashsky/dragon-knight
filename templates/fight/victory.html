@@ -1,7 +1,8 @@
 {#- Victory (legacy fight.php victory()), drawn like a scene's caption (public/js/scene.js;
 		docs/APP.md "Scenes"): the live client fades the fight out and this in, so the
 		transition stays on screen as the page. "Victory!" large, who fell, what it paid, a
-		level-up's gains, a drop, the way on. ctx: encounter.victory_page. -#}
+		level-up's gains, the drop (3.1: its card, fight/drop_offer.html, while it waits; then what
+		became of it), the way on. ctx: encounter.victory_page, offer (routes/fight.lua). -#}
 <section class="dk-scene-page dk-scene-victory victory">
 <h1 class="dk-scene-title">Victory!</h1>
 <p class="dk-scene-detail">You have defeated the {{ defeated }}.</p>
@@ -26,10 +27,14 @@ You have learned a new spell.
 {%- elseif levelup.learned > 1 then %}<br>
 You have learned {{ levelup.learned }} new spells.
 {%- end %}</p>
-<p class="dk-scene-next">You can now continue <a href="/">exploring</a>.</p>
-{%- elseif dropped then %}
-<p class="dk-scene-next">This monster has dropped an item. <a href="/drop">Click here</a> to reveal and take the item, or you may also move on and continue <a href="/">exploring</a>.</p>
-{%- else %}
-<p class="dk-scene-next">You can now continue <a href="/">exploring</a>.</p>
 {%- end %}
+{%- if offer then %}
+<div class="victory-drop">
+<p class="victory-drop-head">It left something behind:</p>
+{{{ include("fight/drop_offer", { offer = offer }) }}}
+</div>
+{%- elseif drop_note then %}
+<p class="victory-drop-note">{{ drop_note }}</p>
+{%- end %}
+<p class="dk-scene-next">You can now continue <a href="/">exploring</a>.</p>
 </section>
