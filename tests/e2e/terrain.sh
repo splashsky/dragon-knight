@@ -8,6 +8,28 @@ if ! t_has_sql || ! command -v python3 >/dev/null; then
 	t_section "terrain (skipped: needs sqlite3 or python3, and python3)"
 else
 
+# te_from KIND KEY LIST TEXT: TEXT (as the page shows it, entities and all) is one of the
+# lines of terrain_lines.lua's KIND ("biome" or "feature") KEY's LIST, "{monster}" and
+# "{direction}" standing for any words. Lines are picked by a hash and the lists grow, so
+# the tests ask "one of this place's lines", never which one.
+te_from() {
+	python3 - "$ROOT/app/lib/terrain_lines.lua" "$1" "$2" "$3" "$4" <<'PY'
+import html, re, sys
+text, kind, key, name, line = open(sys.argv[1]).read(), sys.argv[2], sys.argv[3], sys.argv[4], html.unescape(sys.argv[5])
+def block(s, opener):
+	i = s.index(opener) + len(opener)
+	depth = 1
+	for j in range(i, len(s)):
+		depth += {"{": 1, "}": -1}.get(s[j], 0)
+		if depth == 0: return s[i:j]
+part = block(block(block(text, "\n\t" + kind + " = {"), "\n\t\t" + key + " = {"), name + " = {")
+for cand in re.findall(r'"((?:[^"\\]|\\.)*)"', part):
+	pattern = re.escape(cand).replace(re.escape("{monster}"), ".+").replace(re.escape("{direction}"), ".+")
+	if re.fullmatch(pattern, line): sys.exit(0)
+sys.exit(1)
+PY
+}
+
 # te_place LAND RELIEF [NEIGHBOUR]: "lat lon" of the first tile (a cell's centre, read
 # north-west to south-east) whose cell has the biome letter LAND and the feature character
 # RELIEF; with NEIGHBOUR "north", the top tile of such a cell whose northern neighbour's
@@ -48,10 +70,9 @@ EOF
 t_sql "UPDATE users SET currentaction = 'Exploring', latitude = $TE_LAT, longitude = $TE_LON $TQ"
 t_get /; expect_body '<div class="loc-land">The Thornbog</div>'
 expect_body '<div class="explore-land" data-r="explore-land"><p class="explore-standing">'
-grep -qE '<p class="explore-standing">(Black water and reed-beds|Thornwood spines|A stilt-hut)' "$BODY" && t_ok \
-	|| t_fail "a Thornbog line where the player stands: $(grep -o '<p class="explore-standing">[^<]*' "$BODY")"
-# the same on a reload (hashed, never rolled)
 TE_LINE=$(grep -o '<p class="explore-standing">[^<]*' "$BODY")
+te_from biome marsh standing "${TE_LINE#*>}" && t_ok || t_fail "a Thornbog line where the player stands: $TE_LINE"
+# the same on a reload (hashed, never rolled)
 t_get /; [ "$(grep -o '<p class="explore-standing">[^<]*' "$BODY")" = "$TE_LINE" ] && t_ok || t_fail "the same line again"
 # a hill tile: the feature is named too
 read -r TE_LAT TE_LON <<EOF
@@ -76,9 +97,9 @@ t_fight_new terrainer
 case "$(t_sql "SELECT replace(data, char(10), ';') FROM fights WHERE user_id = (SELECT id FROM users $TQ)")" in
 	*"field_terrain=s:marsh"*) t_ok ;; *) t_fail "the marsh's field kept with the fight" ;;
 esac
-expect_body '<span class="fight-field tip-term" data-field="marsh" data-tip tabindex="0">Marsh<template class="tip"><div class="tip-title">Marsh</div><div class="tip-meta">Terrain</div><ul class="tip-lines"><li>Fire damage -10%</li><li>Earth damage +10%</li><li>Poison damage +15%</li>'
-grep -qE 'class="fight-yourturn">(Among the reeds, the|Knee-deep in the bog, you meet the)' "$BODY" && t_ok \
-	|| t_fail "the encounter opens with the Thornbog's line: $(grep -o 'class="fight-yourturn">[^<]*' "$BODY" | head -n1)"
+expect_body '<span class="fight-field tip-term" data-field="marsh" data-tip tabindex="0"><img class="fight-field-icon" src="/static/images/fields/marsh.png" width="18" height="18" alt="">Marsh<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/fields/marsh.png" width="20" height="20" alt="">Marsh</div><div class="tip-meta">Terrain</div><ul class="tip-lines"><li>Fire damage -10%</li><li>Earth damage +10%</li><li>Poison damage +15%</li>'
+TE_OPEN=$(grep -o 'class="fight-yourturn">[^<]*' "$BODY" | head -n1)
+te_from biome marsh fight_open "${TE_OPEN#*>}" && t_ok || t_fail "the encounter opens with the Thornbog's line: $TE_OPEN"
 # a GET changes nothing
 TE_DATA=$(t_sql "SELECT data FROM fights WHERE user_id = (SELECT id FROM users $TQ)")
 T_NOW=$((T_NOW + 600)) t_get /fight

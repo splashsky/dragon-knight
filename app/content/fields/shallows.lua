@@ -3,7 +3,13 @@
 return {
 	name = "Shallows",
 	description = "Knee-deep water: water and lightning are stronger, fire is weak and can't catch, and everyone wades slowly.",
-	icon = "",
+	lore = [[
+Knee-deep water over soft mud, and every step through it is slow. Water and lightning
+hit harder here, and fire is weak: a burn can't catch while the water is at the knee.
+The pearl divers of Bris wade out to the shell beds like this every day, and they say a
+diver who is afraid of the water is the first to drown. Keep your feet wide and your
+blade up out of the wet.]],
+	icon = "shallows",
 	group = "terrain",
 	damage = { water = 20, lightning = 15, fire = -35 },
 	statuses = { burning = { blocked = true } },
