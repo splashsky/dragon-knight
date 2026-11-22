@@ -2,9 +2,10 @@
 -- the place and the time, hashed and never rolled; its vocabularies; storms forming near
 -- Midworld (about one every 100 minutes) and breaking over Gilead in about two hours; the
 -- land's climate (fog on the moors at dawn, heat in the Ashlands, the Midlands' weather as
--- it was); snow north of 150 and on the peaks; mud after rain, drying; the change
--- lines, the description and the edge line; a step of a minute on the game's clock, and
--- whether the weather changed between two clock ticks; and what it costs.
+-- it was); snow beyond the climates' snow lines and on the peaks, never in the Dry Country,
+-- harder storms over the Barrens; mud after rain, drying; the change lines, the
+-- description and the edge line; a step of a minute on the game's clock, and whether the
+-- weather changed between two clock ticks; and what it costs.
 local clock = require("lib.clock")
 local lines = require("lib.weather_lines")
 local terrain = require("lib.terrain")
@@ -150,37 +151,105 @@ local function find(n, want)
 	return out
 end
 
--- Snow falls instead of rain north of latitude 150 and on the peaks, at any latitude; and
--- lies on the ground there.
-function T.snow_falls_north_of_150_and_on_the_peaks()
-	local peaks = find(6, function(lat, lon) return terrain.at(lat, lon).feature == "peak" and lat < 150 end)
-	assert(#peaks >= 3, "peaks in the south")
-	local places = {}
-	for _, lat in ipairs({ 140, 150, 151, 170, 200, 240 }) do
-		for _, lon in ipairs({ -230, -200, -160, -100, 0, 170 }) do places[#places + 1] = { lat, lon } end
+-- Whether falling weather is snow at a tile, by its cell's climate: north of the snow line,
+-- or on a peak, unless the climate never snows.
+local function cold(lat, lon)
+	local c = climate_at(lat, lon)
+	return c.snow_line ~= math.huge and (lat > c.snow_line or terrain.at(lat, lon).feature == "peak")
+end
+
+-- Snow falls instead of rain beyond the climate's snow line (latitude 150; 100 in the Weald
+-- and the Barrens) and on the peaks, at any latitude, and lies on the ground there; the
+-- Dry Country and the Ashlands never snow (rain instead), north of 150 and on peaks too.
+function T.snow_falls_beyond_the_snow_lines_and_on_the_peaks()
+	eq(terrain.biome("midland").climate.snow_line, 150)
+	eq(terrain.biome("weald").climate.snow_line, 100); eq(terrain.biome("barrens").climate.snow_line, 100)
+	eq(terrain.biome("drylands").climate.snow_line, math.huge); eq(terrain.biome("ashlands").climate.snow_line, math.huge)
+	local function places(n, want)
+		return find(n, function(lat, lon)
+			local _, b = climate_at(lat, lon)
+			return want(lat, lon, b, terrain.at(lat, lon).feature)
+		end)
 	end
-	for _, p in ipairs(peaks) do places[#places + 1] = p end
-	local snowed, peak_snowed = false, false
-	for _, p in ipairs(places) do
-		local lat, lon = p[1], p[2]
-		local peak = terrain.at(lat, lon).feature == "peak"
-		for now = START, START + clock.DAY, 180 do
-			local w = weather.at(lat, lon, now)
-			local where = " at " .. lat .. "," .. lon
-			if lat > 150 or peak then
-				assert(not RAINING[w.sky] and w.sky ~= "drizzle", "no rain where it snows: " .. w.sky .. where)
-				assert(w.ground ~= "mud" and w.ground ~= "wet", "no mud where it snows: " .. w.ground .. where)
-				if w.sky == "snow" or w.sky == "blizzard" then
-					snowed = true
-					peak_snowed = peak_snowed or lat <= 150
+	local groups = {
+		north = places(8, function(lat, _, b) return lat > 150 and b ~= "drylands" end),
+		south = places(8, function(lat, _, b, f) return lat < 90 and b ~= "drylands" and b ~= "ashlands" and f ~= "peak" end),
+		peaks = places(6, function(lat, _, b, f) return f == "peak" and lat < 100 and b ~= "drylands" and b ~= "ashlands" end),
+		weald = places(8, function(lat, _, b, f) return b == "weald" and lat > 100 and lat < 150 and f ~= "peak" end),
+		dry = places(8, function(lat, _, b) return b == "drylands" and lat > 150 end),
+		dry_peaks = places(4, function(_, _, b, f) return (b == "drylands" or b == "ashlands") and f == "peak" end),
+	}
+	local snowed, fell = {}, {}
+	for name, list in pairs(groups) do
+		assert(#list >= 3, "places: " .. name)
+		for _, p in ipairs(list) do
+			local lat, lon = p[1], p[2]
+			local snows = cold(lat, lon)
+			eq(snows, name == "north" or name == "peaks" or name == "weald", "snow at " .. name)
+			for now = START, START + 4 * clock.DAY, 180 do
+				local w = weather.at(lat, lon, now)
+				local where = " (" .. name .. " at " .. lat .. "," .. lon .. ")"
+				if snows then
+					assert(not RAINING[w.sky] and w.sky ~= "drizzle", "no rain where it snows: " .. w.sky .. where)
+					assert(w.ground ~= "mud" and w.ground ~= "wet", "no mud where it snows: " .. w.ground .. where)
+				else
+					assert(w.sky ~= "snow" and w.sky ~= "blizzard", "no snow where it rains: " .. w.sky .. where)
+					assert(w.ground ~= "snow" and w.ground ~= "ice", "no snow on the ground where it rains: " .. w.ground .. where)
 				end
-			else
-				assert(w.sky ~= "snow" and w.sky ~= "blizzard", "no snow where it rains: " .. w.sky .. where)
-				assert(w.ground ~= "snow" and w.ground ~= "ice", "no snow on the ground where it rains: " .. w.ground .. where)
+				if w.sky == "snow" or w.sky == "blizzard" then snowed[name] = true end
+				if FALLING[w.sky] then fell[name] = true end
 			end
 		end
 	end
-	assert(snowed and peak_snowed, "snow in the north and on a southern peak")
+	assert(snowed.north and snowed.peaks and snowed.weald, "snow in the north, on southern peaks and in the Weald")
+	assert(fell.dry, "rain (not snow) in the Dry Country north of 150")
+end
+
+-- Storms rain a step harder over the Storm Barrens (at most a thunderstorm, or a blizzard
+-- where it snows), and as their bands say everywhere else: at tiles under one storm alone,
+-- the sky is the band's (its core the size's strongest, the body one less, the fringe two;
+-- one less again once it weakens), plus the climate's step.
+function T.storms_rain_harder_over_the_barrens()
+	local CORE = { squall = 3, storm = 4, great = 4 }
+	local RAIN = { "drizzle", "rain", "downpour", "thunderstorm" }
+	local SNOW = { "snow", "snow", "blizzard", "blizzard" }
+	local checked, harder = 0, 0
+	for now = START, START + 2 * 24 * 3600, 600 do
+		local storms = weather.storms(now)
+		for _, s in ipairs(storms) do
+			for dlat = -40, 40, 8 do
+				for dlon = -40, 40, 8 do
+					local lat, lon = math.floor(s.lat + 0.5) + dlat, math.floor(s.lon + 0.5) + dlon
+					local over, x = 0, nil
+					for _, o in ipairs(storms) do
+						local d = math.sqrt((o.lat - lat) ^ 2 + (o.lon - lon) ^ 2)
+						if d < o.radius then over = over + 1; x = d / o.radius end
+					end
+					if over == 1 and x and math.abs(lat) <= 250 and math.abs(lon) <= 250 then
+						local o
+						for _, t in ipairs(storms) do
+							if math.sqrt((t.lat - lat) ^ 2 + (t.lon - lon) ^ 2) < t.radius then o = t end
+						end
+						local t = step_start(now)
+						local weaker = (t - o.born) / (o.ends - o.born) >= 0.7 and 1 or 0
+						local band = x < 0.35 and 0 or x < 0.7 and 1 or 2
+						local c, biome = climate_at(lat, lon)
+						local plain = math.max(CORE[o.size] - band - weaker, 1)
+						local level = math.min(plain + c.storm, 4)
+						local list = cold(lat, lon) and SNOW or RAIN
+						eq(weather.at(lat, lon, now).sky, list[level], ("the sky under a %s at %d,%d (%s)"):format(o.size, lat, lon, biome))
+						checked = checked + 1
+						if list[level] ~= list[plain] then harder = harder + 1 end
+					end
+				end
+			end
+		end
+	end
+	eq(terrain.biome("barrens").climate.storm, 1)
+	for _, b in ipairs(terrain.BIOMES) do
+		if b.key ~= "barrens" then eq(b.climate.storm, 0, b.key .. "'s storms") end
+	end
+	assert(checked > 1000 and harder > 0, ("checked %d tiles, %d harder over the Barrens"):format(checked, harder))
 end
 
 -- The land leans the weather: fog likelier on the moors at dawn than in the Midlands, heat
@@ -217,7 +286,8 @@ function T.the_land_leans_the_climate()
 		:format(ash, dry, mid))
 	local m = terrain.biome("midland").climate
 	eq(m.fog .. "/" .. m.fog_dawn .. "/" .. m.fog_night .. "/" .. m.heat .. "/" .. m.drizzle .. "/" .. m.overcast .. "/" ..
-		m.sun .. "/" .. m.mud, "0.04/0/0/0/0.06/0.2/0.35/1", "the Midlands' climate is the weather's own")
+		m.sun .. "/" .. m.snow_line .. "/" .. m.mud .. "/" .. m.storm, "0.04/0/0/0/0.06/0.2/0.35/150/1/0",
+		"the Midlands' climate is the weather's own")
 end
 
 -- On the storms' road (a tile where it rains: not a peak): rain (or worse) leaves mud when

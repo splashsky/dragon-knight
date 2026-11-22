@@ -27,6 +27,8 @@ changelog.RELEASES = {
 			"The land has a shape. The Midlands' farms around Midworld, the Copper Downs by Roma, the Salt Shoals at Bris, Kalle's Diggings, the Greymoor by Narcissa, the Hambry Weald, the Storm Barrens before Gilead, the Ashlands at the world's end, and the Dry Country and the Thornbog in between, with lakes, ponds, hills and mountains. The World Map draws it all, with the towns and where you stand. Every tile can still be walked: lakes are waded and peaks climbed.",
 			"The land shapes the weather (fog on the moors at dawn, heat in the Ashlands, snow on the peaks) and the fights: shallows, marsh, forest, hills, peaks, sand and cinders change what works, and the place has its own lines when you explore and fight there.",
 			"Storms come less often: about one every hour and a half.",
+			"Rain and snow follow the land: the Hambry Weald and the Storm Barrens snow from further south, the Dry Country and the Ashlands never see snow, and storms break harder over the Barrens.",
+			"Each land has pockets of its neighbours' country, of a like climate: stands of the Weald in the Barrens, bog in the Shoals, ash fields in the Dry Country.",
 			"Judgement tells you how much it healed you again.",
 		},
 	},

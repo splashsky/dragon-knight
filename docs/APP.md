@@ -1180,23 +1180,27 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	drizzle 6%, overcast 20%, sun 35% by day), so the e2e tests' calm place sees the same
 	skies.
 - **Snow.** Falling weather is snow (drizzle and rain as snow, downpours and thunderstorms
-	as blizzards) north of latitude 150 (`weather.NORTH`) and, at any latitude, on a peak
-	tile (the feature of the tile itself, so a storm over a range snows on the peaks and
-	rains on the hills around them, and `weather.edge` says so).
+	as blizzards) north of the cell's climate's snow line (`snow_line`: latitude 150 in the
+	Midlands and most lands; 100 in the Hambry Weald and the Storm Barrens) and, at any
+	latitude, on a peak tile (the feature of the tile itself, so a storm over a range snows
+	on the peaks and rains on the hills around them, and `weather.edge` says so); but never
+	where the climate has no snow line (the Dry Country and the Ashlands: rain instead,
+	north of 150 and on their peaks too).
 - **Storms.** A slot every 45 minutes (`weather.SLOT`). One hash per slot decides whether
 	its storm forms (45%, `weather.FORMS`: about one storm every 100 minutes), its size (a
 	squall, half of them, with a radius of 8-14 tiles; a storm, 35%, 16-26; a great storm,
-	15%, 30-40), its birth (in the slot's first half), its origin (within 30 tiles of Midworld), its life (2 hours, give or take
-	12 minutes) and how far its heading is off the line to Gilead (up to 0.08 radians). It
+	15%, 30-40), its birth (in the slot's first half), its origin (within 30 tiles of
+	Midworld), its life (2 hours, give or take 12 minutes) and how far its heading is off the line to Gilead (up to 0.08 radians). It
 	moves in a straight line at the speed that takes it to Gilead in its life, so its
 	position is a closed-form function of time. It grows from 40% of its radius in the first
 	fifth of its life, holds, and from 70% of it weakens (its rain a level lighter, its
 	radius shrinking to half) until it breaks over Gilead (within about 25 tiles). Inside it
 	the rain goes by the distance from its centre over its radius: the core (under 0.35)
 	has the size's strongest (a downpour in a squall, a thunderstorm in the others), the
-	body (under 0.7) a level less, the fringe two (a drizzle at least), the same over any
-	land; where it snows, drizzle and rain fall as snow, downpours and thunderstorms as
-	blizzards.
+	body (under 0.7) a level less, the fringe two (a drizzle at least), and the climate's
+	`storm` levels more (the Storm Barrens one: a squall's core there is a thunderstorm; at
+	most a thunderstorm); where it snows, drizzle and rain fall as snow, downpours and
+	thunderstorms as blizzards.
 	`weather.storms(now)` lists the storms alive (centre, radius, birth, end).
 - **The ground.** From each storm's closest approach to the tile along its track (closed
 	form): where it rains, mud from then until 20 minutes (`weather.MUD`, times the biome's
@@ -1264,7 +1268,8 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	`tests/run.sh` pins every request at `$T_NOW` (4000000000), so the weather is the same on
 	every run and doesn't change between two requests (`T_NOW=<unix> t_get /` asks at another
 	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey and
-	how often they come, the land's climate, snow north of 150 and on the peaks,
+	how often they come, the land's climate, snow beyond the snow lines and on the peaks and
+	never in the Dry Country, the storms' bands and the Barrens' harder storms,
 	mud after rain, the lines, `weather.changed` between clock ticks, the cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
 	line, and a live answer with the weather's regions alone), `tests/e2e/tick.sh` (the push
 	to an open page).
@@ -1277,14 +1282,14 @@ pond, hills or a peak). Every tile stays walkable (lakes are waded, peaks climbe
 changes the weather's climate, the fight's battlefield and the words of the place, never
 where a player may go.
 
-- **The world is data, and permanent.** `app/lib/terrain/world.lua` holds the land of every
+- **The world is data** (permanent after 3.2.0's release). `app/lib/terrain/world.lua` holds the land of every
 	cell of 5 by 5 tiles (101 by 101; a town at a cell's centre): `land`, a string per row
 	from the north with a biome's letter per cell from the west (`M` midland, `R` downs, `B`
 	shoals, `K` diggings, `N` moors, `H` weald, `G` barrens, `E` ashlands, `D` drylands, `T`
 	marsh), and `relief` the same with a feature's character (`~` lake, `o` pond, `n` hill,
 	`^` peak, `.` none), so the file reads as two maps. It is **generated, committed and
-	never edited by hand**: its header names the generator and the seed. It never changes
-	because code changed: the game only reads it.
+	never edited by hand**: its header names the generator and the seed. The game only
+	reads it, so nothing the game's code does moves the land.
 - **World generator v1** (`app/lib/terrain/generator_v1.lua`, seed `0x3300`) made it, and
 	the game never loads it. Integer hashing (the weather's 64-bit mixing) and integer or
 	fixed-point arithmetic only (integer square roots, smoothstep on integers, floor
@@ -1298,26 +1303,36 @@ where a player may go.
 	and takes one within 0.15 of the best score (a hash, weighted by how far within). So
 	the lands are coherent, their borders meander, and they mix only in the bands where
 	two scores are close; every point is reached by some biome (the generator stops if
-	not). Its feature, from value noises (lattice bytes hashed every `step` tiles,
+	not). **Pockets** break up the broad lands by climate: a second jittered grid (one
+	centre in each 56-tile square) whose centres deep inside a land (its score 0.4 above
+	any other's, 26 tiles or more from its town) make round pockets of 22 tiles (to a
+	quarter more), where the land's deep points take a biome of a like climate by a hash:
+	each biome has two integer traits, warmth and wetness (-2 to 2), and the same traits
+	weigh 2, one step apart 1, further never. So the cold Weald has pockets of the Barrens
+	and the Greymoor, the wet Shoals of the Thornbog, the Ashlands of the Dry Country, the
+	Midlands of the Copper Downs; a pocket is a dozen scatter points or so, never one cell
+	alone. Its feature, from value noises (lattice bytes hashed every `step` tiles,
 	smoothstep between) flattened toward the towns (none within 16 tiles of Midworld and 8
 	of another town, fewer out to 40 and 24): a peak where the elevation (steps 48, 24 and
 	12, plus the biome's shift) is 0.76 or more; a lake where the basins (steps 60 and 18,
 	less the biome's lake shift: more in the Shoals and the Thornbog) are 0.22 or less and
 	it isn't high, so lakes are a few bodies several cells across; hills at 0.62; a pond
 	where a fine noise (step 6, plus the biome's pond shift) passes 0.89 and it is low (one
-	or two cells); else none. Its numbers (the biomes' cores, reaches, weights, shifts and
-	the wild seeds) are in the file, tuned by looking at the map before the world was
-	committed. The world: plain 73%, hills 16%, lakes 5%, peaks 4%, ponds 1%; the Dry
-	Country 15% and the Thornbog 10%, the towns' biomes from 4% (the Copper Downs, the
-	Ashlands) to 15% (the Diggings); no cell alone among other biomes; 34 lakes, 9 of them
-	30 cells or more (the largest 77); ponds of at most 4 cells; the widest stretch of one
-	biome away from its town 145 tiles (the Weald).
+	or two cells); else none. Its numbers (the biomes' cores, reaches, weights, shifts,
+	traits and the wild seeds) are in the file, tuned by looking at the map. The world:
+	plain 73%, hills 17%, lakes 5%, peaks 4%, ponds 1%; the Dry Country 13% and the
+	Thornbog 9%, the towns' biomes from 6% (the Ashlands) to 14% (the Greymoor, the Weald);
+	no cell alone among other biomes; 32 lakes, 9 of them 30 cells or more (the largest
+	81); ponds of at most 4 cells; the widest stretch of one biome away from its town 70
+	tiles (the Greymoor).
 - **Verifying it**: `tests/lua/test_terrain.lua` runs generator v1 and requires its output
 	to be the committed file byte for byte (and the generator's code to count in integers).
 	`tools/world.sh` (`BIN=./dk tools/world.sh`) writes the file again from the generator,
 	in the project's own Lua (a scratch copy of `app/` whose `cli/check.lua` is
 	`tools/world.lua`, run by `dk check`, which needs no database): it changes nothing
-	while the generator is v1. **A new world** is a new generator beside v1
+	unless generator v1 changed. **Until 3.2.0 is released** generator v1 may still change:
+	run `tools/world.sh` and commit the data and the picture with it. It is frozen at the
+	release; **after 3.2.0's release, a new world is a new generator** beside v1
 	(`generator_v2.lua`, its own seed), never a change to v1: point `tools/world.lua` and
 	the test at it, run `tools/world.sh`, and commit the new data as a deliberate change of
 	the world (the players' positions stay; only the land under them changes).
@@ -1332,15 +1347,15 @@ where a player may go.
 
 | Biome | Town | Field | Climate (lib/weather.lua) |
 |---|---|---|---|
-| `midland` The Midlands | Midworld | none | the weather's own: fog 4%, drizzle 6%, overcast 20%, sun 35% by day |
+| `midland` The Midlands | Midworld | none | the weather's own: fog 4%, drizzle 6%, overcast 20%, sun 35% by day, snow north of 150 |
 | `downs` The Copper Downs | Roma | none | dawn mist, more drizzle and cloud, a little heat, mud lasts 1.5x |
 | `shoals` The Salt Shoals | Bris | none | sea mist at dawn, drizzle and cloud, mud 1.25x |
 | `diggings` The Diggings | Kalle | none | dry and bright, little rain, mud 0.8x |
 | `moors` The Greymoor | Narcissa | none | fog at dawn about half the time, some at night, grey, mud 1.5x |
-| `weald` The Hambry Weald | Hambry | `forest` | fog off the marsh-forest, more drizzle, overcast |
-| `barrens` The Storm Barrens | Gilead | none | grey, less sun |
-| `ashlands` The Ashlands | Endworld | `cinders` | heat by day 60%, rarely drizzle, mud 0.5x |
-| `drylands` The Dry Country | wild (4 seeds) | `sand` | heat by day 45%, sun, almost no drizzle or fog, mud 0.4x |
+| `weald` The Hambry Weald | Hambry | `forest` | fog off the marsh-forest, more drizzle, overcast, snow north of 100 |
+| `barrens` The Storm Barrens | Gilead | none | grey, less sun, snow north of 100, storms rain a step harder |
+| `ashlands` The Ashlands | Endworld | `cinders` | heat by day 60%, rarely drizzle, never snow, mud 0.5x |
+| `drylands` The Dry Country | wild (4 seeds) | `sand` | heat by day 45%, sun, almost no drizzle or fog, never snow (rain instead), mud 0.4x |
 | `marsh` The Thornbog | wild (4 seeds) | `marsh` | fog (dawn and night), drizzle, overcast, mud 2x |
 
 - **The fields** (group `terrain`, [Fields](#fields)): a tile's field is its feature's
@@ -1348,11 +1363,9 @@ where a player may go.
 	start is the Midlands' plain, with no field, for at least 12 tiles around (the e2e
 	tests' calm place too).
 - **The climate**: the weather reads the biome at the centre of each 10-tile weather cell
-	(its `climate`: the chances of the base sky, and how long mud lasts), and the feature of
-	the tile itself for snow: peaks snow at any latitude ([Clock and weather](#clock-and-weather)).
-	Storms rain the same over any land, and snow falls where it did (north of 150) and on
-	the peaks: the design's colder snow lines (100 in the Weald and the Barrens), snowless
-	dry lands and harder Barrens storms were left out, as the plan's contract asks.
+	(its `climate`: the chances of the base sky, the snow line, how long mud lasts, how
+	much harder storms rain), and the feature of the tile itself for snow: peaks snow at
+	any latitude but where the climate never snows ([Clock and weather](#clock-and-weather)).
 - **The words** (`lib/terrain_lines.lua`, plain tables like `weather_lines.lua`): for
 	each biome and each feature, `standing` (where the player stands), `edge` (another
 	biome or feature on a tile next to theirs, `{direction}`), `fight_open` (an encounter's

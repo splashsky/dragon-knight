@@ -288,8 +288,10 @@ return {
 	committed data file, the grid as generator v1 made it from its seed, and the game only
 	reads that data, so no later change to code can move a lake. Generator v1 stays in the
 	repository (integer arithmetic only, so it gives the same bytes on every platform), and a
-	test reruns it from the recorded seed and requires the committed data byte for byte. A
-	different world would be a generator v2 and a deliberate commit of its data. The
+	test reruns it from the recorded seed and requires the committed data byte for byte.
+	Generator v1 may still change until 3.2.0 is released (its data written again with
+	it); after 3.2.0's release, a new world is a new generator (v2) and a deliberate commit
+	of its data. The
 	generator: biomes seeded around each town (from what the lore already says of each),
 	carried outward by a blue-noise scatter of points (each cell takes its nearest point's
 	biome, so the land comes out in organic patches with mixed borders), then water (ponds,
@@ -300,9 +302,10 @@ return {
 - **The map**: `/map` (and the World Map window) draws the grid in the biomes' colours, with
 	water, hills and mountains distinct, the towns marked and named, and the player's
 	position; it works without JavaScript and stays small.
-- **Climate**: the biome under a tile leans the weather's base climate (its sky and ground
-	vocabularies don't change; storms rain the same everywhere, and snow replaces rain where
-	it already does).
+- **Climate**: the biome under a tile leans the weather's climate (its sky and ground
+	vocabularies don't change): the base sky's chances, how long mud lasts, where snow
+	falls instead of rain (each biome's snow line), and how hard storms rain over it (the
+	Storm Barrens a step harder). The Midlands keep the weather's numbers exactly.
 - **The battlefield**: a new field group, `terrain`, holds the field of the ground the fight
 	is on (shore, marsh, hills, peaks, ...), followed from the player's tile like the
 	weather's. Midworld's starting land has none, and a mild climate.
@@ -343,16 +346,17 @@ return {
 | `shoals` The Salt Shoals | Bris | `#8db4b8` | none | sea mist at dawn, drizzle and cloud, mud 1.25x |
 | `diggings` The Diggings | Kalle | `#a08774` | none | dry and bright, little drizzle, mud 0.8x |
 | `moors` The Greymoor | Narcissa | `#9a93ab` | none | fog at dawn about half the time (Narcissa's before), some at night, grey, mud 1.5x |
-| `weald` The Hambry Weald | Hambry | `#5f8a6b` | `forest` | fog, more drizzle, overcast |
-| `barrens` The Storm Barrens | Gilead | `#9ea3a8` | none | grey, less sun |
-| `ashlands` The Ashlands | Endworld | `#a56a55` | `cinders` | heat by day 60% (Endworld's before), rarely drizzle, mud 0.5x |
-| `drylands` The Dry Country | (215, 10), (-20, 130), (-215, 175), (20, -215) | `#d2bd8a` | `sand` | heat by day 45%, sun, almost no drizzle or fog, mud 0.4x |
+| `weald` The Hambry Weald | Hambry | `#5f8a6b` | `forest` | fog, more drizzle, overcast, snow north of latitude 100 |
+| `barrens` The Storm Barrens | Gilead | `#9ea3a8` | none | grey, less sun, snow north of 100, storms rain a step harder |
+| `ashlands` The Ashlands | Endworld | `#a56a55` | `cinders` | heat by day 60% (Endworld's before), rarely drizzle, never snow, mud 0.5x |
+| `drylands` The Dry Country | (215, 10), (-20, 130), (-215, 175), (20, -215) | `#d2bd8a` | `sand` | heat by day 45%, sun, almost no drizzle or fog, never snow (rain instead, in the north and on its peaks too), mud 0.4x |
 | `marsh` The Thornbog | (-235, -20), (120, -150), (-40, 235), (80, 190) | `#7a7b4a` | `marsh` | fog at dawn and night, drizzle, overcast, mud 2x |
 
-The climate leans only the base sky's chances and how long mud lasts: storms rain the same
-everywhere, and snow falls north of latitude 150 as before, and on the peaks (decision 5).
-The design's colder snow lines for the Weald and the Barrens, snowless dry lands and
-harder storms over the Barrens were left out for that.
+The climate leans the base sky's chances, how long mud lasts, and the rain: snow falls
+north of each biome's snow line (latitude 150 as before; 100 in the Weald and the Barrens;
+never in the Dry Country and the Ashlands, rain instead) and on the peaks (decision 5), and
+storms rain a step harder over the Barrens (a squall's core there a thunderstorm, at most
+a thunderstorm or a blizzard). Every other biome's storms rain as their bands say.
 
 Features: lakes `#3f6fa3` and ponds `#5585b8` (deep blues, apart from the Shoals' teal;
 field `shallows`), hills (the biome's
@@ -388,6 +392,20 @@ Cells of 5 x 5 tiles, 101 x 101, evaluated at their centres (every town at one).
 	sit in the gaps between the towns' lands (the north, the west, the south-east, between
 	Midworld and Kalle; the south, between Bris and Gilead, the east, between Roma and
 	Hambry), each making a tract with ragged borders.
+- **Pockets, by climate**: a second jittered grid (one centre in each 56-tile square).
+	Each centre deep inside a land (its score 0.4 or more above any other's, and 26 tiles
+	or more from its town) makes a round pocket of 22 tiles (to a quarter more); the
+	land's points in it that are deep too (no other biome within 0.15) take another biome
+	whose climate is like the land's, by a hash weighted by how alike their traits are.
+	Each biome has two integer traits, warmth and wetness (-2 to 2): the Midlands 0 / 0,
+	the Downs 1 / 0, the Shoals 0 / 2, the Diggings 1 / -1, the Greymoor -1 / 1, the
+	Weald -2 / 1, the Barrens -2 / 0, the Ashlands 2 / -2, the Dry Country 2 / -2, the
+	Thornbog 0 / 2. The same traits weigh 2, one step apart 1, further never: so the Weald
+	has pockets of the Barrens and the Greymoor, the Barrens of the Weald, the Greymoor of
+	the Weald, the Shoals and the Thornbog of each other, the Ashlands and the Dry Country
+	of each other, the Midlands and the Diggings of the Downs, the Downs of the Midlands and
+	the Diggings. Pockets are a dozen scatter points or so: small patches, never one cell
+	alone; they keep the broad lands from being one stretch.
 - **Feature**, from value noises (lattice bytes every N tiles, smoothstep between)
 	flattened toward the towns (none within 16 tiles of Midworld and 8 of the others,
 	fewer out to 40 and 24):
@@ -404,36 +422,43 @@ Cells of 5 x 5 tiles, 101 x 101, evaluated at their centres (every town at one).
 	- else none.
 - **Integers only**: the hash is 64-bit mixing, distances integer square roots, the noises
 	and the smoothstep fixed point, every division a floor division.
-- **The world it made** (tuned by looking at its map before it was committed): plain 73%,
-	hills 16%, lakes 5%, peaks 4%, ponds 1%. Biomes: the Midlands 9%, the Copper Downs 4%,
-	the Salt Shoals 7%, the Diggings 15%, the Greymoor 13%, the Hambry Weald 13%, the Storm
-	Barrens 10%, the Ashlands 4%, the Dry Country 15%, the Thornbog 10% (the wild ones 25%
-	together, in tracts). No cell alone among other biomes; 34 lakes, 9 of 30 cells or more
-	(the largest 77); ponds of at most 4 cells. The widest stretch of one biome away from
-	its town (a square 90% of it, centred 50 tiles or more from the town) is 145 tiles (the
-	Weald); the test keeps it under a third of the map.
+- **The world it made** (tuned by looking at its map): plain 73%, hills 17%, lakes 5%,
+	peaks 4%, ponds 1%. Biomes: the Midlands 8%, the Copper Downs 9%, the Salt Shoals 8%,
+	the Diggings 11%, the Greymoor 14%, the Hambry Weald 14%, the Storm Barrens 9%, the
+	Ashlands 6%, the Dry Country 13%, the Thornbog 9% (the wild ones 22% together, in
+	tracts). No cell alone among other biomes, and every biome has at least 88% of its
+	cells in tracts of 30 or more; 32 lakes, 9 of 30 cells or more (the largest 81); ponds
+	of at most 4 cells. The widest stretch of one biome away from its town (a square 90%
+	of it, centred 50 tiles or more from the town) is 70 tiles (the Greymoor); the test
+	keeps it at 80 or less.
 - **Checking and changing it**: `tests/lua/test_terrain.lua` reruns v1 and requires the
 	committed `app/lib/terrain/world.lua` byte for byte; `tools/world.sh` writes it (and
-	the map's picture, `public/images/world.svg`, drawn from it). A new world is
+	the map's picture, `public/images/world.svg`, drawn from it). Until 3.2.0 is released,
+	generator v1 may still change, with `tools/world.sh` run and both files committed with
+	it; it is frozen at the release. After 3.2.0's release, a new world is
 	`generator_v2.lua` beside v1, pointed at by the tool and the test, and a commit of its
 	data.
 
 ### 7.4 Decisions
 
-1. The world is generated once by a versioned generator and committed as data; nothing is
-	stored in the database, and GETs stay pure.
+1. The world is generated by a versioned generator and committed as data (frozen with
+	generator v1 at 3.2.0's release); nothing is stored in the database, and GETs stay pure.
 2. The weather reads the biome at the centre of its 10-tile cell (one sky per cell).
 3. Encounters don't weigh monsters by biome (out of scope).
 4. No sea: the shoals lean to lakes and ponds, and the map's edge is its edge.
 5. Peaks snow instead of rain at any latitude, by the tile's own feature (not its weather
-	cell's): the peaks of a range snow while the hills around them rain.
+	cell's): the peaks of a range snow while the hills around them rain. The biomes' rain
+	climates follow the design: snow north of 100 in the Weald and the Barrens, never snow
+	in the Dry Country and the Ashlands (rain instead, on their peaks too), the Barrens'
+	storms a step harder; the Midlands keep the weather's own.
 6. The seven terrain fields above; four biomes have a ground field of their own. Spells
 	can't put a terrain field up.
 7. The far reaches aren't one stretch, and the land reads as geography: a point takes only
 	a biome that reaches it (no confetti of far-away biomes), the wild biomes are a few
-	broad tracts in the gaps between the towns' lands (a quarter of the map), and lakes are
-	real bodies. The unit test checks coherence, the shares, the lakes and the widest
-	stretch (under a third of the map).
+	broad tracts in the gaps between the towns' lands (about a fifth of the map), lakes are
+	real bodies, and the broad lands have pockets of biomes with like climates (never an
+	opposite one), so no stretch of one biome is much more than 80 tiles across away from
+	its town. The unit test checks coherence, the shares, the lakes and the widest stretch.
 8. The map reveals everything (every town and all the land), as the old picture did, and
 	marks the player.
 9. No terrain begins or ends lines: the Battlefield line shows the terrain field, and it

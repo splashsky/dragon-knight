@@ -2,8 +2,10 @@
 -- the world's land, app/lib/terrain/world.lua, once, from SEED; the game never loads it
 -- (lib/terrain.lua reads only that data). It is kept so the data can be checked against
 -- it (tests/lua/test_terrain.lua requires its output byte for byte) and written again
--- (tools/world.sh). Never change it: the world is permanent. A different world is a new
--- generator (generator_v2.lua beside this one) and a deliberate commit of its data.
+-- (tools/world.sh). It is frozen when 3.2.0 is released: from then on the world is
+-- permanent, and a different world is a new generator (generator_v2.lua beside this one)
+-- and a deliberate commit of its data. Until then it may still change, with its data
+-- written again.
 --
 -- Deterministic everywhere: integer hashing and integer or fixed-point arithmetic only
 -- (integer square roots, smoothstep on integers, floor divisions), no floats, so every
@@ -21,6 +23,15 @@
 --      far within: so the lands are coherent, their borders meander, and they mix only in
 --      the bands where two scores are close. Every point is reached by some biome (the
 --      wild seeds sit in the gaps between the towns' lands; the generator stops if not).
+--      Pockets break up the broad lands: a second jittered grid (one centre in each 56-tile
+--      square) whose centres deep inside a land (its score 0.4 or more above any other's,
+--      26 tiles or more from its town) each make a round pocket of 22 tiles (to a quarter
+--      more); the land's points in it that are deep too take another biome with a climate
+--      like the land's, by a hash weighted by how alike their traits are (warmth and
+--      wetness, -2 to 2: the same, 2; one step apart, 1; further, never). So the cold Weald
+--      has pockets of the Barrens and the Greymoor, the wet Shoals of the Thornbog, the
+--      Ashlands of the Dry Country, the Midlands of the Copper Downs: small patches of a
+--      dozen scatter points, never one cell alone.
 --   2. its feature, from value noises (lattice bytes hashed every `step` tiles, smoothstep
 --      between them), flattened toward the towns (none within 16 tiles of Midworld and 8
 --      of another town, fewer out to 40 and 24): elevation (steps 48, 24 and 12, weighted
@@ -29,9 +40,9 @@
 --      so lakes are a few bodies several cells across with ragged shores; elevation again,
 --      hills at 0.62; the pools (step 6, plus the biome's pond shift): a pond at 0.89 and
 --      above where it is low, single cells or pairs; else none (plain).
--- Its numbers were tuned by looking at the map it draws (coherent lands, the wild biomes
--- about a quarter of the map in tracts, a handful of real lakes) before its world was
--- committed, and are frozen with it.
+-- Its numbers were tuned by looking at the map it draws (coherent lands with pockets, no
+-- stretch of one biome much more than 70 tiles across away from its town, the wild biomes
+-- about a fifth of the map in tracts, a handful of real lakes).
 local generator = {}
 
 generator.VERSION = "v1"
@@ -47,6 +58,13 @@ local TOWN_TILES = 7    -- every tile this close to a town has the town's biome
 -- where it reaches), moved by its own border noise (up to WIGGLE either way); a point may
 -- take any biome within MARGIN of the best score, weighted by how far within.
 local MARGIN, WIGGLE, WIGGLE_STEP = 150000, 250000, 32
+-- Pockets: a second jittered grid, one centre in each POCKET x POCKET tile square; each
+-- centre deep inside a land (its score POCKET_DEEP or more above any other's, and
+-- POCKET_AWAY tiles or more from its town) makes a pocket of POCKET_RADIUS tiles (to a
+-- quarter more): its land's points there that are deep too (MARGIN) take another biome,
+-- one with a climate like the land's (weighted by SIMILAR less the distance of their
+-- traits; none at SIMILAR or more).
+local POCKET, POCKET_RADIUS, POCKET_DEEP, POCKET_AWAY, SIMILAR = 56, 22, 400000, 26, 2
 -- the noises' fixed point: a noise is in 2^-20, a sum of noises (weights summing to 10) in ONE
 local ONE = 10 << 20
 local function hundredths(n) return n * ONE // 100 end
@@ -59,29 +77,30 @@ local TOWN_CLEAR = { 8, 24 }
 -- The biomes, in the order their weights add up: their letter in the data, their town
 -- (latitude, longitude) or seeds, core and reach (tiles), weight (thousandths); the shifts
 -- (hundredths) of the elevation (more hills and peaks), of the lake line (more lakes) and of
--- the pond line (more ponds).
+-- the pond line (more ponds); their climate's traits, warmth and wetness (-2 to 2), for
+-- the pockets.
 generator.BIOMES = {
 	{ key = "midland", letter = "M", town = { 0, 0 }, clear = MIDWORLD_CLEAR, core = 20, reach = 130, weight = 1600,
-		elevation = 0, lakes = -4, ponds = 0 },
+		elevation = 0, lakes = -4, ponds = 0, warmth = 0, wetness = 0 },
 	{ key = "downs", letter = "R", town = { 30, 30 }, core = 14, reach = 100, weight = 1300,
-		elevation = 6, lakes = -3, ponds = 0 },
+		elevation = 6, lakes = -3, ponds = 0, warmth = 1, wetness = 0 },
 	{ key = "shoals", letter = "B", town = { 70, -70 }, core = 20, reach = 120, weight = 1000,
-		elevation = -6, lakes = 6, ponds = 3 },
+		elevation = -6, lakes = 6, ponds = 3, warmth = 0, wetness = 2 },
 	{ key = "diggings", letter = "K", town = { -100, 100 }, core = 24, reach = 150, weight = 1000,
-		elevation = 6, lakes = -4, ponds = -2 },
+		elevation = 6, lakes = -4, ponds = -2, warmth = 1, wetness = -1 },
 	{ key = "moors", letter = "N", town = { -130, -130 }, core = 24, reach = 150, weight = 1000,
-		elevation = -3, lakes = 2, ponds = 3 },
+		elevation = -3, lakes = 2, ponds = 3, warmth = -1, wetness = 1 },
 	{ key = "weald", letter = "H", town = { 170, 170 }, core = 24, reach = 150, weight = 1000,
-		elevation = 2, lakes = 1, ponds = 2 },
+		elevation = 2, lakes = 1, ponds = 2, warmth = -2, wetness = 1 },
 	{ key = "barrens", letter = "G", town = { 200, -200 }, core = 24, reach = 150, weight = 1000,
-		elevation = -1, lakes = 0, ponds = 1 },
+		elevation = -1, lakes = 0, ponds = 1, warmth = -2, wetness = 0 },
 	{ key = "ashlands", letter = "E", town = { -250, -250 }, core = 24, reach = 160, weight = 1500,
-		elevation = 5, lakes = -6, ponds = -4 },
-	{ key = "drylands", letter = "D", wild = true, core = 0, reach = 110, weight = 450,
-		elevation = -2, lakes = -6, ponds = -6,
+		elevation = 5, lakes = -6, ponds = -4, warmth = 2, wetness = -2 },
+	{ key = "drylands", letter = "D", wild = true, core = 0, reach = 110, weight = 420,
+		elevation = -2, lakes = -6, ponds = -6, warmth = 2, wetness = -2,
 		seeds = { { 215, 10 }, { -20, 130 }, { -215, 175 }, { 20, -215 } } },
-	{ key = "marsh", letter = "T", wild = true, core = 0, reach = 110, weight = 450,
-		elevation = -7, lakes = 8, ponds = 6,
+	{ key = "marsh", letter = "T", wild = true, core = 0, reach = 110, weight = 420,
+		elevation = -7, lakes = 8, ponds = 6, warmth = 0, wetness = 2,
 		seeds = { { -235, -20 }, { 120, -150 }, { -40, 235 }, { 80, 190 } } },
 }
 -- The features' characters in the data (plain: ".").
@@ -101,7 +120,7 @@ local function hash(salt, a, b)
 	return mix(mix(mix(generator.SEED + salt) + a) + b)
 end
 -- salts: what a hash is for (the noises use 1-5)
-local POINT, PICK = 11, 12
+local POINT, PICK, POCKET_SALT = 11, 12, 13
 
 -- floor(sqrt(n)) for an integer n >= 0 (Newton's method on integers).
 local function isqrt(n)
@@ -152,17 +171,18 @@ local function squared(lat, lon, place, unit)
 	return dlat * dlat + dlon * dlon
 end
 
--- The biome (its index) a point at (lat, lon) (1/FINE tiles) of square (si, sj) takes: a
--- town's within its core; else, among the biomes that reach it, one within MARGIN of the
--- best score (borders: noise), picked by a hash.
-local function pick(si, sj, lat, lon, borders)
-	local scores, best = {}, nil
+-- The lands at a point (lat, lon) (1/FINE tiles): { core (a town's index, within its core),
+-- or scores (by index: the biomes that reach it, each weight * (1 - distance / reach) moved
+-- by its border noise), top (the best), lead (its score less the next one's; nil: alone),
+-- away (its distance from its anchor) }; top is nil where no biome reaches (beyond the map).
+local function lands(lat, lon, borders)
+	local scores, best, top, second, away = {}, nil, nil, nil, nil
 	for i, b in ipairs(generator.BIOMES) do
 		local d2 = math.maxinteger
 		if b.town then
 			d2 = squared(lat, lon, b.town, FINE)
 			local core = b.core * FINE
-			if d2 <= core * core then return i end
+			if d2 <= core * core then return { core = i } end
 		else
 			for _, s in ipairs(b.seeds) do
 				local x = squared(lat, lon, s, FINE)
@@ -174,13 +194,84 @@ local function pick(si, sj, lat, lon, borders)
 			local score = b.weight * 1000 * (r - d) // r +
 				(borders[i](lat // FINE, lon // FINE) - (1 << 19)) * WIGGLE // (1 << 19)
 			scores[i] = score
-			if not best or score > best then best = score end
+			if not best or score > best then
+				best, second, top, away = score, best, i, d
+			elseif not second or score > second then
+				second = score
+			end
 		end
 	end
-	assert(best, "a point no biome reaches")
+	return { scores = scores, top = top, best = best, lead = second and best - second, away = away }
+end
+
+-- Whether a point's lands are deep inside its best land: no other within `lead`, and (a
+-- town's land) POCKET_AWAY tiles or more from the town.
+local function deep(l, lead)
+	if l.core or not l.top or (l.lead and l.lead < lead) then return false end
+	return not generator.BIOMES[l.top].town or l.away >= POCKET_AWAY * FINE
+end
+
+-- The pocket a point at (lat, lon) (1/FINE tiles) with lands l is in: its hash, or nil. The
+-- pockets' centres, one in each pocket square placed by a hash (within its middle half);
+-- one deep inside a land (POCKET_DEEP) makes a pocket of the land's points within its
+-- radius. The first of the 3 x 3 around.
+local function pocket(lat, lon, l, borders, centres)
+	local span = POCKET * FINE
+	local pi, pj = lat // span, lon // span
+	for di = -1, 1 do
+		for dj = -1, 1 do
+			local key = (pi + di) * 4096 + (pj + dj)
+			local c = centres[key]
+			if c == nil then
+				c = false
+				local h = hash(POCKET_SALT, pi + di, pj + dj)
+				local clat = (pi + di) * span + span // 4 + ((h >> 8) & 0xff) * (span // 2) // 256
+				local clon = (pj + dj) * span + span // 4 + ((h >> 16) & 0xff) * (span // 2) // 256
+				local cl = lands(clat, clon, borders)
+				if deep(cl, POCKET_DEEP) then
+					c = { lat = clat, lon = clon, land = cl.top, hash = h,
+						radius = POCKET_RADIUS * FINE * (1024 + ((h >> 24) & 0xff)) // 1024 }
+				end
+				centres[key] = c
+			end
+			if c and c.land == l.top and squared(lat, lon, { c.lat, c.lon }, 1) < c.radius * c.radius then return c.hash end
+		end
+	end
+	return nil
+end
+
+-- The biome (its index) a point at (lat, lon) (1/FINE tiles) of square (si, sj) takes: a
+-- town's within its core; deep inside a land and within one of its pockets, a biome with a
+-- climate like the land's (by a hash: weighted by SIMILAR less the distance of their
+-- traits); else, among the biomes that reach it, one within MARGIN of the best score, by a
+-- hash weighted by how far within.
+local function pick(si, sj, lat, lon, borders, centres)
+	local l = lands(lat, lon, borders)
+	if l.core then return l.core end
+	assert(l.top, "a point no biome reaches")
+	if deep(l, MARGIN) then
+		local h = pocket(lat, lon, l, borders, centres)
+		if h then
+			local land = generator.BIOMES[l.top]
+			local weights, total = {}, 0
+			for i, b in ipairs(generator.BIOMES) do
+				local far = math.abs(b.warmth - land.warmth) + math.abs(b.wetness - land.wetness)
+				weights[i] = (i ~= l.top and far < SIMILAR) and SIMILAR - far or 0
+				total = total + weights[i]
+			end
+			if total > 0 then
+				local u = (h >> 32) % total
+				for i = 1, #weights do
+					if u < weights[i] then return i end
+					u = u - weights[i]
+				end
+			end
+		end
+		return l.top
+	end
 	local weights, total = {}, 0
 	for i = 1, #generator.BIOMES do
-		local w = scores[i] and scores[i] - (best - MARGIN) or 0
+		local w = l.scores[i] and l.scores[i] - (l.best - MARGIN) or 0
 		weights[i] = w > 0 and w or 0
 		total = total + weights[i]
 	end
@@ -244,13 +335,13 @@ end
 function generator.world()
 	local borders = {}
 	for i = 1, #generator.BIOMES do borders[i] = noise(WIGGLE_STEP, 20 + i) end
-	local cache = {}
+	local cache, centres = {}, {}
 	local function points(si, sj)
 		local k = si * 4096 + sj
 		local p = cache[k]
 		if not p then
 			local lat, lon = point(si, sj)
-			p = { lat = lat, lon = lon, biome = pick(si, sj, lat, lon, borders) }
+			p = { lat = lat, lon = lon, biome = pick(si, sj, lat, lon, borders, centres) }
 			cache[k] = p
 		end
 		return p
@@ -279,7 +370,8 @@ function generator.text()
 		("-- world generator %s (app/lib/terrain/generator_%s.lua), seed 0x%X: do not edit by hand."):format(
 			generator.VERSION, generator.VERSION, generator.SEED),
 		"-- tools/world.sh writes it; tests/lua/test_terrain.lua requires the generator's output byte",
-		"-- for byte. The world is permanent: a new world is a new generator and a commit of its data.",
+		"-- for byte. After 3.2.0's release the world is permanent: a new world is then a new generator",
+		"-- and a commit of its data.",
 		"return {",
 		("\tgenerator = %q,"):format(generator.VERSION),
 		("\tseed = 0x%X,"):format(generator.SEED),

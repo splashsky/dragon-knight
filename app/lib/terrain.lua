@@ -14,11 +14,14 @@ terrain.CELLS = world.cells   -- i and j run from -CELLS to CELLS
 
 -- The weather's climate where a biome lies (lib/weather.lua): fog's chance and what dawn and
 -- night add to it, heat's by day (not where it snows), drizzle's (snow where it snows),
--- overcast's, sun's by day (of what remains); how long mud lasts (times weather.MUD). The
--- Midlands' is the weather's own, as it was before the land. Storms rain the same
--- everywhere, and where it snows is the weather's (north of weather.NORTH, and the peaks).
+-- overcast's, sun's by day (of what remains); the latitude north of which falling weather
+-- is snow (and on its peaks; NEVER: no snow at all, rain instead, peaks too); how long mud
+-- lasts (times weather.MUD); the levels a storm rains harder (at most a thunderstorm or a
+-- blizzard). The Midlands' is the weather's own, as it was before the land.
+local NEVER = math.huge
 local function climate(c)
-	local out = { fog = 0.04, fog_dawn = 0, fog_night = 0, heat = 0, drizzle = 0.06, overcast = 0.20, sun = 0.35, mud = 1 }
+	local out = { fog = 0.04, fog_dawn = 0, fog_night = 0, heat = 0, drizzle = 0.06, overcast = 0.20, sun = 0.35,
+		snow_line = 150, mud = 1, storm = 0 }
 	for k, v in pairs(c) do out[k] = v end
 	return out
 end
@@ -38,14 +41,16 @@ terrain.BIOMES = {
 		climate = climate { fog = 0.06, fog_dawn = 0.50, fog_night = 0.15, drizzle = 0.10, overcast = 0.30, sun = 0.25,
 			mud = 1.5 } },
 	{ key = "weald", name = "The Hambry Weald", colour = "#5f8a6b", field = "forest",
-		climate = climate { fog = 0.10, fog_dawn = 0.20, fog_night = 0.05, drizzle = 0.10, overcast = 0.30, sun = 0.25 } },
+		climate = climate { fog = 0.10, fog_dawn = 0.20, fog_night = 0.05, drizzle = 0.10, overcast = 0.30, sun = 0.25,
+			snow_line = 100 } },
 	{ key = "barrens", name = "The Storm Barrens", colour = "#9ea3a8",
-		climate = climate { fog = 0.06, fog_dawn = 0.05, drizzle = 0.08, overcast = 0.30, sun = 0.20 } },
+		climate = climate { fog = 0.06, fog_dawn = 0.05, drizzle = 0.08, overcast = 0.30, sun = 0.20, snow_line = 100,
+			storm = 1 } },
 	{ key = "ashlands", name = "The Ashlands", colour = "#a56a55", field = "cinders",
-		climate = climate { fog = 0.02, heat = 0.60, drizzle = 0.02, overcast = 0.10, sun = 0.30,
+		climate = climate { fog = 0.02, heat = 0.60, drizzle = 0.02, overcast = 0.10, sun = 0.30, snow_line = NEVER,
 			mud = 0.5 } },
 	{ key = "drylands", name = "The Dry Country", colour = "#d2bd8a", field = "sand",
-		climate = climate { fog = 0.02, heat = 0.45, drizzle = 0.02, overcast = 0.08, sun = 0.45,
+		climate = climate { fog = 0.02, heat = 0.45, drizzle = 0.02, overcast = 0.08, sun = 0.45, snow_line = NEVER,
 			mud = 0.4 } },
 	{ key = "marsh", name = "The Thornbog", colour = "#7a7b4a", field = "marsh",
 		climate = climate { fog = 0.12, fog_dawn = 0.30, fog_night = 0.10, drizzle = 0.15, overcast = 0.25, sun = 0.20,
@@ -53,7 +58,8 @@ terrain.BIOMES = {
 }
 
 -- The features: key, name, colour on the map (hills and peaks: their biome's, darker), field.
--- Peaks are cold: falling weather is snow on them at any latitude (lib/weather.lua).
+-- Peaks are cold: falling weather is snow on them at any latitude, but where the climate
+-- never snows (lib/weather.lua).
 terrain.FEATURES = {
 	{ key = "lake", name = "Lake", colour = "#3f6fa3", field = "shallows" },
 	{ key = "pond", name = "Pond", colour = "#5585b8", field = "shallows" },

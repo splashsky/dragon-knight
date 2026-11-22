@@ -28,6 +28,10 @@ t_section "fight: monster selection"
 # is picked by the level band, its first strike (when quicker) played
 f_sql "UPDATE users SET latitude = -50, longitude = 7, currenthp = 1000, base_maxhp = 1000"
 t_fight_new fighter
+# (since 3.2 a monster's first strike may be a spell: a sleep or a stun on the player would
+# leave only Continue on the page; this section is about which monster comes, so the
+# player starts it free of statuses)
+t_sql "DELETE FROM fight_statuses WHERE combatant_id = 1 AND user_id = (SELECT id FROM users $FQ)"
 t_get /fight;   expect_status 200; expect_body '<h1 class="title page-title">Fighting</h1>'; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">'
 expect_body "Monster's HP: "; expect_body 'name="fight"'; expect_body 'name="run"'
 expect_no_body 'action="/move"'                       # no compass while fighting

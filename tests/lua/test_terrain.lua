@@ -3,9 +3,9 @@
 -- byte; a cell's tiles share their land; the towns stand on plain ground in their own biome
 -- and Midworld's start is plain Midlands with no field; no feature near a town; every biome
 -- present in sensible shares (the wild ones a fifth to a quarter of the map); the lands
--- coherent (no confetti, tracts) and none spanning a third of the map; lakes real bodies
--- and ponds small; the features' shares; the fields the land names are the terrain
--- group's; and what loading and a lookup cost.
+-- coherent (no confetti, tracts) and none much more than 80 tiles across away from its town
+-- (pockets); lakes real bodies and ponds small; the features' shares; the fields the land
+-- names are the terrain group's; and what loading and a lookup cost.
 local generator = require("lib.terrain.generator_v1")
 local kind = require("lib.content.kinds.fields")
 local terrain = require("lib.terrain")
@@ -44,7 +44,8 @@ function T.the_world_is_generator_v1s_output_byte_for_byte()
 		local at = 1
 		while made:byte(at) == data:byte(at) do at = at + 1 end
 		error("app/lib/terrain/world.lua differs from world generator v1's output at byte " .. at ..
-			" (the world is permanent: don't change generator v1 or edit the data; a new world is a new generator)")
+			" (never edit the data; before 3.2.0's release, run tools/world.sh after changing generator v1; after it," ..
+			" the world is permanent: a new world is a new generator)")
 	end
 	eq(world.generator, "v1"); eq(world.seed, 0x3300); eq(generator.SEED, world.seed)
 	eq(#world.land, 2 * CELLS + 1); eq(#world.relief, 2 * CELLS + 1)
@@ -203,8 +204,9 @@ end
 
 -- The largest square (tiles a side) in which one biome holds at least 90% of the cells and
 -- whose centre is at least 50 tiles from that biome's town: the widest stretch of one
--- biome away from its town. Lands are coherent, but none spans a third of the map.
-function T.no_stretch_of_one_biome_spans_a_third_of_the_map()
+-- biome away from its town. Pockets of like climates break the broad lands up: none is
+-- much more than 80 tiles across.
+function T.no_stretch_of_one_biome_much_more_than_80_tiles_across()
 	local side = 2 * CELLS + 1
 	local home = {}
 	for _, t in ipairs(towns()) do home[t.biome] = t end
@@ -238,7 +240,7 @@ function T.no_stretch_of_one_biome_spans_a_third_of_the_map()
 			end
 			if any then widest = s elseif s > widest + 3 then break end
 		end
-		assert(widest * CELL < 500 / 3, ("%s holds a stretch %d tiles across"):format(b.key, widest * CELL))
+		assert(widest * CELL <= 80, ("%s holds a stretch %d tiles across"):format(b.key, widest * CELL))
 	end
 end
 

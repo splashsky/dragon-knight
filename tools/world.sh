@@ -5,10 +5,12 @@
 #
 #   BIN=./dk tools/world.sh
 #
-# The world is permanent: the data it writes must be the committed data, byte for byte
-# (tests/lua/test_terrain.lua checks it, and that the picture is the drawing of it), so
-# this changes nothing unless the picture's drawing or colours changed. A new world is a
-# new generator beside v1 and a deliberate commit of its data. It runs in the project's own
+# The data it writes must be the committed data, byte for byte (tests/lua/test_terrain.lua
+# checks it, and that the picture is the drawing of it), so this changes nothing unless
+# generator v1 or the picture's drawing or colours changed. Generator v1 may still change
+# until 3.2.0 is released (run this then, and commit both files); after the release the
+# world is permanent, and a new world is a new generator beside v1 and a deliberate commit
+# of its data. It runs in the project's own
 # Lua: a scratch copy of app/ whose cli/check.lua is tools/world.lua, run by `dk check`
 # (which needs no database).
 set -eu

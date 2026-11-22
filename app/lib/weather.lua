@@ -22,7 +22,6 @@ weather.ORIGIN = 30            -- storms form within this many tiles of Midworld
 weather.GILEAD = { 200, -200 } -- (latitude, longitude) where storms go and break
 weather.CROSSING = 7200        -- seconds from a storm's origin to Gilead, give or take a tenth
 weather.WOBBLE = 0.08          -- radians a storm's heading may be off, either way
-weather.NORTH = 150            -- snow instead of rain north of this latitude (and on the peaks)
 weather.NEAR = 40              -- a storm whose edge is this many tiles away or less is near
 weather.MUD = 1200             -- mud lasts this long after rain (or worse) ends (times the biome's climate.mud)
 weather.SNOW = 2400            -- snow lies this long after snowfall ends (ice its second half)
@@ -43,7 +42,7 @@ local STEP = weather.STEP * clock.TICK   -- a step, in seconds
 -- salts: what a hash is for
 local CELL_SHIFT, CELL_SKY, STORM, CHANGE, DESCRIBE, EDGE = 1, 2, 3, 4, 5, 6
 
-local sqrt, atan, sin, cos, floor, max = math.sqrt, math.atan, math.sin, math.cos, math.floor, math.max
+local sqrt, atan, sin, cos, floor, min, max = math.sqrt, math.atan, math.sin, math.cos, math.floor, math.min, math.max
 
 -- The unix time the weather's step `now` is in starts (a whole number of clock ticks).
 local function step_start(now)
@@ -114,10 +113,11 @@ local function stage(f)
 	return 1 - 0.5 * (f - WEAKENS) / (1 - WEAKENS), 1
 end
 
--- The rain level (1-4) at distance share x (< 1) of the radius.
-local function level(s, x, weaker)
+-- The rain level (1-4) at distance share x (< 1) of the radius, `harder` levels more where
+-- the climate says so (at most 4).
+local function level(s, x, weaker, harder)
 	local band = x < BANDS[1] and 0 or x < BANDS[2] and 1 or 2
-	return max(s.size.core - band - weaker, 1)
+	return min(max(s.size.core + harder - band - weaker, 1), #RAIN)
 end
 
 -- What the storm s left on the ground at (lat, lon) by time t, from the closest approach of
@@ -132,7 +132,7 @@ local function left(s, lat, lon, t, north, c)
 	if closest > t then return nil end
 	local share, weaker = stage(tau / s.life)
 	-- the bands that rain (or snow) hard enough
-	local bands = s.size.core - weaker - (north and 0 or 1)
+	local bands = s.size.core + c.storm - weaker - (north and 0 or 1)
 	if bands < 1 then return nil end
 	local reach = s.radius * share * BANDS[bands > 3 and 3 or bands]
 	local plat, plon = s.lat + s.vlat * tau - lat, s.lon + s.vlon * tau - lon
@@ -153,10 +153,11 @@ local function climate(lat, lon)
 	return terrain.biome(land.biome).climate
 end
 
--- Whether falling weather is snow at a tile: north of weather.NORTH, or on a peak (peaks are
--- cold at any latitude).
-local function snows(lat, lon)
-	return lat > weather.NORTH or terrain.at(lat, lon).feature == "peak"
+-- Whether falling weather is snow at a tile: north of its climate's snow line, or on a peak
+-- (peaks are cold at any latitude), but never where the climate has no snow line.
+local function snows(lat, lon, c)
+	if c.snow_line == math.huge then return false end
+	return lat > c.snow_line or terrain.at(lat, lon).feature == "peak"
 end
 
 -- A cell's base sky by its climate c: fog (likelier at dawn and at night where the climate
@@ -200,7 +201,7 @@ end
 
 -- The weather at a tile: { sky, ground, time, storm, near }.
 --   sky: clear, sun, heat, overcast, fog, drizzle, rain, downpour, thunderstorm, snow,
---        blizzard (snow instead of rain north of weather.NORTH, and on peaks)
+--        blizzard (snow instead of rain north of the climate's snow line, and on peaks)
 --   ground: dry, wet, mud, snow, ice
 --   time: dawn, day, dusk, night (clock.time_of_day)
 --   storm: the storm overhead, { size = "squall" | "storm" | "great", name }, or nil
@@ -212,7 +213,7 @@ function weather.at(lat, lon, now)
 	local t = step_start(now)
 	local time = clock.time_of_day(t)
 	local c = climate(lat, lon)
-	local north = snows(lat, lon)
+	local north = snows(lat, lon, c)
 	local sky = base_sky(lat, lon, t, time, north, c)
 	local rain = FALLING[sky] and 1 or 0
 	local over, near, gap, dlat_near, dlon_near, ground
@@ -227,7 +228,7 @@ function weather.at(lat, lon, now)
 				local dlat, dlon = s.lat + s.vlat * age - lat, s.lon + s.vlon * age - lon
 				local d = sqrt(dlat * dlat + dlon * dlon)
 				if d < r then
-					local lv = level(s, d / r, weaker)
+					local lv = level(s, d / r, weaker, c.storm)
 					if lv > rain or (lv == rain and not over) then rain, over = lv, s end
 				elseif d - r <= weather.NEAR and (not gap or d - r < gap) then
 					near, gap, dlat_near, dlon_near = s, d - r, dlat, dlon
