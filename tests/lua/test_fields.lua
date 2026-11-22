@@ -112,8 +112,11 @@ end
 function T.the_files_and_their_rows()
 	local k = load.kind("fields")
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
-	eq(#k.entities, 14)
+	eq(#k.entities, 21)
 	for key, group in pairs(kind.WORLD) do eq(k.by_key[key].group, group, key) end
+	local terrain_fields = 0
+	for _, e in ipairs(k.entities) do if e.flat.group == "terrain" then terrain_fields = terrain_fields + 1 end end
+	eq(terrain_fields, 7, "the land's fields")
 	for _, key in ipairs({ "consecrated", "brimstone", "miasma" }) do eq(k.by_key[key].group, "aura", key) end
 	local d = assert(rows.by_key("downpour"))
 	eq(d.damage.fire, -40); eq(d.damage.lightning, 25); eq(d.stats.dexterity, -10); eq(d.statuses.burning.blocked, true)
@@ -147,7 +150,7 @@ function T.validation()
 	eq(errors(base({ statuses = { burning = { blocked = true, ticks = -1, chance = 50, scale = { amount = 150 } } },
 		damage = { fire = -40 }, stats = { dexterity = -10 }, messages = { begins = "Hi.", blocked = "No." },
 		data = { chance = 6 }, on_tick = function() end })), "")
-	has(errors(base({ group = "weather" })), "field 'group' must be one of sky, ground, time, aura")
+	has(errors(base({ group = "weather" })), "field 'group' must be one of sky, ground, time, terrain, aura")
 	has(errors(base({ damage = { ice = 5 } })), "damage.ice: unknown")
 	has(errors(base({ damage = { fire = -101 } })), "field 'damage.fire' must be an integer from -100 to 1000")
 	has(errors(base({ stats = { luck = 5 } })), "stats.luck: unknown")
@@ -160,6 +163,9 @@ function T.validation()
 	has(errors(base({ on_tick = 5 })), "field 'on_tick' must be a function")
 	has(errors(base({ group = "aura" }), "rain"), "the weather puts the rain field up in its sky group")
 	eq(errors(base({ group = "sky" }), "rain"), "")
+	has(errors(base({ group = "aura" }), "marsh"), "the land puts the marsh field up in its terrain group")
+	has(errors(base({ group = "terrain" }), "rubble"), "the land puts no rubble field up")
+	eq(errors(base({ group = "terrain" }), "marsh"), "")
 	-- the flat form, overridable like a status's
 	local flat = assert(schema.validate(kind, base({ statuses = { sleep = { scale = { chance = 120 } } }, damage = { holy = 5 } })))
 	eq(flat["statuses.sleep.scale.chance"], 120); eq(flat["damage.holy"], 5)
@@ -174,14 +180,15 @@ end
 ---------------------------------------------------------------------------------------
 -- Combinations
 
--- tests/run.sh's calm place (T_CALM_LAT, T_CALM_LON): the weather brings no field to it from
--- the e2e tests' clock (T_START, 4000000000) until nightfall 1400 s later, so the e2e checks
--- of a fight's numbers fought there meet no battlefield on any run.
+-- tests/run.sh's calm place (T_CALM_LAT, T_CALM_LON): the land (the Midlands' plain) and the
+-- weather bring no field to it from the e2e tests' clock (T_START, 4000000000) until
+-- nightfall 1400 s later, so the e2e checks of a fight's numbers fought there meet no
+-- battlefield on any run.
 function T.the_e2e_tests_calm_place()
 	local f = fight(no_rolls, { -3, 3 })
 	for k = 400000000, 400000139 do
 		local w = fields.world(f, k)
-		eq(next(w), nil, "a field at the calm place at tick " .. k .. ": " .. tostring(w.sky or w.ground or w.time))
+		eq(next(w), nil, "a field at the calm place at tick " .. k .. ": " .. tostring(w.sky or w.ground or w.time or w.terrain))
 	end
 	eq(fields.world(f, 400000140).time, "night", "nightfall")
 end
@@ -341,16 +348,26 @@ end
 ---------------------------------------------------------------------------------------
 -- Fields on the clock
 
+-- A place on the storms' road (Midworld to Gilead) on plain ground (no terrain field), so
+-- the battlefield there is the weather's alone.
+local ROAD = (function()
+	local terrain = require("lib.terrain")
+	for d = 100, 150 do
+		if not terrain.at(d, -d).field then return { d, -d } end
+	end
+	error("no plain ground on the storms' road")
+end)()
+
 -- A place and a tick whose weather puts a sky field up (not rain or fog, which the tests
 -- cast; not the thunderstorm, which rolls) that holds for the next `n` ticks.
 local function steady_sky(n)
-	local f = fight(no_rolls, { 100, -100 })
+	local f = fight(no_rolls, ROAD)
 	for k = 400000002, 400000002 + 720 * 6, 6 do
 		local sky = fields.world(f, k).sky
 		if sky and sky ~= "rain" and sky ~= "fog" and sky ~= "thunderstorm" then
 			local same = true
 			for j = 1, n do if fields.world(f, k + j).sky ~= sky then same = false end end
-			if same then return { 100, -100 }, k, sky end
+			if same then return ROAD, k, sky end
 		end
 	end
 	error("no steady sky field found on the storms' road")
@@ -401,6 +418,34 @@ function T.a_spells_field_displaces_the_worlds()
 	has(x.refused, "Something went wrong")
 end
 
+-- The land's field: the terrain's at the player's tile (lib/terrain.lua), up from the fight's
+-- start and held for it (the player doesn't move in a fight); no spell puts one up.
+function T.the_terrain_field()
+	local terrain = require("lib.terrain")
+	local place
+	for lat = -245, 245, 10 do
+		for lon = -245, 245, 10 do
+			if not place and terrain.at(lat, lon).field == "marsh" then place = { lat, lon } end
+		end
+	end
+	local k = 400000002
+	-- (the highest of every roll: a thunderstorm's bolt never strikes)
+	local f = fight(function(lo, hi) return math.max(php.intval(lo), php.intval(hi)) end, place)
+	f.tick, f.deadline = k, k + 1000
+	fields.start(f, k)
+	eq(f.data.field_terrain, "marsh")
+	has(up(f), "terrain:marsh")
+	eq(rows.by_key("marsh").damage.poison, 15)
+	local a = round.advance(f, k + 60)
+	eq(a.f.data.field_terrain, "marsh", "held")
+	local x = act_run(a.f, function(s) s:field("peaks", { ticks = 2 }) end)
+	has(x.refused, "Something went wrong")
+	eq(fields.set(a.f, "peaks", 3), nil)
+	eq(a.f.data.field_terrain, "marsh")
+	-- the plain Midlands have none
+	eq(fields.world(fight(no_rolls, { 0, 5 }), k).terrain, nil)
+end
+
 function T.auras_come_only_from_spells()
 	local place, k = steady_sky(2)
 	local f = fight(no_rolls, place)
@@ -419,11 +464,11 @@ end
 
 -- A place (on the storms' road) and a tick at which the weather changes the world's fields.
 local function change_at(want)
-	local f = fight(no_rolls, { 100, -100 })
+	local f = fight(no_rolls, ROAD)
 	for k = 400000002, 400000002 + 720 * 24, 6 do
 		local was, now = fields.world(f, k - 1), fields.world(f, k)
 		if (was.sky ~= now.sky or was.ground ~= now.ground) and (not want or want(was, now)) then
-			return { 100, -100 }, k, was, now
+			return ROAD, k, was, now
 		end
 	end
 	error("no change of the world's fields found")

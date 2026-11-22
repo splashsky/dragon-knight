@@ -27,8 +27,20 @@ t_section "town: the map and the character sheet (floating windows)"
 # alone; without JavaScript, the pages in a new tab
 expect_body '<a href="/map" target="_blank" data-window="map">View Map</a>'
 expect_body '<a class="charpanel-more" href="/character" target="_blank" data-window="stats">Extended Stats</a>'
-t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'; expect_body '<div class="world-map"><img src="/static/images/map.gif" alt="Map"></div>'
+t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'; expect_body '<div class="world-map">'
 expect_no_body '<html'
+# the land's picture under the towns and the player (in town at Midworld: the map's centre),
+# with a legend; the picture is a static file
+expect_body '<svg class="world-map-svg" viewBox="0 0 101 101"'; expect_body '<image href="/static/images/world.svg" width="101" height="101"/>'
+expect_body '<g class="world-map-town"><circle cx="50.5" cy="50.5" r="0.9"/><text x="51.9" y="51.5" text-anchor="start">Midworld</text></g>'
+expect_body '<g class="world-map-town"><circle cx="0.5" cy="100.5" r="0.9"/><text x="1.9" y="99.1" text-anchor="start">Endworld</text></g>'
+expect_body '<circle class="world-map-you" cx="50.5" cy="50.5" r="1.7"><title>You are here (0N, 0E)</title></circle>'
+expect_body 'The Thornbog</li>'; expect_body 'Peaks</li>'
+tu "latitude=-3, longitude=3"
+t_get /map; expect_body '<circle class="world-map-you" cx="51.1" cy="51.1" r="1.7"><title>You are here (3S, 3E)</title></circle>'
+tu "latitude=0, longitude=0"
+t_get /static/images/world.svg; expect_status 200; expect_header '^content-type: image/svg\+xml'
+expect_body '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 101 101"'
 t_get /character -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body '<div class="charsheet">'; expect_body 'Travel Points:'
 expect_no_body '<html'
 
@@ -478,7 +490,7 @@ t_get "/character/$ADMIN_ID";     expect_status 200
 expect_body 'Here is the character profile for <b>Admin</b>'; expect_body 'action="/move"'
 expect_no_body 'Next Level'
 t_get /character/999999;          expect_body 'No such user.'
-t_get /map;                       expect_status 200; expect_body 'src="/static/images/map.gif"'
+t_get /map;                       expect_status 200; expect_body '<image href="/static/images/world.svg"'
 
 t_section "town: babble"
 # (the chat in detail, live: tests/e2e/chat.sh; the rate limit is lifted here by aging the

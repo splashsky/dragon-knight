@@ -4,9 +4,9 @@
 		.compass-rose), as named as the old text buttons; dk.js presses them for the arrow keys.
 		Location: where the player is as its heading ("In Midworld", "Exploring", "Fighting";
 		a theme with a picture for "location" shows that, and this as the first line), then
-		the coordinates ("3N, 5E": latitude, longitude) and the map, then the weather where the
-		player stands and the time of day (weather.report; a region of its own: it changes on
-		its own). Towns: a button per town on
+		the coordinates ("3N, 5E": latitude, longitude) and the map, the land there (its biome
+		and feature: game.land), then the weather where the player stands and the time of day
+		(weather.report; a region of its own: it changes on its own). Towns: a button per town on
 		the player's map (POST /travel/<id>, town/travel.lua) with what the trip costs; the town
 		they are in, those their TP don't cover and all of them while fighting are disabled
 		(the server checks again). -#}
@@ -19,6 +19,7 @@
 <div class="loc-where">{{ where }}</div>
 {%- end %}
 <div class="loc-line"><span class="loc-coords" title="Latitude {{ latitude }}, longitude {{ longitude }}">{{ latitude }}, {{ longitude }}</span> &middot; <a href="/map" target="_blank" data-window="map">View Map</a></div>
+<div class="loc-land">{{ land.biome }}{% if land.feature then %} &middot; {{ land.feature }}{% end %}</div>
 {{{ region("weather") }}}<div class="loc-weather" data-r="weather"><span class="wx wx-{{ weather.sky }} wx-{{ weather.time }}" aria-hidden="true"></span><span class="loc-sky tip-term" data-tip tabindex="0" title="{{ weather.description }}">{{ weather.name }}{{{ include("tip/tip", { title = weather.name, meta = weather.meta, body = weather.description }) }}}</span> &middot; <span class="loc-time">{{ weather.time_name }}</span></div>{{{ endregion() }}}
 {%- if not fighting then %}
 <form class="compass" method="post" action="/move">

@@ -1,10 +1,16 @@
-{#- Exploring (routes/home.lua). Above the legacy line, the weather's: what changed at the
-		player's tile in this minute (change) and other weather on a tile next to theirs (edge),
-		lib/weather.lua's. They change on their own (and when the player moves), so they are a
-		region of their own, there even when empty: the middle column stays the same. -#}
+{#- Exploring (routes/home.lua). Above the legacy line, the land's: where the player stands
+		(standing) and other land on a tile next to theirs (land_edge), lib/terrain.lua's; then
+		the weather's: what changed at the player's tile in this minute (change) and other
+		weather on a tile next to theirs (edge), lib/weather.lua's. Each changes on its own (and
+		when the player moves), so each is a region of its own, there even when empty: the
+		middle column stays the same. -#}
 <section class="box">
 <h1 class="title page-title">{{{ art("exploring", "Exploring") }}}</h1>
 <div class="box-body">
+{{{ region("explore-land") }}}<div class="explore-land" data-r="explore-land">
+{%- if standing then %}<p class="explore-standing">{{ standing }}</p>{% end %}
+{%- if land_edge then %}<p class="explore-land-edge">{{ land_edge }}</p>{% end -%}
+</div>{{{ endregion() }}}
 {{{ region("explore-weather") }}}<div class="explore-weather" data-r="explore-weather">
 {%- if change then %}<p class="explore-change">{{ change }}</p>{% end %}
 {%- if edge then %}<p class="explore-edge">{{ edge }}</p>{% end -%}

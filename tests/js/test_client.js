@@ -51,7 +51,7 @@ check("another page with a hash", c.livePath("/shop#x", B, "/inn") === "/shop");
 check("a hash, the page unknown (forms)", c.livePath("/inn#x", B, null) === "/inn");
 check("other site", c.livePath("http://other.test/", B, "/inn") === null);
 check("other port", c.livePath("http://dk.test:8080/", B, "/inn") === null);
-check("static files", c.livePath("/static/images/map.gif", B, "/inn") === null);
+check("static files", c.livePath("/static/images/world.svg", B, "/inn") === null);
 check("the event stream", c.livePath("/live", B, "/inn") === null && c.livePath("/live/state", B, "/inn") === null);
 check("not /livestock", c.livePath("/livestock", B, "/inn") === "/livestock");
 check("javascript:", c.livePath("javascript:alert(1)", B, "/inn") === null);

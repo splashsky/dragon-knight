@@ -300,8 +300,8 @@ CREATE TABLE statuses (
 );
 
 -- Fields: content files app/content/fields/<key>.lua (schema version 23): effects on the
--- whole battlefield, the weather's or a spell's (app/fight/fields.lua). group ('sky',
--- 'ground', 'time', 'aura': one field per group is up); damage ("fire=-40,water=15":
+-- whole battlefield, the weather's, the land's or a spell's (app/fight/fields.lua). group
+-- ('sky', 'ground', 'time', 'terrain', 'aura': one field per group is up); damage ("fire=-40,water=15":
 -- percent per element) and stats ("dexterity=-10": percent per stat); statuses (how
 -- statuses behave under it: "burning.blocked=1,burning.ticks=-1,sleep.scale.chance=120");
 -- messages and data like a status's; on_tick is the file's code.

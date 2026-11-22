@@ -1,2 +1,24 @@
-{#- World map popup (legacy showmap()); minimal layout. -#}
-<div class="world-map"><img src="/static/images/map.gif" alt="Map"></div>
+{#- The World Map (town/character.lua character.map, legacy showmap()); minimal layout, and the
+		World Map window (windows.js). The land's picture (public/images/world.svg: a cell of 5 x
+		5 tiles a unit) under the axes through Midworld, the towns (a dot and the name) and the
+		player (a red ring), all in the picture's units; then a legend. No JavaScript needed. -#}
+<div class="world-map">
+<svg class="world-map-svg" viewBox="0 0 {{ side }} {{ side }}" width="505" height="505" role="img" aria-labelledby="world-map-title">
+<title id="world-map-title">The world map: you are at {{ player.where }}</title>
+<image href="/static/images/world.svg" width="{{ side }}" height="{{ side }}"/>
+<path class="world-map-axes" d="M{{ centre.x }} 0V{{ side }}M0 {{ centre.y }}H{{ side }}"/>
+{%- for _, t in ipairs(towns) do %}
+<g class="world-map-town"><circle cx="{{ t.x }}" cy="{{ t.y }}" r="0.9"/><text x="{{ t.tx }}" y="{{ t.ty }}" text-anchor="{{ t.anchor }}">{{ t.name }}</text></g>
+{%- end %}
+<circle class="world-map-you" cx="{{ player.x }}" cy="{{ player.y }}" r="1.7"><title>You are here ({{ player.where }})</title></circle>
+</svg>
+<ul class="world-map-legend">
+{%- for _, l in ipairs(legend) do %}
+<li><svg class="world-map-swatch" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><rect width="1" height="1" fill="{{ l.colour }}"/>
+{%- if l.mark == "hill" then %}<path d="M.2 .72Q.5 .28 .8 .72" fill="none" stroke="#000" stroke-opacity=".4" stroke-width=".1"/>
+{%- elseif l.mark == "peak" then %}<path d="M.12 .86L.5 .14L.88 .86z" fill="#000" fill-opacity=".35"/><path d="M.37 .39L.5 .14L.63 .39z" fill="#fff" fill-opacity=".85"/>{% end %}</svg>{{ l.name }}</li>
+{%- end %}
+<li><svg class="world-map-swatch" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><circle cx=".5" cy=".5" r=".3"/></svg>Town</li>
+<li><svg class="world-map-swatch world-map-swatch-you" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><circle cx=".5" cy=".5" r=".35"/></svg>You</li>
+</ul>
+</div>

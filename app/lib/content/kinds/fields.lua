@@ -1,7 +1,8 @@
 -- content/kinds/fields.lua :: fields (app/content/fields/<key>.lua) -> the fields table. A
 -- field is an effect on the whole battlefield, for everyone in a fight: the weather's (rain,
--- mud, night) or a spell's (s:field("consecrated", { ticks = 5 })). One field per group
--- (sky, ground, time, aura). What it does is data, synced and overridable like a status's:
+-- mud, night), the land's (marsh, peaks: lib/terrain.lua) or a spell's
+-- (s:field("consecrated", { ticks = 5 })). One field per group (sky, ground, time, terrain,
+-- aura). What it does is data, synced and overridable like a status's:
 -- its damage percent per element, how statuses behave under it, its percent on the
 -- combatants' stats, its messages; only an optional on_tick(e) is code (a storm's bolts).
 -- How fields combine in a fight is app/fight/fields.lua. Flat fields: "damage.fire",
@@ -14,15 +15,19 @@ local schema = require("lib.content.schema")
 
 local fields = { name = "fields", table = "fields", dir = "content.fields", label = "field" }
 
-fields.GROUPS = { "sky", "ground", "time", "aura" }
+fields.GROUPS = { "sky", "ground", "time", "terrain", "aura" }
 -- the combatants' numbers a field may change (percent)
 fields.STATS = { "attack", "defense", "strength", "dexterity" }
 fields.STAT_NAMES = { attack = "Attack", defense = "Defense", strength = "Strength", dexterity = "Dexterity" }
--- The fields the weather puts up (app/fight/fields.lua): the key of a world field is the
--- weather's word, and its group the part of the weather it follows.
+-- The fields the world puts up (app/fight/fields.lua): the key of a weather's field is the
+-- weather's word, and its group the part of the weather it follows; the terrain's are the
+-- fields lib/terrain.lua names (its biomes' and features'). Spells can't put up the
+-- terrain's (the ground under a fight is the ground).
 fields.WORLD = {
 	sun = "sky", heat = "sky", fog = "sky", rain = "sky", downpour = "sky", thunderstorm = "sky", snow = "sky",
 	blizzard = "sky", mud = "ground", ice = "ground", night = "time",
+	shallows = "terrain", marsh = "terrain", forest = "terrain", hills = "terrain", peaks = "terrain", sand = "terrain",
+	cinders = "terrain",
 }
 fields.FUNCTIONS = { { "on_tick", false } }
 fields.extra_keys = scripted.extra_keys(fields.FUNCTIONS, { damage = true, statuses = true, stats = true })
@@ -36,7 +41,7 @@ fields.fields = {
 		help = "A PNG in public/images/fields/, without \".png\" (rain: rain.png); empty: none." },
 	{ name = "group", type = "choice", values = fields.GROUPS, required = true, label = "Group",
 		help = "One field per group is up: the weather's sky, ground and time, or a spell's in their place; " ..
-			"aura fields come only from spells." },
+			"the terrain's (the ground the fight is on, never a spell's); aura fields come only from spells." },
 }
 
 local PERCENT = { type = "int", min = -100, max = 1000, default = 0 }
@@ -156,11 +161,14 @@ function fields.validate_extra(data, flat, err)
 end
 
 -- The statuses its rules name must be status files; a world field's group is the part of the
--- weather it follows.
+-- world it follows, and only the land's fields are in the terrain group.
 function fields.validate_refs(flat, all, err, key)
 	local world = fields.WORLD[key or ""]
 	if world and flat.group ~= world then
-		err(("group: the weather puts the %s field up in its %s group (not %s)"):format(key, world, tostring(flat.group)))
+		err(("group: the %s puts the %s field up in its %s group (not %s)"):format(world == "terrain" and "land" or "weather",
+			key, world, tostring(flat.group)))
+	elseif not world and flat.group == "terrain" then
+		err("group: the land puts no " .. tostring(key) .. " field up (the terrain group's fields are lib/terrain.lua's)")
 	end
 	local known = all.kinds.statuses and all.kinds.statuses.by_key or {}
 	local seen = {}

@@ -6,8 +6,9 @@ table.maps-list td:nth-child(1), table.maps-list td:nth-child(2) { width: 25%; }
 table.maps-list td:nth-child(3) { width: 35%; }
 table.maps-list td:nth-child(4) { width: 15%; }
 
-/* the exploring page's weather lines (home/explore.html: a change, other weather next door) */
-.explore-weather p { margin: 0 0 6px; font-style: italic; }
+/* the exploring page's land and weather lines (home/explore.html: where you stand, other
+	land next door, a change of the weather, other weather next door) */
+.explore-land p, .explore-weather p { margin: 0 0 6px; font-style: italic; }
 
 /* character sheets */
 .charsheet { width: 240px; }
@@ -15,8 +16,34 @@ body.minimal .charsheet { width: auto; min-width: 210px; }
 table.inventory { width: 100%; }
 table.inventory td + td { width: 100%; }
 
-/* world map popup */
+/* the World Map (town/map.html): the land's picture with the towns and the player drawn on
+	it (in its units: a cell of 5 x 5 tiles each), and a legend under it */
 .world-map { text-align: center; }
+.world-map-svg { display: block; width: 100%; max-width: 606px; height: auto; margin: 0 auto; }
+.world-map-axes { fill: none; stroke: #000; stroke-opacity: 0.25; stroke-width: 0.15; }
+.world-map-town circle { fill: #000; }
+.world-map-town text {
+	font: bold 2.8px sans-serif;
+	fill: #000;
+	stroke: #fff;
+	stroke-opacity: 0.8;
+	stroke-width: 0.6px;
+	paint-order: stroke;
+}
+.world-map-you { fill: none; stroke: #c8141b; stroke-width: 0.6; }
+.world-map-legend {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 2px 10px;
+	margin: 6px auto 0;
+	padding: 0;
+	max-width: 606px;
+	list-style: none;
+	text-align: left;
+	font-size: 11px;
+}
+.world-map-swatch { margin-right: 5px; vertical-align: -2px; }
+.world-map-swatch-you circle { fill: none; stroke: #c8141b; stroke-width: 0.15; }
 
 /* the town's places (home/town.html): light cards that sit in the page (a faint wash and a
 	hairline, both a little stronger when pointed at), the picture a small round medallion

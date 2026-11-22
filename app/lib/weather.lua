@@ -1,12 +1,14 @@
 -- weather.lua :: the weather (docs/APP.md "Clock and weather"): a pure function of the
 -- place (latitude, longitude), the time and a fixed seed. Nothing is stored, nothing runs
 -- in the background, and no dice roll: every choice is a hash of the seed. The map is a
--- grid of 10 x 10 tile cells, each with a base climate from its place and the time of day;
--- every 20 minutes a storm may form near Midworld and drift to Gilead in about two hours,
--- its position a closed-form function of time. It moves in steps of weather.STEP ticks of
--- the game's clock (lib/clock.lua): a minute. The words are in lib/weather_lines.lua.
+-- grid of 10 x 10 tile cells, each with a base climate from the land at its centre (the
+-- biome's, lib/terrain.lua) and the time of day; every 45 minutes a storm may form near
+-- Midworld and drift to Gilead in about two hours, its position a closed-form function of
+-- time. It moves in steps of weather.STEP ticks of the game's clock (lib/clock.lua): a
+-- minute. The words are in lib/weather_lines.lua.
 local clock = require("lib.clock")
 local lines = require("lib.weather_lines")
+local terrain = require("lib.terrain")
 
 local weather = {}
 
@@ -14,15 +16,15 @@ weather.STEP = 6               -- the weather moves every 6 clock ticks (a minut
 weather.SEED = 0x3200
 weather.CELL = 10              -- the grid's cells, in tiles
 weather.SPELL = 1200           -- a cell's base weather holds this long (the cells staggered)
-weather.SLOT = 1200            -- a storm slot every 20 minutes
-weather.FORMS = 0.6            -- the chance that a slot's storm forms
+weather.SLOT = 2700            -- a storm slot every 45 minutes
+weather.FORMS = 0.45           -- the chance that a slot's storm forms (about one storm every 100 minutes)
 weather.ORIGIN = 30            -- storms form within this many tiles of Midworld (0, 0)
 weather.GILEAD = { 200, -200 } -- (latitude, longitude) where storms go and break
 weather.CROSSING = 7200        -- seconds from a storm's origin to Gilead, give or take a tenth
 weather.WOBBLE = 0.08          -- radians a storm's heading may be off, either way
-weather.NORTH = 150            -- snow instead of rain north of this latitude
+weather.NORTH = 150            -- snow instead of rain north of this latitude (and on the peaks)
 weather.NEAR = 40              -- a storm whose edge is this many tiles away or less is near
-weather.MUD = 1200             -- mud lasts this long after rain (or worse) ends
+weather.MUD = 1200             -- mud lasts this long after rain (or worse) ends (times the biome's climate.mud)
 weather.SNOW = 2400            -- snow lies this long after snowfall ends (ice its second half)
 
 -- Storm sizes (by chance): their radius in tiles, and the rain at their core (1 drizzle,
@@ -37,7 +39,6 @@ local GROWN, WEAKENS = 0.2, 0.7  -- a storm grows for the first part of its life
 local RAIN = { "drizzle", "rain", "downpour", "thunderstorm" }
 local SNOW = { "snow", "snow", "blizzard", "blizzard" }
 local FALLING = { drizzle = true, rain = true, downpour = true, thunderstorm = true, snow = true, blizzard = true }
-local NARCISSA, ENDWORLD = { -130, -130 }, { -250, -250 }
 local STEP = weather.STEP * clock.TICK   -- a step, in seconds
 -- salts: what a hash is for
 local CELL_SHIFT, CELL_SKY, STORM, CHANGE, DESCRIBE, EDGE = 1, 2, 3, 4, 5, 6
@@ -120,10 +121,11 @@ local function level(s, x, weaker)
 end
 
 -- What the storm s left on the ground at (lat, lon) by time t, from the closest approach of
--- its track: in the south "mud" from then until weather.MUD after its rain (rain or worse)
--- there ended; in the north "snow" after any snowfall, "ice" in the second half of
--- weather.SNOW. nil when it hasn't passed, missed, or the ground has dried.
-local function left(s, lat, lon, t, north)
+-- its track: where it rains "mud" from then until weather.MUD (times the climate's mud)
+-- after its rain (rain or worse) there ended; where it snows "snow" after any snowfall,
+-- "ice" in the second half of weather.SNOW. nil when it hasn't passed, missed, or the
+-- ground has dried.
+local function left(s, lat, lon, t, north, c)
 	local tau = ((lat - s.lat) * s.vlat + (lon - s.lon) * s.vlon) / (s.speed * s.speed)
 	if tau < 0 then tau = 0 elseif tau > s.life then tau = s.life end
 	local closest = s.born + tau
@@ -137,34 +139,45 @@ local function left(s, lat, lon, t, north)
 	local gap = reach * reach - plat * plat - plon * plon
 	if gap <= 0 then return nil end
 	local since = t - (closest + sqrt(gap) / s.speed)
-	if not north then return since < weather.MUD and "mud" or nil end
+	if not north then return since < weather.MUD * c.mud and "mud" or nil end
 	if since < weather.SNOW / 2 then return "snow" end
 	if since < weather.SNOW then return "ice" end
 	return nil
 end
 
--- A cell's base sky: fog likelier at dawn (and at night) toward Narcissa, heat by day
--- toward Endworld, a little drizzle (snow in the north), clouds, sun by day, else clear.
--- Each cell changes every weather.SPELL, at its own moment.
-local function base_sky(lat, lon, t, time, north)
+-- The climate of the weather's cell a tile is in: its centre's biome's (lib/terrain.lua),
+-- so a cell keeps one sky.
+local function climate(lat, lon)
+	local cell = weather.CELL
+	local land = terrain.at(lat // cell * cell + cell // 2, lon // cell * cell + cell // 2)
+	return terrain.biome(land.biome).climate
+end
+
+-- Whether falling weather is snow at a tile: north of weather.NORTH, or on a peak (peaks are
+-- cold at any latitude).
+local function snows(lat, lon)
+	return lat > weather.NORTH or terrain.at(lat, lon).feature == "peak"
+end
+
+-- A cell's base sky by its climate c: fog (likelier at dawn and at night where the climate
+-- says), heat by day (not where it snows), a little drizzle (snow where it snows), clouds,
+-- sun by day, else clear. Each cell changes every weather.SPELL, at its own moment.
+local function base_sky(lat, lon, t, time, north, c)
 	local cell = weather.CELL
 	local x, y = lon // cell, lat // cell
 	local shift = hash(CELL_SHIFT, x, y, 0) % weather.SPELL
 	local u = unit(hash(CELL_SKY, x, y, (t + shift) // weather.SPELL))
-	local clat, clon = y * cell + cell / 2, x * cell + cell / 2
-	local sw = max(0, 1 - distance(clat, clon, NARCISSA) / 150)
-	local far = max(0, 1 - distance(clat, clon, ENDWORLD) / 180)
-	local fog = 0.04 + (time == "dawn" and 0.5 or time == "night" and 0.15 or 0) * sw
+	local fog = c.fog + (time == "dawn" and c.fog_dawn or time == "night" and c.fog_night or 0)
 	if u < fog then return "fog" end
 	u = u - fog
-	local heat = (time == "day" and not north) and 0.6 * far or 0
+	local heat = (time == "day" and not north) and c.heat or 0
 	if u < heat then return "heat" end
 	u = u - heat
-	if u < 0.06 then return north and "snow" or "drizzle" end
-	u = u - 0.06
-	if u < 0.2 then return "overcast" end
-	u = u - 0.2
-	if time == "day" and u < 0.35 then return "sun" end
+	if u < c.drizzle then return north and "snow" or "drizzle" end
+	u = u - c.drizzle
+	if u < c.overcast then return "overcast" end
+	u = u - c.overcast
+	if time == "day" and u < c.sun then return "sun" end
 	return "clear"
 end
 
@@ -187,7 +200,7 @@ end
 
 -- The weather at a tile: { sky, ground, time, storm, near }.
 --   sky: clear, sun, heat, overcast, fog, drizzle, rain, downpour, thunderstorm, snow,
---        blizzard (snow instead of rain north of weather.NORTH)
+--        blizzard (snow instead of rain north of weather.NORTH, and on peaks)
 --   ground: dry, wet, mud, snow, ice
 --   time: dawn, day, dusk, night (clock.time_of_day)
 --   storm: the storm overhead, { size = "squall" | "storm" | "great", name }, or nil
@@ -198,12 +211,13 @@ end
 function weather.at(lat, lon, now)
 	local t = step_start(now)
 	local time = clock.time_of_day(t)
-	local north = lat > weather.NORTH
-	local sky = base_sky(lat, lon, t, time, north)
+	local c = climate(lat, lon)
+	local north = snows(lat, lon)
+	local sky = base_sky(lat, lon, t, time, north, c)
 	local rain = FALLING[sky] and 1 or 0
 	local over, near, gap, dlat_near, dlon_near, ground
 	local slot = weather.SLOT
-	for k = floor((t - LIFE - AFTER - (north and weather.SNOW or weather.MUD)) / slot), t // slot do
+	for k = floor((t - LIFE - AFTER - (north and weather.SNOW or weather.MUD * c.mud)) / slot), t // slot do
 		local s = storm(k)
 		if s and s.born <= t then
 			local age = t - s.born
@@ -219,7 +233,7 @@ function weather.at(lat, lon, now)
 					near, gap, dlat_near, dlon_near = s, d - r, dlat, dlon
 				end
 			end
-			local mark = left(s, lat, lon, t, north)
+			local mark = left(s, lat, lon, t, north, c)
 			if mark == "snow" or mark == "mud" or (mark == "ice" and not ground) then ground = mark end
 		end
 	end

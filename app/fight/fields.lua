@@ -1,14 +1,16 @@
 -- fight/fields.lua :: the battlefield (docs/APP.md "Fields"): which fields are up in a fight
 -- and how they combine with damage, statuses and stats. The one place the combinations
 -- live; fight/engine.lua and fight/round.lua apply what it decides (lines, the trace, a
--- field's on_tick). Pure but for reading content (lib/fields.lua rows) and the weather
--- (lib/weather.lua: a function of the place and the time).
+-- field's on_tick). Pure but for reading content (lib/fields.lua rows), the weather
+-- (lib/weather.lua: a function of the place and the time) and the land (lib/terrain.lua).
 --
--- One field per group (sky, ground, time, aura). The world's follow the weather at the
--- player's tile on every clock tick (sky "rain" -> the field rain, ground "mud" -> mud, time
--- "night" -> night: the field of the same key, when it exists); a spell's (s:field) displaces
--- the world's of its group for its ticks, counted from the tick after it was cast, and when
--- it ends the weather's comes back; aura fields come only from spells. The fight keeps them
+-- One field per group (sky, ground, time, terrain, aura). The world's follow the player's
+-- tile on every clock tick: the weather's (sky "rain" -> the field rain, ground "mud" -> mud,
+-- time "night" -> night: the field of the same key, when it exists) and the land's (the
+-- terrain's field there: marsh, peaks, ...; the player doesn't move in a fight, so it holds
+-- for the fight). A spell's (s:field) displaces the weather's of its group for its ticks,
+-- counted from the tick after it was cast, and when it ends the weather's comes back; no
+-- spell puts up a terrain field, and aura fields come only from spells. The fight keeps them
 -- in f.data: field_<group> (the key), and for a spell's field_<group>_ticks (ticks left)
 -- and field_<group>_tick (the last tick it counted). Names and plain values only.
 --
@@ -23,12 +25,13 @@ local clock = require("lib.clock")
 local kind = require("lib.content.kinds.fields")
 local load = require("lib.content.load")
 local rows = require("lib.fields")
+local terrain = require("lib.terrain")
 local weather = require("lib.weather")
 
 local fields = {}
 
 fields.GROUPS = kind.GROUPS
-local WORLD_GROUPS = { "sky", "ground", "time" }
+local WORLD_GROUPS = { "sky", "ground", "time", "terrain" }
 
 -- The field `key` when it can be up (a row, not retired), or nil.
 function fields.row(key)
@@ -166,10 +169,11 @@ function fields.battlefield(f)
 		return false
 	end
 	-- Puts field `key` up in the view: true, false when it is already up, or nil and why
-	-- not (no such field).
+	-- not (no such field, or the terrain's).
 	function bf.set(key)
 		local r = fields.row(key)
 		if not r then return nil, "no field '" .. tostring(key) .. "'" end
+		if r.group == "terrain" then return nil, "the terrain's field '" .. key .. "' can't be put up by a spell" end
 		if bf.has(key) then return false end
 		set[r.group] = key
 		return true
@@ -178,16 +182,16 @@ function fields.battlefield(f)
 end
 
 -- The world's fields at clock tick k where the player of fight f stands: { sky, ground,
--- time } (keys, each nil without a field), or nil when the fight has no place (a model
--- without the player's position: unit tests).
+-- time, terrain } (keys, each nil without a field), or nil when the fight has no place (a
+-- model without the player's position: unit tests).
 function fields.world(f, k)
 	local lat, lon = f.st and f.st.latitude, f.st and f.st.longitude
 	if lat == nil or lon == nil then return nil end
 	local w = weather.at(lat, lon, clock.tick_start(k))
 	local out = {}
 	for _, g in ipairs(WORLD_GROUPS) do
-		local word = w[g]
-		if kind.WORLD[word] == g and fields.row(word) then out[g] = word end
+		local word = g == "terrain" and terrain.at(lat, lon).field or w[g]
+		if word and kind.WORLD[word] == g and fields.row(word) then out[g] = word end
 	end
 	return out
 end
@@ -252,10 +256,11 @@ function fields.advance(f, k)
 end
 
 -- A spell's field: `key` up for `ticks` clock ticks (from the tick after f.tick) in place of
--- its group's. Returns the changes, or nil when it is already up or isn't a field.
+-- its group's. Returns the changes, or nil when it is already up, isn't a field or is the
+-- terrain's.
 function fields.set(f, key, ticks)
 	local r = fields.row(key)
-	if not r or fields.has(f, key) then return nil end
+	if not r or r.group == "terrain" or fields.has(f, key) then return nil end
 	local changes = {}
 	put(f, r.group, key, changes)
 	f.data[slot(r.group) .. "_ticks"], f.data[slot(r.group) .. "_tick"] = ticks, f.tick or 0

@@ -9,6 +9,7 @@ local presence = require("lib.presence")
 local roles = require("lib.roles")
 local spells = require("lib.spells")
 local stats = require("lib.stats")
+local terrain = require("lib.terrain")
 local weather = require("lib.weather")
 
 local game = {}
@@ -175,6 +176,12 @@ function game.bars(user, s)
 	return bars
 end
 
+-- The land at a tile, for the Location box: { biome (its name), feature (its name, or nil) }.
+function game.land(lat, lon)
+	local here = terrain.at(lat, lon)
+	return { biome = terrain.biome(here.biome).name, feature = here.feature and terrain.feature(here.feature).name }
+end
+
 -- Everything layout/nav_left + layout/nav_right need (port of legacy display()).
 function game.nav(user)
 	local town = user.currentaction == "In Town" and game.current_town(user) or nil
@@ -186,6 +193,7 @@ function game.nav(user)
 		latitude = game.latitude_str(user.latitude),
 		longitude = game.longitude_str(user.longitude),
 		town = town,
+		land = game.land(user.latitude, user.longitude),   -- the Location box (game.land)
 		weather = weather.report(user.latitude, user.longitude, clock.now()),   -- the Location box (weather.report)
 		towns = game.user_towns(user),
 		forum = game.forum_link(),

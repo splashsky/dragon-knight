@@ -162,6 +162,7 @@ a:hover, button.link:hover {
 .box { margin-bottom: 12px; }
 .box-body { padding: 3px; }
 .loc-line { margin-bottom: 4px; }
+.loc-land { margin-bottom: 4px; }
 .loc-coords { font-variant-numeric: lining-nums; }
 .box .title { margin: 0 0 3px; }
 .box .title img { display: block; }
@@ -754,11 +755,12 @@ body.minimal .dk-content { display: inline-block; text-align: left; }
 .dk-window-chat .chat-send { color: #f2f3f5; }
 .dk-window-chat .chat-send:hover { background-color: rgba(255, 255, 255, 0.1); }
 
-/* the world map (town/map.html): the picture as large as the window allows */
-.dk-window-map { width: 460px; height: 490px; }
+/* the World Map (town/map.html): the map as large as the window allows, the legend under it */
+.dk-window-map { width: 540px; height: 680px; }
 .dk-window-map .dk-modal-content { display: flex; flex: 1 1 auto; min-height: 0; padding: 6px; }
-.dk-window-map .world-map { display: flex; flex: 1 1 auto; min-height: 0; align-items: center; justify-content: center; }
-.dk-window-map .world-map img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.dk-window-map .world-map { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.dk-window-map .world-map-svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: none; }
+.dk-window-map .world-map-legend { flex: none; max-width: none; }
 
 /* the character sheet (town/character.html): its boxes one under the other, scrolling */
 .dk-window-stats { width: 280px; height: 520px; }

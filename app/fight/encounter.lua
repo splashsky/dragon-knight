@@ -20,6 +20,7 @@ local round = require("fight.round")
 local speech = require("fight.speech")
 local spells = require("lib.spells")
 local state = require("fight.state")
+local terrain = require("lib.terrain")
 
 local encounter = {}
 
@@ -201,8 +202,9 @@ end
 -- An encounter begins for player `user_id`, marked Fighting by the caller (the row is read
 -- again: the caller saved the position, and a move's world statuses may have changed the
 -- HP): any older fight goes, a monster of the level band where they stand is picked (each
--- enemy's HP rolled), the weather's fields are up (fight/fields.lua), and when it is
--- quicker its first strike is played (an ambush). Saved.
+-- enemy's HP rolled), the world's fields are up (fight/fields.lua), the land sets the scene
+-- (lib/terrain.lua: the encounter's first line), and when it is quicker its first strike is
+-- played (an ambush). Saved.
 -- Returns "fight" (go on fighting), "death" (the ambush killed the player: see
 -- encounter.die), each with the monster's row, or nil when no monster can be met there
 -- (nothing changed).
@@ -225,8 +227,9 @@ function encounter.begin(user_id)
 	-- the fight's voice: what its monsters say is picked by it, not by the dice
 	f.data.voice = (os.time() * 7919 + math.floor((dk.clock() % 1) * 1000000)) % 2147483647
 	local player_first = round.start(f)
-	-- the monster's first words open the page (before its first strike, if it is quicker)
-	local opening = {}
+	-- the land's line and the monster's first words open the page (before its first strike,
+	-- if it is quicker)
+	local opening = { terrain.fight_open(user.latitude, user.longitude, f.tick, monster.name) }
 	f.out, f.part = opening, "player"
 	speech.start(f)
 	f.out, f.part = nil, nil

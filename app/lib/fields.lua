@@ -9,7 +9,7 @@ local kind = require("lib.content.kinds.fields")
 
 local fields = {}
 
-fields.GROUP_NAMES = { sky = "Sky", ground = "Ground", time = "Time of day", aura = "Aura" }
+fields.GROUP_NAMES = { sky = "Sky", ground = "Ground", time = "Time of day", terrain = "Terrain", aura = "Aura" }
 
 local by_id, by_key = {}, {}
 
@@ -34,9 +34,10 @@ function fields.by_key(key)
 	return by_key[key] or nil
 end
 
-local GROUP_ORDER = "CASE \"group\" WHEN 'sky' THEN 1 WHEN 'ground' THEN 2 WHEN 'time' THEN 3 ELSE 4 END"
+local GROUP_ORDER = "CASE \"group\" WHEN 'sky' THEN 1 WHEN 'ground' THEN 2 WHEN 'time' THEN 3 WHEN 'terrain' THEN 4 " ..
+	"ELSE 5 END"
 
--- Fields that aren't retired, by group (sky, ground, time, aura) then id (help pages).
+-- Fields that aren't retired, by group (sky, ground, time, terrain, aura) then id (help pages).
 function fields.active()
 	local out = dk.db:query("SELECT * FROM fields WHERE retired = 0 ORDER BY " .. GROUP_ORDER .. ", id")
 	for _, r in ipairs(out) do remember(r) end

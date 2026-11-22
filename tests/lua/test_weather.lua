@@ -1,10 +1,13 @@
 -- Unit tests for the weather (lib/weather.lua, lib/weather_lines.lua): a pure function of
 -- the place and the time, hashed and never rolled; its vocabularies; storms forming near
--- Midworld and breaking over Gilead in about two hours; snow in the north; mud after rain,
--- drying; the change lines, the description and the edge line; a step of a minute on the
--- game's clock, and whether the weather changed between two clock ticks; and what it costs.
+-- Midworld (about one every 100 minutes) and breaking over Gilead in about two hours; the
+-- land's climate (fog on the moors at dawn, heat in the Ashlands, the Midlands' weather as
+-- it was); snow north of 150 and on the peaks; mud after rain, drying; the change
+-- lines, the description and the edge line; a step of a minute on the game's clock, and
+-- whether the weather changed between two clock ticks; and what it costs.
 local clock = require("lib.clock")
 local lines = require("lib.weather_lines")
+local terrain = require("lib.terrain")
 local weather = require("lib.weather")
 local T = {}
 
@@ -72,7 +75,7 @@ function T.the_vocabularies()
 	local seen = { sky = {}, ground = {}, size = {} }
 	for lat = -250, 250, 25 do
 		for lon = -250, 250, 25 do
-			for now = START, START + clock.DAY, 420 do
+			for now = START, START + 12 * clock.DAY, 840 do   -- a day of the clock (twelve of the game)
 				local w = weather.at(lat, lon, now)
 				assert(SKIES[w.sky], "sky " .. w.sky)
 				assert(GROUNDS[w.ground], "ground " .. w.ground)
@@ -101,7 +104,7 @@ end
 
 function T.storms_form_near_midworld_and_break_over_gilead_in_about_two_hours()
 	local first, last, ends, seen = {}, {}, {}, 0
-	local from, to = START + 3 * 3600, START + 48 * 3600   -- two days of storms, whole
+	local from, to = START + 3 * 3600, START + 99 * 3600   -- four days of storms, whole
 	for now = START, to + 3 * 3600, STEP do
 		for _, s in ipairs(weather.storms(now)) do
 			if s.born >= from and s.born < to then
@@ -116,7 +119,10 @@ function T.storms_form_near_midworld_and_break_over_gilead_in_about_two_hours()
 		end
 	end
 	local slots = (to - from) / weather.SLOT
-	assert(seen > slots * 0.45 and seen < slots * 0.75, "about 3 slots in 5 form a storm: " .. seen .. "/" .. slots)
+	eq(weather.SLOT, 2700, "a slot every 45 minutes")
+	assert(seen > slots * 0.3 and seen < slots * 0.6, "about 45 slots in 100 form a storm: " .. seen .. "/" .. slots)
+	local minutes = (to - from) / 60 / seen
+	assert(minutes > 75 and minutes < 150, "about one storm every 100 minutes: one every " .. minutes)
 	for born, s in pairs(first) do
 		assert(math.sqrt(s.lat ^ 2 + s.lon ^ 2) <= weather.ORIGIN + 3, "formed near Midworld")
 		local e = last[born]
@@ -127,32 +133,104 @@ function T.storms_form_near_midworld_and_break_over_gilead_in_about_two_hours()
 	end
 end
 
-function T.snow_falls_north_of_150_and_rain_south_of_it()
-	local snowed = false
+-- The climate of the weather's cell a tile is in (its centre's biome).
+local function climate_at(lat, lon)
+	local land = terrain.at(lat // 10 * 10 + 5, lon // 10 * 10 + 5)
+	return terrain.biome(land.biome).climate, land.biome
+end
+
+-- Up to n places where `want(lat, lon)`, among the weather cells' centres (every 10 tiles).
+local function find(n, want)
+	local out = {}
+	for lat = -245, 245, 10 do
+		for lon = -245, 245, 10 do
+			if #out < n and want(lat, lon) then out[#out + 1] = { lat, lon } end
+		end
+	end
+	return out
+end
+
+-- Snow falls instead of rain north of latitude 150 and on the peaks, at any latitude; and
+-- lies on the ground there.
+function T.snow_falls_north_of_150_and_on_the_peaks()
+	local peaks = find(6, function(lat, lon) return terrain.at(lat, lon).feature == "peak" and lat < 150 end)
+	assert(#peaks >= 3, "peaks in the south")
+	local places = {}
 	for _, lat in ipairs({ 140, 150, 151, 170, 200, 240 }) do
-		for _, lon in ipairs({ -230, -200, -160, -100, 0, 170 }) do
-			for now = START, START + clock.DAY, 180 do
-				local w = weather.at(lat, lon, now)
-				if lat > 150 then
-					assert(not RAINING[w.sky] and w.sky ~= "drizzle", "no rain in the north: " .. w.sky)
-					assert(w.ground ~= "mud" and w.ground ~= "wet", "no mud in the north: " .. w.ground)
-					snowed = snowed or w.sky == "snow" or w.sky == "blizzard"
-				else
-					assert(w.sky ~= "snow" and w.sky ~= "blizzard", "no snow in the south: " .. w.sky)
-					assert(w.ground ~= "snow" and w.ground ~= "ice", "no snow on the ground in the south: " .. w.ground)
+		for _, lon in ipairs({ -230, -200, -160, -100, 0, 170 }) do places[#places + 1] = { lat, lon } end
+	end
+	for _, p in ipairs(peaks) do places[#places + 1] = p end
+	local snowed, peak_snowed = false, false
+	for _, p in ipairs(places) do
+		local lat, lon = p[1], p[2]
+		local peak = terrain.at(lat, lon).feature == "peak"
+		for now = START, START + clock.DAY, 180 do
+			local w = weather.at(lat, lon, now)
+			local where = " at " .. lat .. "," .. lon
+			if lat > 150 or peak then
+				assert(not RAINING[w.sky] and w.sky ~= "drizzle", "no rain where it snows: " .. w.sky .. where)
+				assert(w.ground ~= "mud" and w.ground ~= "wet", "no mud where it snows: " .. w.ground .. where)
+				if w.sky == "snow" or w.sky == "blizzard" then
+					snowed = true
+					peak_snowed = peak_snowed or lat <= 150
 				end
+			else
+				assert(w.sky ~= "snow" and w.sky ~= "blizzard", "no snow where it rains: " .. w.sky .. where)
+				assert(w.ground ~= "snow" and w.ground ~= "ice", "no snow on the ground where it rains: " .. w.ground .. where)
 			end
 		end
 	end
-	assert(snowed, "snow falls in the north")
+	assert(snowed and peak_snowed, "snow in the north and on a southern peak")
 end
 
--- On the storms' road: rain (or worse) leaves mud when it stops, and the mud dries.
+-- The land leans the weather: fog likelier on the moors at dawn than in the Midlands, heat
+-- by day in the Ashlands and the Dry Country and never in the Midlands; the Midlands keep
+-- the weather's own climate (the one the game had before the land).
+function T.the_land_leans_the_climate()
+	local function share(biome, sky, time, n)
+		local places = find(n, function(lat, lon)
+			local _, b = climate_at(lat, lon)
+			return b == biome and terrain.at(lat, lon).feature ~= "peak"
+		end)
+		assert(#places >= 4, "places in " .. biome)
+		local hits, all = 0, 0
+		for _, p in ipairs(places) do
+			for day = 0, 9 do
+				for now = START + day * clock.DAY, START + day * clock.DAY + clock.DAY - 1, 300 do
+					if clock.time_of_day(now) == time then
+						local w = weather.at(p[1], p[2], now)
+						if not w.storm then
+							all = all + 1
+							if w.sky == sky then hits = hits + 1 end
+						end
+					end
+				end
+			end
+		end
+		return hits / all
+	end
+	local moors, midland = share("moors", "fog", "dawn", 12), share("midland", "fog", "dawn", 12)
+	assert(moors > 0.35 and midland < 0.1, ("fog at dawn: the moors %.2f, the Midlands %.2f"):format(moors, midland))
+	local ash, dry, mid = share("ashlands", "heat", "day", 12), share("drylands", "heat", "day", 12),
+		share("midland", "heat", "day", 12)
+	assert(ash > 0.4 and dry > 0.3 and mid == 0, ("heat by day: the Ashlands %.2f, the Dry Country %.2f, the Midlands %.2f")
+		:format(ash, dry, mid))
+	local m = terrain.biome("midland").climate
+	eq(m.fog .. "/" .. m.fog_dawn .. "/" .. m.fog_night .. "/" .. m.heat .. "/" .. m.drizzle .. "/" .. m.overcast .. "/" ..
+		m.sun .. "/" .. m.mud, "0.04/0/0/0/0.06/0.2/0.35/1", "the Midlands' climate is the weather's own")
+end
+
+-- On the storms' road (a tile where it rains: not a peak): rain (or worse) leaves mud when
+-- it stops, and the mud dries.
 function T.rain_leaves_mud_that_dries()
+	local lat
+	for d = 100, 150 do
+		if not lat and terrain.at(d, -d).feature ~= "peak" then lat = d end
+	end
 	local stopped, muddy, dried = 0, 0, 0
-	local was = weather.at(100, -100, START)
+	local was = weather.at(lat, -lat, START)
 	for now = START + STEP, START + clock.DAY, STEP do
-		local w = weather.at(100, -100, now)
+		local w = weather.at(lat, -lat, now)
 		if RAINING[was.sky] and not FALLING[w.sky] then
 			stopped = stopped + 1
 			if w.ground == "mud" then muddy = muddy + 1 end

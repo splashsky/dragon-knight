@@ -235,7 +235,9 @@ async function run(wsUrl, port) {
 	check("the character window", await until("!!" + SW + " && !" + SW + ".hidden && !!" + SW + ".querySelector('.charsheet')"));
 	check("its title", await js(SW + ".querySelector('.dk-window-title').textContent === 'Extended Stats'"));
 	await js("document.querySelector('a[data-window=map]').click()");
-	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map img')"));
+	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map-svg image')"));
+	check("the player and the towns on it", await js("!!" + MW + ".querySelector('.world-map-you') && " + MW +
+		".querySelectorAll('.world-map-town').length >= 8"));
 	check("the page stays", await js("location.pathname === '/' && window.__dk === 1"));
 	check("the map in front", await js("+" + MW + ".style.zIndex > +" + SW + ".style.zIndex"));
 	var title = await js("(function () { var r = " + SW + ".querySelector('.dk-window-title').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })()");

@@ -12,7 +12,8 @@
 --   3. each enemy of the current wave, in order, acts unless blocked: an action and a target
 --      chosen by weight (fight/ai.lua: its attack, the original formula, or a spell or item
 --      of its loadout);
---   4. the player's next turn begins: guarding ends.
+--   4. the player's next turn begins: guarding ends; now and then the land has a line
+--      (lib/terrain.lua terrain.fight_turn: hashed, never rolled).
 --
 -- The fight's clock (round.advance): a fight plays the game's clock ticks (10 s,
 -- lib/clock.lua) in order. At each one the battlefield's fields follow the weather and
@@ -38,6 +39,7 @@ local engine = require("fight.engine")
 local fields = require("fight.fields")
 local speech = require("fight.speech")
 local state = require("fight.state")
+local terrain = require("lib.terrain")
 
 local round = {}
 
@@ -165,6 +167,9 @@ function round.play(f0, a)
 	-- 4. the player's next turn begins: a guard lasts until then
 	f.out, f.part = r.ending, "ending"
 	engine.expire(f, p, "guarding")
+	local lat, lon = f.st.latitude, f.st.longitude
+	local line = lat and lon and terrain.fight_turn(lat, lon, f.round)
+	if line then engine.say(f, line) end
 	return r
 end
 

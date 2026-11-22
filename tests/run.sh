@@ -292,8 +292,9 @@ t_tick() {
 	t_get /changepassword
 	t_post /__test/tick "csrf=$(t_csrf)"
 }
-# A calm place: the weather brings no field to it (fight/fields.lua) from $T_START until
-# nightfall, 1400 s later (tests/lua/test_fields.lua checks it), so a fight there has no
+# A calm place: the Midlands' plain (no terrain field: lib/terrain.lua), and the weather
+# brings no field to it (fight/fields.lua) from $T_START until nightfall, 1400 s later
+# (tests/lua/test_fields.lua checks both), so a fight there has no
 # battlefield, the same on every run. A check of the numbers of a fight (damage, healing, a
 # status's data or duration, an attack that never lands) fights there: t_calm USER moves
 # USER to it (Midworld's level band; no town). The weather's fields have tests of their own

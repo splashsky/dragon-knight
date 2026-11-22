@@ -21,7 +21,7 @@
 	// an answer names the outermost region that changed).
 	var KINDS = {
 		chat: { title: "Babble Box", at: "corner", pick: ".chat", focus: "[name=babble]" },
-		map: { title: "World Map", at: "middle" },
+		map: { title: "World Map", at: "middle", stale: ["loc", "left", "root"] },
 		stats: { title: "Extended Stats", at: "top", stale: ["charpanel", "invpanel", "spellpanel", "right", "root"] },
 	};
 	var MARGIN = 8, Z = 950;

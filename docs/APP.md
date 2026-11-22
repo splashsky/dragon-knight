@@ -17,6 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
+| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` (generated), `public/css/{dk,town}.css`, `public/js/windows.js` | `tests/lua/test_terrain.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town}.sh` |
 | The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
 | Fields (the battlefield: the weather's and spells' effects on a fight) | `app/fight/fields.lua`, `app/lib/fields.lua`, `app/lib/content/kinds/fields.lua`, `app/content/fields/*.lua`, `app/fight/{engine,round}.lua`, `app/community/help.lua` (`/help/fields`), `app/admin/effects.lua` | `templates/fight/battlefield.html`, `templates/community/help/fields.html`, `public/js/fight.js`, `public/css/fight.css`, `public/images/fields/*` | `tests/lua/test_fields.lua`, `tests/e2e/fields.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
@@ -240,7 +241,7 @@ carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
 `banner`, `topnav` (the header's links), `left` (`loc` with `weather`, `towns`, `functions`), `main` (on the
-exploring page with `explore-weather`), `right` (`charpanel`, `invpanel`,
+exploring page with `explore-land` and `explore-weather`), `right` (`charpanel`, `invpanel`,
 `spellpanel`, `online-count`), `foot` (with `foot-time`, the timing line), `themes` (with
 `theme-back`), and on `/babble` the chat's `chat` (with `chat-posts`, and `chat-form` with
 `chat-back`); `minimal` and
@@ -476,15 +477,17 @@ on the minimal layout, in a new tab).
 	whose change makes it out of date: the sheet's are the right column's panels
 	(`charpanel`, `invpanel`, `spellpanel`, or `right`/`root` when the answer sends those
 	whole), seen in the live client's `before` hook; it is fetched again once the answer is
-	on screen (`applied`). The map is a picture and never changes.
+	on screen (`applied`). The map's are the Location box's (`loc`, or `left`/`root`): the
+	player's ring follows a move (the land's picture is a cached static file, so only the
+	page's few kilobytes come again).
 - **The window** (`<section class="dk-window dk-window-<kind>" role="dialog">`, not a
 	`<dialog>`: the game goes on under it, the arrow keys and the hotbar too;
 	`data-client`, so the live client's morph leaves it and it stays open from page to
 	page). Its strip (`.dk-window-grip`: the title, the close button `.dk-window-x` at the
 	right) moves it (pointer events, kept inside the viewport); its corner resizes it (CSS
 	`resize`); a press anywhere in one brings it in front (`z-index` from 950, in the order
-	pressed). Sizes at first: the chat 320 by 400, the map 460 by 490 (the picture as large
-	as the window allows), the sheet 280 by 520 (scrolling). It has the page's own
+	pressed). Sizes at first: the chat 320 by 400, the map 540 by 680 (the map as large as
+	the window allows, the legend under it), the sheet 280 by 520 (scrolling). It has the page's own
 	background (the theme's `body` image) a little darker. Whether each is open, where and
 	how big are kept in `localStorage` (`dk-window-<kind>`), so a page load opens it again
 	where it was. Escape in one closes it. A page without a window's link (logged out, the
@@ -829,8 +832,8 @@ starting with `__` are reserved.
 	`creature*.png`, `relic.png`, `send_message.png`, ...), `tiles/` (grid cells: `1x1.png`,
 	`1x1_mini.png`, `2x2.png`, `2x3.png`), `ui/` (`spinner.gif`, the `indicators.png`
 	sprite), `themes/<key>/` (a theme's logo, background, pictures); at the top the
-	original's (the compass, the slot icons `icon_*.gif`, the world map, the help pages'
-	pictures). The `actions/`, `tiles/`, `ui/` pictures and all but the parchment tile among
+	original's (the compass, the slot icons `icon_*.gif`, the help pages' pictures) and
+	`world.svg` (the land's picture, generated: [Terrain and the map](#terrain-and-the-map)). The `actions/`, `tiles/`, `ui/` pictures and all but the parchment tile among
 	the backgrounds aren't used yet. A link-styled submit button:
 	`<form class="inline" method="post" action="/x">{{{ csrf_field() }}}<button class="link">Text</button></form>`.
 - Low numbers blink with `<span class="highlight blink">`. The CSS animation replaces
@@ -1168,13 +1171,22 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	begins, and is the same all through one.
 - **The grid.** The map in cells of 10 by 10 tiles (`weather.CELL`). Each cell has a base
 	sky that holds 20 minutes (`weather.SPELL`; each cell changes at its own moment), picked
-	by a hash from its place and the time of day: fog likelier at dawn (and a little at
-	night) within 150 tiles of Narcissa, heat by day within 180 tiles of Endworld, a little
-	drizzle (snow north of latitude 150, `weather.NORTH`), clouds, sun by day, else clear.
-- **Storms.** A slot every 20 minutes (`weather.SLOT`). One hash per slot decides whether
-	its storm forms (3 in 5), its size (a squall, half of them, with a radius of 8-14
-	tiles; a storm, 35%, 16-26; a great storm, 15%, 30-40), its birth (in the slot's first
-	10 minutes), its origin (within 30 tiles of Midworld), its life (2 hours, give or take
+	by a hash from its place and the time of day, by the **climate of the land** at the
+	cell's centre (its biome's `climate`, [Terrain and the map](#terrain-and-the-map); one
+	climate per cell, so a cell keeps one sky): fog (likelier at dawn and at night where the
+	biome says: the Greymoor's dawns are foggy half the time), heat by day (the Ashlands and
+	the Dry Country), a little drizzle (snow where it snows), clouds, sun by day, else
+	clear. The Midlands keep the weather's numbers from before the land exactly (fog 4%,
+	drizzle 6%, overcast 20%, sun 35% by day), so the e2e tests' calm place sees the same
+	skies.
+- **Snow.** Falling weather is snow (drizzle and rain as snow, downpours and thunderstorms
+	as blizzards) north of latitude 150 (`weather.NORTH`) and, at any latitude, on a peak
+	tile (the feature of the tile itself, so a storm over a range snows on the peaks and
+	rains on the hills around them, and `weather.edge` says so).
+- **Storms.** A slot every 45 minutes (`weather.SLOT`). One hash per slot decides whether
+	its storm forms (45%, `weather.FORMS`: about one storm every 100 minutes), its size (a
+	squall, half of them, with a radius of 8-14 tiles; a storm, 35%, 16-26; a great storm,
+	15%, 30-40), its birth (in the slot's first half), its origin (within 30 tiles of Midworld), its life (2 hours, give or take
 	12 minutes) and how far its heading is off the line to Gilead (up to 0.08 radians). It
 	moves in a straight line at the speed that takes it to Gilead in its life, so its
 	position is a closed-form function of time. It grows from 40% of its radius in the first
@@ -1182,13 +1194,15 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	radius shrinking to half) until it breaks over Gilead (within about 25 tiles). Inside it
 	the rain goes by the distance from its centre over its radius: the core (under 0.35)
 	has the size's strongest (a downpour in a squall, a thunderstorm in the others), the
-	body (under 0.7) a level less, the fringe two (a drizzle at least); north of latitude 150
-	drizzle and rain fall as snow, downpours and thunderstorms as blizzards.
+	body (under 0.7) a level less, the fringe two (a drizzle at least), the same over any
+	land; where it snows, drizzle and rain fall as snow, downpours and thunderstorms as
+	blizzards.
 	`weather.storms(now)` lists the storms alive (centre, radius, birth, end).
 - **The ground.** From each storm's closest approach to the tile along its track (closed
-	form): in the south mud from then until 20 minutes (`weather.MUD`) after its rain (rain
-	or worse) there ended; in the north snow for 20 minutes after any snowfall, then ice for
-	20 more (`weather.SNOW`). Otherwise wet while rain falls (snow while snow falls), else
+	form): where it rains, mud from then until 20 minutes (`weather.MUD`, times the biome's
+	`mud`: 2 in the Thornbog, 0.4 in the Dry Country) after its rain (rain or worse) there
+	ended; where it snows, snow for 20 minutes after any snowfall, then ice for 20 more
+	(`weather.SNOW`). Otherwise wet while rain falls (snow while snow falls), else
 	dry. The ground follows the closest approach and the sky the moment, so the two agree
 	closely but not exactly at a storm's edge.
 - **`weather.at(lat, lon, now)`** is `{ sky, ground, time, storm, near }`, the same all
@@ -1249,11 +1263,137 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	seconds>` (`main.lua`, `clock.pin`), for everything that asks `clock.now()`.
 	`tests/run.sh` pins every request at `$T_NOW` (4000000000), so the weather is the same on
 	every run and doesn't change between two requests (`T_NOW=<unix> t_get /` asks at another
-	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey,
-	snow in the north, mud after rain, the lines, `weather.changed` between clock ticks, the
-	cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
+	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey and
+	how often they come, the land's climate, snow north of 150 and on the peaks,
+	mud after rain, the lines, `weather.changed` between clock ticks, the cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
 	line, and a live answer with the weather's regions alone), `tests/e2e/tick.sh` (the push
 	to an open page).
+
+## Terrain and the map
+
+(3.2, `docs/plans/elements-and-weather.md` part 7.) The world's land: every tile has a
+**biome** (ten: one around each town and two wild ones) and maybe a **feature** (a lake, a
+pond, hills or a peak). Every tile stays walkable (lakes are waded, peaks climbed); the land
+changes the weather's climate, the fight's battlefield and the words of the place, never
+where a player may go.
+
+- **The world is data, and permanent.** `app/lib/terrain/world.lua` holds the land of every
+	cell of 5 by 5 tiles (101 by 101; a town at a cell's centre): `land`, a string per row
+	from the north with a biome's letter per cell from the west (`M` midland, `R` downs, `B`
+	shoals, `K` diggings, `N` moors, `H` weald, `G` barrens, `E` ashlands, `D` drylands, `T`
+	marsh), and `relief` the same with a feature's character (`~` lake, `o` pond, `n` hill,
+	`^` peak, `.` none), so the file reads as two maps. It is **generated, committed and
+	never edited by hand**: its header names the generator and the seed. It never changes
+	because code changed: the game only reads it.
+- **World generator v1** (`app/lib/terrain/generator_v1.lua`, seed `0x3300`) made it, and
+	the game never loads it. Integer hashing (the weather's 64-bit mixing) and integer or
+	fixed-point arithmetic only (integer square roots, smoothstep on integers, floor
+	divisions; no floats), so every Lua 5.4 on every platform makes the same bytes. Each
+	cell, at its centre: its biome is the town's within 7 tiles of a town, else the nearest
+	point's of a blue-noise scatter (a jittered grid: one point in each 12-tile square,
+	within 0.6 of it). A point within a town's core takes the town's biome; any other is
+	reached only by the biomes whose nearest anchor (their town, or a wild biome's four
+	seeds, placed in the gaps between the towns' lands) is within their reach, each scoring
+	weight * (1 - distance / reach), moved up to 0.25 either way by its own border noise,
+	and takes one within 0.15 of the best score (a hash, weighted by how far within). So
+	the lands are coherent, their borders meander, and they mix only in the bands where
+	two scores are close; every point is reached by some biome (the generator stops if
+	not). Its feature, from value noises (lattice bytes hashed every `step` tiles,
+	smoothstep between) flattened toward the towns (none within 16 tiles of Midworld and 8
+	of another town, fewer out to 40 and 24): a peak where the elevation (steps 48, 24 and
+	12, plus the biome's shift) is 0.76 or more; a lake where the basins (steps 60 and 18,
+	less the biome's lake shift: more in the Shoals and the Thornbog) are 0.22 or less and
+	it isn't high, so lakes are a few bodies several cells across; hills at 0.62; a pond
+	where a fine noise (step 6, plus the biome's pond shift) passes 0.89 and it is low (one
+	or two cells); else none. Its numbers (the biomes' cores, reaches, weights, shifts and
+	the wild seeds) are in the file, tuned by looking at the map before the world was
+	committed. The world: plain 73%, hills 16%, lakes 5%, peaks 4%, ponds 1%; the Dry
+	Country 15% and the Thornbog 10%, the towns' biomes from 4% (the Copper Downs, the
+	Ashlands) to 15% (the Diggings); no cell alone among other biomes; 34 lakes, 9 of them
+	30 cells or more (the largest 77); ponds of at most 4 cells; the widest stretch of one
+	biome away from its town 145 tiles (the Weald).
+- **Verifying it**: `tests/lua/test_terrain.lua` runs generator v1 and requires its output
+	to be the committed file byte for byte (and the generator's code to count in integers).
+	`tools/world.sh` (`BIN=./dk tools/world.sh`) writes the file again from the generator,
+	in the project's own Lua (a scratch copy of `app/` whose `cli/check.lua` is
+	`tools/world.lua`, run by `dk check`, which needs no database): it changes nothing
+	while the generator is v1. **A new world** is a new generator beside v1
+	(`generator_v2.lua`, its own seed), never a change to v1: point `tools/world.lua` and
+	the test at it, run `tools/world.sh`, and commit the new data as a deliberate change of
+	the world (the players' positions stay; only the land under them changes).
+- **`lib/terrain.lua`** reads the data and says what the land is: `terrain.at(lat, lon)` is
+	`{ biome, feature, field }` (a biome key; `"lake"`, `"pond"`, `"hill"`, `"peak"` or nil;
+	the terrain field's key or nil), the same for the 25 tiles of a cell, a shared table
+	(two string reads and a table read: about 0.15 µs; the module loads in well under a
+	millisecond, from the code cache). `terrain.BIOMES` (key, name, map colour, field,
+	climate) and `terrain.FEATURES` (key, name, colour or how much darker than the biome,
+	field), `terrain.biome(key)`, `terrain.feature(key)`, `terrain.colour(biome,
+	feature)`.
+
+| Biome | Town | Field | Climate (lib/weather.lua) |
+|---|---|---|---|
+| `midland` The Midlands | Midworld | none | the weather's own: fog 4%, drizzle 6%, overcast 20%, sun 35% by day |
+| `downs` The Copper Downs | Roma | none | dawn mist, more drizzle and cloud, a little heat, mud lasts 1.5x |
+| `shoals` The Salt Shoals | Bris | none | sea mist at dawn, drizzle and cloud, mud 1.25x |
+| `diggings` The Diggings | Kalle | none | dry and bright, little rain, mud 0.8x |
+| `moors` The Greymoor | Narcissa | none | fog at dawn about half the time, some at night, grey, mud 1.5x |
+| `weald` The Hambry Weald | Hambry | `forest` | fog off the marsh-forest, more drizzle, overcast |
+| `barrens` The Storm Barrens | Gilead | none | grey, less sun |
+| `ashlands` The Ashlands | Endworld | `cinders` | heat by day 60%, rarely drizzle, mud 0.5x |
+| `drylands` The Dry Country | wild (4 seeds) | `sand` | heat by day 45%, sun, almost no drizzle or fog, mud 0.4x |
+| `marsh` The Thornbog | wild (4 seeds) | `marsh` | fog (dawn and night), drizzle, overcast, mud 2x |
+
+- **The fields** (group `terrain`, [Fields](#fields)): a tile's field is its feature's
+	(`peaks`; `shallows` in a lake or a pond; `hills`), else its biome's own. Midworld's
+	start is the Midlands' plain, with no field, for at least 12 tiles around (the e2e
+	tests' calm place too).
+- **The climate**: the weather reads the biome at the centre of each 10-tile weather cell
+	(its `climate`: the chances of the base sky, and how long mud lasts), and the feature of
+	the tile itself for snow: peaks snow at any latitude ([Clock and weather](#clock-and-weather)).
+	Storms rain the same over any land, and snow falls where it did (north of 150) and on
+	the peaks: the design's colder snow lines (100 in the Weald and the Barrens), snowless
+	dry lands and harder Barrens storms were left out, as the plan's contract asks.
+- **The words** (`lib/terrain_lines.lua`, plain tables like `weather_lines.lua`): for
+	each biome and each feature, `standing` (where the player stands), `edge` (another
+	biome or feature on a tile next to theirs, `{direction}`), `fight_open` (an encounter's
+	first line, `{monster}`) and `fight_turn` (now and then between rounds). A tile's own
+	words are its feature's, else its biome's. One variant is picked by a hash of the place
+	and the time (the hour for the exploring page, the clock tick for an encounter, the
+	round in a fight), never by dice: `terrain.standing(lat, lon, now)`, `terrain.edge(lat,
+	lon, now)` (the first neighbour, north, east, south, west, with other land),
+	`terrain.fight_open(lat, lon, k, monster)` and `terrain.fight_turn(lat, lon, round)`
+	(one round in four may have a line, chosen by the place, and half of those do: at most
+	one in four rounds, about one in eight; at the end of the round, `fight/round.lua`).
+	Fights roll the same dice with them.
+- **Shown**: the Location box names the biome and the feature (`.loc-land`, `game.land`);
+	the exploring page has the standing and edge lines above the weather's, in a region of
+	their own, `explore-land` (`.explore-standing`, `.explore-land-edge`), there even when
+	empty; an encounter opens with the land's line; the Battlefield line shows the terrain
+	field.
+- **The map** (`GET /map`, `town/map.html`, and the World Map window, [Windows](#windows)):
+	the land's picture under the towns and the player, and a legend; the whole world
+	(every town and all the land, whatever maps the player bought). The picture is a static
+	file, `public/images/world.svg` (about 30 KB, served and cached like any static file):
+	a cell a unit, each row's runs of one colour a stroke (a path per colour: the biomes',
+	the water's deep blues, lakes `#3f6fa3` and ponds `#5585b8`, apart from the Shoals'
+	teal; the hills' and peaks' darker shades), the hills' and peaks' cells with a
+	pattern over them (a hump; a peak with a pale cap). `app/lib/terrain/picture.lua` draws
+	it from the data; `tools/world.sh` writes it, and `tests/lua/test_terrain.lua` requires
+	the file to be that drawing (so a colour change fails until it is written again). The
+	page is an inline SVG in the picture's units: the picture as an `<image>`, thin axes
+	through Midworld, each town from the `towns` table (a dot and its name, inward from the
+	map's edges), the player's red ring and a title naming where they are; it works
+	without JavaScript.
+- **Testing**: `tests/lua/test_terrain.lua` (the data is generator v1's output byte for
+	byte, integers only, the picture is the drawing, a cell is one place, the towns plain
+	in their biomes and no feature near them, Midworld's start, the biomes' and features'
+	shares, the lands coherent (no confetti, tracts), lakes as bodies and small ponds, the
+	widest stretch of one biome, the fields, the cost), `tests/lua/test_weather.lua`
+	(the climate: fog on the moors at dawn, heat in the Ashlands; snow on the peaks),
+	`tests/lua/test_fields.lua` (the terrain field held, never a spell's),
+	`tests/e2e/terrain.sh` (the Location box, the exploring page's lines, a fight on the
+	Thornbog's field and its first line, `/help/fields`; places found in the world's data),
+	`tests/e2e/town.sh` (`/map`: the picture, the towns, the player, the legend).
 
 ## The server tick
 
@@ -2222,9 +2362,9 @@ resistance in a fight, the sheet, the help page, a class).
 
 ## Fields
 
-(3.2, `docs/plans/elements-and-weather.md` part 4.) A **field** is an effect on the whole
-battlefield, for everyone in a fight: the weather's (rain, mud, the night) or a spell's
-(consecrated ground). Fields are content (see [Content](#content)):
+(3.2, `docs/plans/elements-and-weather.md` parts 4 and 7.) A **field** is an effect on the
+whole battlefield, for everyone in a fight: the weather's (rain, mud, the night), the
+land's (a marsh, the peaks) or a spell's (consecrated ground). Fields are content (see [Content](#content)):
 `app/content/fields/<key>.lua`, synced into `fields` (`lib/content/kinds/fields.lua`, rows
 by `lib/fields.lua`), overridable in the admin panel (`/admin/fields`). What a field does
 is data, so the pages can show it; only an optional `on_tick` is code.
@@ -2236,7 +2376,7 @@ return {
 	description = "Hard rain: fire is weak, lightning strong, no fire can catch, ...",
 	lore = [[...]],                   -- optional, like every kind's
 	icon = "",                        -- a PNG in public/images/fields/ (optional; none here)
-	group = "sky",                    -- sky | ground | time | aura: one field per group is up
+	group = "sky",                    -- sky | ground | time | terrain | aura: one field per group is up
 	damage = { water = 15, lightning = 25, fire = -40 },   -- percent, by element (-100..1000)
 	statuses = {                      -- how statuses behave under it, by status key
 		burning = { blocked = true },   -- can't take hold (the field's `blocked` line)
@@ -2262,8 +2402,15 @@ return {
 	tick). A spell's (`s:field(key, { ticks = n })`, the player's or a monster's) takes its
 	group's place for `n` ticks, counted from the tick after the one it was cast in, and
 	when it ends the weather's comes back; `aura` fields (`consecrated`, `brimstone`,
-	`miasma`) come only from spells. The 14 fields are the 11 world fields and the three
-	auras, with the starting numbers of the 3.2 design (Phase E tunes them).
+	`miasma`) come only from spells. The **terrain** group is the land's: the field of the
+	player's tile ([Terrain and the map](#terrain-and-the-map): `shallows` in a lake or a
+	pond, `peaks`, `hills`, else the biome's own, `marsh`, `forest`, `sand` or `cinders`),
+	up from the start like the weather's and followed the same way, which holds it for the
+	fight (the player doesn't move in one). It has no `begins` or `ends` lines (it never
+	changes in a fight; the Battlefield line shows it), and no spell can put one up
+	(`s:field` with a terrain field is an error; `dk check`: a terrain-group field must be
+	one the land names, and those must be in the terrain group). The 21 fields are the 11
+	weather's, the 7 land's and the three auras.
 - **Changes** become lines and `field` events: when only the weather's fields changed, at
 	the weather's step, and no spell holds a group of it, the weather's change line
 	(`weather.change`) says them all; otherwise each field that went says its `ends` and each
@@ -2305,7 +2452,8 @@ return {
 	hold", "Burning lasts 10s less", "Sleep chance +30%", "Dexterity -20%":
 	`fields.lines`, then the description and lore). `fight.js` adds and strikes out its
 	fields as a round's `field` events play ([Fight events](#fight-events-smooth-fights)).
-	`/help/fields` lists every field (icon, group, modifiers, description, lore), linked
+	`/help/fields` lists every field by group (sky, ground, time of day, terrain, aura: icon,
+	group, modifiers, description, lore), linked
 	from the help index. `/admin/fields` overrides the name, description, lore, icon, the
 	damage percent of every element, the stats, the file's status rules, numbers and
 	messages (the group is the file's).
@@ -2316,13 +2464,15 @@ return {
 	`statuses.burning.scale.amount`. A status a rule names must be a status file.
 
 Adding a field: copy `app/content/fields/rain.lua` (or `thunderstorm.lua` for one with
-`on_tick`) to `<key>.lua`, give it a group (`aura` unless the weather brings it), run
+`on_tick`) to `<key>.lua`, give it a group (`aura` unless the weather or the land brings
+it), run
 `./dk check`; a spell puts it up with `s:field("<key>", { ticks = n })` (declare it: `uses =
 { fields = { "<key>" } }`). Testing: `tests/lua/test_fields.lua` (the files and their
 validation, nothing changing without fields, the damage percent, `blocked` before the ward,
 `chance`, `ticks` and `scale`, stats on the handles, a spell's field displacing the
-world's, auras, the weather moving the fields and its events, a spell meeting a sky just
-cleared, `on_tick`, `m.turn`, the e2e tests' calm place: `t_calm` in [End-to-end
+world's, auras, the terrain's field held and never a spell's, the weather moving the
+fields and its events, a spell meeting a sky just cleared, `on_tick`, `m.turn`, the e2e
+tests' calm place: `t_calm` in [End-to-end
 tests](#end-to-end-tests)), `tests/lua/test_monsters.lua` (weight 0),
 `tests/e2e/fields.sh` (the help page, the Battlefield line and its tooltips, nightfall in a
 fight on the clock, a live round's `field` event, the admin page), `tests/e2e/migrate.sh`
@@ -3060,7 +3210,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`; an item that casts with full charges); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
 | `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_win`, `t_fight_clear username`, `t_fight_status username who key [data [ticks]]` | a fight in progress against a monster (round 2 by default; not on the clock yet: its first POST or tick starts it at its time); an encounter beginning where the player stands, as on a map move (the current jar's player: `POST /__test/encounter`; `$BODY` is the fight page); the current jar's won fight (`t_fight user m 0`) paid by a round, `$BODY` the victory page; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
 | `t_tick [seconds]` | the clock moves on (default 10 s: a tick; `$T_NOW` too, until the next script) and the server's tick runs there (`POST /__test/tick`, the current jar logged in; the e2e server's own tick is off: `tick = false`); `$BODY` says what it advanced |
-| `t_calm username`, `$T_CALM_LAT`, `$T_CALM_LON` | put the player at the calm place (-3, 3): the weather brings no [field](#fields) to it from `$T_START` until nightfall 1400 s later (`tests/lua/test_fields.lua` checks it), and it has Midworld's level band and no town. A check of a fight's numbers (damage, healing, a status's data or duration, an attack that never lands) fights there, so the battlefield is the same, none, on every run: the weather is a pure function of the place and the pinned time, and elsewhere it may bring the sun (fire +10%), fog (attack -15%) or mud (dexterity -20%). The weather's fields have tests of their own (`tests/e2e/fields.sh`) |
+| `t_calm username`, `$T_CALM_LAT`, `$T_CALM_LON` | put the player at the calm place (-3, 3): the Midlands' plain (no terrain field), and the weather brings no [field](#fields) to it from `$T_START` until nightfall 1400 s later (`tests/lua/test_fields.lua` checks it), and it has Midworld's level band and no town. A check of a fight's numbers (damage, healing, a status's data or duration, an attack that never lands) fights there, so the battlefield is the same, none, on every run: the weather is a pure function of the place and the pinned time, and elsewhere it may bring the sun (fire +10%), fog (attack -15%) or mud (dexterity -20%). The weather's fields have tests of their own (`tests/e2e/fields.sh`) |
 | `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight in progress (0 when there is none; a finished fight kept for its page doesn't count) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |

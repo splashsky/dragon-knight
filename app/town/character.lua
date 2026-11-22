@@ -1,5 +1,6 @@
 -- town/character.lua :: legacy index.php showchar() (own sheet, popup), onlinechar($id)
--- (anyone's sheet, from Who's Online) and showmap().
+-- (anyone's sheet, from Who's Online) and showmap() (the World Map: the land's picture,
+-- public/images/world.svg, under the towns and the player; docs/APP.md "Terrain and the map").
 local affinities = require("lib.content.affinities")
 local classes = require("lib.classes")
 local clock = require("lib.clock")
@@ -10,6 +11,7 @@ local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 local spells = require("lib.spells")
+local terrain = require("lib.terrain")
 local view = require("lib.view")
 
 local character = {}
@@ -73,9 +75,39 @@ function character.online(req, params)
 	return view.page(req, "Character Information", "town/onlinechar", character.sheet(user))
 end
 
--- GET /map
+-- Where a tile is on the map's picture (a cell a unit, from the north-west corner).
+local function spot(lat, lon)
+	local half = terrain.CELLS + 0.5
+	return lon / terrain.CELL + half, half - lat / terrain.CELL
+end
+local function num(n) return ("%.1f"):format(n) end
+
+-- The legend: the biomes, then the features (hills and peaks with their marks).
+local LEGEND = {}
+for _, b in ipairs(terrain.BIOMES) do LEGEND[#LEGEND + 1] = { name = b.name, colour = b.colour } end
+for _, f in ipairs(terrain.FEATURES) do
+	LEGEND[#LEGEND + 1] = { name = f.name, colour = terrain.colour("midland", f.key), mark = not f.colour and f.key or nil }
+end
+
+-- GET /map: the whole world (every town, all of the land), and where the player is.
 function character.map(req)
-	return view.page(req, "Map", "town/map", {}, { layout = "minimal", nav = false })
+	local user = req.user
+	local side = 2 * terrain.CELLS + 1
+	local towns = {}
+	for _, t in ipairs(dk.db:query("SELECT name, latitude, longitude FROM towns ORDER BY id")) do
+		local x, y = spot(t.latitude, t.longitude)
+		-- the name beside the dot, inward from the map's edges
+		local right = x > side * 0.8
+		towns[#towns + 1] = { name = t.name, x = num(x), y = num(y), tx = num(right and x - 1.4 or x + 1.4),
+			ty = num(y > side - 4 and y - 1.4 or y + 1), anchor = right and "end" or "start" }
+	end
+	local x, y = spot(user.latitude, user.longitude)
+	local cx, cy = spot(0, 0)
+	return view.page(req, "Map", "town/map", {
+		side = side, towns = towns, legend = LEGEND,
+		player = { x = num(x), y = num(y), where = game.latitude_str(user.latitude) .. ", " .. game.longitude_str(user.longitude) },
+		centre = { x = num(cx), y = num(cy) },
+	}, { layout = "minimal", nav = false })
 end
 
 return character

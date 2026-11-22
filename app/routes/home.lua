@@ -3,6 +3,7 @@ local auth = require("lib.auth")
 local clock = require("lib.clock")
 local game = require("lib.game")
 local news = require("lib.news")
+local terrain = require("lib.terrain")
 local view = require("lib.view")
 local weather = require("lib.weather")
 
@@ -20,11 +21,15 @@ local function town_page(req)
 	return view.page(req, "In Town", "home/town", ctx)
 end
 
--- Exploring: the weather's change at the player's tile in this minute (its step), and other
--- weather on a tile next to it (a GET can't know where the player came from: weather.edge).
+-- Exploring: the land where the player stands and other land on a tile next to theirs
+-- (terrain.standing, terrain.edge); the weather's change at the player's tile in this minute
+-- (its step), and other weather on a tile next to it (a GET can't know where the player
+-- came from: weather.edge).
 local function explore_page(req)
 	local user, now = req.user, clock.now()
 	return view.page(req, "Exploring", "home/explore", {
+		standing = terrain.standing(user.latitude, user.longitude, now),
+		land_edge = terrain.edge(user.latitude, user.longitude, now),
 		change = weather.change(user.latitude, user.longitude, now),
 		edge = weather.edge(user.latitude, user.longitude, now),
 	})
