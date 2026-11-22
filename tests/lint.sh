@@ -35,4 +35,9 @@ if [ "$bad" -gt 0 ]; then
 	echo "lint: $bad file(s) indented with spaces (use tabs)" >&2
 	exit 1
 fi
+# the world's lore (.opencode/skills/dk-lore): chunks, index, glossary and links agree
+if command -v python3 >/dev/null; then
+	python3 .opencode/skills/dk-lore/scripts/check.py >/dev/null || {
+		python3 .opencode/skills/dk-lore/scripts/check.py >&2 || true; exit 1; }
+fi
 echo "lint: ok"

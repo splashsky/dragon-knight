@@ -1,0 +1,154 @@
+# Glossary
+
+Every proper noun of the world, once: `- **Name**: what it is (\`area/chunk\`).` Check here
+before naming anything; add a line when a chunk introduces a name.
+
+- **The abbey (Hambry)**: the Hambry abbey whose cellars make Cure-All (`towns/hambry`).
+- **The allies**: the summoned bear, wolf, spirit and golem, borrowed for a few rounds (`magic/allies`).
+- **The Angel's set**: Joy, Rise, Truth and Love, left by winged guardians; life and strength (`things/legendary-sets`).
+- **Arcane**: the Mages' raw force, the eleventh kind of harm; it ignores armor (`magic/elements`).
+- **Archfiend**: what a summoner's circle is meant to hold; bound once in the north, walked out when the seal cracked (`monsters/demons`).
+- **The Ashlands**: the smallest and scattered land, round Endworld at the world's end: ash, glass, lava vents, heat, no snow (`lands/ashlands`).
+- **The auras**: Brimstone (the demon lords'), Miasma (the liches') and Consecrated ground (the Paladin's); a new one drives out the old (`magic/elements`).
+- **The Barrens**: short for the Storm Barrens (`lands/storm-barrens`).
+- **Beehive**: the Weald's skep in the branches that swarms whoever stood under it (`things/battlefield-objects`).
+- **Behemoth**: the barn-sized marsh beast whose path is a road through the reed-beds (`monsters/beasts`).
+- **Black Dragon**: the oldest dragon the road-wardens know, over the marshes beyond Narcissa (`monsters/drakes-and-dragons`).
+- **Blue Dragon**: the frost dragon of the peaks above Kalle (`monsters/drakes-and-dragons`).
+- **Bog priests**: Gilead's priests who carve thornwood hearts into charms (`lands/thornbog`).
+- **Bog-bubbles**: the Thornbog folk's name for gas pockets (`things/battlefield-objects`).
+- **Bris**: the shoal-town at 70, -70 on the north-west arm, on the storms' road; pearl divers, apothecaries and smiths (`towns/bris`).
+- **The brute kin**: Brute and Large Brute, the hired muscle who throw what they can lift (`monsters/giants`).
+- **Call Wolf**: the ally spell no class learns (`magic/allies`).
+- **Campfire**: the Downs' goblin-camp coals that spark other objects alight (`things/battlefield-objects`).
+- **Charging**: the one-turn tell before a breath, a dive or a charged blow (`monsters/others`).
+- **Cherufiend**: a devil that was a guard of the pit gates and holds the stairs from the mines to the deeper pits (`monsters/demons`).
+- **Cinders**: the Ashlands' terrain field: fire stronger, frost weak, wind 1 (`lands/ashlands`).
+- **The cliffs north of Roma**: the Downs' largest peak range, with the Wyrm's caves (`lands/copper-downs`).
+- **Colossus**: the statue of stone and iron that guards the road beyond Endworld, obeying its last order (`monsters/giants`).
+- **The Copper Downs**: Roma's hill country of chalk tracks, goblin camps, rain and slow mud; the hilliest land (`lands/copper-downs`).
+- **The cracks**: the breaks in the old roads from which demons came up; the Demon King's realm lies beyond them (`legends/upper-echelon`).
+- **The cross**: the two straight lines on which the eight towns lie, crossing at Midworld: Hambry-Roma-Midworld-Narcissa-Endworld, and Gilead-Bris-Midworld-Kalle; the four arms of the world (`world/overview`).
+- **The crown**: the old kingdom's throne, blamed by the Demagogue, defied by the Insurgent, deserted by the Renegade and the Dark Knights (`legends/upper-echelon`).
+- **The cult of the pits**: the cult that runs the fire pits under Hambry and keeps hellbeasts as guards (`monsters/beasts`).
+- **The daemons**: Grey, Red, Dark and Black, the single great demons that come through the cracks (`monsters/demons`).
+- **Dark Dragon**: the dragon under Hambry that collects names (`monsters/drakes-and-dragons`).
+- **The dawk kin**: the grey-skinned cave and pass brutes: Dawk, Dawkin, Dawkor, Dawkare (`monsters/giants`).
+- **The Dead School**: the school of the dead beyond Narcissa, run by the Liche Master under the Liche Prince, where lessons are given in fire (`monsters/undead`).
+- **Dead Tree**: the snag of the Weald, Greymoor, Barrens and Thornbog that falls on whoever is under it (`things/battlefield-objects`).
+- **Demon King**: rules the realm beyond the cracks since before the first town; a crown of cooled lava (`monsters/demons`).
+- **Demon Lord**: rules a stronghold of demons beyond Endworld, the hall of black glass (`monsters/demons`).
+- **Demon Prince**: commands the demons on the roads beyond Endworld, sends them in waves and counts the dead (`monsters/demons`).
+- **The Demon's set**: Fall, Sin, Hate and Lie, demon trophies that trade life or magic for strength (`things/legendary-sets`).
+- **The Destiny set**: Destiny Blade, Aegis and Raiment, the made gear sold only at Endworld (`things/legendary-sets`).
+- **The devils**: the ladder of the pits: Fiend, Lesser Devil, Devil, Greater Devil and the Greatest Devil, with the Cherufiends who guard the stairs (`monsters/demons`).
+- **The Diggings**: Kalle's red scree, spoil heaps and mines, dry and bright, with the high country above and no lakes (`lands/diggings`).
+- **The doomers**: Doomer, Megadoomer and Ultradoomer, who name the day you die and count (`monsters/undead`).
+- **The Dragon's set**: the six dragon drops: Claw, Scale, Tooth, Plate, Tear, Wing (`things/legendary-sets`).
+- **Drakes**: the small scaled dragon kin of the hills and marshes: Drake, Drakelor, Drakemal, Drakefin (`monsters/drakes-and-dragons`).
+- **Drops**: accessories left by victories, each with a drop level (`things/legendary-sets`).
+- **The Dry Country**: the wild land of sand, scrub and salt pans in four seeds between the towns; scorpions, nomads, water cacti (`lands/dry-country`).
+- **The edge**: the limit of the walkable map at 250 tiles each way; what lore calls "beyond Endworld" is the far side of it (`world/overview`).
+- **The elementals**: fire, earth, wind and water given a shape: Fire, Flame, Blaze, Fira, Terra, Aero and Aqua (`monsters/elementals`).
+- **Endworld**: the last town at -250, -250, the south-west corner of the map and its edge; the legendary shop (`towns/endworld`).
+- **Explosive Barrel**: the keg of Kalle's blasting powder, as an object on the field and as an item sold in Kalle, Narcissa and Gilead (`things/battlefield-objects`).
+- **The fey**: nymph, sylph and nisse, small folk weak to iron (`monsters/fey-and-spirits`).
+- **The fire pits**: the pits worked by a cult under Hambry, where hellbeasts are kept as guards; one country with the devils' pits (`towns/hambry`).
+- **The fright kin**: Fear, Fright, Horror and Terror, the cold that gathers where there is dread (`monsters/undead`).
+- **The garrison knights**: Knight, Armor Knight, Strong Knight, Pale Knight and Dark Knight, the crown's own guard or its remains (`monsters/people`).
+- **The garrison of Gilead**: Gilead's old garrison, its standards, tower shields and Strong Knight (`towns/gilead`).
+- **Gas Pocket**: the Thornbog's bubble of marsh gas that flashes or bursts (`things/battlefield-objects`).
+- **The gems**: Ruby, Emerald, Obsidian, Diamond, Topaz and Pearl, the level-50 drops worth 150 of a stat (`things/legendary-sets`).
+- **Gilead**: the walled garrison-town at 200, -200 on the north-west arm, where the storms end (`towns/gilead`).
+- **Greatest Devil**: the strongest demon through the cracks and the one the others obey; its name is painted red on Endworld's gates (`monsters/demons`).
+- **Green Dragon**: the marsh-forest dragon beyond Hambry, venom breath, "takes only the gold it is owed" (`monsters/drakes-and-dragons`).
+- **The Greymoor**: Narcissa's heather moor of peat water and standing stones, the foggiest land (`lands/greymoor`).
+- **The hall of the pleaders**: Hambry's hall, where the Advocate, Fanatic, Zealot and Obsessive judge whoever comes in without a receipt (`towns/hambry`).
+- **Hambry**: the snowbound forest city at 170, 170 on the north-east arm; abbey, temple, watch guild and the hall of the pleaders (`towns/hambry`).
+- **The Hambry Weald**: Hambry's forest, the largest land, with the Woods field, beehives and snow half the year (`lands/hambry-weald`).
+- **The hell-kin**: Hellcat, Hellhound and Hellbeast, fire-coated beasts of the road and the pits (`monsters/beasts`).
+- **The high country**: the great range of peaks and passes above Kalle, half Diggings and half Downs (`lands/diggings`).
+- **High Peaks**: the terrain field of peaks: frost, wind and lightning stronger, short of breath, wind 2 (`lands/waters-and-heights`).
+- **The hill clans**: the people said to have forged the first claymores (`lands/waters-and-heights`).
+- **Honey-cutters**: the Weald's bee-keepers of Hambry, who walk under the skeps with a smoking pot (`lands/hambry-weald`).
+- **The hot road**: the road between Bris and Kalle, dry, hellhound country, read loosely off the Midworld hub (`lands/dry-country`).
+- **The hurt spells**: Hurt, Pain, Maim, Rend, Chaos, Magic Bolt, Hyper Beam, Sap Mind and Starfall, the arcane force that shades, daemons, great dragons and some elementals are immune to (`magic/elements`).
+- **The ice pits**: Kalle's pits that go down into winter ice, worked with frost charms; not the devils' pits (`towns/kalle`).
+- **Incubus and Succubus**: the tempters of the inns along the road to Narcissa, one handsome and one warm (`monsters/demons`).
+- **Kalle**: the mining town at -100, 100, alone on the south-east arm; pits, powder and the pass above (`towns/kalle`).
+- **The keg trick**: the thieves', goblins' and deserters' habit of rolling a keg of blasting powder onto the field and lighting it with a Fire Flask (`monsters/people`).
+- **The King's crypts**: the crypts under Kalle where the Liche King's court meets and the Liche Lord keeps the ledgers (`monsters/undead`).
+- **The knights' standard**: the War Standard the old garrison knights raise on their first turn; one good blow brings it down (`monsters/people`).
+- **The lamplighters' guild**: Roma's guild that sells Fire Flasks "at a price never quite explained" (`peoples/trades`).
+- **Leviathan**: the lake-beast beyond Endworld whose back is taken for an island (`monsters/others`).
+- **Liche King**: the lord of the old kingdom bound to a throne of bone; his court of the dead meets in the crypts under Kalle (`monsters/undead`).
+- **The Liche line**: Liche, Liche Master, Liche Prince, Liche Lord and Liche King; dead mages of two courts (`monsters/undead`).
+- **Lit Fuse**: the status of a burning rag fuse, put out by water (`things/battlefield-objects`).
+- **Loose Sand**: the Dry Country's terrain field: earth and wind stronger, water weak, feet slip (`lands/dry-country`).
+- **Lucifuge**: the fallen seraph who rules the deepest pits; courteous (`monsters/demons`).
+- **The lycans**: werewolf, Lycan, Lycanthor and Lycanthra, men who let the wolf in; weak to silver (`monsters/beasts`).
+- **The Mages' guild**: Roma's guild of Mages, one body that sells apprentice robes, buys magic stones and every thornwood root, and whose halls sell ward charms; the lore's "Mage's guild" and "mage guild" are the same (`towns/roma`).
+- **Marsh (field)**: the Thornbog's terrain field: poison and earth stronger, everyone slogging (`lands/thornbog`).
+- **The Midlands**: Midworld's farmland (hedgerows, stubble, soft earth), the mildest land: the weather's plain numbers, no field, no objects (`lands/midlands`).
+- **Midworld**: the hub town at 0, 0 where every character begins; the Mages' towers, the training yards and the chapel with the oath book (`towns/midworld`).
+- **The mountain clan (Endworld)**: the clan of the mountains above Endworld, whose old women say the bear's roar is in the claw (`lands/ashlands`).
+- **Narcissa**: the walled foundry-town at -130, -130 on the south-west arm; fog at dawn, kilns, the college (`towns/narcissa`).
+- **Narcissa's college**: the mages' college whose copper stills make Hi-Ether on its north wall (`towns/narcissa`).
+- **Nisse**: the bearded barn trickster of the farms around Roma who wants a bowl of milk (`monsters/fey-and-spirits`).
+- **The nomads**: the caravan folk of the Dry Country with a knotted band for each hand that walked with them (`lands/dry-country`).
+- **The northern road**: the road of the reavers, whose blood trick the Paladins who ride with caravans learned (`peoples/roads-and-outlaws`).
+- **The oath book**: the Paladins' book kept at the Midworld chapel, with the Dawn prayer and a page for every field the Order has held (`magic/paladins`).
+- **The old kingdom**: the realm of the Liche King and the crown, whose garrisons, guard, road tax and old wars the lore keeps meeting (`legends/upper-echelon`).
+- **The Order**: the Paladins' order, whose oath was sworn before the first dragon fell; it keeps the oath book at the Midworld chapel (`magic/paladins`).
+- **Pan-men**: Kalle's salt workers who dig a bitter white root at night for Weakening Dust (`peoples/trades`).
+- **The passes above Kalle**: the snowbound passes of the high country, climbed by herders with a rope, home of the Blue Dragon (`lands/diggings`).
+- **The pit fights**: the gladiators' bouts of Kalle, where the pit master sells Strength Tonic at cost (`towns/kalle`).
+- **The pits**: the devils' country under the old mines and under Hambry, where contracts are signed and ledgers never close; the fire pits of Hambry are part of it (`monsters/demons`).
+- **Rallied**: the status of the shout when a standard goes up: blades bite harder (`things/battlefield-objects`).
+- **The realm beyond the cracks**: the demons' country past Endworld, ruled by the Demon King (`monsters/demons`).
+- **The reavers**: the ungentle men of the northern road (`peoples/roads-and-outlaws`).
+- **Red Dragon**: the fire dragon on a hoard beneath the mountains past Endworld (`monsters/drakes-and-dragons`).
+- **The restless dead**: ghosts, specters, phantoms, spirits, haunts, polgergeists and the dybbuk, who died owing, unpaid or unavenged (`monsters/fey-and-spirits`).
+- **The ring**: a tile's larger distance from Midworld, in tiles; a monster's level is met by the ring, one level for each five tiles (`world/overview`).
+- **The road order**: the order in which a traveller meets the towns and in which markets sell neighbouring maps: Midworld, Roma, Bris, Kalle, Narcissa, Hambry, Gilead, Endworld (`world/overview`).
+- **Roma**: the first town out of Midworld, at 30, 30 on the north-east arm; copper, glass, clocks and the Mages' guild (`towns/roma`).
+- **Rough Ground**: the terrain field of hills: earth and wind stronger, footing poor, wind 1 (`lands/waters-and-heights`).
+- **The salt pans**: the pans at the mouth of the Kalle road, worked by pan-men; and the glaring white pans of the Dry Country (`lands/diggings`).
+- **The Salt Shoals**: Bris's grey tidal flats, shell beds, cliffs and ruined towers, with sea mist and tide pools (`lands/salt-shoals`).
+- **Serafiend**: a seraph fallen out of the choir that kept its voice, guarding old chapels above Roma (`monsters/demons`).
+- **The Seraph's set**: Joy, Rise, Truth and Love, left by seraphs; magic and dexterity (`things/legendary-sets`).
+- **Seraphs**: the fire-winged beings whose fall leaves the Seraph's set; the Serafiend and Lucifuge are of the fallen kind (`things/legendary-sets`).
+- **Shadow Dragon**: the dragon that hunts in the hours after dusk outside Narcissa and brings the night (`monsters/drakes-and-dragons`).
+- **Shallows**: the terrain field of any lake or pond: water and lightning stronger, fire weak (`lands/waters-and-heights`).
+- **The shell beds**: the pearl divers' beds on the Shoals' flats, picked clean every spring (`lands/salt-shoals`).
+- **Silver**: "holy in the old tongue": what lycans, the dead and devils are weak to (`magic/elements`).
+- **Silver Slime**: the rare level-30 slime, 15 hit points and armor 200, said to carry coins (`monsters/slimes`).
+- **Siren**: the singer of the sea-coast beyond Endworld, 68 hit points, armor 800 (`monsters/others`).
+- **Slimes**: the humblest monster kin, blue, red, dark and silver; "what is left when a spell goes wrong" (`monsters/slimes`).
+- **The snow line**: the latitude north of which falling weather is snow: 150, 100 in the Weald and the Barrens, none in the Ashlands and the Dry Country (`world/weather-and-time`).
+- **Soaked**: the status of being wet through, hard to burn and easy to shock (`things/battlefield-objects`).
+- **Squall, storm and great storm**: the three sizes of storm, by radius (`world/weather-and-time`).
+- **Standing Stone**: the Greymoor's leaning menhir that crushes and stuns one side when toppled (`things/battlefield-objects`).
+- **Staves and wands**: weapons that cast a spell free, a few charges, recharged at an inn (`things/gear`).
+- **Steam Vent**: the Ashlands' crack in the cinders that scalds a creature in turn (`things/battlefield-objects`).
+- **Stilt-hut folk**: the people of the Thornbog, who test each step with a pole and leave a loaf for the hag (`lands/thornbog`).
+- **The Storm Barrens**: Gilead's windswept ruins and battlefields, where the storms end and rain a step harder; war banners (`lands/storm-barrens`).
+- **The storms' road**: the track storms take from near Midworld north-west through the Bris country to Gilead, in about two hours; "the storm road" is the same; the south-east arm, Kalle's, lies behind it (`world/weather-and-time`).
+- **Swarmed**: the status of bees about the face, one sting a turn (`things/battlefield-objects`).
+- **The Thornbog**: the wild bog-land of black water, reeds and thornwood in four seeds between the towns; the wettest ground (`lands/thornbog`).
+- **The Thornwood set**: Bark, Thorn, Heart and Root, four pieces for three slots whose costs offset one another (`things/legendary-sets`).
+- **Tide Pool**: the Shoals' rock pool whose splash soaks the whole field (`things/battlefield-objects`).
+- **Titan**: the giant of living rock in the mountains above Endworld, oldest of the great beings (`monsters/giants`).
+- **Tolls**: what trolls, ogres and orcs take from travellers who would pass (`monsters/giants`).
+- **The upper echelon**: the legendary things: monsters from level 42, the dragons, the Destiny gear, the four accessory sets and the late spells (`legends/upper-echelon`).
+- **War Banner**: the Barrens' torn standard whose side deals more damage while it stands (`things/battlefield-objects`).
+- **Wards**: the chance that a state (sleep, poison, venom, burning, weakening, withering) does not take hold; not the Ward spell (`magic/afflictions`).
+- **The watch guild**: Hambry's guild that gives each guildsman a Sentinel Charm on the night he first stands a gate (`towns/hambry`).
+- **Water Cactus**: the Dry Country's ribbed cactus that heals the worst hurt when split (`things/battlefield-objects`).
+- **The Weald**: short for the Hambry Weald (`lands/hambry-weald`).
+- **Widowmakers**: the woodcutters' name for dead trees (`things/battlefield-objects`).
+- **Winged guardians**: the angels whose fall leaves the Angel's set; told of, never met (`things/legendary-sets`).
+- **Wire men**: Kalle's storm folk who wear spark rings out on the storm road to the north-west, where the lightning comes down (`peoples/trades`).
+- **Woods**: the Weald's terrain field: close trunks, fire stronger, wind and lightning weaker (`lands/hambry-weald`).
+- **Wyrms**: dragons that never grew up, of smoke, frost and fire (`monsters/drakes-and-dragons`).
+- **Wyverns**: two-legged dragon kin with no fire, only a tail and a dive (`monsters/drakes-and-dragons`).

@@ -1077,6 +1077,17 @@ softly over a wound, it draws warmth back into tired flesh. Old soldiers say a H
 in time is worth a hundred herbs.]],
 ```
 
+**The canon** (3.3): the world's facts (its towns, lands, peoples, monsters, magic, weather
+and legends) are kept in an OpenCode skill, `.opencode/skills/dk-lore/`: `SKILL.md` (when to
+use it, the voice, what wins when sources disagree, how to edit, prune and add while staying
+one world), `INDEX.md` (one line per chunk), `chunks/<area>/<chunk>.md` (short chunks, each
+citing the files its facts come from), `glossary.md` (every proper noun once, with its
+chunk) and `continuity.md` (contradictions decided, inferred facts, open questions). The
+game's mechanics win over the chunks, and the chunks over older lore text: write new lore
+against them, and update them in the same change when the world's facts change.
+`.opencode/skills/dk-lore/scripts/check.py` (run by `tests/lint.sh`) keeps the chunks, the
+index, the glossary and their links agreeing.
+
 ## Icons
 
 Every item, spell, monster, status and ally has an icon (3.1): a square PNG named by its
