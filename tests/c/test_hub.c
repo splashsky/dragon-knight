@@ -481,6 +481,7 @@ static void srv_config(srv *s)
 	s->cfg.port = 0;
 	s->cfg.workers = 2;
 	s->cfg.access_log = 0;
+	s->cfg.tick = 0;
 	s->cfg.stats_socket = strdup("");
 	free(s->cfg.public_dir);
 	s->cfg.public_dir = strdup("/nonexistent");

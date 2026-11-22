@@ -32,6 +32,14 @@ function clock.tick_start(n)
 	return n * clock.TICK
 end
 
+-- A length of time for the page: "20s", "1m 30s", "2m", "1h 5m" (seconds, a whole number).
+function clock.duration(seconds)
+	local h, m, sec = seconds // 3600, seconds % 3600 // 60, seconds % 60
+	if h > 0 then return m > 0 and (h .. "h " .. m .. "m") or (h .. "h") end
+	if m > 0 then return sec > 0 and (m .. "m " .. sec .. "s") or (m .. "m") end
+	return sec .. "s"
+end
+
 -- The phase `now` is in ("dawn", "day", "dusk" or "night") and the unix time it ends.
 local function phase(now)
 	local ends = now - now % clock.DAY

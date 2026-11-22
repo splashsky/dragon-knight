@@ -275,19 +275,19 @@ CREATE TABLE spells (
 -- Statuses: content files app/content/statuses/<key>.lua (like spells; never deleted, a
 -- status whose file is gone is retired). Timed effects on a combatant, scripted
 -- (app/fight/engine.lua): the hooks are the file's code; kind ('harmful', 'helpful',
--- 'neutral'), tick_on ('turn_start', 'turn_end'), scope ('fight', 'world', 'both'), turns
--- (default duration; 0: no limit), blocks_action, messages and data are data. Ids 1-3 are
--- the original game's mechanics (sleep, uber_damage, uber_defense; seed.sql). Schema
--- version 21: resist and ward, what it gives its bearer (like a monster's).
+-- 'neutral'), scope ('fight', 'world', 'both'), ticks (default duration in clock ticks of
+-- 10 s; 0: no limit), blocks_action, messages and data are data. Ids 1-3 are the original
+-- game's mechanics (sleep, uber_damage, uber_defense; seed.sql). Schema version 21: resist
+-- and ward, what it gives its bearer (like a monster's). Version 22: durations in ticks
+-- (turns became ticks; tick_on went: statuses tick on the clock).
 CREATE TABLE statuses (
 	id             INTEGER PRIMARY KEY,
 	key            TEXT    NOT NULL UNIQUE,
 	name           TEXT    NOT NULL DEFAULT '',
 	description    TEXT    NOT NULL DEFAULT '',
 	kind           TEXT    NOT NULL DEFAULT 'neutral',
-	tick_on        TEXT    NOT NULL DEFAULT 'turn_end',
 	scope          TEXT    NOT NULL DEFAULT 'fight',
-	turns          INTEGER NOT NULL DEFAULT 0,
+	ticks          INTEGER NOT NULL DEFAULT 0,
 	blocks_action  INTEGER NOT NULL DEFAULT 0,
 	retired        INTEGER NOT NULL DEFAULT 0,
 	messages       TEXT    NOT NULL DEFAULT '',
@@ -299,8 +299,9 @@ CREATE TABLE statuses (
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
--- player (app/fight/engine.lua); act is the file's code, the numbers are data. Schema
--- version 21: resist and ward (like a monster's), element (its attacks').
+-- player (app/fight/engine.lua); act is the file's code, the numbers are data (ticks: how
+-- many clock ticks it stays; 0: the whole fight). Schema version 21: resist and ward (like
+-- a monster's), element (its attacks').
 CREATE TABLE summons (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -310,7 +311,7 @@ CREATE TABLE summons (
 	attack       INTEGER NOT NULL DEFAULT 0,
 	defense      INTEGER NOT NULL DEFAULT 0,
 	dexterity    INTEGER NOT NULL DEFAULT 0,
-	turns        INTEGER NOT NULL DEFAULT 0,
+	ticks        INTEGER NOT NULL DEFAULT 0,
 	retired      INTEGER NOT NULL DEFAULT 0,
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
@@ -422,8 +423,8 @@ CREATE UNIQUE INDEX user_items_equipped ON user_items (user_id, equipped);
 
 -- The hotbar (schema version 17, app/lib/hotbar.lua): every fight action besides Attack
 -- and Run a character has met, kind 'spell' (ref_id: a spells id) or 'item' (ref_id: an
--- items id: gear that casts, or a consumable), on the bar (slot 2-9: its number key) or off
--- it (slot NULL: taken off, or the bar was full when it came).
+-- items id: gear that casts, or a consumable), on the bar (slot 2-8: its number key; 9 is
+-- Guard since version 22) or off it (slot NULL: taken off, or the bar was full when it came).
 CREATE TABLE user_hotbar (
 	user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	kind     TEXT    NOT NULL,
@@ -450,8 +451,13 @@ CREATE INDEX sessions_expires ON sessions (expires);
 -- encounter's first strike is round 1, so the first form carries 2); wave: the enemies'
 -- wave on the field; data: fight-level values ("name=value" lines, typed). outcome: '' in
 -- progress, 'victory' or 'death': a finished fight is kept for its page (GET /fight, GET
--- /victory) until the next encounter or a move (app/fight/encounter.lua); log: the last
--- round's lines ("<part>\t<line>" lines); result: a victory's rewards ("name=value" lines).
+-- /victory) until the next encounter or a move (app/fight/encounter.lua); log: the lines
+-- since the player's last command ("<part>\t<line>" lines: its round's, then what the clock
+-- did); result: a victory's rewards ("name=value" lines). Schema version 22, the fight on
+-- the clock (app/fight/round.lua round.advance): tick, the last clock tick it played;
+-- deadline, the tick the player's turn runs out at (then they guard); due, the next tick
+-- the server's tick must advance it at (the next one while anything on it counts ticks,
+-- else the deadline; fights_due finds them).
 CREATE TABLE fights (
 	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
 	round    INTEGER NOT NULL DEFAULT 1,
@@ -459,13 +465,17 @@ CREATE TABLE fights (
 	data     TEXT    NOT NULL DEFAULT '',
 	outcome  TEXT    NOT NULL DEFAULT '',
 	log      TEXT    NOT NULL DEFAULT '',
-	result   TEXT    NOT NULL DEFAULT ''
+	result   TEXT    NOT NULL DEFAULT '',
+	tick     INTEGER NOT NULL DEFAULT 0,
+	deadline INTEGER NOT NULL DEFAULT 0,
+	due      INTEGER NOT NULL DEFAULT 0
 );
+CREATE INDEX fights_due ON fights (due) WHERE outcome = '';
 
 -- The combatants of a fight, numbered from 1 within it (1: the player). side: player,
 -- ally, enemy; kind: player, monster (entity_id: monsters.id), summon (summons.id). wave:
 -- an enemy's wave (0 otherwise). hp, maxhp: NULL for the player (users.currenthp and the
--- effective stats hold them). turns_left: rounds a summon stays (NULL: no limit). data:
+-- effective stats hold them). ticks_left: clock ticks a summon stays (NULL: no limit). data:
 -- per-combatant values (a monster's immunity, the stock of its items), "name=value" lines.
 -- mp, maxmp: a monster's MP (NULL otherwise; NULL for a monster: full).
 CREATE TABLE fight_combatants (
@@ -477,7 +487,7 @@ CREATE TABLE fight_combatants (
 	wave        INTEGER NOT NULL DEFAULT 0,
 	hp          INTEGER,
 	maxhp       INTEGER,
-	turns_left  INTEGER,
+	ticks_left  INTEGER,
 	data        TEXT    NOT NULL DEFAULT '',
 	mp          INTEGER,
 	maxmp       INTEGER,
@@ -485,29 +495,34 @@ CREATE TABLE fight_combatants (
 ) WITHOUT ROWID;
 
 -- Statuses on the combatants of a fight: one instance per status and bearer (applying it
--- again replaces it), in the order applied (position). turns_left: the bearer's turns left
+-- again replaces it), in the order applied (position). ticks_left: the clock ticks left
 -- (NULL: until removed or the fight ends); data: the params it was applied with (names and
--- values only, never code); source: the combatant who applied it.
+-- values only, never code); tick: the last tick it counted (at first the one it was applied
+-- in); source: the combatant who applied it.
 CREATE TABLE fight_statuses (
 	user_id        INTEGER NOT NULL,
 	combatant_id   INTEGER NOT NULL,
 	status_id      INTEGER NOT NULL REFERENCES statuses (id),
 	position       INTEGER NOT NULL,
-	turns_left     INTEGER,
+	ticks_left     INTEGER,
 	data           TEXT    NOT NULL DEFAULT '',
-	applied_round  INTEGER NOT NULL DEFAULT 0,
+	tick           INTEGER NOT NULL DEFAULT 0,
 	source         INTEGER,
 	PRIMARY KEY (user_id, combatant_id, status_id),
 	FOREIGN KEY (user_id, combatant_id) REFERENCES fight_combatants (user_id, id) ON DELETE CASCADE
 ) WITHOUT ROWID;
 
 -- World statuses of a character (scope 'world' or 'both', applied outside fights): they
--- tick on map moves (turns_left: moves left; NULL: until removed) and outlast fights.
+-- tick on the clock while the character isn't fighting (ticks_left: clock ticks left; NULL:
+-- until removed; tick: the last tick it counted, at first the one it was applied in;
+-- user_statuses_tick finds those the server's tick must advance) and outlast fights.
 CREATE TABLE user_statuses (
 	user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
 	status_id   INTEGER NOT NULL REFERENCES statuses (id),
 	position    INTEGER NOT NULL,
-	turns_left  INTEGER,
+	ticks_left  INTEGER,
 	data        TEXT    NOT NULL DEFAULT '',
+	tick        INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (user_id, status_id)
 ) WITHOUT ROWID;
+CREATE INDEX user_statuses_tick ON user_statuses (tick);

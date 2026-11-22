@@ -87,7 +87,7 @@ t_section "pure GETs: fighting"
 t_sql "UPDATE users SET currenthp = 5000, base_maxhp = 5000 $PQ"
 t_fight_new pureuser
 t_fight_status pureuser 1 regen 'amount=i:5' 3
-t_sql "INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, hp, maxhp, turns_left)
+t_sql "INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, hp, maxhp, ticks_left)
 	SELECT u.id, 9, 'ally', 'summon', s.id, 20, 30, 4 FROM users u, summons s $PQ AND s.key = 'wolf'"
 t_get /fight; expect_body 'You are fighting a'; expect_body 'Your <b>Wolf</b>: 20 / 30 HP'
 pu_all "fighting"

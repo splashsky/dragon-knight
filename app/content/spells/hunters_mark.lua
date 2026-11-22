@@ -1,17 +1,17 @@
 -- app/content/spells/hunters_mark.lua :: the Hunter's Mark spell: marks the monster so that it takes
--- more damage from weapon attacks for a few turns (app/content/statuses/marked.lua; spells
+-- more damage from weapon attacks for a while (app/content/statuses/marked.lua; spells
 -- and allies do not pass the damage hooks, so only the blows of a weapon count). Learned by no class by default.
 -- learned: warrior 40
 local function cast(s)
-	if not s.target:afflict("marked", { turns = s.power, pct = s.data.pct }) then
+	if not s.target:afflict("marked", { ticks = s.power, pct = s.data.pct }) then
 		return s:say(s.target:ward("marked") == 100 and "immune" or "resisted", s.name)
 	end
-	s:say("cast", s.name, s.power)
+	s:say("cast", s.name, s:seconds(s.power))
 end
 
 return {
 	name = "Hunter's Mark",
-	description = "Marks the monster: it takes more damage from your weapon for a few turns. Some monsters are immune.",
+	description = "Marks the monster: it takes more damage from your weapon for a while. Some monsters are immune.",
 	lore = [[
 Hunters in the hills above Kalle chalk a sign on the track where a wounded animal ran, so the
 next party knows what it is following. The spell draws the same sign in light on the
@@ -19,11 +19,11 @@ monster's hide. For a few turns every swing of a weapon lands harder on the mark
 which is why warriors cast it just before they swing.]],
 	icon = "hunters_mark",
 	mp = 12,
-	power = 4,                  -- how many turns the mark lasts
+	power = 4,                  -- how many ticks the mark lasts
 	data = { pct = 50 },        -- percent more damage taken from weapon attacks
 	uses = { statuses = { "marked" } },
 	messages = {
-		cast = "You have cast the %s spell. The monster is marked for %d turns.",
+		cast = "You have cast the %s spell. The monster is marked for %d seconds.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
 		resisted = "You have cast the %s spell, but the monster resists it.",
 	},

@@ -7,14 +7,18 @@
 // once; with prefers-reduced-motion there are no delays. The fight forms are disabled while
 // a round plays, and the button that sent it gets the focus back after. The monsters' and
 // allies' bars ([data-stat][data-max]) are drawn here (data-client: the live client's morph
-// leaves them, and they are updated after each answer). Without the live client the fight
-// forms are plain forms. Text from the server goes in with textContent only.
+// leaves them, and they are updated after each answer). So is the turn's timer
+// (fight/clock.html): a thin bar draining over the turn's last WARN seconds, from the
+// page's data-turn-ends and the server's time (data-now); display only, the server plays a
+// turn that runs out. Without the live client the fight forms are plain forms. Text from
+// the server goes in with textContent only.
 (function () {
 	"use strict";
 	var root = document.documentElement;
 	if (!document.body || !window.Promise) return;
 
 	var STEP = 400;
+	var WARN = 20;          // the timer shows for the turn's last seconds
 	var PARTS = { player: "fight-yourturn", allies: "fight-allyturn", enemies: "fight-monsterturn", ending: "fight-roundend" };
 	var motion = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
@@ -181,9 +185,9 @@
 				chip.appendChild(icon);
 			}
 			chip.appendChild(txt(x.name));
-			if (x.turns != null) {
+			if (x.left != null) {
 				chip.appendChild(txt(" "));
-				chip.appendChild(el("span", "light", "(" + x.turns + " " + (x.turns === 1 ? "turn" : "turns") + ")"));
+				chip.appendChild(el("span", "light", "(" + x.left + ")"));
 			}
 			span.appendChild(chip);
 		});
@@ -288,9 +292,47 @@
 		});
 	}
 
+	// ---- the turn's timer
+
+	var ticking = 0, serverNow = null, offset = 0;
+
+	function drawClock() {
+		var node = $("[data-turn-ends]");
+		if (!node) {
+			clearInterval(ticking);
+			ticking = 0;
+			return;
+		}
+		var ends = Number(node.getAttribute("data-turn-ends")), now = Number(node.getAttribute("data-now"));
+		if (now !== serverNow) {   // a new answer: the server's clock again
+			serverNow = now;
+			offset = now * 1000 - Date.now();
+		}
+		var left = ends - (Date.now() + offset) / 1000;
+		var bar = $(".fight-clock-bar", node);
+		if (!(left <= WARN)) {
+			remove(bar);
+			return;
+		}
+		if (!bar) {
+			bar = el("span", "fight-clock-bar");
+			bar.setAttribute("data-client", "");   // the live client's morph leaves it
+			node.appendChild(bar);
+		}
+		// with motion the bar slides through the next second (fight.css: a 1 s transition)
+		var at = motion ? left - 1 : left;
+		bar.style.width = Math.max(0, Math.min(100, at / WARN * 100)) + "%";
+	}
+
+	function startClock() {
+		drawClock();
+		if (!ticking && $("[data-turn-ends]")) ticking = setInterval(drawClock, 1000);
+	}
+
 	// after an answer: the bars of the page now, and the focus back on the button used
 	function applied() {
 		enhance(document);
+		startClock();
 		var m = middle();
 		if (refocus && m) {
 			// the same button again (a spell's, say) if the new form has it enabled, else the first
@@ -333,4 +375,5 @@
 	}
 	root.classList.add("fight-js");
 	enhance(document);
+	startClock();
 })();

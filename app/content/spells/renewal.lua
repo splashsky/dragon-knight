@@ -3,7 +3,7 @@
 -- learned: mage 65; paladin 72
 return {
 	name = "Renewal",
-	description = "Restores a large amount of hit points, cures the harmful effects and regenerates for a few turns, in a fight or out of it.",
+	description = "Restores a large amount of hit points, cures the harmful effects and regenerates for a while, in a fight or out of it.",
 	lore = [[
 Renewal is what a Mage learns once Gaia has stopped feeling like a miracle and started
 feeling like a bill. It draws back a large share of hit points, washes out whatever is
@@ -12,16 +12,16 @@ say it is the only spell that leaves the caster more tired than the fight did.]]
 	icon = "renewal",
 	mp = 40,
 	power = 70,                -- the most HP it restores
-	data = { amount = 10, turns = 4 },   -- regeneration per turn afterwards, and its turns
+	data = { amount = 10, ticks = 4 },   -- regeneration per tick afterwards, and its ticks
 	usable_in = "both",
 	target = "self",
 	uses = { statuses = { "regen" } },
 	messages = {
-		cast = "You have cast the %s spell, gained %d Hit Points, and will regenerate %d Hit Points for %d turns.",
+		cast = "You have cast the %s spell, gained %d Hit Points, and will regenerate %d Hit Points for %d seconds.",
 		full = "Your Hit Points are already full. Please go back and try again.",
 		full_town = "Your Hit Points are already full. You don't need to use Renewal now.",
 		enemy = {
-			cast = "The monster casts %s, recovers %d Hit Points and will regenerate %d Hit Points for %d turns.",
+			cast = "The monster casts %s, recovers %d Hit Points and will regenerate %d Hit Points for %d seconds.",
 		},
 	},
 	-- refused (costs nothing) at full HP with nothing harmful on the caster
@@ -33,7 +33,7 @@ say it is the only spell that leaves the caster more tired than the fight did.]]
 	cast = function(s)
 		local healed = s.caster:heal("hp", s.power)
 		s.caster:cure("harmful")
-		s.caster:afflict("regen", { turns = s.data.turns, amount = s.data.amount })
-		s:say("cast", s.name, healed, s.data.amount, s.data.turns)
+		s.caster:afflict("regen", { ticks = s.data.ticks, amount = s.data.amount })
+		s:say("cast", s.name, healed, s.data.amount, s:seconds(s.data.ticks))
 	end,
 }

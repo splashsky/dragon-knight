@@ -1,4 +1,4 @@
--- app/content/statuses/withering.lua :: drains the bearer at the end of each of its turns:
+-- app/content/statuses/withering.lua :: drains the bearer on every tick of the clock:
 -- the shadow damage (rand(min, max)) is taken from it and, when the caster is still in the
 -- fight, added to the caster's HP. The Withering spell puts it on a monster.
 local function tick(t)
@@ -13,7 +13,7 @@ end
 
 return {
 	name = "Withering",
-	description = "Loses hit points every turn; the caster gains what it loses.",
+	description = "Loses hit points every 10 seconds; the caster gains what it loses.",
 	lore = [[
 A dark working that pulls the life out of a creature and into the caster. The victim
 shrivels a little more each turn, and the caster's wounds close by the same amount. Those
@@ -21,8 +21,7 @@ who study such magic in the old libraries say it was banned for a reason, and th
 reason is still standing in the road to Endworld.]],
 	icon = "withering",
 	kind = "harmful",
-	tick_on = "turn_end",
-	turns = 3,
+	ticks = 3,
 	data = { min = 14, max = 24 },
 	messages = {
 		hurt = "The %s withers, losing %d Hit Points to you.",

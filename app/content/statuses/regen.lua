@@ -1,8 +1,8 @@
--- app/content/statuses/regen.lua :: recovers HP at the end of each turn; outside fights
--- (scope "both": a world status) after each move on the map.
+-- app/content/statuses/regen.lua :: recovers HP on every tick of the clock, in a fight or
+-- outside one (scope "both": a world status there).
 return {
 	name = "Regenerating",
-	description = "Recovers hit points every turn, or every move outside fights.",
+	description = "Recovers hit points every 10 seconds, in a fight or out of it.",
 	lore = [[
 A warm, steady healing that works on its own, from a prayer, a salve or a spell that
 someone has left running. In a fight it closes wounds a little each turn. On the road it
@@ -10,9 +10,8 @@ does the same after each step, which is why the old travelers never bothered wit
 for the first few days. It runs out after a while and does not stack with itself.]],
 	icon = "regen",
 	kind = "helpful",
-	tick_on = "turn_end",
 	scope = "both",
-	turns = 5,
+	ticks = 5,
 	data = { amount = 5 },
 	messages = {
 		heal = "The %s regenerates %d Hit Points.",

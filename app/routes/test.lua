@@ -8,9 +8,13 @@
 --                           move's 1-in-5 begins one (tests/run.sh t_fight_new)
 --   GET  /__test/slow?ms=N  a page that takes N ms (at most 5000; the browser test of the
 --                           live client's progress bar)
+--   POST /__test/tick       the server's tick (lib/tick.lua) at the request's time
+--                           (X-Test-Now: the tests step the clock exactly)
 local auth = require("lib.auth")
+local clock = require("lib.clock")
 local encounter = require("fight.encounter")
 local state = require("fight.state")
+local tick = require("lib.tick")
 local view = require("lib.view")
 
 local function enabled() return dk.config.test_routes == true end
@@ -44,8 +48,15 @@ local function slow(req)
 	return view.message(req, "Slow", "<p>A slow page.</p>")
 end
 
+local function run_tick(req)
+	if not enabled() then return view.not_found(req) end
+	req.quiet = true   -- (the tick's own stale events are what the tests look for)
+	return view.text(tick.summary(tick.run(clock.now())) .. "\n")
+end
+
 return function(r)
 	r:get("/__test/routes", routes)
+	r:post("/__test/tick", run_tick)
 	r:get("/__test/slow", slow)
 	r:post("/__test/encounter", auth.game, begin_encounter)
 end

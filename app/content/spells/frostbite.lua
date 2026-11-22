@@ -21,7 +21,7 @@ when a cave bear wanders in from the back passages.]],
 	icon = "frostbite",
 	mp = 9,
 	power = 22,                 -- the most damage it deals
-	data = { chance = 6 },      -- the chance in 15 that the sleep lasts each turn
+	data = { chance = 6 },      -- the chance in 15 that the sleep lasts each tick
 	uses = { statuses = { "sleep" } },
 	messages = {
 		hit = "You have cast the %s spell for %d damage.",

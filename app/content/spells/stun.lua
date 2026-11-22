@@ -12,7 +12,7 @@ what they were doing. It lasts only a turn or two, so it is a poor reason to sto
 fighting and an excellent one to swing again.]],
 	icon = "stun",
 	mp = 6,
-	power = 2,                  -- the chance in 15 that it stays dazed each turn
+	power = 2,                  -- the chance in 15 that it stays dazed each tick
 	messages = {
 		asleep = "You have cast the %s spell. The monster is stunned.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",

@@ -236,7 +236,7 @@ function T.context_and_handles()
 			assert(not pcall(function() s.target:afflict("no_such_status") end), "unknown status")
 			assert(not pcall(function() s.target:afflict("poison", { f = function() end }) end), "params are data only")
 			assert(not pcall(function() s.target:afflict("poison", { nested = {} }) end), "no tables in params")
-			assert(not pcall(function() s.target:afflict("poison", { turns = -1 }) end), "turns >= 0")
+			assert(not pcall(function() s.target:afflict("poison", { ticks = -1 }) end), "ticks >= 0")
 			s:say("Done with %s.", "it")
 		end,
 	}
@@ -394,7 +394,7 @@ function T.monster_casters()
 		s.target:hurt(2)
 		s:say("done", 2)
 		s.target:sleep(3)
-		s.target:afflict("poison", { turns = 2 })
+		s.target:afflict("poison", { ticks = 2 })
 		s:say("Slept.")
 	end
 	local caster = engine.handle(fm.model(fight_state(), MONSTER), enemy_of(fm.model(fight_state(), MONSTER)))

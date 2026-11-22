@@ -1,6 +1,6 @@
 -- app/content/statuses/recharging.lua :: must recover after a big action (Hyper Beam):
--- s:recharge(turns) puts it on the caster, who can't act for that many turns (the fight
--- page offers only "Continue").
+-- s:recharge(ticks) puts it on the caster, who can't act until it runs out: the turn it
+-- blocks ends at the clock's next tick (the fight page offers only "Continue").
 return {
 	name = "Recharging",
 	description = "Can't act: recovering from a powerful attack.",
@@ -11,7 +11,7 @@ worth it when it works, and that nobody remembers the turn afterwards. Monsters 
 big enough to shrug off such a spell are not affected by it at all.]],
 	icon = "recharging",
 	kind = "neutral",
-	turns = 1,
+	ticks = 1,
 	blocks_action = true,
 	messages = {
 		blocked = "You must recharge this turn.",

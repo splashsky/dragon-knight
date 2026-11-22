@@ -591,6 +591,10 @@ static void push_request(lua_State *L, const dk_request *r)
 	set_str(L, "remote", r->remote_addr);
 	lua_pushlstring(L, r->body ? r->body : "", r->body ? r->body_len : 0);
 	lua_setfield(L, t, "body");
+	if (r->tick) {               /* the server's own tick (http.c): no network request sets it */
+		lua_pushboolean(L, 1);
+		lua_setfield(L, t, "tick");
+	}
 
 	lua_newtable(L);
 	if (r->query) parse_urlencoded(L, lua_gettop(L), r->query, strlen(r->query));

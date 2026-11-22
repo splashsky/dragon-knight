@@ -6,11 +6,15 @@
 		play nothing: the page says so at the top); a refused command (not enough MP, ...) is a
 		note above the commands. The commands are the hotbar (3.1, lib/hotbar.lua; docs/APP.md
 		"Hotbar"): ten slots on the number keys (data-hotkey: hotbar.js presses them and shows
-		their .hotkey), 1 Attack and 0 Run (icon buttons: fight=Fight, run=Run, as the text
-		buttons before 2.4 sent: routes/fight.lua reads the name), 2-9 the player's actions
-		(fight/action.html), an action of the bar's not at hand greyed (its tooltip, and why),
-		an empty slot dashed; then the actions off the bar, under More. A locked turn has only
-		Continue, which any number key presses. -#}
+		their .hotkey), 1 Attack, 9 Guard and 0 Run (icon buttons: fight=Fight, guard=Guard,
+		run=Run, as the text buttons before 2.4 sent: routes/fight.lua reads the name), 2-8 the
+		player's actions (fight/action.html), an action of the bar's not at hand greyed (its
+		tooltip, and why), an empty slot dashed; then the actions off the bar, under More. A
+		locked turn has only Continue, which any number key presses. The log is the lines since
+		the player's last command, in order (the clock's too: fight/round.lua). The turn's
+		timer (3.2) is the fight-clock region: data-turn-ends (when the turn runs out, unix
+		seconds) and data-now (the server's time), a region of its own because data-now changes
+		on every request; fight.js draws a draining bar in it for the last seconds. -#}
 <section class="box fight">
 <h1 class="title page-title">{{{ art("fighting", "Fighting") }}}</h1>
 <div class="box-body">
@@ -37,16 +41,14 @@
 {%- end %}
 {%- end %}
 {%- for _, al in ipairs(allies) do %}
-<p class="fight-combatant fight-ally" data-fighter="{{ al.id }}" data-stat="hp" data-value="{{ al.hp }}" data-max="{{ al.maxhp }}">{% if al.icon then %}<img class="fight-ally-icon" src="{{ al.icon }}" width="22" height="22" alt=""> {% end %}Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.turns then %} <span class="light">({{ al.turns }} {{ al.turns == 1 and "round" or "rounds" }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
+<p class="fight-combatant fight-ally" data-fighter="{{ al.id }}" data-stat="hp" data-value="{{ al.hp }}" data-max="{{ al.maxhp }}">{% if al.icon then %}<img class="fight-ally-icon" src="{{ al.icon }}" width="22" height="22" alt=""> {% end %}Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.left then %} <span class="light">({{ al.left }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
 {%- end %}
 {%- if #player_statuses > 0 then %}
 <p class="fight-combatant fight-you" data-fighter="{{ player_id }}"><b>You</b>{{{ include("fight/statuses", { statuses = player_statuses }) }}}</p>
 {%- end %}
 <div class="fight-log" data-fight-log>
-{%- for _, part in ipairs({ { "fight-yourturn", yourturn }, { "fight-allyturn", allyturn }, { "fight-monsterturn", monsterturn }, { "fight-roundend", roundend } }) do %}
-{%- if #part[2] > 0 then %}
-<p class="{{ part[1] }}">{% for i, line in ipairs(part[2]) do %}{% if i > 1 then %}<br>{% end %}{% if line.speech then %}<span class="fight-speech">{{ line.text }}</span>{% else %}{{ line.text }}{% end %}{% end %}</p>
-{%- end %}
+{%- for _, p in ipairs(log) do %}
+<p class="{{ p.class }}">{% for i, line in ipairs(p.lines) do %}{% if i > 1 then %}<br>{% end %}{% if line.speech then %}<span class="fight-speech">{{ line.text }}</span>{% else %}{{ line.text }}{% end %}{% end %}</p>
 {%- end %}
 </div>
 {%- if note and not dead then %}
@@ -59,6 +61,7 @@
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
 <p><input type="submit" name="continue" value="Continue"> <span class="hotkey-hint light">(or any number key)</span></p>
+{{{ include("fight/clock") }}}
 </form>
 {%- else %}
 <p>Command?</p>
@@ -76,9 +79,11 @@
 <li class="hotbar-slot hotbar-empty" aria-hidden="true"><kbd class="hotkey">{{ s.n }}</kbd><span class="hotbar-hole"></span></li>
 {%- end %}
 {%- end %}
+<li class="hotbar-slot" data-hotkey="9"><kbd class="hotkey" aria-hidden="true">9</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="guard" value="Guard" title="Guard" aria-label="Guard" aria-keyshortcuts="9"><img src="/static/images/skills/guard.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", guard_tip) }}}</span></li>
 <li class="hotbar-slot hotbar-run" data-hotkey="0"><kbd class="hotkey" aria-hidden="true">0</kbd><span class="action-tip" data-tip><button class="action-btn" type="submit" name="run" value="Run" title="Run" aria-label="Run" aria-keyshortcuts="0"><img src="/static/images/skills/run.png" width="44" height="44" alt=""></button>{{{ include("tip/tip", run_tip) }}}</span></li>
 </ol>
 </div>
+{{{ include("fight/clock") }}}
 {%- if #more > 0 then %}
 <div class="fight-more" role="group" aria-labelledby="fight-more-label"><span class="fight-more-label" id="fight-more-label">More</span>
 <div class="spell-grid">

@@ -143,6 +143,12 @@ function tips.attack(power, weapon)
 	return { title = "Attack", meta = meta, body = "Strike the monster with your weapon." }
 end
 
+-- The fight menu's Guard button.
+function tips.guard()
+	return { title = "Guard", body = "Raise your guard: take less damage from the monster's attacks until your next turn. " ..
+		"A turn that runs out is a guard too." }
+end
+
 -- The fight menu's Run button.
 function tips.run()
 	return { title = "Run", body = "Try to escape. The monster may block your way and strike." }

@@ -23,6 +23,7 @@
 	X(conn_streaming,       GAUGE,   "connections with an open event stream") \
 	X(requests,             COUNTER, "requests") \
 	X(requests_static,      COUNTER, "requests for /static/") \
+	X(ticks,                COUNTER, "game ticks sent (the server's own POST /__tick)") \
 	X(responses_2xx,        COUNTER, "2xx responses") \
 	X(responses_3xx,        COUNTER, "3xx responses") \
 	X(responses_4xx,        COUNTER, "4xx responses") \

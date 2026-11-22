@@ -8,7 +8,7 @@ nap. A drowsy monster may wake on any turn, so the caster must be quick. Innkeep
 Midworld say it works just as well on drunk customers.]],
 	icon = "sleep",
 	mp = 10,
-	power = 5,                  -- the chance in 15 that it stays asleep each turn
+	power = 5,                  -- the chance in 15 that it stays asleep each tick
 	messages = {
 		asleep = "You have cast the %s spell. The monster is asleep.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",

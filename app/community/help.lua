@@ -3,6 +3,7 @@
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
 local classes = require("lib.classes")
+local clock = require("lib.clock")
 local elements = require("lib.elements")
 local game = require("lib.game")
 local items = require("lib.items")
@@ -73,12 +74,20 @@ function help.items(req)
 	return page(req, "Items & Drops", "community/help/items", { groups = out })
 end
 
+-- How long a status or an ally lasts without a duration of its own: "30s" (nil: until
+-- it ends, or the whole fight).
+local function lasts(ticks)
+	return ticks > 0 and clock.duration(ticks * clock.TICK) or nil
+end
+
 -- Name and description, MP cost and power (what a spell does is its file's code; the
--- description says it); then the statuses spells and items cause and the allies they call.
+-- description says it); then the statuses spells and items cause and the allies they call,
+-- with how long they last.
 function help.spells(req)
-	return page(req, "Spells", "community/help/spells", {
-		spells = spells.active(), statuses = statuses.active(), summons = summons.active(),
-	})
+	local st, su = statuses.active(), summons.active()
+	for _, s in ipairs(st) do s.lasts = lasts(s.ticks) end
+	for _, s in ipairs(su) do s.lasts = lasts(s.ticks) end
+	return page(req, "Spells", "community/help/spells", { spells = spells.active(), statuses = st, summons = su })
 end
 
 -- Every monster that isn't retired, with its stats and MP (with equipment counted: what

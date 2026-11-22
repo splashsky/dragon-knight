@@ -147,9 +147,9 @@ t_fight fighter 2 50 "$FIGHT"
 f_sql "UPDATE users SET currentmp = 50"
 t_round "csrf=$CS&spell=Spell&userspell=11"
 expect_body 'You have cast the Sleep spell. The monster is asleep.'
-if grep -qF 'The monster is still asleep.' "$BODY"; then f_is "$T_SLEEP" 5; f_is "$T_STATUSES" "enemy:sleep"
-	expect_body '&mdash; <img class="fight-status-icon" src="/static/images/statuses/sleep.png" width="16" height="16" alt="">Asleep</span>'
-else expect_body 'The monster has woken up.'; f_is "$T_SLEEP" 0; fi
+# asleep: its turn is skipped (it rolls to wake on the clock's ticks, not in the rounds)
+expect_body 'class="fight-monsterturn">The Red Slime is still asleep.'; f_is "$T_SLEEP" 5; f_is "$T_STATUSES" "enemy:sleep"
+expect_body '&mdash; <img class="fight-status-icon" src="/static/images/statuses/sleep.png" width="16" height="16" alt="">Asleep</span>'
 f_is currentmp 40
 t_sql "UPDATE fight_combatants SET hp = 1 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FQ)"
 t_round "csrf=$CS&spell=Spell&userspell=6"; expect_redirect /victory

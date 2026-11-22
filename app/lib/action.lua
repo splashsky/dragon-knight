@@ -16,6 +16,7 @@
 -- numbers is shown. Damage has an element and meets the target's resistance, and a status
 -- its ward (lib/elements.lua): a hit against a weakness or a resistance adds a line after
 -- the next one said ("It resists fire.").
+local clock = require("lib.clock")
 local elements = require("lib.elements")
 local load = require("lib.content.load")
 local sandbox = require("lib.content.sandbox")
@@ -97,7 +98,7 @@ end
 -- "ally", "enemy"), name, is_player, level, hp, maxhp, mp, maxmp, tp, maxtp, attack,
 -- defense, strength, dexterity, attack_element (default "neutral"), resist, ward (its own
 -- resistances and wards: { fire = 50 }, { sleep = 100 }; its file's and its gear's),
--- statuses = { { key, name, kind, turns_left, data, resist, ward }, ... } (in the order
+-- statuses = { { key, name, kind, ticks_left, data, resist, ward }, ... } (in the order
 -- applied) }.
 function action.combatant(t)
 	local v = {}
@@ -110,7 +111,7 @@ function action.combatant(t)
 	v.own_resist, v.own_ward = copy(t.resist), copy(t.ward)
 	v.statuses = {}
 	for _, s in ipairs(t.statuses or {}) do
-		v.statuses[#v.statuses + 1] = { key = s.key, name = s.name, kind = s.kind, turns_left = s.turns_left,
+		v.statuses[#v.statuses + 1] = { key = s.key, name = s.name, kind = s.kind, ticks_left = s.ticks_left,
 			data = copy(s.data), resist = s.resist, ward = s.ward }
 	end
 	derive(v)
@@ -153,7 +154,7 @@ end
 function action.params(p, what)
 	what = what or "the params"
 	if p == nil then return {} end
-	if type(p) ~= "table" then error(what .. " must be a table like { turns = 3 } (got " .. type(p) .. ")", 3) end
+	if type(p) ~= "table" then error(what .. " must be a table like { ticks = 3 } (got " .. type(p) .. ")", 3) end
 	local out = {}
 	for k, v in pairs(p) do
 		if type(k) ~= "string" or not k:find(IDENT) then error(what .. ": bad name " .. tostring(k), 3) end
@@ -170,9 +171,10 @@ function action.params(p, what)
 		end
 		out[k] = v
 	end
-	if out.turns ~= nil and (math.type(out.turns) ~= "integer" or out.turns < 0) then
-		error(what .. ".turns must be a whole number >= 0 (0: no limit)", 3)
+	if out.ticks ~= nil and (math.type(out.ticks) ~= "integer" or out.ticks < 0) then
+		error(what .. ".ticks must be a whole number >= 0 (0: no limit)", 3)
 	end
+	if out.turns ~= nil then error(what .. ": durations are clock ticks since 3.2: ticks = n, not turns", 3) end
 	return out
 end
 
@@ -192,11 +194,11 @@ end
 local function set_status(h, ctx, key, params, e)
 	local v = INNER[h].v
 	local m = status_info(key)
-	local turns = params.turns
-	if turns == nil or turns == 0 then turns = math.tointeger(m.turns) or 0 end
+	local ticks = params.ticks
+	if ticks == nil or ticks == 0 then ticks = math.tointeger(m.ticks) or 0 end
 	local data = copy(params)
-	data.turns = nil
-	local s = { key = key, name = m.name, kind = m.kind or "neutral", turns_left = turns ~= 0 and turns or nil,
+	data.ticks = nil
+	local s = { key = key, name = m.name, kind = m.kind or "neutral", ticks_left = ticks ~= 0 and ticks or nil,
 		data = data, resist = m.resist, ward = m.ward }
 	local _, i = find_status(v, key)
 	if i then table.remove(v.statuses, i) end
@@ -315,7 +317,7 @@ local function takes_hold(h, ctx, key)
 end
 
 -- Puts it to sleep (the status sleep): it stays asleep while rand(1, 15) <= chance,
--- checked at the start of each of its turns (0 wakes it). Returns whether it fell asleep
+-- rolled on every tick of the clock (0 wakes it). Returns whether it fell asleep
 -- (false: its ward against sleep stopped it; waking always works).
 function Combatant:sleep(chance)
 	chance = whole(chance, "the chance to stay asleep")
@@ -332,7 +334,7 @@ function Combatant:sleep(chance)
 end
 
 -- Applies the status `key` (app/content/statuses/<key>.lua) with `params` (names and
--- values: turns = how long, 0 or absent: the file's turns, and anything its code reads as
+-- values: ticks = how many clock ticks, 0 or absent: the file's ticks, and anything its code reads as
 -- t.data). Applying it again replaces the one it has (the new duration and params win,
 -- even when shorter). Returns whether it took hold (false: its ward stopped it).
 function Combatant:afflict(key, params)
@@ -365,10 +367,10 @@ function Combatant:has_status(key)
 end
 
 local function status_copy(s)
-	return { key = s.key, name = s.name, kind = s.kind, turns_left = s.turns_left, data = copy(s.data) }
+	return { key = s.key, name = s.name, kind = s.kind, ticks_left = s.ticks_left, data = copy(s.data) }
 end
 
--- { key, name, kind, turns_left (nil: no limit), data } of a status it has, or nil.
+-- { key, name, kind, ticks_left (nil: no limit), data } of a status it has, or nil.
 function Combatant:status(key)
 	local s = find_status(INNER[self].v, key)
 	return s and status_copy(s) or nil
@@ -425,7 +427,7 @@ end
 -- key, name, mp, power, decoded data and messages), module (the loaded content file),
 -- caster, target (combatant handles; target may be nil), in_fight, rand (php.rand-like),
 -- data (overrides of the data: a status's params), fields (more read-only fields: bearer,
--- source, self, turns_left, round), summon_room (allies that may still join), plain (its
+-- source, self, ticks_left, round), summon_room (allies that may still join), plain (its
 -- lines are never worded for a monster: statuses and summons), field_pct (a
 -- function(element) giving the battlefield's damage percent for it; absent: 0) }.
 function action.new(o)
@@ -510,8 +512,8 @@ local function is_refusal(r)
 end
 
 -- Calls an ally to the caster's side (in a fight; s.summon_room says how many more may
--- join): the summon `key` (app/content/summons/<key>.lua) with params (turns = how many
--- rounds it stays, 0 or absent: the file's turns; the rest is its a.data).
+-- join): the summon `key` (app/content/summons/<key>.lua) with params (ticks = how many
+-- clock ticks it stays, 0 or absent: the file's ticks; the rest is its a.data).
 function Action:summon(key, params)
 	local i = running(self, "summon")
 	if not self.in_fight then error("allies can only be summoned in a fight", 2) end
@@ -526,21 +528,26 @@ function Action:summon(key, params)
 end
 
 -- Multi-stage actions (docs/APP.md "Fight engine"). charge: the caster gathers power for
--- `turns` turns (the status charging: it can't act), then the file's stages[step] runs
--- (by name: a fight in progress holds names, never code). recharge: the caster can't act
--- for `turns` turns (the status recharging).
-function Action:charge(turns, step)
-	turns = whole(turns, "the turns to charge")
+-- `ticks` clock ticks (the status charging: it can't act), then the file's stages[step]
+-- runs (by name: a fight in progress holds names, never code). recharge: the caster can't
+-- act for `ticks` clock ticks (the status recharging).
+function Action:charge(ticks, step)
+	ticks = whole(ticks, "the ticks to charge")
 	local stages = INNER[self].module.stages
 	if type(step) ~= "string" or type(stages) ~= "table" or type(stages[step]) ~= "function" then
 		error("charge needs the name of a function in the file's stages (got " .. tostring(step) .. ")", 2)
 	end
-	self.caster:afflict("charging", { turns = math.max(turns, 1), release = step, from = self.kind, entity = self.key })
+	self.caster:afflict("charging", { ticks = math.max(ticks, 1), release = step, from = self.kind, entity = self.key })
 end
 
-function Action:recharge(turns)
-	turns = whole(turns, "the turns to recharge")
-	self.caster:afflict("recharging", { turns = math.max(turns, 1) })
+function Action:recharge(ticks)
+	ticks = whole(ticks, "the ticks to recharge")
+	self.caster:afflict("recharging", { ticks = math.max(ticks, 1) })
+end
+
+-- How long n clock ticks last, in seconds (for lines: "burns for %d seconds").
+function Action:seconds(n)
+	return whole(n, "the ticks") * clock.TICK
 end
 
 -- Status hooks only: end this status now, as if it ran out (on_expire runs) or as removed

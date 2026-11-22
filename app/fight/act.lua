@@ -1,5 +1,5 @@
 -- fight/act.lua :: the actions of a turn in the round pipeline (fight/round.lua): the
--- player's attack, spell or item (step 2) and a monster's attack. Pure like
+-- player's attack, spell, item or guard (step 1) and a monster's attack. Pure like
 -- fight/combat.lua: no DB access; dice from f.rand. Gear that casts a spell (the Wand) is
 -- the spell's code with the player as caster and no MP cost (a charge pays, spent by the
 -- caller): an item's turn.
@@ -76,6 +76,16 @@ function act.run(f, a)
 	engine.apply(f, r.events, p)
 	engine.done(f, prev)
 	return {}
+end
+
+-- The player guards (the Guard button; timeout: the turn ran out, fight/round.lua): the
+-- status guarding (less damage taken) until the player's next turn begins. No dice.
+function act.guard(f, timeout)
+	local p = state.player(f)
+	local prev = engine.doing(f, p, "guard")
+	engine.say(f, timeout and "You hesitate, and raise your guard." or "You raise your guard.")
+	engine.afflict(f, p, "guarding", {}, p)
+	engine.done(f, prev)
 end
 
 -- Whether the player could use consumable `item` now (the fight menu greys out the others):

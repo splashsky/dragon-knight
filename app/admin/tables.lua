@@ -35,7 +35,7 @@ local ID = { name = "id", label = "ID", kind = "static" }
 local function statuses_text(sql, ...)
 	local names = {}
 	for _, r in ipairs(dk.db:query(sql, ...)) do
-		names[#names + 1] = r.name .. (r.turns_left and (" (" .. r.turns_left .. ")") or "")
+		names[#names + 1] = r.name .. (r.ticks_left and (" (" .. r.ticks_left .. ")") or "")
 	end
 	return table.concat(names, ", ")
 end
@@ -47,7 +47,7 @@ local function fight_summary(user_id)
 	for _, c in ipairs(dk.db:query("SELECT c.*, coalesce(m.name, s.name) AS name FROM fight_combatants c " ..
 			"LEFT JOIN monsters m ON c.kind = 'monster' AND m.id = c.entity_id " ..
 			"LEFT JOIN summons s ON c.kind = 'summon' AND s.id = c.entity_id WHERE c.user_id = ? ORDER BY c.id", user_id)) do
-		local st = statuses_text("SELECT s.name, fs.turns_left FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id " ..
+		local st = statuses_text("SELECT s.name, fs.ticks_left FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id " ..
 			"WHERE fs.user_id = ? AND fs.combatant_id = ? ORDER BY fs.position", user_id, c.id)
 		local who = c.side == "player" and "you" or (tostring(c.name) .. " " .. tostring(c.hp) .. "/" .. tostring(c.maxhp) .. " HP")
 		if c.side ~= "player" or st ~= "" then parts[#parts + 1] = who .. (st ~= "" and (" (" .. st .. ")") or "") end
@@ -56,7 +56,7 @@ local function fight_summary(user_id)
 end
 
 local function world_summary(user_id)
-	local st = statuses_text("SELECT s.name, us.turns_left FROM user_statuses us JOIN statuses s ON s.id = us.status_id " ..
+	local st = statuses_text("SELECT s.name, us.ticks_left FROM user_statuses us JOIN statuses s ON s.id = us.status_id " ..
 		"WHERE us.user_id = ? ORDER BY us.position", user_id)
 	return st ~= "" and st or "None"
 end

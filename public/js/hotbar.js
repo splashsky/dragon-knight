@@ -1,5 +1,5 @@
 // hotbar.js :: the fight's hotbar (docs/APP.md "Hotbar"). In a fight the number keys press
-// the slots' buttons (fight/fight.html: [data-hotkey] 1 Attack ... 9, 0 Run; a locked turn's
+// the slots' buttons (fight/fight.html: [data-hotkey] 1 Attack ... 9 Guard, 0 Run; a locked turn's
 // Continue for any of them), as a click would: the live client (client.js) sends the form
 // and fight.js plays the round. Not while a field has the keyboard (the chat), a modifier
 // is held, a dialog is open, the key repeats or a request runs; a disabled button (MP short,

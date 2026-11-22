@@ -4,15 +4,15 @@
 -- learned: mage 83
 local function cast(s)
 	if s.target:immune_to("poison") then return s:say("immune", s.name) end
-	if not s.target:afflict("venom", { turns = s.power, min = s.data.min, max = s.data.max, pct = s.data.pct }) then
+	if not s.target:afflict("venom", { ticks = s.power, min = s.data.min, max = s.data.max, pct = s.data.pct }) then
 		return s:say(s.target:ward("venom") == 100 and "immune" or "resisted", s.name)
 	end
-	s:say("cast", s.name, s.power)
+	s:say("cast", s.name, s:seconds(s.power))
 end
 
 return {
 	name = "Plague",
-	description = "Infects the monster with a sickness that eats its hit points and weakens its blows for several turns. Some monsters are immune.",
+	description = "Infects the monster with a sickness that eats its hit points and weakens its blows for a long while. Some monsters are immune.",
 	lore = [[
 Plague is what Venom becomes when the Mage has more time and fewer scruples. The sickness
 takes hold quickly, spreads through the blood and leaves the monster too weak to swing
@@ -20,15 +20,15 @@ properly for many turns. Gaia's priests in Hambry will not teach it, and the Mag
 know it say that is the only sensible reason to keep it to themselves.]],
 	icon = "plague",
 	mp = 45,
-	power = 6,                  -- how many turns the sickness lasts
-	data = { min = 18, max = 32, pct = 35 },   -- hit points per turn, percent less damage dealt
+	power = 6,                  -- how many ticks the sickness lasts
+	data = { min = 18, max = 32, pct = 35 },   -- hit points per tick, percent less damage dealt
 	uses = { statuses = { "venom" } },
 	messages = {
-		cast = "You have cast the %s spell. The monster is infected for %d turns.",
+		cast = "You have cast the %s spell. The monster is infected for %d seconds.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
 		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
-			cast = "The monster casts %s. You are infected for %d turns.",
+			cast = "The monster casts %s. You are infected for %d seconds.",
 			immune = "The monster casts %s, but you are immune to it.",
 			resisted = "The monster casts %s, but you resist it.",
 		},

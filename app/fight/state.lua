@@ -5,19 +5,22 @@
 -- (fight/round.lua) and the engine (fight/engine.lua) work on the plain tables below, so
 -- they are unit-testable without the database. Outside fights the same model, with the
 -- player alone (state.world), carries the world statuses (user_statuses), which tick on
--- map moves.
+-- the clock too (lib/world.lua).
 --
 -- f = { user_id, round, wave, data = {}, st (the game.player row copy: the player's
 -- numbers), in_fight, combatants = { c, ... } (by id), next_id, outcome ("" in progress,
 -- "victory", "death": a finished fight kept for its page, fight/encounter.lua), log (the
--- last round's lines, encounter.log_of), result = {} (a victory's rewards) }
+-- lines since the player's last command, encounter.log_of), result = {} (a victory's
+-- rewards), tick (the last clock tick it played, lib/clock.lua; 0: not on the clock yet),
+-- deadline (the tick the player's turn runs out at: fight/round.lua) }
 -- c = { id, side ("player" | "ally" | "enemy"), kind ("player" | "monster" | "summon"),
 -- entity_id, wave, hp, maxhp (nil for the player: st has them), mp, maxmp (monsters),
--- turns_left (summons), data = {} (the stock of a monster's items, stock_<position>), row
+-- ticks_left (summons), data = {} (the stock of a monster's items, stock_<position>), row
 -- (the summons row; a monster's with its equipment counted: lib/monsters.lua
 -- monsters.effective), statuses = { inst, ... } (in the order applied) }
--- inst = { status_id, key, row (statuses row), turns_left (nil: no limit), data (the params
--- it was applied with), applied_round, source (a combatant id), position }
+-- inst = { status_id, key, row (statuses row), ticks_left (nil: no limit), data (the params
+-- it was applied with), tick (the last tick it counted: at first the one it was applied
+-- in), source (a combatant id), position }
 -- Persisted values are names and plain data only (lib/action.lua action.params), never
 -- code: a charged spell's release step is saved by name.
 local monsters = require("lib.monsters")
@@ -67,6 +70,7 @@ function state.new(o)
 	local f = {
 		user_id = o.user_id, round = o.round or 1, wave = o.wave or 1, data = o.data or {}, st = o.st,
 		in_fight = o.in_fight ~= false, combatants = {}, next_id = 1, outcome = "", log = "", result = {},
+		tick = o.tick or 0, deadline = o.deadline or 0,
 	}
 	state.add(f, { side = "player", kind = "player" })
 	return f
@@ -195,8 +199,8 @@ local function status_rows(sql, ...)
 		local row = statuses.get(r.status_id)
 		if row and row.retired == 0 then
 			out[#out + 1] = {
-				status_id = r.status_id, key = row.key, row = row, turns_left = r.turns_left, data = state.decode(r.data),
-				applied_round = r.applied_round or 0, source = r.source, position = r.position, combatant_id = r.combatant_id,
+				status_id = r.status_id, key = row.key, row = row, ticks_left = r.ticks_left, data = state.decode(r.data),
+				tick = r.tick or 0, source = r.source, position = r.position, combatant_id = r.combatant_id,
 			}
 		end
 	end
@@ -210,11 +214,11 @@ function state.load(user, st)
 	if not fr then return nil end
 	local f = { user_id = user.id, round = fr.round, wave = fr.wave, data = state.decode(fr.data), st = st,
 		in_fight = true, combatants = {}, next_id = 1, outcome = fr.outcome, log = fr.log,
-		result = state.decode(fr.result) }
+		result = state.decode(fr.result), tick = fr.tick, deadline = fr.deadline }
 	local by_id = {}
 	for _, r in ipairs(dk.db:query("SELECT * FROM fight_combatants WHERE user_id = ? ORDER BY id", user.id)) do
 		local c = { id = r.id, side = r.side, kind = r.kind, entity_id = r.entity_id, wave = r.wave, hp = r.hp,
-			maxhp = r.maxhp, mp = r.mp, maxmp = r.maxmp, turns_left = r.turns_left, data = state.decode(r.data),
+			maxhp = r.maxhp, mp = r.mp, maxmp = r.maxmp, ticks_left = r.ticks_left, data = state.decode(r.data),
 			statuses = {} }
 		if r.kind == "monster" then
 			local m = monsters.get(r.entity_id)
@@ -239,24 +243,35 @@ function state.load(user, st)
 	return f
 end
 
+-- The next tick the server's tick must advance fight f at: the next one while anything in
+-- it counts ticks (a status on anyone, an ally), else the player's turn's deadline.
+function state.due(f)
+	for _, c in ipairs(f.combatants) do
+		if c.side == "ally" or #c.statuses > 0 then return f.tick + 1 end
+	end
+	return f.deadline
+end
+
 -- Writes the fight back (users' HP/MP/TP are the caller's: they belong to the users row).
 function state.save(f)
 	local uid = f.user_id
-	dk.db:exec("INSERT INTO fights (user_id, round, wave, data, outcome, log, result) VALUES (?, ?, ?, ?, ?, ?, ?) " ..
-		"ON CONFLICT (user_id) DO UPDATE SET round = excluded.round, wave = excluded.wave, data = excluded.data, " ..
-		"outcome = excluded.outcome, log = excluded.log, result = excluded.result", uid, f.round, f.wave,
-		state.encode(f.data), f.outcome or "", f.log or "", state.encode(f.result))
+	dk.db:exec("INSERT INTO fights (user_id, round, wave, data, outcome, log, result, tick, deadline, due) " ..
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET round = excluded.round, " ..
+		"wave = excluded.wave, data = excluded.data, outcome = excluded.outcome, log = excluded.log, " ..
+		"result = excluded.result, tick = excluded.tick, deadline = excluded.deadline, due = excluded.due", uid, f.round,
+		f.wave, state.encode(f.data), f.outcome or "", f.log or "", state.encode(f.result), f.tick, f.deadline,
+		state.due(f))
 	dk.db:exec("DELETE FROM fight_combatants WHERE user_id = ?", uid)
 	for _, c in ipairs(f.combatants) do
 		local player = c.side == "player"
-		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, turns_left, data, " ..
+		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, ticks_left, data, " ..
 			"mp, maxmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind, c.entity_id, c.wave or 0,
-			not player and c.hp or nil, not player and c.maxhp or nil, c.turns_left, state.encode(c.data),
+			not player and c.hp or nil, not player and c.maxhp or nil, c.ticks_left, state.encode(c.data),
 			c.kind == "monster" and c.mp or nil, c.kind == "monster" and c.maxmp or nil)
 		for i, s in ipairs(c.statuses) do
-			dk.db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, turns_left, data, " ..
-				"applied_round, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, s.status_id, i, s.turns_left,
-				state.encode(s.data), s.applied_round or 0, s.source)
+			dk.db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, ticks_left, data, " ..
+				"tick, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, s.status_id, i, s.ticks_left,
+				state.encode(s.data), s.tick or 0, s.source)
 		end
 	end
 end
@@ -271,9 +286,10 @@ function state.forget(user_id)
 	dk.db:exec("DELETE FROM fights WHERE user_id = ? AND outcome <> ''", user_id)
 end
 
--- The player outside fights, with the world statuses (user_statuses).
-function state.world(user, st)
-	local f = state.new({ user_id = user.id, round = 0, st = st, in_fight = false })
+-- The player outside fights, with the world statuses (user_statuses); tick: the clock's
+-- tick now (what statuses applied to it count from).
+function state.world(user, st, tick)
+	local f = state.new({ user_id = user.id, round = 0, st = st, in_fight = false, tick = tick })
 	local p = state.player(f)
 	p.statuses = status_rows("SELECT * FROM user_statuses WHERE user_id = ? ORDER BY position", user.id)
 	return f
@@ -282,8 +298,8 @@ end
 function state.save_world(f)
 	dk.db:exec("DELETE FROM user_statuses WHERE user_id = ?", f.user_id)
 	for i, s in ipairs(state.player(f).statuses) do
-		dk.db:exec("INSERT INTO user_statuses (user_id, status_id, position, turns_left, data) VALUES (?, ?, ?, ?, ?)",
-			f.user_id, s.status_id, i, s.turns_left, state.encode(s.data))
+		dk.db:exec("INSERT INTO user_statuses (user_id, status_id, position, ticks_left, data, tick) VALUES (?, ?, ?, ?, ?, ?)",
+			f.user_id, s.status_id, i, s.ticks_left, state.encode(s.data), s.tick or 0)
 	end
 end
 

@@ -198,18 +198,23 @@ function T.monster_turn()
 end
 
 function T.monster_sleep_and_wake()
-	-- still asleep: rand(1,15)=5 is not > 5: no attack rolls at all (sleep is a status:
-	-- its roll at the start of the monster's turn)
+	-- asleep: no attack rolls at all in a round (sleep is a status that blocks its turn)
 	local st = player({ currentmonstersleep = 5, currentmonsterhp = 10 })
-	local d = dice({ 5 })
+	local d = dice({})
 	local lines = monster_turn(st, CREATURE, d.rand)
-	d.done(); eq(lines[1], "The monster is still asleep."); eq(#lines, 1); eq(st.currentmonstersleep, 5)
-	-- wakes up (6 > 5) and attacks in the same turn
-	st = player({ currentmonstersleep = 5, currentmonsterhp = 10 })
-	d = dice({ 6, 4, 3, 100 })     -- tohit 4, block ceil(3/4) = 1 -> 3
-	lines = monster_turn(st, CREATURE, d.rand)
-	d.done(); eq(lines[1], "The monster has woken up.")
-	eq(lines[2], "The monster attacks you for 3 damage."); eq(st.currentmonstersleep, 0); eq(st.currenthp, 12)
+	d.done(); eq(lines[1], "The Creature is still asleep."); eq(#lines, 1); eq(st.currentmonstersleep, 5)
+	-- (3.2) it rolls to wake on the clock's ticks: rand(1,15)=5 is not > 5, 6 is; then it
+	-- attacks in the next round
+	local f = fm.model(player({ currentmonstersleep = 5, currentmonsterhp = 10 }), CREATURE, nil)
+	f.tick, f.deadline = 100, 200
+	d = dice({ 5, 6, 4, 3, 100 })     -- then tohit 4, block ceil(3/4) = 1 -> 3
+	f.rand = d.rand
+	local a = round.advance(f, 101)
+	eq(#a.lines, 0, "still asleep: nothing said")
+	a = round.advance(a.f, 102)
+	eq(a.lines[1][2], "The monster has woken up.")
+	local r = round.play(a.f, { kind = "continue" })
+	d.done(); eq(r.enemies[1], "The monster attacks you for 3 damage."); eq(r.f.st.currenthp, 12)
 end
 
 -- A spell turn (fight/act.lua): lines, killed, or the refusal.

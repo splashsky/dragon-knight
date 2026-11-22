@@ -13,7 +13,7 @@ it with the air of men who have learned it the hard way.]],
 	price = 45,
 	max_stack = 10,
 	usable_in = "fight",
-	power = 5,                      -- the chance (of 15) that it stays asleep each turn
+	power = 5,                      -- the chance (of 15) that it stays asleep each tick
 	messages = {
 		used = "You throw the %s. The monster falls asleep.",
 		immune = "You throw the %s, but the monster is immune to it.",

@@ -1,18 +1,18 @@
 -- app/content/spells/ember.lua :: the Ember spell: sets the monster on fire, so it burns for a
--- fixed amount at the end of each of its turns (app/content/statuses/burning.lua). Learned
+-- fixed amount on every tick of the clock (app/content/statuses/burning.lua). Learned
 -- by no class by default.
 -- learned: mage 19
 local function cast(s)
 	if s.target:immune_to("fire") then return s:say("immune", s.name) end
-	if not s.target:afflict("burning", { turns = s.power, amount = s.data.amount }) then
+	if not s.target:afflict("burning", { ticks = s.power, amount = s.data.amount }) then
 		return s:say(s.target:ward("burning") == 100 and "immune" or "resisted", s.name)
 	end
-	s:say("cast", s.name, s.power)
+	s:say("cast", s.name, s:seconds(s.power))
 end
 
 return {
 	name = "Ember",
-	description = "Sets the monster alight: it burns for a few hit points every turn. Some monsters are immune.",
+	description = "Sets the monster alight: it burns for a few hit points every 10 seconds. Some monsters are immune.",
 	lore = [[
 Mages who have been burned once never forget the first lesson: fire keeps working after the
 spell is done. An Ember leaves a small, stubborn flame on the target that eats a few hit
@@ -20,15 +20,15 @@ points every turn, the way a cook's oil spatter keeps stinging the wrist. Hunter
 swear it also makes a wolf think twice about coming back.]],
 	icon = "ember",
 	mp = 10,
-	power = 4,                  -- how many turns the fire burns
-	data = { amount = 7 },      -- hit points it burns away each turn
+	power = 4,                  -- how many ticks the fire burns
+	data = { amount = 7 },      -- hit points it burns away each tick
 	uses = { statuses = { "burning" } },
 	messages = {
-		cast = "You have cast the %s spell. The monster burns for %d turns.",
+		cast = "You have cast the %s spell. The monster burns for %d seconds.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
 		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
-			cast = "The monster casts %s. You burn for %d turns.",
+			cast = "The monster casts %s. You burn for %d seconds.",
 			immune = "The monster casts %s, but you are immune to it.",
 			resisted = "The monster casts %s, but you resist it.",
 		},

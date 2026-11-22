@@ -382,7 +382,7 @@ t_get /admin/users/$ADM_UID; expect_body 'Username:'; expect_body 'Fight:'; expe
 expect_no_body 'Current Monster'
 # the fight and world statuses, read-only (the fight tables)
 t_fight admtester 5 9; t_fight_status admtester 2 sleep 'chance=i:4'; t_fight_status admtester 1 uber_damage 'pct=i:10' 3
-t_sql "INSERT INTO user_statuses (user_id, status_id, position, turns_left) SELECT $ADM_UID, id, 1, 7 FROM statuses WHERE key = 'regen'"
+t_sql "INSERT INTO user_statuses (user_id, status_id, position, ticks_left) SELECT $ADM_UID, id, 1, 7 FROM statuses WHERE key = 'regen'"
 t_get /admin/users/$ADM_UID; expect_body 'round 2; you (Damage Up (3)); Shadow 9/10 HP (Asleep)'; expect_body 'Regenerating (7)'
 t_fight_clear admtester; t_sql "DELETE FROM user_statuses; UPDATE users SET currentaction = 'In Town' WHERE id = $ADM_UID"
 t_get /admin/users/$ADM_UID

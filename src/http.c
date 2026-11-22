@@ -69,6 +69,8 @@
 #define LINGER_SECONDS   2.0            /* drain unread input before closing after an error */
 #define POOL_MAX_FREE    256            /* pooled buffers kept per size class */
 #define HEAD_INLINE      1024
+#define TICK_PATH        "/__tick"
+#define TICK_LAG         0.01           /* the tick goes this long after its boundary */
 
 /* ------------------------------------------------------------------ globals */
 
@@ -407,6 +409,8 @@ typedef struct server {
 	double     accept_pause_until;
 	double     now;
 	int        listening;
+	double     tick_at;             /* when the next game tick goes (monotonic); 0: never */
+	int        tick_busy;           /* a tick is at a worker */
 } server;
 
 /* ------------------------------------------------------------------ small helpers */
@@ -1196,6 +1200,12 @@ static void serve_static(server *s, conn *c, job *j)
 static void worker_finish(server *s, job *j)
 {
 	conn *c = j->c;
+	if (!c) {
+		/* the game's tick: its answer goes nowhere (the app logs its errors) */
+		if (j->resp.status != 200)
+			log_warn("http: the tick answered %d", j->resp.status);
+		return;
+	}
 	if (j->resp.sse) {
 		if (strcmp(j->req.method, "GET") == 0) {
 			j->sse = 1;               /* the I/O thread opens it */
@@ -1337,6 +1347,51 @@ static int queue_push(server *s, job *j)
 	pthread_cond_signal(&s->qcv);
 	pthread_mutex_unlock(&s->qmu);
 	return 0;
+}
+
+/* ------------------------------------------------------------------ the game's tick */
+
+/* When the next boundary of tick_ms on the wall clock comes, on the monotonic clock (a
+ * moment after it, so the handler's clock reads the new tick). */
+static double tick_next(server *s)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	int64_t period = s->cfg->tick_ms;
+	int64_t ms = (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+	return s->now + (double)(period - ms % period) / 1000.0 + TICK_LAG;
+}
+
+/* The game's tick: POST /__tick with req.tick set, down the queue like any request but
+ * without a connection (complete() and worker_finish() know it by that). One at a time:
+ * a tick still at a worker when the next is due skips that one. */
+static void tick_send(server *s)
+{
+	s->tick_at = tick_next(s);
+	if (s->tick_busy || s->stopping)
+		return;
+	job *j = calloc(1, sizeof *j);
+	if (!j) {
+		log_error("http: out of memory sending the tick");
+		return;
+	}
+	resp_init(&j->resp);
+	sb_init(&j->head_out);
+	j->req.method = "POST";
+	j->req.target = TICK_PATH;
+	j->req.path = TICK_PATH;
+	j->req.query = "";
+	j->req.body = "";
+	j->req.remote_addr = "-";
+	j->req.tick = 1;
+	j->t0 = s->now;
+	if (queue_push(s, j) < 0) {
+		log_warn("http: the tick was dropped: the request queue is full");
+		job_free(j);
+		return;
+	}
+	s->tick_busy = 1;
+	stat_inc(ST_ticks);
 }
 
 /* ------------------------------------------------------------------ connection state machine */
@@ -1875,6 +1930,11 @@ static void serve_stats(server *s)
 static void complete(server *s, job *j)
 {
 	conn *c = j->c;
+	if (!c) {
+		s->tick_busy = 0;            /* the game's tick is done */
+		job_free(j);
+		return;
+	}
 	c->inflight = NULL;
 	if (c->closed) {
 		job_free(j);
@@ -1995,6 +2055,7 @@ static void on_conn_event(server *s, conn *c, int ev)
 static void begin_stop(server *s)
 {
 	s->stopping = 1;
+	s->tick_at = 0;
 	atomic_store(&s->stopping_flag, 1);
 	s->stop_deadline = s->now + SHUTDOWN_GRACE;
 	if (s->lfd >= 0) {
@@ -2047,11 +2108,15 @@ static void io_loop(server *s)
 			hub_tick(s->hub, s->now);
 			flush_dirty(s, FLUSH_BATCH);
 		}
+		if (s->tick_at && s->now >= s->tick_at)
+			tick_send(s);
 
 		double next = ev_timer_next(&s->timers);
 		double tick = hub_next_tick(s->hub);
 		if (!next || tick < next)
 			next = tick;
+		if (s->tick_at && s->tick_at < next)
+			next = s->tick_at;
 		if (s->stopping && (!next || next > s->stop_deadline))
 			next = s->stop_deadline;
 		if (!s->listening && s->lfd >= 0 && (!next || next > s->accept_pause_until))
@@ -2233,7 +2298,8 @@ static void free_server(server *s)
 	job *j = s->chead;
 	while (j) {
 		job *next = j->next;
-		j->c->inflight = NULL;
+		if (j->c)
+			j->c->inflight = NULL;
 		job_free(j);
 		j = next;
 	}
@@ -2241,7 +2307,8 @@ static void free_server(server *s)
 	j = s->qhead;
 	while (j) {
 		job *next = j->next;
-		j->c->inflight = NULL;
+		if (j->c)
+			j->c->inflight = NULL;
 		job_free(j);
 		j = next;
 	}
@@ -2347,6 +2414,9 @@ int http_serve(const dk_config *cfg, const dk_hooks *hooks)
 		}
 		if (start_workers(&s, config_workers(cfg)) == 0) {
 			stats_set_server(ev_backend(s.ev), s.nthreads);
+			s.now = now_mono();
+			if (cfg->tick && cfg->tick_ms > 0)
+				s.tick_at = tick_next(&s);
 			io_loop(&s);
 			rc = 0;
 		}

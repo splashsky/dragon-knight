@@ -17,6 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
+| The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
@@ -57,7 +58,8 @@ for one request only):
 4. The router matches the method and path. No match gives a 404 page; the wrong method
 	 gives a 405 page with an `Allow` header.
 5. **Every POST must pass CSRF verification**, or the response is a 403 page. This check
-	 runs before any guard or handler.
+	 runs before any guard or handler. (The server's own tick, `req.tick`, has none: [The
+	 server tick](#the-server-tick).)
 6. Guards run, then the handler runs. The handler returns a response table (or an HTML
 	 string).
 7. HEAD requests: the transaction is rolled back and queued cookies are dropped.
@@ -95,6 +97,11 @@ issue `BEGIN`/`COMMIT` yourself.
 - **Event streams.** A handler may answer with `{ sse = {...} }` instead of a page; the
 	connection then stays open, held by the server, not by a worker or a VM (see
 	[Realtime](#realtime-event-streams)). `dk.publish` events go out after the commit.
+- **The server's tick.** Every 10 s, on the clock's tick boundary, the engine sends a
+	request of its own, `POST /__tick`, down this same path (a worker, a pool VM, the
+	transaction, events after the commit, errors logged): the game's clock moving (see
+	[The server tick](#the-server-tick)). It has no connection, no access log line and no
+	CSRF token: only the engine can mark a request as the tick (`req.tick`).
 - **Metrics.** `/admin/server` (administrators) and `dk stats` show the server's counters:
 	requests and latency buckets, queue wait, worker time, VM pool, time in SQLite and
 	waiting for the write lock, checkpoints, static cache, event streams and subscribers
@@ -579,7 +586,7 @@ the browser sees only the name):
 | `notices` | `clear` | `{ id }` | `/admin/broadcast` (clear) |
 | `user:<id>` | `reply` | `{ thread, title, author, url }` | a reply in a forum thread the player started or posted in (not to the one replying; at most 200 players) |
 | `user:<id>` | `logout` | `{ session }` (one session's pages) or `{ all = true }` | logout; password change, lost password, a new password set in the user editor |
-| `user:<id>` | `stale` | `{ tab }` (the sending page's `X-DK-Tab`, or `""`) | every successful POST of the player (`main.lua`), but those that set `req.quiet` (the chat's, the banner's dismissal): their other pages ask for themselves again |
+| `user:<id>` | `stale` | `{ tab }` (the sending page's `X-DK-Tab`, or `""`) | every successful POST of the player (`main.lua`), but those that set `req.quiet` (the chat's, the banner's dismissal): their other pages ask for themselves again; the server's tick (`lib/tick.lua`, `tab` `""`: every page) when it changed the player's fight or world statuses, or the weather where an online player with a stream stands |
 | (server) | `resync`, `bye` | empty | the hub: missed events are gone / shutdown |
 
 The `admin` channel exists for administrators' streams; nothing uses it yet.
@@ -610,7 +617,10 @@ reload. No toasts in popup windows (`window.opener`).
 	the sending page's id (`X-DK-Tab`, `DK.tab`). Every other page of the player, in this
 	browser or another, asks for itself again (`DK.refresh()`, 250 ms later: several
 	changes, one request; only what changed comes); a hidden page does it when it shows
-	again (also after more than a minute hidden, whatever happened).
+	again (also after more than a minute hidden, whatever happened). The server's tick
+	publishes it too, with no tab (every page of the player): a fight the clock moved (a
+	status's tick, a guard), world statuses, the weather (see [The server
+	tick](#the-server-tick)).
 
 - **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
 	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
@@ -1145,8 +1155,10 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	numbered from the unix epoch: `clock.tick(now)` is the number of the tick `now` is in
 	(`now // 10`), `clock.tick_start(n)` the unix time tick `n` starts. A game day lasts 2
 	hours (`clock.DAY`): dawn 15 minutes, day 60, dusk 15 and night 30 (`clock.PHASES`, whole
-	ticks). `clock.time_of_day(now)` is the phase, `clock.phase_ends(now)` when it ends. (A
-	later phase runs the game's tick on the server and puts fights on this clock.)
+	ticks). `clock.time_of_day(now)` is the phase, `clock.phase_ends(now)` when it ends.
+	`clock.duration(seconds)` is a length for the page ("20s", "1m 30s"). The server runs
+	the game's tick on it ([The server tick](#the-server-tick)), and fights, statuses and
+	allies count its ticks.
 - **The weather's step** is 6 clock ticks (`weather.STEP`): it changes only as a minute
 	begins, and is the same all through one.
 - **The grid.** The map in cells of 10 by 10 tiles (`weather.CELL`). Each cell has a base
@@ -1222,11 +1234,12 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	behind is next to the player, and the line is true whichever way they came. The fight
 	page will show the battlefield (part 4, fields).
 - **Open pages** learn of a change from the server, never from a timer of their own: the
-	server's game tick (a later phase) asks `weather.changed` for the tiles of the players
-	online from one tick to the next and publishes `stale` on `user:<id>` for those whose
-	weather changed, which live.js turns into `DK.refresh()` (only what changed comes: the
-	`weather` region, and `explore-weather` on the exploring page). Until then a page shows
-	the weather of its last answer.
+	server's tick (`lib/tick.lua`), at each tick that begins a weather step, asks
+	`weather.changed` between the tick before and this one for the tiles of the players
+	online with an event stream and publishes `stale` on `user:<id>` for those whose weather
+	changed, which live.js turns into `DK.refresh()` (only what changed comes: the `weather`
+	region, and `explore-weather` on the exploring page). Until then a page shows the
+	weather of its last answer.
 - **Testing.** With `test_routes = true` a request may pin the clock: `X-Test-Now: <unix
 	seconds>` (`main.lua`, `clock.pin`), for everything that asks `clock.now()`.
 	`tests/run.sh` pins every request at `$T_NOW` (4000000000), so the weather is the same on
@@ -1234,7 +1247,86 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey,
 	snow in the north, mud after rain, the lines, `weather.changed` between clock ticks, the
 	cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
-	line, and a live answer with the weather's regions alone).
+	line, and a live answer with the weather's regions alone), `tests/e2e/tick.sh` (the push
+	to an open page).
+
+## The server tick
+
+(3.2, `docs/plans/elements-and-weather.md` part 6.) The game runs on one server-authoritative
+clock ([Clock and weather](#clock-and-weather)): nothing a browser does (a refresh, a dropped
+connection, a closed tab) drives it.
+
+- **The timer** (`src/http.c`): with `tick = true` (the default; `false` turns it off: the
+	e2e tests' config does), the I/O thread sends the game's tick on every boundary of 10
+	s of the wall clock (`clock.TICK`; `dk_config.tick_ms`, not a config key, shortens it
+	in the C tests), a moment after it: a request of its own, `POST /__tick` with
+	`req.tick = true`, queued for a worker like any other and run by the ordinary path (a
+	pool VM, `main.lua`, the transaction and its write lock, `dk.publish` events after the
+	commit, errors logged), with no connection: its answer goes nowhere (a status other
+	than 200 is logged) and it has no access log line. One at a time: a tick still running
+	when the next is due skips that one (the next catches up). The CLI and `dk check` never
+	run it. `ticks` in `dk stats` and `/admin/server` counts them.
+- **Only the engine reaches it.** A network request can't set `req.tick` (the engine sets
+	it on its own request only), and `routes/tick.lua` answers anything else with a 404
+	(`main.lua` skips the CSRF check for the tick alone, so a network POST without a token
+	gets its 403 first). The tick has no user: `main.lua`'s `stale` after a player's POST
+	isn't sent for it; `tick.run` publishes what it changed itself.
+- **`tick.run(now)`** (`app/lib/tick.lua`) advances everything the clock moves up to the
+	tick `now` is in, in three parts, each bounded per run (`tick.FIGHTS` = 100 fights,
+	`tick.WORLD` = 200 characters, at most `tick.TICKS` = 30 ticks each): what is left over
+	continues on the next run, so after the server was down the next runs catch up, because
+	time ran on.
+	- **Fights** due (`SELECT ... FROM fights WHERE outcome = '' AND due <= ? ORDER BY due`:
+		the partial index `fights_due`, the most behind first) are advanced with
+		`encounter.advance` (below), the same code a `POST /fight` runs first.
+	- **World statuses** (`user_statuses.tick < ?`, the index `user_statuses_tick`, the most
+		behind first) count the ticks with `world.advance`: each ticks and counts down
+		(they can't take the last hit point outside a fight); while the character fights,
+		the ticks pass them by.
+	- **The weather**: at a tick that begins a weather step, the players online with an
+		event stream whose tile's weather changed since the tick before.
+	A fight or world statuses the tick changed, and a changed weather, publish `stale` on
+	`user:<id>` (with no tab: every page of the player refreshes; a player gets one per
+	run).
+- **Fights on the clock** (`fight/round.lua` `round.advance(f, n [, limit])`): a fight saves
+	the last tick it played (`fights.tick`), the tick its turn runs out at
+	(`fights.deadline`) and when the tick must advance it next (`fights.due`: the next tick
+	while anything in it counts ticks, a status or an ally, else the deadline). Advancing it
+	to tick `n` plays every tick after `fights.tick` in order; at each:
+	1. a turn the player can't act in (asleep, recharging, charging: `round.locked`) ends:
+		a round with the blocked turn (its line), the allies and the monsters acting;
+	2. every combatant's statuses tick (`on_tick`) and count down, those that run out
+		expire (a charge releases: the caster's action, even between the player's turns;
+		sleep rolls to wake), and allies count down and leave;
+	3. a turn whose deadline passed is played as a **Guard** round ("You hesitate, and
+		raise your guard."), whether or not a page is open: a player who walked away keeps
+		guarding, every 30 seconds, until the fight ends.
+	Each round played starts the player's next turn (`round.next_turn`: the round counter
+	+1, the deadline `round.TURN` = 3 ticks, 30 s, later). A fight further behind than
+	`round.CATCHUP` (360 ticks, an hour) skips the older ticks. A fight not on the clock yet
+	(`fights.tick` 0: in progress when the database was migrated, or made by a test) starts
+	on it at `n` with its turn's full time; world statuses with `tick` 0 too.
+	`encounter.advance(user, f, n [, limit])` runs it and settles what it did: its lines go
+	into the fight's log, a death or a victory ends the fight as a round's would, else the
+	fight is saved.
+- **Commands catch up first**: `POST /fight` advances the fight to now (the same code), then
+	plays the command: a form from before a turn that ran out is stale (the round counter
+	moved on), and a status's tick due in between happens before the spell.
+- **GETs stay pure**: `GET /fight` shows the fight as the tick (or the last command) left it,
+	at most one tick old; it computes the timer and nothing else.
+- **Testing.** `POST /__test/tick` (test routes only) runs `tick.run` at the request's time
+	(`X-Test-Now`: `t_tick [SECONDS]` moves `$T_NOW` on and runs it, see [End-to-end
+	tests](#end-to-end-tests)). `tests/c/test_http.c` (the timer fires on its boundaries,
+	is off with `tick = false`, a network request to `/__tick` is never the tick),
+	`tests/lua/test_round.lua` (advancing: statuses and allies counting ticks from the one
+	after they came, a blocked turn ending at the tick, sleep waking on ticks, a charge
+	releasing between turns, the timed-out Guard, catching up after a long absence until
+	the fight ends, bounded per call), `tests/lua/test_tick.lua` (`tick.run` on the
+	database: the fights due in order and bounded, `stale` published, world statuses),
+	`tests/e2e/tick.sh` (the route, the timer's markup, a guard pushed to an open page and
+	kept in the log, a fight that ends on the clock, the weather pushed),
+	`tests/e2e/fight_api.sh` (a command catching up first, Guard), `tests/e2e/migrate.sh`
+	(step 22).
 
 ## Content
 
@@ -1555,10 +1647,10 @@ wards](#elements-and-wards)):
 | `:ward(key)` | its ward against status `key` (percent chance, 0..100, that it doesn't take hold) |
 | `:spend(stat, n)` | uses up `n` of a stat (a cost) |
 | `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the statuses `uber_damage` / `uber_defense`; 0 ends it) |
-| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance` at the start of each of its turns (0 wakes it); returns whether it fell asleep (false: its ward stopped it) |
-| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`turns`: how long; the rest is the status's `t.data`); replaces an instance it has; returns whether it took hold (false: its ward stopped it) |
+| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance`, rolled on every clock tick (0 wakes it); returns whether it fell asleep (false: its ward stopped it) |
+| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`ticks`: how many clock ticks; the rest is the status's `t.data`); replaces an instance it has; returns whether it took hold (false: its ward stopped it) |
 | `:cure(key or kind)` | removes a status, or all of a kind (`"harmful"`, `"helpful"`, `"neutral"`); returns how many |
-| `:has_status(key)`, `:status(key)`, `:statuses([kind])` | what it has: `{ key, name, kind, turns_left, data }` copies |
+| `:has_status(key)`, `:status(key)`, `:statuses([kind])` | what it has: `{ key, name, kind, ticks_left, data }` copies |
 
 Amounts are whole numbers >= 0; anything else is an error. The handle's numbers follow its
 own changes during the action (heal, then read `hp`).
@@ -1570,15 +1662,16 @@ Nothing touches the game state meanwhile: the handles record an ordered list of 
 (`heal`, `hurt`, `spend`, `buff`, `sleep`, `afflict`, `cure`, `summon`, `say`), and the
 caller applies them (`fight/engine.lua` `engine.apply` on the fight model; outside fights
 `lib/world.lua`) and saves. A refusal, or an error, returns no events, so nothing changes
-and no MP, item or turn is spent. In fights the player's action is step 2 of the round
+and no MP, item or turn is spent. In fights the player's action is step 1 of the round
 pipeline (`fight/act.lua` `act.run(f, action)`, see [Fight engine](#fight-engine)); town
 casting (`town/heal.lua`) and the inventory's Use (`town/inventory.lua`) call
 `action.perform` and `world.apply`.
 
-More context methods: `s:summon(key, params)` (an ally joins, in fights; `s.summon_room`
-says how many more may), `s:charge(turns, step)` and `s:recharge(turns)` (multi-stage
-actions), and the file's `stages = { release = fn }` (named steps; see
-[Fight engine](#fight-engine)).
+More context methods: `s:summon(key, params)` (an ally joins, in fights, for `ticks` of
+the clock; `s.summon_room` says how many more may), `s:charge(ticks, step)` and
+`s:recharge(ticks)` (multi-stage actions), `s:seconds(n)` (`n` clock ticks in seconds, for
+a line: "burns for %d seconds"), and the file's `stages = { release = fn }` (named steps;
+see [Fight engine](#fight-engine)).
 
 **Monsters acting.** Messages are worded for the player. When a monster is the caster,
 `s:say("hit", ...)` uses `messages.enemy.hit` if there is one (same arguments); otherwise
@@ -1623,13 +1716,17 @@ request plays at most one **round** of a deterministic pipeline (`fight/round.lu
 what happens to combatants (handles for content code, applying events, statuses, summons)
 is `fight/engine.lua`. Monsters choose by weight (`fight/ai.lua`). The dice and formulas of
 the original game stay in `fight/combat.lua`; `routes/fight.lua` picks the monster, checks
-the player's choice (known spell, MP, item in the bag) and saves.
+the player's choice (known spell, MP, item in the bag) and saves. Since 3.2 a fight runs on
+the game's clock: statuses and allies count its ticks, and the player's turn has a deadline
+([The server tick](#the-server-tick)); a command first catches the fight up to now.
 
 **The fight menu** (`templates/fight/fight.html`, one form posting to `/fight`) is the
 **hotbar** (3.1, see [Hotbar](#hotbar)): ten slots on the number keys, each an icon button
 (`.action-btn`, `.spell-btn`, styled in `dk.css` and the themes; the slots in `fight.css`):
 **1 Attack** `<button type="submit" name="fight" value="Fight" aria-label="Attack"
-aria-keyshortcuts="1">` with `images/skills/attack.png`, **2-9** the player's actions, and
+aria-keyshortcuts="1">` with `images/skills/attack.png`, **2-8** the player's actions, **9
+Guard** (3.2) `<button type="submit" name="guard" value="Guard" aria-label="Guard"
+aria-keyshortcuts="9">` with `images/skills/guard.png`, and
 **0 Run** `<button type="submit" name="run" value="Run" aria-label="Run"
 aria-keyshortcuts="0">` with `images/skills/run.png`, set apart (`.hotbar-run`) so it
 isn't pressed instead; then, under **More**, the actions not on the bar, without keys. An
@@ -1651,20 +1748,30 @@ spent); the round then casts the spell through the spell's code with the player 
 and no MP cost (`act.run` with `{ kind = "gear", item, spell }`, an `item` step in the
 trace), and the route spends one charge (`inventory.spend_charge`), also when the player
 dies that turn. The route only checks that the
-field is there (`form.fight`, `form.run`), so `fight=Fight` and `run=Run` (the text buttons
-before 2.4, old forms, tests) and whatever value a button sends play the same. Each button
-sits in a span carrying its tooltip (`.action-tip`, `.spell-tip`; `tips.attack(power,
-weapon)`: "Attack", the player's attack power and weapon, what it does; `tips.run()`), as
-fight.js disables the buttons while a round plays. A turn a status blocks shows only the
-"Continue" text button (`continue=Continue`; any command is a Continue then), which any
-number key presses.
+field is there (`form.fight`, `form.guard`, `form.run`), so `fight=Fight` and `run=Run`
+(the text buttons before 2.4, old forms, tests) and whatever value a button sends play the
+same. Each button sits in a span carrying its tooltip (`.action-tip`, `.spell-tip`;
+`tips.attack(power, weapon)`: "Attack", the player's attack power and weapon, what it does;
+`tips.guard()`, `tips.run()`), as fight.js disables the buttons while a round plays. **Guard**
+costs the turn and puts on the status `guarding` (helpful: weapon attacks deal a quarter
+less, `modify_damage_taken`) until the player's next turn begins, when the round ends it; a
+turn that runs out is a Guard. A turn a status blocks shows only the "Continue" text button
+(`continue=Continue`), which any number key presses: the turn ends at the clock's next
+tick (a round with the blocked turn), so a command now plays nothing, and Continue just
+shows the fight again. **The turn's timer** (`templates/fight/clock.html`, the region
+`fight-clock` under the hotbar: `data-turn-ends`, when the turn runs out, a blocked one at
+the next tick, and `data-now`, the server's time, both unix seconds; a region of its own
+because `data-now` differs on every request): fight.js works out its clock's offset from
+`data-now` and draws a thin bar draining over the turn's last 20 seconds
+(`.fight-clock-bar`, `data-client`; moved each second, without its 1 s slide under
+`prefers-reduced-motion`). It is display only: the server plays the timeout.
 **The model** (`fight/state.lua`; tables `fights`, `fight_combatants`, `fight_statuses`):
 
 | | |
 |---|---|
-| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result }`. `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the last round's lines (`encounter.log_of`, `encounter.lines`); `result`: a victory's rewards |
-| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's item stock (`stock_<position>`) |
-| status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
+| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result, tick, deadline }`. `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the lines since the player's last command, its round's and then what the clock did, at most `encounter.LOG_LINES` (60), the latest (`encounter.log_of`, `encounter.log_add`, `encounter.lines`: paragraphs in order); `result`: a victory's rewards; `tick`: the last clock tick it played (0: not on the clock yet); `deadline`: the tick the player's turn runs out at (`fights.due`, when the server's tick must advance it, is `state.due(f)`, written by `state.save`) |
+| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, ticks_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `ticks_left`: the clock ticks an ally stays (nil: the whole fight); `data`: a monster's item stock (`stock_<position>`) |
+| status instance | `{ status_id, key, row, ticks_left, data, tick, source }`: `data` holds the params it was applied with, `tick` the last clock tick it counted (at first the one it was applied in), `source` the combatant who applied it |
 
 `state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (an escape, a new
 encounter) and `state.forget(user_id)` (a move or travel: a finished fight's page goes).
@@ -1685,49 +1792,62 @@ level); `GET /victory` shows them. The player's actions aim at "the current targ
 living enemy of the wave, `s.target` in spells), so a target picker can come later without
 changing spell files.
 
-**The round** (`round.play(f, a)`; `a.kind`: `attack`, `spell`, `item`, `gear`, `run`, `continue`,
-or `ambush`: the monster swung first):
+**The round** (`round.play(f, a)`; `a.kind`: `attack`, `spell`, `item`, `gear`, `guard`
+(`a.timeout`: the turn ran out), `run`, `continue`, or `ambush`: the monster swung first):
 
-1. the player's turn starts: statuses with `tick_on = "turn_start"` tick; a status that
-	 blocks the action makes the turn a skip (with its `blocked` message);
-2. the player's action. A refused spell or item (or one whose code fails) leaves the fight
-	 exactly as it was: the round runs on a copy (`state.copy`), so even the turn-start
-	 ticks are undone;
-3. each ally (summon), in the order summoned: turn-start ticks, then its `act` unless
-	 blocked;
-4. each enemy of the current wave: turn-start ticks (the monster's sleep is a status: its
-	 wake-up roll), then, unless blocked, an action and a target chosen by `fight/ai.lua`;
-5. turn ends for the player, the allies and the enemies: `turn_end` ticks, then the
-	 statuses count down and expire; allies count their rounds down and leave.
+1. the player's action; a status that blocks the action makes the turn a skip (with its
+	 `blocked` message). A refused spell or item (or one whose code fails) leaves the fight
+	 exactly as it was: the round runs on a copy (`state.copy`);
+2. each ally (summon), in the order summoned: its `act` unless blocked;
+3. each enemy of the current wave: unless blocked (its `blocked_other` message), an action
+	 and a target chosen by `fight/ai.lua`;
+4. the player's next turn begins: `guarding` ends.
 
-After each step that changed HP the round checks the outcome: the player dead is the
-death (as before), the last enemy defeated the victory, an ally at 0 HP leaves ("Your Wolf
-has been defeated.", or its `on_death`). The result `r` has the lines of each part
-(`player`, `allies`, `enemies`, `ending`; the fight page shows them in that order), the
-model after the round (`r.f`) and `escaped`, `victory`, `died` or `refused`.
-`round.start(f)` rolls a new encounter (each enemy's HP, then who swings first).
-`round.locked(f)`: the player has a blocking status, so the page offers only "Continue"
-and the route turns any command into `continue`.
+No status ticks in a round: they tick on the clock (below). After each step that changed
+HP the round checks the outcome: the player dead is the death (as before), the last enemy
+defeated the victory, an ally at 0 HP leaves ("Your Wolf has been defeated.", or its
+`on_death`). The result `r` has the lines of each part (`player`, `allies`, `enemies`,
+`ending`; `round.lines(r)`: them in order), the model after the round (`r.f`) and
+`escaped`, `victory`, `died` or `refused`; the caller starts the next turn
+(`round.next_turn(f)`: the round counter +1, the deadline `round.TURN` ticks after
+`f.tick`). `round.start(f)` rolls a new encounter (each enemy's HP, then who swings first).
+`round.locked(f)`: the player has a blocking status, so the page offers only "Continue", a
+command plays nothing, and the turn ends at the clock's next tick.
 
-**The trace.** With `f.trace = {}` set on the model before `round.play` (the JSON fight
-API does), the round records in `r.f.trace`, in order, every line it says, every change
+**The clock** (`round.advance(f, n [, limit])`, see [The server tick](#the-server-tick)):
+every tick after `f.tick` up to `n` in order: a blocked turn ends (a round with `continue`:
+its blocked line, the allies and monsters acting); every combatant's statuses tick and
+count down (`engine.tick(f, c, k)`: those applied before tick `k`, which counts from the
+tick after a status came, so one put on in a round played at a tick waits for the next)
+and allies count down (`engine.summon_tick`); a turn whose deadline passed is a Guard
+round. It returns the lines in order (`{ part, line }`), how many ticks it played,
+`changed` and `died` or `victory`. Status and summon code runs at most `engine.MAX_RUNS`
+times per round and per tick. `fight/encounter.lua` `encounter.advance` runs it for the
+server's tick and before every command.
+
+**The trace.** With `f.trace = {}` set on the model before `round.play` or `round.advance`
+(a live request does), they record in `f.trace`, in order, every line said, every change
 of HP, MP or TP, every status applied, counted down, expiring or removed and every ally
 joining, counting down or leaving, each with its step (`f.doing`: who acts and how, set by
 `engine.doing(f, c, kind)` / `engine.done(f, prev)` around the code that acts). Lines go
 through `engine.say(f, line)`. Tracing rolls nothing and changes nothing (the equivalence
-test below traces every other fight); `fight/events.lua` turns it into the API's events.
+test below traces every other fight); `fight/events.lua` turns it into the live client's
+events.
 
-**Equivalence.** Fights without summons or new statuses roll exactly the original's dice,
-in the same order, with the same messages and results: no AI roll with one action and one
-target, sleep and the damage/defense buffs as statuses with the original formulas.
-`tests/lua/test_round.lua` plays 1,000 seeded fights through the pipeline and through a
-frozen copy of the 2.1 fight (`tests/lua/fight_original.lua`) and compares every roll,
-line and state.
+**Equivalence.** Fights without summons, new statuses or timeouts roll exactly the
+original's dice, in the same order, with the same messages and results: no AI roll with
+one action and one target, the damage/defense buffs as statuses with the original
+formulas. `tests/lua/test_round.lua` plays 1,000 seeded fights through the pipeline and
+through a frozen copy of the 2.1 fight (`tests/lua/fight_original.lua`) and compares every
+roll, line and state. Sleep's match is retired (3.2): a sleeper rolls to wake on the
+clock's ticks, not at the start of its turns, so those fights cast no sleep spells and the
+new sleep rules have tests of their own.
 
 ### Statuses
 
 A status (`app/content/statuses/<key>.lua`, table `statuses`) is a named, timed effect on
-a combatant: poison, a buff, sleep, "recharging".
+a combatant: poison, a buff, sleep, "recharging". Its time is the game's clock (3.2): it
+lasts `ticks` of 10 seconds, and its `on_tick` runs on each of them.
 
 ```lua
 -- app/content/statuses/poison.lua
@@ -1738,18 +1858,17 @@ end
 
 return {
 	name = "Poisoned",
-	description = "Loses hit points at the end of every turn.",
+	description = "Loses hit points every 10 seconds.",
 	kind = "harmful",            -- harmful | helpful | neutral (an antidote cures "harmful")
-	tick_on = "turn_end",        -- turn_start | turn_end: when on_tick runs
-	turns = 3,                   -- default duration (0: until removed or the fight ends)
+	ticks = 3,                   -- default duration in clock ticks (0: until removed or the fight ends)
 	data = { min = 2, max = 5 }, -- defaults of t.data (admin-overridable)
 	messages = { hurt = "The %s takes %d poison damage.", hurt_you = "You take %d poison damage." },
-	on_tick = tick,              -- or inline: on_tick = function(t) ... end
+	on_tick = tick,              -- on every clock tick; or inline: on_tick = function(t) ... end
 }
 ```
 
-- Fields: `name`, `description`, `kind`, `tick_on`, `scope` (`"fight"`, the default: ends
-	with the fight; `"world"`: outside fights only; `"both"`), `turns`, `blocks_action`
+- Fields: `name`, `description`, `kind`, `scope` (`"fight"`, the default: ends with the
+	fight; `"world"`: outside fights only; `"both"`), `ticks`, `blocks_action`
 	(`true`, or a `function(t)` returning true while it blocks), `data`, `messages`
 	(`blocked`: said when it blocks the player's turn; `blocked_other`: anyone else's, `%s`
 	the name), `resist` and `ward` (what it gives its bearer, like a monster's: `resist = {
@@ -1760,44 +1879,50 @@ return {
 	like `can_cast`). A tick that hurts names its element (`t.bearer:hurt(n, "poison")`:
 	burning is fire, poison and venom poison, withering shadow).
 - The context `t`: `t.bearer` and `t.source` (handles; `source` may be nil),
-	`t.turns_left` (nil: no limit), `t.data` (the status's data under the params it was
+	`t.ticks_left` (nil: no limit), `t.data` (the status's data under the params it was
 	applied with), `t.name`, `t.messages`, `t.round`, `t.in_fight`, `t:roll`, `t:say`,
 	`t:expire()` / `t:remove()` (end it, once the hook returns), `t:release()` (charging:
 	run the charged action's stage).
-- Applying: `s.target:afflict("poison", { turns = 2, min = 1, max = 3 })` from any
-	context. **Re-applying replaces** the instance: the old one's `on_remove` runs (not
-	`on_expire`), then the new one's `on_apply`, with the new duration and params even when
-	shorter; there is no stacking.
-- Timing: a status counts the bearer's turns that begin after it was applied (a poison the
-	player casts ticks at the end of the monster's turn in the same round; a regen the
-	player casts on itself first ticks in the next round). It counts down at the end of the
-	bearer's turn and expires at 0.
-- The original mechanics are statuses 1-3: `sleep` (blocks; at the start of each turn
-	`rand(1, 15) > chance` wakes it: "The monster has woken up."), `uber_damage` and
-	`uber_defense` (damage modifiers with the original formulas). `:buff` and `:sleep`
-	apply them; anyone can be put to sleep or buffed now.
+- Applying: `s.target:afflict("poison", { ticks = 2, min = 1, max = 3 })` from any
+	context (`turns` is refused: durations are ticks since 3.2). **Re-applying replaces** the
+	instance: the old one's `on_remove` runs (not `on_expire`), then the new one's
+	`on_apply`, with the new duration and params even when shorter; there is no stacking.
+- Timing (the clock, `engine.tick`): a status counts the clock's ticks after the one it
+	was applied in, whatever the rounds do: on each it ticks (`on_tick`), then counts down,
+	and at 0 it expires. A poison cast at 10:00:03 first ticks at 10:00:10, and a 3-tick
+	one is gone at 10:00:30. Its chip on the fight page says the time left ("20s",
+	`clock.duration`). Messages say durations in seconds: `s:seconds(n)` is `n` ticks in
+	seconds (`clock.TICK` each).
+- The original mechanics are statuses 1-3: `sleep` (blocks: the sleeper's turns are
+	skipped with its `blocked` / `blocked_other` line, "The Shadow is still asleep."; on
+	every clock tick `rand(1, 15) > chance` wakes it: "The monster has woken up."),
+	`uber_damage` and `uber_defense` (damage modifiers with the original formulas). `:buff`
+	and `:sleep` apply them; anyone can be put to sleep or buffed now. 3.2 adds `guarding`
+	(the Guard action's: weapon attacks deal a quarter less until the next turn).
 - Robustness: an error in a hook is logged as a warning and removes that status (without
 	its hooks); the round goes on. At most `engine.MAX_STATUSES` (10) per combatant (more
-	are not applied, logged); at most `engine.MAX_TICKS` (100) runs of status and summon
-	code per round (the rest is skipped, logged). A status whose file is gone (retired) ends
-	when the fight loads.
+	are not applied, logged); at most `engine.MAX_RUNS` (100) runs of status and summon
+	code per round and per clock tick (the rest is skipped, logged). A status whose file is
+	gone (retired) ends when the fight loads.
 - **World statuses** (`scope = "world"` or `"both"`, applied outside a fight, like the
-	Regen Potion's) live in `user_statuses`, tick on map moves (one move is one turn:
-	`lib/world.lua` `world.move`; they can't take the last hit point), outlast fights and
-	take no part in them; the character page lists them. Their lines aren't shown yet (the
-	move redirects to the map). In a fight a "world" status isn't applied, and outside one a
-	"fight" status isn't (logged).
+	Regen Potion's) live in `user_statuses` and tick on the clock too (the server's tick:
+	`lib/world.lua` `world.advance`; they can't take the last hit point; while the character
+	fights, the ticks pass them by), outlast fights and take no part in them; the character
+	page lists them with their time left. Their lines aren't shown. In a fight a "world"
+	status isn't applied, and outside one a "fight" status isn't (logged).
 
 ### Multi-stage actions
 
 - **Recharge** (Hyper Beam): `cast` hits, then `s:recharge(1)` puts the caster in
-	`recharging` (blocks): its next turn is skipped ("You must recharge this turn."; the page
-	offers only "Continue") and the monster still acts.
+	`recharging` (blocks, 1 tick): its next turn is skipped at the clock's next tick ("You
+	must recharge this turn."; until then the page offers only "Continue") and the monster
+	still acts; then the status runs out.
 - **Charge** (Solar Beam): `cast` calls `s:charge(1, "release")`: the caster is `charging`
-	(blocks) with the params `{ entity = "solar_beam", from = "spell", release = "release" }`
-	(names only). At the start of its next turn the status runs out and its `on_expire`
+	(blocks, 1 tick) with the params `{ entity = "solar_beam", from = "spell", release =
+	"release" }` (names only). At the clock's next tick the blocked turn ends ("You are
+	gathering power.", the monster acts), then the status runs out and its `on_expire`
 	calls `t:release()`, which runs the file's `stages.release(s)` with the caster and its
-	current target: that turn's action.
+	current target: the caster's action, between the player's turns.
 
 ```lua
 -- app/content/spells/solar_beam.lua (excerpt)
@@ -1821,7 +1946,7 @@ return {
 ### Summons
 
 A summon (`app/content/summons/<key>.lua`, table `summons`) is an ally on the player's
-side, called by `s:summon("wolf", { turns = 5 })` (in fights; a file refuses in `can_cast`
+side, called by `s:summon("wolf", { ticks = 5 })` (in fights; a file refuses in `can_cast`
 when `s.summon_room` is 0: at most `control.max_allies` allies, default 1, "Allies" in the
 main settings).
 
@@ -1834,7 +1959,7 @@ end
 
 return {
 	name = "Wolf", hp = 30, attack = 12, defense = 5, dexterity = 4,
-	turns = 5,                                 -- rounds it stays (0: the whole fight)
+	ticks = 5,                                 -- clock ticks it stays (0: the whole fight)
 	messages = { bite = "Your %s bites the monster for %d damage.", gone = "Your %s runs off into the wild." },
 	act = act,                                 -- once per round, after the player
 	on_expire = function(a) a:say("gone", a.self.name) end,   -- optional; on_summon, on_death too
@@ -1842,9 +1967,11 @@ return {
 ```
 
 The context `a`: `a.self` (its handle), `a.target` (chosen by the AI), `a.data` (its
-params), `a.turns_left`, `a:roll`, `a:say`. Monsters may attack an ally instead of the
-player; the original formula then uses the ally's defense and dexterity. An ally leaves at
-0 HP, when its rounds run out or when the fight ends; an error in its code removes it. Its
+params), `a.ticks_left`, `a:roll`, `a:say`. Monsters may attack an ally instead of the
+player; the original formula then uses the ally's defense and dexterity. An ally acts once
+per round and counts the clock's ticks: it leaves at 0 HP, when its ticks run out ("Your
+Wolf leaves the fight.", or its `on_expire`) or when the fight ends; an error in its code
+removes it. Its
 file may give `element` (its attacks', handed to its `act` as `a.self.attack_element`),
 `resist` and `ward` (3.2, see [Elements and wards](#elements-and-wards)).
 
@@ -1878,9 +2005,12 @@ With the [live client](#live-client) a fight round plays in place: the fight for
 like any other form, and the answer to a live request carries the round's **events** (an
 `events fight` frame: the JSON list below), which `public/js/fight.js` plays on the page
 being shown before the page's regions apply. The server side is the fight routes
-(`routes/fight.lua`): when `req.live`, the round records its trace and `go` puts the events
-on its redirect (`res.events`), which `main.lua` carries into the answer of the page it
-lands on (`/fight`, `/victory`, `/`). Everything
+(`routes/fight.lua`): when `req.live`, the request records its trace (the clock's ticks
+it caught up first, then its round: their events come in that order) and `go` puts the
+events on its redirect (`res.events`), which `main.lua` carries into the answer of the page
+it lands on (`/fight`, `/victory`, `/`). What the server's tick does to a fight comes as
+`stale` instead: the page asks for itself again and shows the new lines without playing
+them. Everything
 else is the page: the same handlers, the same round code, the same templates, so what stays
 on screen is what a page load shows. (2.3's JSON fight API, `Accept: application/json` with
 `fragments`, is gone: the live client replaced it.)
@@ -1895,8 +2025,8 @@ stock, resistances).
 {
 	part = "player",               -- the page's paragraph: player, allies, enemies, ending
 	actor = "enemy", actor_id = 2, actor_name = "Goblin Shaman",   -- who acts (a status: its bearer)
-	type = "spell",                -- attack, spell, item, status (a status's tick or hook, or the
-	                               -- turn's countdown), summon (an ally acting, joining, leaving),
+	type = "spell",                -- attack, spell, item, guard, status (a status's tick or hook, or
+	                               -- its countdown), summon (an ally acting, joining, leaving),
 	                               -- blocked (a status blocks the turn), run, ambush, wave (the next
 	                               -- enemy), speech (a monster speaking: "Troll: “Tickles.”", see
 	                               -- [Monster speech](#monster-speech)), say (anything else); the last event of a round that
@@ -1906,21 +2036,23 @@ stock, resistances).
 	mp = { { who = "enemy", id = 2, name = "Goblin Shaman", from = 17, to = 12, max = 17 } },
 	tp = { ... },                  -- who: player | ally | enemy; an enemy's MP only if the page shows it
 	status = { { who = "player", id = 1, name = "Fapi", key = "poison", status = "Poisoned",
-		turns = 3, change = "add",   -- add | remove | expire | turns (counted down)
-		statuses = { { key = "poison", name = "Poisoned", turns = 3,   -- the bearer's, after it
+		ticks = 3, change = "add",   -- add | remove | expire | ticks (counted down)
+		statuses = { { key = "poison", name = "Poisoned", ticks = 3, left = "30s",   -- the bearer's, after it
 			icon = "/static/images/statuses/poison.png" } } } },   -- (icon: absent when none)
-	summon = { { change = "join", id = 3, name = "Wolf", hp = 30, max = 30, turns = 5 } },   -- join | leave | turns
+	summon = { { change = "join", id = 3, name = "Wolf", hp = 30, max = 30, ticks = 5 } },   -- join | leave | ticks
 }
 ```
 
-Lists are present only when not empty; `turns` is absent for an unlimited status or ally.
+Lists are present only when not empty; `ticks` (clock ticks left) is absent for an
+unlimited status or ally, and `left` is what its chip says (`events.left`).
 Changes go with their step's latest line (a spell's line, then its damage and MP cost).
 
 **Every command comes back to the fight page** (Post/Redirect/Get): a `POST
-/fight` that played a round saves its lines (`fights.log`) and redirects to `/fight` (a
-victory to `/victory`, an escape to `/`), and `GET /fight` shows them, as often as it is
-loaded. The live client follows the redirect on the server, so a round is still one
-request, with its events.
+/fight` that played a round saves its lines (`fights.log`: what catching up said, then the
+round's) and redirects to `/fight` (a victory to `/victory`, an escape to `/`), and `GET
+/fight` shows them, as often as it is loaded, with the lines the clock added since (the
+server's tick appends them: a status's tick, a guard). The live client follows the
+redirect on the server, so a round is still one request, with its events.
 
 **Refusals** (not enough MP, a spell not learned, an item not in the bag, a wand without
 charges, a content file's `s:refuse`): nothing is played or spent, and the fight page comes
@@ -1931,7 +2063,8 @@ error page of their own: the note leaves out "Please go back and try again.".
 
 **Stale rounds.** Every fight form carries the round it was shown at (`<input type="hidden"
 name="round">`, `fights.round`, which only a played round counts up). A `POST /fight` with
-another round (a second click, an older tab, a resubmitted page) plays nothing: the fight
+another round (a second click, an older tab, a resubmitted page, a page from before a turn
+the clock ran out or a blocked turn it ended: the POST catches up first) plays nothing: the fight
 page comes back with the note "That command came from an older page, so nothing happened."
 at the top (kept like a refusal's); a fight that is over (not fighting any more) redirects
 to `/`. A form without the field (from before 2.3) plays as before. The counter has no cap (the original's
@@ -1951,8 +2084,9 @@ the regions apply; when the keyboard was in the middle column, the button that s
 round gets the focus back (the same spell's button, unless it is now disabled; else
 Attack). The monsters' and allies' bars are fight.js's (`span.fight-meter[data-client]`, so
 the morph keeps them; it updates them from `data-value`/`data-max` after every answer):
-without JavaScript there are none, as before. Without the live client the forms post as
-plain forms and nothing is played.
+without JavaScript there are none, as before. So is the turn's timer (the `fight-clock`
+region, see the fight menu above). Without the live client the forms post as plain forms
+and nothing is played.
 
 **Adding an animated event type.** A new kind of line needs nothing: give the code that
 says it a step (`local prev = engine.doing(f, c, "my_kind")` ... `engine.done(f, prev)`
@@ -2466,15 +2600,17 @@ an item that casts, see [Items](#items)), equipped in a slot
 ## Hotbar
 
 (3.1, `docs/plans/hotbar.md`.) The fight menu is a bar of ten slots on the number keys: **1
-Attack** and **0 Run**, fixed, and **2-9** the player's other fight actions where they put
-them (`app/lib/hotbar.lua`).
+Attack**, **9 Guard** (3.2) and **0 Run**, fixed, and **2-8** the player's other fight
+actions where they put them (`app/lib/hotbar.lua`, `hotbar.FIRST` and `hotbar.LAST`).
 
 - **Actions** (`hotbar.actions(user)`): the equipped gear that casts (by slot), the fight
 	spells known, the fight consumables in the bag (bag order), keyed `spell:<spells id>` or
 	`item:<items id>` (gear and consumables are both items; the route tells them apart).
 - **The table** `user_hotbar (user_id, kind, ref_id, slot)` (schema version 17) keeps every
-	action a character has **met**: on the bar (`slot` 2-9, unique per character) or off it
-	(`slot` NULL: taken off, or the bar was full when it came). Attack and Run aren't stored.
+	action a character has **met**: on the bar (`slot` 2-8, unique per character) or off it
+	(`slot` NULL: taken off, or the bar was full when it came). Attack, Guard and Run aren't
+	stored. Schema version 22 moved what sat on 9 (Guard's key since) to the first free key
+	of 2-8, or off the bar.
 - **The bar** (`hotbar.arrange(user_id, keys)`, keys: the actions at hand in the menu's
 	order): the stored slots, then each action **not met yet** in the first free slot (off
 	the bar when none is free). It only reads: GET pages show the bar this way without
@@ -2488,7 +2624,8 @@ them (`app/lib/hotbar.lua`).
 	stays, greyed (`.hotbar-gone`: the picture, its tooltip, and why: "none left", "not worn",
 	"not known"); pressing its key does nothing.
 - **The fight page** (`templates/fight/fight.html`; `hotbar_view` in `routes/fight.lua`
-	builds `bar`, ten `{ n, button | gone, why }`, and `more`, the buttons off the bar): each
+	builds `bar`, slots 2-8 `{ n, button | gone, why }`, and `more`, the buttons off the bar;
+	the template adds 1 Attack, 9 Guard and 0 Run): each
 	slot `<li class="hotbar-slot" data-hotkey="<n>">` with `<kbd class="hotkey">` and its
 	button (`aria-keyshortcuts="<n>"`); an empty one dashed (`.hotbar-empty`, hidden from
 	screen readers). Then `.fight-more` ("More") with the rest, without keys.
@@ -2500,8 +2637,8 @@ them (`app/lib/hotbar.lua`).
 	nothing. The script marks `<html class="dk-hotbar-js">`; the key badges and the "(or any
 	number key)" hint show only then, since without it the keys do nothing.
 - **Arranging** (`GET/POST /hotbar`, linked from the Functions box, `app/town/hotbar.lua`,
-	`templates/town/hotbar.html`; not while fighting: `common.not_fighting`): the ten slots, each of 2-9 with its tile and
-	a list (`slot2` ... `slot9`: "Empty" and every choice, `hotbar.choices`: the actions at
+	`templates/town/hotbar.html`; not while fighting: `common.not_fighting`): the ten slots, each of 2-8 with its tile and
+	a list (`slot2` ... `slot8`: "Empty" and every choice, `hotbar.choices`: the actions at
 	hand and those on the bar now); **Save** (`save`) puts the chosen ones on their keys and
 	everything else met off the bar (`hotbar.save`; an unknown key is the cheat page, the
 	same action in two lists keeps the first); **Reset** (`forget`: not `reset`, which would
@@ -2513,7 +2650,8 @@ them (`app/lib/hotbar.lua`).
 	then the form saves through the live client, in place (`scene.js` doesn't fade `/hotbar`
 	into `/hotbar`). Keyboard and touch use the lists.
 - Tests: `tests/e2e/hotbar.sh` (filling, settling, the fight's bar, greyed slots, More,
-	saving, refusals, reset, new actions), `tests/e2e/migrate.sh` (step 17),
+	saving, refusals, reset, new actions, Guard's fixed key), `tests/e2e/migrate.sh` (steps 17
+	and 22),
 	`tests/browser/client.js` (a number key plays a round, not while typing; a drag saves).
 
 ## Derived stats
@@ -2657,8 +2795,8 @@ To change the schema:
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
 	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9),
-	 `schema_v11.sql`, `schema_v12.sql` and `schema_v13.sql` with the game data of that time
-	 (`seed_v3.sql` to `seed_v9.sql`, `seed_v11.sql` to `seed_v13.sql`), migrates them, checks the data and compares
+	 `schema_v11.sql` to `schema_v14.sql` and `schema_v21.sql` with the game data of that time
+	 (`seed_v3.sql` to `seed_v9.sql`, `seed_v11.sql` to `seed_v14.sql`, `seed_v21.sql`), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -2729,7 +2867,8 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_register user pass email charname [class]`, `t_login user pass [remember]`, `t_logout` | account shortcuts |
 | `t_spells username "1,6"`, `$T_KNOWN` | set the spells a user knows; SQL expression for a users row's known spell ids (`SELECT $T_KNOWN FROM users ...` → `1,6`) |
 | `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`; an item that casts with full charges); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
-| `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_win`, `t_fight_clear username`, `t_fight_status username who key [data [turns]]` | a fight in progress against a monster (round 2 by default); an encounter beginning where the player stands, as on a map move (the current jar's player: `POST /__test/encounter`; `$BODY` is the fight page); the current jar's won fight (`t_fight user m 0`) paid by a round, `$BODY` the victory page; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
+| `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_win`, `t_fight_clear username`, `t_fight_status username who key [data [ticks]]` | a fight in progress against a monster (round 2 by default; not on the clock yet: its first POST or tick starts it at its time); an encounter beginning where the player stands, as on a map move (the current jar's player: `POST /__test/encounter`; `$BODY` is the fight page); the current jar's won fight (`t_fight user m 0`) paid by a round, `$BODY` the victory page; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
+| `t_tick [seconds]` | the clock moves on (default 10 s: a tick; `$T_NOW` too, until the next script) and the server's tick runs there (`POST /__test/tick`, the current jar logged in; the e2e server's own tick is off: `tick = false`); `$BODY` says what it advanced |
 | `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight in progress (0 when there is none; a finished fight kept for its page doesn't count) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |
@@ -2739,7 +2878,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
 | `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |
 | `live_publish channel event data`, `live_frames_ok name` | `POST /__test/publish`; the stream is well-formed (retry, id/event/data blocks, comments) |
-| `$T_NOW` | the time every request pins the game's clock at (`X-Test-Now`, see [Clock and weather](#clock-and-weather)); `T_NOW=<unix> t_get /` for another |
+| `$T_NOW`, `$T_START` | the time every request pins the game's clock at (`X-Test-Now`, see [Clock and weather](#clock-and-weather)); `T_NOW=<unix> t_get /` for another; every script starts at `$T_START` (4000000000) |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.

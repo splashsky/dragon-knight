@@ -1,6 +1,6 @@
--- app/content/statuses/venom.lua :: a stronger poison than the poison status: it loses HP at
--- the end of each of its turns (rand(min, max) of poison damage) and, while the venom
--- lasts, deals less damage (pct, the Venom spell's weakness). The Venom spell puts it on a
+-- app/content/statuses/venom.lua :: a stronger poison than the poison status: it loses HP on
+-- every tick of the clock (rand(min, max) of poison damage) and, while the venom lasts,
+-- deals less damage (pct, the Venom spell's weakness). The Venom spell puts it on a
 -- monster.
 local function tick(t)
 	local damage = t.bearer:hurt(t:roll(t.data.min, t.data.max), "poison")
@@ -13,7 +13,7 @@ end
 
 return {
 	name = "Venomous",
-	description = "Loses hit points every turn, and deals less damage while it lasts.",
+	description = "Loses hit points every 10 seconds, and deals less damage while it lasts.",
 	lore = [[
 A venom worse than the common poison, from the fangs of the deeper beasts. It eats at the
 blood and dulls the strength at the same time, so a venomed creature hits softer and
@@ -21,8 +21,7 @@ bleeds on. Herb-wives in the road towns will tell you it cannot be cured by a bu
 leaves. They are half right: the cure takes longer and costs more.]],
 	icon = "venom",
 	kind = "harmful",
-	tick_on = "turn_end",
-	turns = 4,
+	ticks = 4,
 	data = { min = 4, max = 9, pct = 20 },
 	messages = {
 		hurt = "The %s takes %d venom damage.",

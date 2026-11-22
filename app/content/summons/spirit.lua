@@ -1,5 +1,5 @@
 -- app/content/summons/spirit.lua :: a spirit that fights alongside the player (the Call Spirit
--- spell: s:summon("spirit", { turns = 6 })). Hard to pin down: a high defense and quick, so
+-- spell: s:summon("spirit", { ticks = 6 })). Hard to pin down: a high defense and quick, so
 -- monsters often miss it, and it hits for a fair amount.
 local function act(a)
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
@@ -19,7 +19,7 @@ leaves a chill on the skin that lasts a while after the fight.]],
 	attack = 30,
 	defense = 40,
 	dexterity = 30,
-	turns = 6,
+	ticks = 6,
 	messages = {
 		touch = "Your %s touches the monster for %d damage.",
 		gone = "Your %s fades back into the air.",

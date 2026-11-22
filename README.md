@@ -149,6 +149,7 @@ Server tuning keys (the defaults suit a small server; see `docs/PERF.md`):
 | `vm_gc_pause` | `1000` | Lua GC pause (%) of request VMs |
 | `db_cache_kb` / `db_mmap_bytes` | 8192 / 0 (off) | SQLite page cache and memory-mapped I/O per connection |
 | `db_checkpoint_ms` | `1000` | background WAL checkpoint interval (0 = SQLite's automatic checkpoints in requests) |
+| `tick` | `true` | the game's tick: every 10 s the server sends itself a request (`POST /__tick`) that moves the game's clock on (fights in real time, statuses, the weather on open pages; `docs/APP.md` "The server tick"); `false` turns it off (tests) |
 
 Event streams (`GET /live`, see below):
 

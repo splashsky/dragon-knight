@@ -1,0 +1,4 @@
+{#- The turn's timer (fight/fight.html; public/js/fight.js draws a bar in it): when the turn
+		runs out and the server's time now, unix seconds. A region of its own: data-now differs
+		on every request, the rest of the page doesn't. -#}
+{{{ region("fight-clock") }}}<div class="fight-clock" data-r="fight-clock" data-turn-ends="{{ turn_ends }}" data-now="{{ now }}" aria-hidden="true"></div>{{{ endregion() }}}

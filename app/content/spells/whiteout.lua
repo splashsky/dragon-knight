@@ -21,7 +21,7 @@ which is still on its feet after a Whiteout has earned its place at the top of t
 	icon = "whiteout",
 	mp = 55,
 	power = 180,                -- the most damage it deals
-	data = { chance = 9 },      -- the chance in 15 that the sleep lasts each turn
+	data = { chance = 9 },      -- the chance in 15 that the sleep lasts each tick
 	uses = { statuses = { "sleep" } },
 	messages = {
 		hit = "You have cast the %s spell for %d damage.",

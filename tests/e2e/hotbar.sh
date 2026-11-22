@@ -67,7 +67,7 @@ t_section "hotbar: fixed when a fight begins"
 t_fight_new barkeep; HC=$(t_csrf)
 expect_body '<div class="hotbar" role="group" aria-labelledby="hotbar-label">'
 hb_is "spell:1@3 spell:6@4 item:66@5 item:$HB_WAND@2" "the encounter settled the bar"
-hb_bar_is "1=fight=Fight 2=use_gear=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id $HQ AND ui.equipped = 'weapon'") 3=spell=1 4=spell=6 5=item=66 6=- 7=- 8=- 9=- 0=run=Run" "the fight's bar"
+hb_bar_is "1=fight=Fight 2=use_gear=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id $HQ AND ui.equipped = 'weapon'") 3=spell=1 4=spell=6 5=item=66 6=- 7=- 8=- 9=guard=Guard 0=run=Run" "the fight's bar"
 expect_body 'aria-label="Heal (5 MP)" aria-keyshortcuts="3"'
 expect_body '<li class="hotbar-slot hotbar-empty" aria-hidden="true"><kbd class="hotkey">6</kbd><span class="hotbar-hole"></span></li>'
 expect_no_body 'class="fight-more"'
@@ -78,7 +78,7 @@ hb_is "spell:1@3 spell:6@4 item:66@5 item:$HB_WAND@2" "unchanged while fighting"
 # the herbs used up: the slot stays, greyed, with the herb's tooltip and why
 t_items_clear barkeep; t_give barkeep wand 1 weapon
 t_get /fight
-hb_bar_is "1=fight=Fight 2=use_gear=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id $HQ AND ui.equipped = 'weapon'") 3=spell=1 4=spell=6 5=gone 6=- 7=- 8=- 9=- 0=run=Run" "a used-up item keeps its key"
+hb_bar_is "1=fight=Fight 2=use_gear=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN users u ON u.id = ui.user_id $HQ AND ui.equipped = 'weapon'") 3=spell=1 4=spell=6 5=gone 6=- 7=- 8=- 9=guard=Guard 0=run=Run" "a used-up item keeps its key"
 expect_body '<span class="spell-btn" role="img" title="Herb (none left)" aria-label="Herb (none left)"><img src="/static/images/items/herb.png" width="44" height="44" alt=""></span><template class="tip"><div class="tip-title"><img class="tip-icon"'
 # the wand taken off: its slot greyed as "not worn"
 t_items_clear barkeep
@@ -91,10 +91,13 @@ t_get /hotbar
 # the actions not at hand are still choices while they hold a key (a used-up herb: kept)
 expect_body 'Wand<span class="small light">Key 2</span>'
 t_post /hotbar "slot2=spell:6"; expect_status 403
-# Hurt on 2, Heal on 9, the wand off the bar, 3-8 empty; the herb not chosen: off the bar
-t_post /hotbar "csrf=$HC&slot2=spell:6&slot3=&slot9=spell:1&save=Save"; expect_redirect '/hotbar\?saved=1'
-hb_is "spell:1@9 spell:6@2 item:66@- item:$HB_WAND@-" "saved"
+# Hurt on 2, Heal on 8, the wand off the bar, 3-7 empty; the herb not chosen: off the bar
+# (9 is Guard's: a list for it is no slot)
+t_post /hotbar "csrf=$HC&slot2=spell:6&slot3=&slot8=spell:1&slot9=item:66&save=Save"; expect_redirect '/hotbar\?saved=1'
+hb_is "spell:1@8 spell:6@2 item:66@- item:$HB_WAND@-" "saved"
 t_get '/hotbar?saved=1'; expect_body '<p class="hotbar-note" role="status">Your hotbar is saved.</p>'
+expect_body '<li class="hotbar-slot hotbar-fixed"><kbd class="hotkey">9</kbd><span class="action-btn"><img src="/static/images/skills/guard.png" width="44" height="44" alt=""></span><span class="hotbar-name">Guard</span></li>'
+expect_no_body 'name="slot9"'
 expect_body 'Wand<span class="small light">Not on the bar</span>'
 # the same action twice (no JavaScript): the first key keeps it
 t_post /hotbar "csrf=$HC&slot4=spell:1&slot7=spell:1&slot5=item:66"; expect_redirect '/hotbar\?saved=1'
@@ -107,7 +110,7 @@ hb_is "spell:1@4 spell:6@- item:66@5 item:$HB_WAND@-" "refusals change nothing"
 # in the fight: the bar as saved, the actions off it under More (without keys)
 t_fight_new barkeep
 hb_is "spell:1@4 spell:6@- item:66@5 item:$HB_WAND@-" "the next fight keeps the arrangement"
-hb_bar_is "1=fight=Fight 2=- 3=- 4=spell=1 5=item=66 6=- 7=- 8=- 9=- 0=run=Run" "the saved bar"
+hb_bar_is "1=fight=Fight 2=- 3=- 4=spell=1 5=item=66 6=- 7=- 8=- 9=guard=Guard 0=run=Run" "the saved bar"
 expect_body '<div class="fight-more" role="group" aria-labelledby="fight-more-label"><span class="fight-more-label" id="fight-more-label">More</span>'
 expect_body 'name="use_gear" value="'; expect_body 'title="Hurt (5 MP)" aria-label="Hurt (5 MP)"><img'   # no key
 t_fight_clear barkeep; hb_sql "UPDATE users SET currentaction = 'Exploring'"
@@ -122,15 +125,15 @@ t_post /hotbar "csrf=$HC&slot2=spell:1&slot3=spell:6"
 t_fight_new barkeep
 hb_is "spell:1@2 spell:6@3 item:66@- item:$HB_WAND@-" "saved before the fight"
 t_fight_clear barkeep; hb_sql "UPDATE users SET currentaction = 'Exploring'"
-# learned since: Pain, Maim, Rend, Chaos, Sleep, Dream, Nightmare (7 more for 6 free keys)
+# learned since: Pain, Maim, Rend, Chaos, Sleep, Dream, Nightmare (7 more for 5 free keys)
 t_spells barkeep 1,6,7,8,9,10,11,12,13
 t_get /hotbar
 expect_body '<option value="spell:7" selected>Pain (spell)</option>'
 expect_body 'Nightmare<span class="small light">Not on the bar</span>'
 t_fight_new barkeep
-hb_is "spell:1@2 spell:6@3 spell:7@4 spell:8@5 spell:9@6 spell:10@7 spell:11@8 spell:12@9 spell:13@- item:66@- item:$HB_WAND@-" \
+hb_is "spell:1@2 spell:6@3 spell:7@4 spell:8@5 spell:9@6 spell:10@7 spell:11@8 spell:12@- spell:13@- item:66@- item:$HB_WAND@-" \
 	"the free keys filled, the last one off the bar"
-hb_bar_is "1=fight=Fight 2=spell=1 3=spell=6 4=spell=7 5=spell=8 6=spell=9 7=spell=10 8=spell=11 9=spell=12 0=run=Run" "a full bar"
+hb_bar_is "1=fight=Fight 2=spell=1 3=spell=6 4=spell=7 5=spell=8 6=spell=9 7=spell=10 8=spell=11 9=guard=Guard 0=run=Run" "a full bar"
 expect_body 'title="Nightmare ('   # under More
 t_fight_clear barkeep; hb_sql "UPDATE users SET currentaction = 'Exploring'"
 # a key freed later stays free: an action off the bar was met, it doesn't jump on

@@ -148,10 +148,10 @@ end
 
 function T.wards_roll_only_when_uncertain()
 	-- 0: always takes hold, no roll
-	local r, h = on(with(), function(_, h) return h:afflict("poison", { turns = 2 }) end)
+	local r, h = on(with(), function(_, h) return h:afflict("poison", { ticks = 2 }) end)
 	eq(r.value, true); eq(h:has_status("poison"), true)
 	-- 100: never, no roll, nothing recorded
-	r, h = on(with({ ward = { poison = 100 } }), function(_, h) return h:afflict("poison", { turns = 2 }) end)
+	r, h = on(with({ ward = { poison = 100 } }), function(_, h) return h:afflict("poison", { ticks = 2 }) end)
 	eq(r.value, false); eq(h:has_status("poison"), false); eq(#r.events, 0)
 	r, h = on(with({ ward = { sleep = 60 }, statuses = { { key = "x", name = "X", kind = "helpful", data = {},
 		ward = { sleep = 70 } } } }), function(_, h) return h:sleep(5) end)

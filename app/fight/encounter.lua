@@ -1,11 +1,15 @@
--- fight/encounter.lua :: how a fight begins and ends, for the POSTs that cause it (GETs
--- never change the game: docs/APP.md "Pure GETs"). An encounter begins on a map move (POST
--- /move): the monster is picked and, when it is quicker, its first strike is played right
--- there. It ends in a POST /fight round: a victory is paid out at once, a death costs what
--- it always did. A finished fight is kept (fights.outcome, its last round's lines in
--- fights.log, the rewards in fights.result) so GET /fight and GET /victory can show it
--- again, until the next encounter begins or the player moves or travels on.
+-- fight/encounter.lua :: how a fight begins, goes on with the clock and ends, for the POSTs
+-- and the server's tick that cause it (GETs never change the game: docs/APP.md "Pure
+-- GETs"). An encounter begins on a map move (POST /move): the monster is picked and, when
+-- it is quicker, its first strike is played right there. The clock advances it (the
+-- server's tick, and every POST /fight before its command: encounter.advance). It ends in
+-- a round (a command's, or a guard when the turn ran out) or a clock tick: a victory is
+-- paid out at once, a death costs what it always did. A finished fight is kept
+-- (fights.outcome, its last lines in fights.log, the rewards in fights.result) so GET
+-- /fight and GET /victory can show it again, until the next encounter begins or the
+-- player moves or travels on.
 local classes = require("lib.classes")
+local clock = require("lib.clock")
 local combat = require("fight.combat")
 local game = require("lib.game")
 local hotbar = require("lib.hotbar")
@@ -20,31 +24,59 @@ local encounter = {}
 
 local rand = php.rand
 
--- The parts of the fight page a round's lines go in, in the page's order (the round's r
--- fields: player, allies, enemies, ending).
-encounter.PARTS = { { "yourturn", "player" }, { "allyturn", "allies" }, { "monsterturn", "enemies" },
-	{ "roundend", "ending" } }
+-- The page's paragraphs for the parts of a round's lines (round.PARTS).
+encounter.PARTS = { player = "yourturn", allies = "allyturn", enemies = "monsterturn", ending = "roundend" }
 
--- A round's lines (r from round.play) as fights.log text: "<part>\t<line>" per line.
-function encounter.log_of(r)
-	local out = {}
-	for _, p in ipairs(encounter.PARTS) do
-		for _, line in ipairs(r[p[2]] or {}) do
-			out[#out + 1] = p[1] .. "\t" .. tostring(line):gsub("[\t\n]", " ")
-		end
-	end
-	return table.concat(out, "\n")
+-- The fight log keeps at most this many lines (the latest): a player away for long keeps
+-- guarding, and the log the clock's lines.
+encounter.LOG_LINES = 60
+
+local function log_line(entry)
+	return encounter.PARTS[entry[1]] .. "\t" .. tostring(entry[2]):gsub("[\t\n]", " ")
 end
 
--- fights.log text -> { yourturn = { line, ... }, allyturn = ..., monsterturn = ..., roundend =
--- ..., note = text or nil, stale = true or nil }
-function encounter.lines(log)
+local function trimmed(out)
+	if #out <= encounter.LOG_LINES then return table.concat(out, "\n") end
+	return table.concat(out, "\n", #out - encounter.LOG_LINES + 1)
+end
+
+-- Lines (round.lines, round.advance: { { part, line }, ... }) as fights.log text:
+-- "<paragraph>\t<line>" per line.
+function encounter.log_of(lines)
 	local out = {}
-	for _, p in ipairs(encounter.PARTS) do out[p[1]] = {} end
+	for _, e in ipairs(lines) do out[#out + 1] = log_line(e) end
+	return trimmed(out)
+end
+
+-- The log text with lines added after it (what the clock did since): a note about the
+-- last command goes (it belonged to the page before).
+function encounter.log_add(log, lines)
+	if #lines == 0 then return log end
+	local out = {}
+	for line in tostring(log or ""):gmatch("[^\n]+") do
+		local part = line:match("^([^\t]*)\t")
+		if part ~= "note" and part ~= "stale" then out[#out + 1] = line end
+	end
+	for _, e in ipairs(lines) do out[#out + 1] = log_line(e) end
+	return trimmed(out)
+end
+
+-- fights.log text -> { paragraphs = { { part = "yourturn" | "allyturn" | "monsterturn" |
+-- "roundend", lines = { line, ... } }, ... } (in order: the lines of one part in a row make
+-- a paragraph), note = text or nil, stale = true or nil }
+function encounter.lines(log)
+	local out = { paragraphs = {} }
+	local last
 	for part, line in tostring(log or ""):gmatch("([^\t\n]+)\t([^\n]*)") do
-		if out[part] then table.insert(out[part], line)
-		elseif part == "note" then out.note = line
-		elseif part == "stale" then out.stale = true end
+		if part == "note" then out.note = line
+		elseif part == "stale" then out.stale = true
+		else
+			if not last or last.part ~= part then
+				last = { part = part, lines = {} }
+				out.paragraphs[#out.paragraphs + 1] = last
+			end
+			last.lines[#last.lines + 1] = line
+		end
 	end
 	return out
 end
@@ -76,14 +108,15 @@ function encounter.save_player(user_id, st)
 		st.currenthp, st.currentmp, st.currenttp, user_id)
 end
 
--- The player died in the round r: half the gold, a quarter of the HP, back to town. The
--- fight is kept as it ended (outcome "death") for its page.
-function encounter.die(user, r)
-	local f, st = r.f, r.f.st
+-- The player died in fight f (its log set by the caller: the lines that led to it): half
+-- the gold, a quarter of the HP, back to town. The fight is kept as it ended (outcome
+-- "death") for its page.
+function encounter.die(user, f)
+	local st = f.st
 	local d = combat.death(st)
 	-- fixed: legacy kept the uber buffs and didn't write currentmp, refunding the MP of a
 	-- spell cast on the fatal turn. The fight (and its statuses) ends.
-	f.outcome, f.log = "death", encounter.log_of(r)
+	f.outcome = "death"
 	-- the monster's last word over the player, for the death page (fight/speech.lua)
 	f.result = f.taunt and { taunt_by = f.taunt.by, taunt = f.taunt.text } or {}
 	state.save(f)
@@ -91,11 +124,11 @@ function encounter.die(user, r)
 		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
 end
 
--- The player won fight f (r: the round that won it, nil for a fight won before 3.0): the
--- rewards per defeated enemy (summed), a level-up or the drop roll (once per encounter),
--- paid now; the fight is kept with outcome "victory" and what GET /victory shows in
--- fights.result. `user`: the users row (as before the round: its experience and gold).
-function encounter.win(user, f, r)
+-- The player won fight f (its log set by the caller: the lines that won it): the rewards
+-- per defeated enemy (summed), a level-up or the drop roll (once per encounter), paid now;
+-- the fight is kept with outcome "victory" and what GET /victory shows in fights.result.
+-- `user`: the users row (as before the round: its experience and gold).
+function encounter.win(user, f)
 	local player = game.player(user)
 	local res = { exp = 0, gold = 0, warnexp = "", warngold = "" }
 	local names, top = {}, nil
@@ -141,7 +174,6 @@ function encounter.win(user, f, r)
 	-- UNSIGNED: a bonus below -100% made them negative and MySQL stored 0.
 	if f.last_words then res.said_by, res.said = f.last_words.by, f.last_words.text end
 	f.outcome, f.result = "victory", res
-	if r then f.log = encounter.log_of(r) end
 	state.save(f)
 	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, base_maxhp = base_maxhp + ?,
 		base_maxmp = base_maxmp + ?, base_maxtp = base_maxtp + ?, strength = strength + ?,
@@ -183,7 +215,7 @@ function encounter.begin(user_id)
 	-- the hotbar is fixed for the fight: actions new to it take their slots now
 	hotbar.settle(user)
 	local st = game.player(user)
-	local f = state.new({ user_id = user.id, round = 1, st = st })
+	local f = state.new({ user_id = user.id, round = 1, st = st, tick = clock.tick(clock.now()) })
 	state.add_monster(f, monster, 1)
 	f.rand = rand
 	f.max_allies = game.control().max_allies or 1
@@ -198,19 +230,43 @@ function encounter.begin(user_id)
 	if not player_first then
 		local r = round.play(f, { kind = "ambush" })
 		for i = #opening, 1, -1 do table.insert(r.player, 1, opening[i]) end
+		f = r.f
+		f.log = encounter.log_of(round.lines(r))
 		if r.died then
-			encounter.die(user, r)
+			encounter.die(user, f)
 			return "death", monster
 		end
-		f = r.f
-		f.log = encounter.log_of(r)
 	else
-		f.log = encounter.log_of({ player = opening })
+		f.log = encounter.log_of(round.lines({ player = opening }))
 	end
-	f.round = f.round + 1
+	round.next_turn(f)
 	state.save(f)
 	encounter.save_player(user.id, f.st)
 	return "fight", monster
+end
+
+-- Advances fight f of users row `user` (in progress, f.rand set) to clock tick n
+-- (round.advance; at most `limit` ticks), then settles what that did: the lines go into
+-- the log, a death or a victory ends the fight (encounter.die, encounter.win), else the
+-- fight and the player's numbers are saved when anything was played. The server's tick
+-- (lib/tick.lua) and POST /fight (before its command) both come here. Returns the advance
+-- (round.advance's: f the model after it, lines, ticks, changed, died / victory).
+function encounter.advance(user, f, n, limit)
+	local fresh = f.tick == 0
+	local a = round.advance(f, n, limit)
+	f = a.f
+	if a.ticks == 0 and not fresh then return a end
+	f.log = encounter.log_add(f.log, a.lines)
+	if a.died then
+		encounter.die(user, f)
+	elseif a.victory then
+		encounter.save_player(user.id, f.st)
+		encounter.win(user, f)
+	else
+		state.save(f)
+		encounter.save_player(user.id, f.st)
+	end
+	return a
 end
 
 return encounter

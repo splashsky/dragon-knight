@@ -1,12 +1,17 @@
--- Unit tests for the round pipeline (fight/round.lua, fight/engine.lua, fight/ai.lua,
--- fight/state.lua). First the equivalence: whole fights played through a frozen copy of
--- the 2.1 fight (tests/lua/fight_original.lua, spells and items through the frozen effects
--- engine) and through the round pipeline, from the same seeded dice: every encounter start,
--- round and outcome must make the same rolls (arguments and order), messages and state,
--- with sleep and the damage/defense buffs as statuses. Then the new mechanics with test
--- statuses and summons: tick timing, override on re-apply, expiry vs removal, blocked
--- turns, charge and recharge, summons, weighted targets, waves, caps, error containment and
--- world statuses on moves.
+-- Unit tests for the round pipeline and the fight's clock (fight/round.lua,
+-- fight/engine.lua, fight/ai.lua, fight/state.lua). First the equivalence: whole fights
+-- played through a frozen copy of the 2.1 fight (tests/lua/fight_original.lua, spells and
+-- items through the frozen effects engine) and through the round pipeline, from the same
+-- seeded dice: every encounter start, round and outcome must make the same rolls
+-- (arguments and order), messages and state, with the damage/defense buffs as statuses.
+-- Sleep's match with the original is retired (3.2: statuses tick on the clock, and a
+-- sleeper rolls to wake on every tick, not at the start of its turns): those fights cast
+-- no sleep spells, and the new sleep rules have tests of their own. Then the new mechanics
+-- with test statuses and summons: the clock's ticks (statuses and allies counting them,
+-- from the tick after they came), override on re-apply, expiry vs removal, blocked turns
+-- ending at the next tick, charge and recharge, the turn's deadline (a Guard), catching
+-- up (bounded, and after a long absence), summons, weighted targets, waves, caps, error
+-- containment and world statuses.
 local ai = require("fight.ai")
 local engine = require("fight.engine")
 local events = require("fight.events")
@@ -89,8 +94,11 @@ end
 ---------------------------------------------------------------------------------------
 -- Equivalence with the 2.1 fight
 
+-- (sleep's equivalence is retired: see the top)
 local ORIGINAL_KEYS = {}
-for key in pairs(olds.ORIGINAL.spells) do ORIGINAL_KEYS[#ORIGINAL_KEYS + 1] = key end
+for key, spec in pairs(olds.ORIGINAL.spells) do
+	if spec[1] ~= "sleep" then ORIGINAL_KEYS[#ORIGINAL_KEYS + 1] = key end
+end
 table.sort(ORIGINAL_KEYS)
 
 function T.fights_play_as_in_2_1()
@@ -102,7 +110,7 @@ function T.fights_play_as_in_2_1()
 	local spell_rows = {}
 	for _, key in ipairs(ORIGINAL_KEYS) do spell_rows[#spell_rows + 1] = assert(spells.by_key(key)) end
 	local item_rows = { items.by_key("herb"), items.by_key("potion"), items.by_key("ether") }
-	local rounds, outcomes, refusals, sleeps, buffs = 0, {}, 0, 0, 0
+	local rounds, outcomes, refusals, buffs = 0, {}, 0, 0
 	for seed = 1, 1000 do
 		local g = recorder(seed * 7717 + 3).rand
 		local monster = monsters[g(1, #monsters)]
@@ -165,7 +173,6 @@ function T.fights_play_as_in_2_1()
 				eq(r.died == true, o.died == true, what .. ": died")
 				if not o.escaped then same(fm.flat(f), old, what .. ": state") end
 				rounds = rounds + 1
-				if old.currentmonstersleep ~= 0 then sleeps = sleeps + 1 end
 				if old.currentuberdamage ~= 0 or old.currentuberdefense ~= 0 then buffs = buffs + 1 end
 				local outcome = o.escaped and "escaped" or o.victory and "victory" or o.died and "died"
 				if outcome then
@@ -176,12 +183,12 @@ function T.fights_play_as_in_2_1()
 		end
 	end
 	assert(rounds > 2500, "rounds: " .. rounds)
-	print(("equivalence: %d fights, %d rounds (%s escaped, %s won, %s lost), %d refusals, %d rounds asleep, %d buffed"):format(
-		1000, rounds, tostring(outcomes.escaped), tostring(outcomes.victory), tostring(outcomes.died), refusals, sleeps, buffs))
+	print(("equivalence: %d fights, %d rounds (%s escaped, %s won, %s lost), %d refusals, %d buffed"):format(
+		1000, rounds, tostring(outcomes.escaped), tostring(outcomes.victory), tostring(outcomes.died), refusals, buffs))
 	assert((outcomes.escaped or 0) > 10 and (outcomes.victory or 0) > 50 and (outcomes.died or 0) > 10,
 		("outcomes: %s escaped, %s victories, %s deaths"):format(tostring(outcomes.escaped), tostring(outcomes.victory),
 			tostring(outcomes.died)))
-	assert(refusals > 10 and sleeps > 50 and buffs > 50, ("refusals %d, asleep %d, buffed %d"):format(refusals, sleeps, buffs))
+	assert(refusals > 10 and buffs > 50, ("refusals %d, buffed %d"):format(refusals, buffs))
 end
 
 ---------------------------------------------------------------------------------------
@@ -193,18 +200,18 @@ local function with_content(fn)
 	local env = {}
 	function env.status(key, module, row)
 		row = row or {}
-		dk.db:exec("INSERT INTO statuses (key, name, kind, tick_on, scope, turns, blocks_action, messages, data) " ..
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", key, module.name or key, module.kind or "neutral",
-			module.tick_on or "turn_end", module.scope or "fight", module.turns or 0, module.blocks_action == true and 1 or 0,
+		dk.db:exec("INSERT INTO statuses (key, name, kind, scope, ticks, blocks_action, messages, data) " ..
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?)", key, module.name or key, module.kind or "neutral",
+			module.scope or "fight", module.ticks or 0, module.blocks_action == true and 1 or 0,
 			row.messages or "", row.data or "")
 		load.preload("statuses", key, module)
 		primed[#primed + 1] = { "statuses", key }
 		statuses.reload()
 	end
 	function env.summon(key, module)
-		dk.db:exec("INSERT INTO summons (key, name, hp, attack, defense, dexterity, turns) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		dk.db:exec("INSERT INTO summons (key, name, hp, attack, defense, dexterity, ticks) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			key, module.name or key, module.hp or 10, module.attack or 4, module.defense or 0, module.dexterity or 0,
-			module.turns or 0)
+			module.ticks or 0)
 		load.preload("summons", key, module)
 		primed[#primed + 1] = { "summons", key }
 		summons.reload()
@@ -244,57 +251,79 @@ local function enemy(f, i) return state.side(f, "enemy", true)[i or 1] end
 
 local function keys(c)
 	local out = {}
-	for _, s in ipairs(c.statuses) do out[#out + 1] = s.key .. (s.turns_left and ("/" .. s.turns_left) or "") end
+	for _, s in ipairs(c.statuses) do out[#out + 1] = s.key .. (s.ticks_left and ("/" .. s.ticks_left) or "") end
 	return table.concat(out, ",")
+end
+
+-- A fight on the clock: at tick `t` (default 100), its turn running out round.TURN later.
+local function clocked(f, t)
+	f.tick = t or 100
+	f.deadline = f.tick + round.TURN
+	return f
+end
+
+-- What an advance said, "|"-joined (speech left out, as in lines).
+local function said(a)
+	local out = {}
+	for _, e in ipairs(a.lines) do out[#out + 1] = e[2] end
+	return lines(out)
 end
 
 -- A monster that never hits (dodge roll) and whose turns are predictable: maxdam 0.
 local PUNCHBAG = { id = 99, name = "Punchbag", maxhp = 1000, maxdam = 0, armor = 0, level = 1, maxexp = 1, maxgold = 1 }
 
-function T.round_order_and_tick_timing()
+function T.round_order_and_clock_ticks()
 	with_content(function(env)
 		local log = {}
 		local function hook(name) return function(t) log[#log + 1] = name .. ":" .. t.bearer.name end end
-		env.status("t_start", { name = "S", tick_on = "turn_start", on_tick = hook("start") })
-		env.status("t_end", { name = "E", tick_on = "turn_end", turns = 2, on_tick = hook("end"), on_expire = hook("expire") })
-		env.summon("t_pup", { name = "Pup", act = function(a) log[#log + 1] = "pup acts on " .. a.target.name end })
+		env.status("t_mark", { name = "S", on_tick = hook("tick") })
+		env.status("t_end", { name = "E", ticks = 2, on_tick = hook("end"), on_expire = hook("expire") })
+		env.summon("t_pup", { name = "Pup", ticks = 2, act = function(a) log[#log + 1] = "pup acts on " .. a.target.name end })
 		-- the monster never hits: rand(0,0) to hit, rand(0,0) block, rand(1,150) dodge
-		local f = fight(recorder(1).rand, nil, { PUNCHBAG }, 500)
+		local f = clocked(fight(recorder(1).rand, nil, { PUNCHBAG }, 500))
 		local p, m = state.player(f), enemy(f)
-		engine.afflict(f, p, "t_start", {})
+		engine.afflict(f, p, "t_mark", {})
 		engine.afflict(f, m, "t_end", {})
 		engine.summon(f, "t_pup", {}, p)
-		local _, m_hp_before = nil, m.hp
+		-- a round: the player, the ally, the monster; statuses don't tick in it
 		local r = round.play(f, { kind = "continue" })
-		f = r.f
-		-- player turn start, the ally, the monster, then the ends (the monster's poison-like tick)
-		eq(table.concat(log, "|"), "start:Tester|pup acts on Punchbag|end:Punchbag")
-		eq(keys(enemy(f)), "t_end/1", "counted down once")
-		eq(enemy(f).hp, m_hp_before)
-		-- applied this round (in the player's action, before the monster's turn): it counts
+		eq(table.concat(log, "|"), "pup acts on Punchbag")
+		eq(keys(enemy(r.f)), "t_end/2"); eq(state.allies(r.f)[1].ticks_left, 2)
+		-- the clock's next tick: every status ticks and counts down (the player's, the
+		-- allies', the enemies'), and the allies count down
 		log = {}
-		r = round.play(f, { kind = "continue" })
-		f = r.f
-		eq(table.concat(log, "|"), "start:Tester|pup acts on Punchbag|end:Punchbag|expire:Punchbag")
-		eq(keys(enemy(f)), "", "expired")
-		eq(keys(state.player(f)), "t_start", "no duration: stays")
+		local a = round.advance(r.f, 101)
+		eq(a.ticks, 1); eq(a.changed, true)
+		eq(table.concat(log, "|"), "tick:Tester|end:Punchbag")
+		eq(keys(enemy(a.f)), "t_end/1"); eq(state.allies(a.f)[1].ticks_left, 1)
+		log = {}
+		a = round.advance(a.f, 102)
+		eq(table.concat(log, "|"), "tick:Tester|end:Punchbag|expire:Punchbag")
+		eq(keys(enemy(a.f)), "", "expired"); eq(#state.allies(a.f), 0, "the ally's ticks are up")
+		eq(said(a), "Your Pup leaves the fight.")
+		eq(keys(state.player(a.f)), "t_mark", "no duration: stays")
+		eq(a.f.round, 2, "no round: the turn hasn't run out")
 	end)
 end
 
-function T.status_applied_by_the_player_on_itself_counts_from_its_next_turn()
+function T.statuses_count_ticks_from_the_next_one()
 	with_content(function(env)
 		local ticks = 0
-		env.status("t_regen", { name = "R", tick_on = "turn_end", turns = 2, on_tick = function() ticks = ticks + 1 end })
-		local f = fight(recorder(2).rand, nil, { PUNCHBAG }, 500)
+		env.status("t_regen", { name = "R", ticks = 2, on_tick = function() ticks = ticks + 1 end })
+		local f = clocked(fight(recorder(2).rand, nil, { PUNCHBAG }, 500))
 		local spell = { key = "t_spell", name = "T", mp = 0, power = 0, data = {}, messages = {}, target = "self",
 			usable_in = "fight", retired = 0 }
 		local r = round.play(f, { kind = "spell", spell = spell, module = { cast = function(s) s.caster:afflict("t_regen") end } })
-		f = r.f
-		eq(ticks, 0, "not in the round it was applied (the player's turn had begun)")
-		eq(keys(state.player(f)), "t_regen/2")
-		f = round.play(f, { kind = "continue" }).f
-		f = round.play(f, { kind = "continue" }).f
-		eq(ticks, 2); eq(keys(state.player(f)), "", "two turns, two ticks")
+		eq(ticks, 0, "not in the round"); eq(keys(state.player(r.f)), "t_regen/2")
+		local a = round.advance(r.f, 101)
+		eq(ticks, 1); eq(keys(state.player(a.f)), "t_regen/1")
+		a = round.advance(a.f, 102)
+		eq(ticks, 2); eq(keys(state.player(a.f)), "", "two ticks")
+		-- applied at a tick (in a round the clock played there): from the next one
+		f = clocked(fight(recorder(3).rand), 103)
+		engine.afflict(f, state.player(f), "t_regen", {})
+		eq(engine.tick(f, state.player(f), 103), false, "not at the tick it came in")
+		eq(engine.tick(f, state.player(f), 104), true); eq(ticks, 3)
 	end)
 end
 
@@ -302,15 +331,15 @@ function T.override_replaces_with_remove_not_expire()
 	with_content(function(env)
 		local log = {}
 		env.status("t_poison", {
-			name = "P", turns = 5,
-			on_apply = function(t) log[#log + 1] = "apply " .. tostring(t.turns_left) .. " " .. tostring(t.data.dose) end,
+			name = "P", ticks = 5,
+			on_apply = function(t) log[#log + 1] = "apply " .. tostring(t.ticks_left) .. " " .. tostring(t.data.dose) end,
 			on_remove = function(t) log[#log + 1] = "remove " .. tostring(t.data.dose) end,
 			on_expire = function(t) log[#log + 1] = "expire " .. tostring(t.data.dose) end,
 		})
 		local f = fight(recorder(3).rand)
 		local m = enemy(f)
-		engine.afflict(f, m, "t_poison", { turns = 5, dose = 1 })
-		engine.afflict(f, m, "t_poison", { turns = 2, dose = 2 })   -- shorter replaces longer
+		engine.afflict(f, m, "t_poison", { ticks = 5, dose = 1 })
+		engine.afflict(f, m, "t_poison", { ticks = 2, dose = 2 })   -- shorter replaces longer
 		eq(table.concat(log, "|"), "apply 5 1|remove 1|apply 2 2")
 		eq(keys(m), "t_poison/2"); eq(m.statuses[1].data.dose, 2)
 		eq(#m.statuses, 1, "no stacking")
@@ -319,106 +348,161 @@ function T.override_replaces_with_remove_not_expire()
 		eq(keys(m), "t_poison/5")
 		engine.cure(f, m, "t_poison")
 		eq(log[#log], "remove 3"); eq(keys(m), "")
+		-- durations are ticks: turns is refused
+		local action = require("lib.action")
+		assert(not pcall(action.params, { turns = 2 }), "turns")
 	end)
 end
 
-function T.blocked_turns_sleep_and_recharge()
-	-- the player asleep (statuses lift the "monsters only" limit): wake roll at the turn's
-	-- start, 2 > 1 wakes up; then the action happens
-	local f = fight(dice({ 1, 2 }).rand)
+function T.sleep_on_the_clock()
+	-- the player asleep (chance 1) can't play the turn (the page offers Continue), which
+	-- ends at the clock's next tick: the blocked line, the monster's attack (rand(4,8) 8,
+	-- block ceil(rand(3,5)=5 / 4) 2, no dodge: 6), then the wake roll, rand(1, 15): 1 is
+	-- not > 1, it sleeps on
+	local d = dice({ 8, 5, 100, 1, 8, 5, 100, 2 })
+	local f = clocked(fight(d.rand))
 	engine.afflict(f, state.player(f), "sleep", { chance = 1 })
 	eq(round.locked(f), true)
-	-- still asleep (1 is not > 1): no player action; the monster attacks: rand(4,8) 8,
-	-- block ceil(rand(3,5)=5 / 4) 2, no dodge: 6
-	local d = dice({ 1, 8, 5, 100 })
-	f.rand = d.rand
-	local r = round.play(f, { kind = "attack" })
-	eq(lines(r.player), "You are still asleep."); eq(lines(r.enemies), "The monster attacks you for 6 damage.")
-	d.done()
-	-- woke up (2 > 1): the status ends; the turn's action was the page's Continue
-	d = dice({ 2, 8, 5, 100 })
-	r.f.rand = d.rand
-	r = round.play(r.f, { kind = "continue" })
-	eq(lines(r.player), "You have woken up."); eq(keys(state.player(r.f)), "")
-	eq(r.f.st.currenthp, 38); d.done()
-	-- recharging: the next turn is skipped with its message, the monster acts; then free
-	f = fight(recorder(5).rand)
-	engine.afflict(f, state.player(f), "recharging", { turns = 1 })
+	local a = round.advance(f, 101)
+	eq(said(a), "You are still asleep.|The monster attacks you for 6 damage.")
+	eq(round.locked(a.f), true); eq(a.f.round, 3, "a round was played"); eq(a.f.deadline, 104)
+	-- the next tick: another blocked turn, then 2 > 1 wakes it; the next turn is the player's
+	a = round.advance(a.f, 102)
+	eq(said(a), "You are still asleep.|The monster attacks you for 6 damage.|You have woken up.")
+	eq(round.locked(a.f), false); eq(a.f.st.currenthp, 38); eq(a.f.deadline, 105); d.done()
+	-- a monster asleep: blocked in the rounds (its line), it rolls to wake on the ticks
+	d = dice({ 15 })
+	f = clocked(fight(d.rand))
+	engine.afflict(f, enemy(f), "sleep", { chance = 5 })
+	local r = round.play(f, { kind = "continue" })
+	eq(lines(r.enemies), "The Creature is still asleep.")
+	a = round.advance(r.f, 101)
+	eq(said(a), "The monster has woken up."); eq(keys(enemy(a.f)), ""); d.done()
+end
+
+function T.recharge_on_the_clock()
+	-- recharging (1 tick): the turn is blocked and ends at the next tick (its line, the
+	-- monster acts), then it runs out: the next turn is the player's
+	local f = clocked(fight(recorder(5).rand))
+	engine.afflict(f, state.player(f), "recharging", { ticks = 1 })
 	eq(round.locked(f), true)
-	r = round.play(f, { kind = "continue" })
-	eq(lines(r.player), "You must recharge this turn.")
-	has(lines(r.enemies), "The monster attacks you for")
-	eq(round.locked(r.f), false, "recharged")
+	local a = round.advance(f, 101)
+	has(said(a), "You must recharge this turn.|The monster attacks you for")
+	eq(round.locked(a.f), false, "recharged"); eq(keys(state.player(a.f)), "")
 	-- a monster blocked by a status (other wording)
-	f = fight(recorder(6).rand)
-	engine.afflict(f, enemy(f), "recharging", { turns = 1 })
-	r = round.play(f, { kind = "continue" })
+	f = clocked(fight(recorder(6).rand))
+	engine.afflict(f, enemy(f), "recharging", { ticks = 1 })
+	local r = round.play(f, { kind = "continue" })
 	eq(lines(r.enemies), "The Creature must recharge this turn.")
 end
 
 function T.hyper_beam_and_solar_beam()
-	-- Hyper Beam: hit now, recharge next turn (the page offers only Continue)
+	-- Hyper Beam: hit now, recharge: the next turn ends at the next tick
 	local hyper = spells.by_key("hyper_beam")
-	local f = fight(recorder(7).rand, nil, { PUNCHBAG }, 900)
+	local f = clocked(fight(recorder(7).rand, nil, { PUNCHBAG }, 900))
 	local r = round.play(f, { kind = "spell", spell = hyper })
 	has(lines(r.player), "You have cast the Hyper Beam spell for")
 	local dmg = math.tointeger(lines(r.player):match("for (%d+) damage"))
 	assert(dmg >= 50 and dmg <= 60, dmg)
 	eq(enemy(r.f).hp, 900 - dmg); eq(r.f.st.currentmp, 35)
 	eq(round.locked(r.f), true, "locked after the beam")
-	r = round.play(r.f, { kind = "continue" })
-	eq(lines(r.player), "You must recharge this turn.")
-	eq(round.locked(r.f), false)
-	-- Solar Beam: charge, then the release is the next turn's action (by name: saved and
-	-- loaded through the codec in between)
+	local a = round.advance(r.f, 101)
+	has(said(a), "You must recharge this turn.")
+	eq(round.locked(a.f), false)
+	-- Solar Beam: charge; at the next tick the blocked turn ends, then the charge runs out
+	-- and releases (by name: saved and loaded through the codec in between): the beam fires
+	-- between the player's turns, the caster's action
 	local solar = spells.by_key("solar_beam")
-	f = fight(recorder(8).rand, nil, { PUNCHBAG }, 900)
+	f = clocked(fight(recorder(8).rand, nil, { PUNCHBAG }, 900))
 	r = round.play(f, { kind = "spell", spell = solar })
 	eq(lines(r.player), "You have cast the Solar Beam spell, and gather sunlight.")
 	eq(enemy(r.f).hp, 900); eq(round.locked(r.f), true)
 	local inst = state.player(r.f).statuses[1]
 	eq(inst.key, "charging"); eq(state.encode(inst.data), "entity=s:solar_beam\nfrom=s:spell\nrelease=s:release")
 	inst.data = state.decode(state.encode(inst.data))
-	r = round.play(r.f, { kind = "continue" })
-	local fired = math.tointeger(lines(r.player):match("^The Solar Beam fires for (%d+) damage%.$"))
-	assert(fired and fired >= 75 and fired <= 90, lines(r.player))
-	eq(enemy(r.f).hp, 900 - fired); eq(round.locked(r.f), false); eq(keys(state.player(r.f)), "")
-	-- a release that kills the monster is a victory
-	f = fight(recorder(9).rand, nil, { PUNCHBAG }, 900)
+	a = round.advance(r.f, 101)
+	local text = said(a)
+	has(text, "You are gathering power.|The monster attacks you for")
+	local fired = math.tointeger(text:match("|The Solar Beam fires for (%d+) damage%.$"))
+	assert(fired and fired >= 75 and fired <= 90, text)
+	eq(enemy(a.f).hp, 900 - fired); eq(round.locked(a.f), false); eq(keys(state.player(a.f)), "")
+	-- a release that kills the monster is a victory, at the tick
+	f = clocked(fight(recorder(9).rand, nil, { PUNCHBAG }, 900))
 	r = round.play(f, { kind = "spell", spell = solar })
 	enemy(r.f).hp = 1
-	r = round.play(r.f, { kind = "continue" })
-	eq(r.victory, true); eq(lines(r.enemies), "")
+	a = round.advance(r.f, 101)
+	eq(a.victory, true)
+end
+
+function T.a_turn_that_runs_out_is_a_guard()
+	-- the ticks before the deadline play nothing on a fight without statuses
+	local d = dice({ 8, 5, 100 })
+	local f = clocked(fight(d.rand))
+	local a = round.advance(f, 102)
+	eq(a.ticks, 2); eq(said(a), ""); eq(a.changed, false); eq(a.f.round, 2)
+	-- at the deadline (round.TURN ticks after the turn began) the player guards: the
+	-- monster's 6 less a quarter (guarding), and the guard ends with the round
+	a = round.advance(a.f, 103)
+	eq(said(a), "You hesitate, and raise your guard.|The monster attacks you for 5 damage.")
+	eq(a.changed, true); eq(a.f.st.currenthp, 45); eq(keys(state.player(a.f)), "", "the guard ended with the round")
+	eq(a.f.round, 3); eq(a.f.deadline, 106, "the next turn runs out 30 s later"); d.done()
+	-- the Guard button: the same, without hesitating
+	d = dice({ 8, 5, 100 })
+	f = clocked(fight(d.rand))
+	local r = round.play(f, { kind = "guard" })
+	eq(lines(r.player), "You raise your guard."); eq(lines(r.enemies), "The monster attacks you for 5 damage.")
+	eq(keys(state.player(r.f)), ""); d.done()
+	-- a player who walked away keeps guarding, every 30 s, until the fight ends; at most
+	-- round.CATCHUP ticks are caught up
+	f = clocked(fight(recorder(40).rand, { currenthp = 100, maxhp = 100 }))
+	a = round.advance(f, 100 + 100000)
+	eq(a.died, true, "the guards ran out of hit points")
+	assert(a.ticks <= round.CATCHUP, a.ticks)
+	has(said(a), "You hesitate, and raise your guard.")
+end
+
+function T.advancing_is_bounded()
+	local f = clocked(fight(recorder(41).rand, nil, { PUNCHBAG }, 900))
+	local a = round.advance(f, 200, 5)
+	eq(a.ticks, 5); eq(a.f.tick, 105)
+	a = round.advance(a.f, 200, 5)
+	eq(a.f.tick, 110, "the rest on the next call")
+	-- a fight not on the clock yet starts on it now, with its turn's full time
+	f = fight(recorder(42).rand)
+	a = round.advance(f, 500)
+	eq(a.ticks, 0); eq(a.f.tick, 500); eq(a.f.deadline, 500 + round.TURN)
 end
 
 function T.poison_and_regen_spells()
-	local f = fight(recorder(10).rand, nil, { PUNCHBAG }, 900)
+	local f = clocked(fight(recorder(10).rand, nil, { PUNCHBAG }, 900))
 	local r = round.play(f, { kind = "spell", spell = spells.by_key("poison") })
-	eq(lines(r.player), "You have cast the Poison spell. The monster is poisoned for 3 turns.")
-	local dmg = math.tointeger(lines(r.ending):match("^The Punchbag takes (%d+) poison damage%.$"))
-	assert(dmg and dmg >= 2 and dmg <= 6, lines(r.ending))
-	eq(enemy(r.f).hp, 900 - dmg)
-	for _ = 1, 2 do r = round.play(r.f, { kind = "continue" }) end
-	eq(keys(enemy(r.f)), "", "three ticks")
+	eq(lines(r.player), "You have cast the Poison spell. The monster is poisoned for 30 seconds.")
+	eq(lines(r.ending), "")
+	local a = round.advance(r.f, 101)
+	local dmg = math.tointeger(said(a):match("^The Punchbag takes (%d+) poison damage%.$"))
+	assert(dmg and dmg >= 2 and dmg <= 6, said(a))
+	eq(enemy(a.f).hp, 900 - dmg)
+	a = round.advance(a.f, 103)
+	eq(keys(enemy(a.f)), "", "three ticks")
 	-- monsters immune to poison aren't poisoned
 	f = fight(recorder(11).rand, nil, { PUNCHBAG }, 900)
 	enemy(f).row.resist = { poison = 100 }
 	r = round.play(f, { kind = "spell", spell = spells.by_key("poison") })
 	eq(lines(r.player), "You have cast the Poison spell, but the monster is immune to it.")
-	-- regen: from the next turn on
-	f = fight(recorder(12).rand, { currenthp = 10, dexterity = 22500 }, { PUNCHBAG }, 900)   -- always dodges
+	-- regen: from the next tick on
+	f = clocked(fight(recorder(12).rand, { currenthp = 10, dexterity = 22500 }, { PUNCHBAG }, 900))   -- always dodges
 	r = round.play(f, { kind = "spell", spell = spells.by_key("regen") })
-	eq(lines(r.player), "You have cast the Regen spell, and will regenerate 6 Hit Points for 5 turns.")
-	eq(lines(r.ending), ""); eq(r.f.st.currenthp, 10)
-	r = round.play(r.f, { kind = "continue" })
-	eq(lines(r.ending), "You regenerate 6 Hit Points."); eq(r.f.st.currenthp, 16)
+	eq(lines(r.player), "You have cast the Regen spell, and will regenerate 6 Hit Points for 50 seconds.")
+	eq(r.f.st.currenthp, 10)
+	a = round.advance(r.f, 101)
+	eq(said(a), "You regenerate 6 Hit Points."); eq(a.f.st.currenthp, 16)
 	-- an antidote cures harmful statuses only
 	f = fight(recorder(13).rand)
 	engine.afflict(f, state.player(f), "poison", {})
 	engine.afflict(f, state.player(f), "regen", {})
 	r = round.play(f, { kind = "item", item = items.by_key("antidote") })
 	eq(lines(r.player), "You have used the Antidote, and feel better.")
-	eq(keys(state.player(r.f)), "regen/4", "regen stays (counted down)")
+	eq(keys(state.player(r.f)), "regen/5", "regen stays")
 	r = round.play(r.f, { kind = "item", item = items.by_key("antidote") })
 	eq(r.refused, "You don't need the Antidote now. Please go back and try again.")
 end
@@ -428,26 +512,25 @@ function T.summons_act_and_can_be_targeted()
 	-- the wolf 50/50 (one roll), the wolf's defense and dexterity in the player's place
 	local f = fight(recorder(14).rand, nil, { CREATURE }, 500)
 	f.max_allies = 1
+	f.tick, f.deadline = 100, 1000
 	local r = round.play(f, { kind = "spell", spell = spells.by_key("call_wolf") })
-	eq(lines(r.player), "You have cast the Call Wolf spell. A wolf joins the fight for 5 rounds.")
+	eq(lines(r.player), "You have cast the Call Wolf spell. A wolf joins the fight for 50 seconds.")
 	local bite = math.tointeger(lines(r.allies):match("^Your Wolf bites the monster for (%d+) damage%.$"))
 	assert(bite and bite >= 6 and bite <= 12, lines(r.allies))
 	eq(enemy(r.f).hp, 500 - bite)
 	local wolf = state.allies(r.f)[1]
-	eq(wolf.turns_left, 4, "one round used")
+	eq(wolf.ticks_left, 5, "it counts the clock, not the rounds")
 	-- no room for a second ally: refused, nothing spent
 	local again = round.play(r.f, { kind = "spell", spell = spells.by_key("call_wolf") })
 	eq(again.refused, "You can't call another ally now. Please go back and try again.")
-	-- the wolf leaves after its rounds
-	f = r.f
-	for _ = 1, 4 do
-		r = round.play(f, { kind = "continue" })
-		f = r.f
-	end
-	eq(#state.allies(f), 0); has(lines(r.ending), "Your Wolf runs off into the wild.")
+	-- the wolf leaves when its ticks are up
+	local a = round.advance(r.f, 104)
+	eq(state.allies(a.f)[1].ticks_left, 1)
+	a = round.advance(a.f, 105)
+	eq(#state.allies(a.f), 0); has(said(a), "Your Wolf runs off into the wild.")
 	-- a wolf at 0 HP is defeated
 	f = fight(recorder(15).rand, nil, { CREATURE }, 500)
-	engine.summon(f, "wolf", { turns = 3 }, state.player(f))
+	engine.summon(f, "wolf", { ticks = 3 }, state.player(f))
 	state.allies(f)[1].hp = 1
 	for _ = 1, 30 do
 		r = round.play(f, { kind = "continue" })
@@ -505,29 +588,31 @@ end
 
 function T.caps_and_error_containment()
 	with_content(function(env)
-		-- a failing tick: logged, the status removed, the round goes on
-		env.status("t_bad", { name = "Bad", tick_on = "turn_start", on_tick = function() error("tick broke") end })
-		env.status("t_loop", { name = "Loop", tick_on = "turn_end", on_tick = function(t) t.bearer:afflict("t_loop2") end,
+		-- a failing tick: logged, the status removed, the fight goes on
+		env.status("t_bad", { name = "Bad", on_tick = function() error("tick broke") end })
+		env.status("t_loop", { name = "Loop", on_tick = function(t) t.bearer:afflict("t_loop2") end,
 			on_apply = function(t) t.bearer:afflict("t_loop2") end })
 		env.status("t_loop2", { name = "Loop2", on_apply = function(t) t.bearer:afflict("t_loop") end })
 		env.status("t_badmod", { name = "BadMod", modify_damage_taken = function() return -5 end })
 		env.summon("t_badpup", { name = "BadPup", act = function() error("pup broke") end })
 		for i = 1, engine.MAX_STATUSES + 2 do env.status("t_many" .. i, { name = "M" .. i }) end
-		local f = fight(recorder(18).rand)
+		local f = clocked(fight(recorder(18).rand))
 		local p, m = state.player(f), enemy(f)
 		engine.afflict(f, m, "t_bad", {})
 		engine.summon(f, "t_badpup", {}, p)
 		engine.afflict(f, p, "t_badmod", {})
 		local r = round.play(f, { kind = "attack" })
-		eq(keys(enemy(r.f)), "", "the failing status is gone")
 		eq(#state.allies(r.f), 0, "the failing summon is gone")
 		eq(keys(state.player(r.f)), "", "a modifier returning a bad value is gone")
 		has(lines(r.enemies), "The monster attacks you for", "the round went on")
-		-- statuses applying each other forever: capped per round
-		f = fight(recorder(19).rand)
+		local a = round.advance(r.f, 101)
+		eq(keys(enemy(a.f)), "", "the failing status is gone")
+		-- statuses applying each other forever: capped per round and per tick
+		f = clocked(fight(recorder(19).rand))
 		engine.afflict(f, enemy(f), "t_loop", {})
-		r = round.play(f, { kind = "continue" })
-		assert(r.f.ticks > engine.MAX_TICKS, "stopped by the cap")
+		assert(f.runs > engine.MAX_RUNS, "stopped by the cap")
+		a = round.advance(f, 101)
+		assert(a.f.runs > engine.MAX_RUNS, "stopped by the cap at the tick")
 		-- at most MAX_STATUSES per combatant
 		f = fight(recorder(20).rand)
 		for i = 1, engine.MAX_STATUSES + 2 do engine.afflict(f, enemy(f), "t_many" .. i, {}) end
@@ -535,22 +620,13 @@ function T.caps_and_error_containment()
 	end)
 end
 
-function T.refusal_after_ticks_changes_nothing()
-	-- the player's turn-start ticks run before the action; a refused action leaves the
-	-- fight as it was (nothing ticked, nothing spent)
-	with_content(function(env)
-		env.status("t_drain", { name = "Drain", tick_on = "turn_start", turns = 3,
-			on_tick = function(t) t.bearer:hurt(1) end })
-		local f = fight(recorder(21).rand, { currenthp = 100, maxhp = 100 })
-		engine.afflict(f, state.player(f), "t_drain", {})
-		local r = round.play(f, { kind = "spell", spell = spells.by_key("heal") })
-		eq(r.refused, nil, "a tick hurt: not at full HP any more")
-		f = fight(recorder(22).rand, { currenthp = 50, maxhp = 100 })
-		engine.afflict(f, state.player(f), "t_drain", {})
-		r = round.play(f, { kind = "item", item = items.by_key("antidote") })
-		eq(r.refused, "You don't need the Antidote now. Please go back and try again.")
-		eq(f.st.currenthp, 50); eq(keys(state.player(f)), "t_drain/3")
-	end)
+function T.refusal_changes_nothing()
+	-- a refused action leaves the fight as it was (nothing spent, no status counted)
+	local f = fight(recorder(22).rand, { currenthp = 50, maxhp = 100 })
+	engine.afflict(f, state.player(f), "regen", { ticks = 3 })
+	local r = round.play(f, { kind = "item", item = items.by_key("antidote") })
+	eq(r.refused, "You don't need the Antidote now. Please go back and try again.")
+	eq(f.st.currenthp, 50); eq(keys(state.player(f)), "regen/3")
 end
 
 -- A round's events (fight/events.lua) from a traced round.
@@ -585,17 +661,22 @@ function T.round_events()
 	has(e.text, "You attack the monster for")
 	e = find_event(list, function(x) return x.actor == "enemy" and x.type == "attack" end, "the monster's attack")
 	eq(e.part, "enemies"); eq(e.actor_name, "Punchbag")
-	-- a spell with a status: the status on the monster, then its tick at the end (the bearer)
-	f = fight(recorder(31).rand, nil, { PUNCHBAG }, 900)
+	-- a spell with a status: the status on the monster (its chip: the time it has left);
+	-- then, at the clock's tick, its tick (the bearer's) and its countdown
+	f = clocked(fight(recorder(31).rand, nil, { PUNCHBAG }, 900))
 	r, list = play_events(f, { kind = "spell", spell = spells.by_key("poison") })
 	e = find_event(list, function(x) return x.type == "spell" end, "the spell")
 	eq(e.actor, "player"); eq(e.mp[1].who, "player"); eq(e.mp[1].from - e.mp[1].to, spells.by_key("poison").mp)
-	eq(e.status[1].who, "enemy"); eq(e.status[1].key, "poison"); eq(e.status[1].change, "add"); eq(e.status[1].turns, 3)
-	eq(e.status[1].status, "Poisoned"); eq(e.status[1].statuses[1].key, "poison")
+	eq(e.status[1].who, "enemy"); eq(e.status[1].key, "poison"); eq(e.status[1].change, "add"); eq(e.status[1].ticks, 3)
+	eq(e.status[1].status, "Poisoned"); eq(e.status[1].statuses[1].key, "poison"); eq(e.status[1].statuses[1].left, "30s")
+	r.f.trace = {}
+	local a = round.advance(r.f, 101)
+	list = events.build(a.f.trace)
+	eq(lines(events.lines(list)), said(a), "the events' texts are the lines")
 	e = find_event(list, function(x) return x.type == "status" and x.text end, "the tick")
 	eq(e.part, "ending"); eq(e.actor, "enemy"); eq(e.hp[1].who, "enemy")
-	e = find_event(list, function(x) return x.status and x.status[1].change == "turns" end, "the countdown")
-	eq(e.status[1].turns, 2)
+	e = find_event(list, function(x) return x.status and x.status[1].change == "ticks" end, "the countdown")
+	eq(e.status[1].ticks, 2); eq(e.status[1].statuses[1].left, "20s")
 	-- an item on the player
 	f = fight(recorder(32).rand, { currenthp = 10, dexterity = 22500 }, { PUNCHBAG }, 900)
 	r, list = play_events(f, { kind = "item", item = items.by_key("herb") })
@@ -607,17 +688,24 @@ function T.round_events()
 	r, list = play_events(f, { kind = "spell", spell = spells.by_key("call_wolf") })
 	e = find_event(list, function(x) return x.summon end, "the summon")
 	eq(e.type, "spell"); eq(e.summon[1].change, "join"); eq(e.summon[1].name, "Wolf"); eq(e.summon[1].hp, 30)
-	eq(e.summon[1].turns, 5)
+	eq(e.summon[1].ticks, 5)
 	e = find_event(list, function(x) return x.actor == "ally" and x.text end, "the bite")
 	eq(e.type, "summon"); eq(e.part, "allies"); eq(e.actor_name, "Wolf"); eq(e.hp[1].who, "enemy")
-	-- a blocked turn; a status running out (the bearer's)
-	f = fight(recorder(35).rand)
-	engine.afflict(f, state.player(f), "recharging", { turns = 1 })
-	r, list = play_events(f, { kind = "continue" })
+	-- a blocked turn ending at the tick; a status running out (the bearer's); a guard
+	f = clocked(fight(recorder(35).rand))
+	engine.afflict(f, state.player(f), "recharging", { ticks = 1 })
+	f.trace = {}
+	a = round.advance(f, 101)
+	list = events.build(a.f.trace)
 	e = find_event(list, function(x) return x.type == "blocked" end, "blocked")
 	eq(e.text, "You must recharge this turn."); eq(e.actor, "player"); eq(e.part, "player")
 	e = find_event(list, function(x) return x.status and x.status[1].change == "expire" end, "the expiry")
 	eq(e.actor, "player"); eq(e.type, "status"); eq(e.status[1].key, "recharging"); eq(#e.status[1].statuses, 0)
+	a.f.trace = {}
+	a = round.advance(a.f, 104)
+	list = events.build(a.f.trace)
+	e = find_event(list, function(x) return x.type == "guard" end, "the guard")
+	eq(e.text, "You hesitate, and raise your guard."); eq(e.status[1].key, "guarding"); eq(e.status[1].change, "add")
 	-- waves
 	f = fight(recorder(17).rand, { attackpower = 2000, strength = 0 }, { SLIME, CREATURE, waves = { 1, 2 } }, 1)
 	r, list = play_events(f, { kind = "attack" })
@@ -638,19 +726,20 @@ function T.codec_and_world_statuses()
 	local t = { a = 1, b = "x y", c = true, d = false }
 	same(state.decode(state.encode(t)), t, "codec")
 	assert(not pcall(state.encode, { f = function() end }), "no functions")
-	-- the regen potion outside fights: a world status, ticking on moves
-	local f = state.new({ user_id = 1, st = player_row({ currenthp = 10 }), in_fight = false })
+	-- the regen potion outside fights: a world status, ticking on the clock
+	local f = state.new({ user_id = 1, st = player_row({ currenthp = 10 }), in_fight = false, tick = 100 })
 	f.rand = recorder(23).rand
 	local action = require("lib.action")
 	local player = engine.handle(f, state.player(f))
 	local r = action.perform({ kind = "item", entity = items.by_key("regen_potion"), caster = player, target = player,
 		in_fight = false, rand = f.rand })
 	assert(r.ok)
-	eq(lines(r.lines), "You have used the Regen Potion, and will regenerate 5 Hit Points for the next 10 moves.")
+	eq(lines(r.lines), "You have used the Regen Potion, and will regenerate 5 Hit Points for 100 seconds.")
 	engine.apply(f, r.events, state.player(f))
 	eq(keys(state.player(f)), "regen/10")
 	f.out = {}
-	engine.world_move(f)
+	eq(engine.tick(f, state.player(f), 100), false, "not at the tick it came in")
+	engine.tick(f, state.player(f), 101)
 	eq(lines(f.out), "You regenerate 5 Hit Points."); eq(f.st.currenthp, 15); eq(keys(state.player(f)), "regen/9")
 	-- fight-only statuses aren't applied outside fights
 	engine.afflict(f, state.player(f), "poison", {})

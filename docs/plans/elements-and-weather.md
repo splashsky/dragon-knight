@@ -239,7 +239,7 @@ return {
 	Lua side, `app/lib/tick.lua` `tick.run(now)`, advances everything due: fights, world
 	statuses, and weather pushes. Its work per run is bounded; what is left over continues
 	on the next run. After the server was down, the next runs catch up, because time ran
-	on.
+	on, at most an hour of it: a fight further behind than that skips its oldest ticks.
 - **Fights on the clock**: each fight saves the last tick it processed and the player's
 	turn deadline. Advancing a fight to tick n plays every tick in order: the fields follow
 	the weather; statuses tick and run out; allies count down and leave; a charge releases

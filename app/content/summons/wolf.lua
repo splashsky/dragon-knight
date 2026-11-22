@@ -1,5 +1,5 @@
 -- app/content/summons/wolf.lua :: a wolf that fights alongside the player (the Call Wolf
--- spell: s:summon("wolf", { turns = 5 })). act runs once per round after the player's
+-- spell: s:summon("wolf", { ticks = 5 })). act runs once per round after the player's
 -- turn, at a target the fight picks (a.target); monsters may attack it instead of the
 -- player (50/50 with one ally), with its defense and dexterity in place of the player's.
 -- Its bite is of its element (`element`, neutral unless the file says otherwise), which its
@@ -22,7 +22,7 @@ happens to choose it. Hunters from Roma say it always leaves before the trouble 
 	attack = 12,
 	defense = 5,
 	dexterity = 4,
-	turns = 5,
+	ticks = 5,
 	messages = {
 		bite = "Your %s bites the monster for %d damage.",
 		gone = "Your %s runs off into the wild.",

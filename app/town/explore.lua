@@ -1,7 +1,6 @@
 -- town/explore.lua :: legacy explore.php move(): compass buttons, 1-in-5 chance of a fight
--- (it begins here: fight/encounter.lua). Each move is a turn for the world statuses
--- (lib/world.lua). Setting out from a town, arriving in one (town/travel.lua) and a fight
--- beginning are scenes for the live client (lib/scene.lua).
+-- (it begins here: fight/encounter.lua). Setting out from a town, arriving in one
+-- (town/travel.lua) and a fight beginning are scenes for the live client (lib/scene.lua).
 local encounter = require("fight.encounter")
 local game = require("lib.game")
 local php = require("lib.php")
@@ -9,7 +8,6 @@ local scene = require("lib.scene")
 local state = require("fight.state")
 local travel = require("town.travel")
 local view = require("lib.view")
-local world = require("lib.world")
 
 local explore = {}
 
@@ -28,7 +26,6 @@ function explore.move(req)
 	if form.west ~= nil then lon = lon - 1; if lon < -size then lon = -size end end
 	local leaving = user.currentaction == "In Town" and game.current_town(user) or nil
 
-	world.move(user, php.rand)
 	-- moving on: the page of the last finished fight goes
 	state.forget(user.id)
 

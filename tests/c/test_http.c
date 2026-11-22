@@ -1,7 +1,8 @@
 /* test_http.c :: HTTP server + config loader tests (raw sockets against a live server),
  * run once on the epoll backend and once on the poll fallback; plus unit tests of the
  * timer heap and the buffer pool, backpressure, the static file cache (ETag, sendfile),
- * buffer release on idle connections and the stats socket. */
+ * buffer release on idle connections, the stats socket and the game's tick (the server's
+ * own request on each boundary, which no network request can pose as). */
 #include "minitest.h"
 
 #include <arpa/inet.h>
@@ -31,6 +32,7 @@
 /* ------------------------------------------------------------------ test handler */
 
 static atomic_int n_init, n_fini;
+static atomic_int n_ticks, tick_late_ms;   /* the server's tick requests; the latest after a boundary */
 
 static void *h_init(int id, void *ud)
 {
@@ -52,9 +54,20 @@ static void h_handle(void *wctx, const dk_request *req, dk_response *resp, void 
 {
 	(void)wctx;
 	(void)ud;
+	if (req->tick) {
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		int late = (int)((ts.tv_sec * 1000 + ts.tv_nsec / 1000000) % 100);
+		if (late > atomic_load(&tick_late_ms))
+			atomic_store(&tick_late_ms, late);
+		atomic_fetch_add(&n_ticks, 1);
+	}
 	if (strcmp(req->path, "/sleep") == 0)
 		usleep(300 * 1000);
-	if (strcmp(req->path, "/notfound") == 0)
+	if (strcmp(req->path, "/__tick") == 0) {
+		resp_add_header(resp, "Content-Type", "text/plain");
+		sb_printf(&resp->body, "tick=%d", req->tick);
+	} else if (strcmp(req->path, "/notfound") == 0)
 		resp_error(resp, 404, "nope <b>");
 	else if (strcmp(req->path, "/big") == 0) {
 		resp_add_header(resp, "Content-Type", "application/octet-stream");
@@ -858,6 +871,7 @@ static void test_max_conns(void)
 {
 	srv s;
 	config_defaults(&s.cfg);
+	s.cfg.tick = 0;
 	free(s.cfg.bind);
 	s.cfg.bind = strdup("127.0.0.1");
 	s.cfg.port = 0;
@@ -897,6 +911,7 @@ static void test_ipv6(void)
 {
 	srv s;
 	config_defaults(&s.cfg);
+	s.cfg.tick = 0;
 	free(s.cfg.bind);
 	s.cfg.bind = strdup("::1");
 	s.cfg.port = 0;
@@ -1120,6 +1135,7 @@ static void test_backpressure(void)
 {
 	srv s;
 	config_defaults(&s.cfg);
+	s.cfg.tick = 0;
 	s.cfg.port = 0;
 	s.cfg.workers = 1;
 	s.cfg.queue_timeout_ms = 100;
@@ -1169,6 +1185,7 @@ static void test_stats_socket(void)
 {
 	srv s;
 	config_defaults(&s.cfg);
+	s.cfg.tick = 0;
 	s.cfg.port = 0;
 	s.cfg.workers = 1;
 	char path[512];
@@ -1199,6 +1216,49 @@ static void test_stats_socket(void)
 	CHECK(srv_stop(&s) == 0);
 	struct stat st;
 	CHECK(stat(path, &st) < 0);               /* removed at shutdown */
+	config_free(&s.cfg);
+}
+
+/* ---- the game's tick: POST /__tick on every boundary of tick_ms, marked req->tick; a
+ * network request to the same path (whatever it sends) is not the tick ---- */
+
+static void test_tick(void)
+{
+	srv s;
+	config_defaults(&s.cfg);
+	s.cfg.port = 0;
+	s.cfg.workers = 2;
+	s.cfg.tick_ms = 100;
+	s.cfg.access_log = 0;
+	s.cfg.stats_socket = strdup("");
+	atomic_store(&n_ticks, 0);
+	atomic_store(&tick_late_ms, 0);
+	CHECK(srv_start(&s) == 0);
+	for (int i = 0; i < 100 && atomic_load(&n_ticks) < 3; i++)
+		usleep(20 * 1000);
+	CHECK(atomic_load(&n_ticks) >= 3);
+	CHECK(atomic_load(&tick_late_ms) < 80);   /* just after its boundary */
+	resp r;
+	CHECK(oneshot(s.port, "POST /__tick HTTP/1.1\r\nX-DK-Tick: 1\r\nContent-Length: 0\r\n\r\n", &r) == 200);
+	CHECK(r.body && strcmp(r.body, "tick=0") == 0);
+	resp_clear(&r);
+	CHECK(oneshot(s.port, "GET /__tick?tick=1 HTTP/1.1\r\n\r\n", &r) == 200);
+	CHECK(r.body && strcmp(r.body, "tick=0") == 0);
+	resp_clear(&r);
+	CHECK(srv_stop(&s) == 0);
+	config_free(&s.cfg);
+	/* off: none */
+	config_defaults(&s.cfg);
+	s.cfg.port = 0;
+	s.cfg.workers = 1;
+	s.cfg.tick = 0;
+	s.cfg.tick_ms = 50;
+	s.cfg.stats_socket = strdup("");
+	atomic_store(&n_ticks, 0);
+	CHECK(srv_start(&s) == 0);
+	usleep(200 * 1000);
+	CHECK(atomic_load(&n_ticks) == 0);
+	CHECK(srv_stop(&s) == 0);
 	config_free(&s.cfg);
 }
 
@@ -1342,6 +1402,7 @@ static void test_config(void)
 	CHECK(c.db_cache_kb == 8192 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 1000);
 	CHECK(c.max_streams == 512 && c.max_streams_per_ip == 8 && c.stream_queue_bytes == 256u << 10);
 	CHECK(c.stream_heartbeat_ms == 15000 && c.stream_replay_events == 200 && c.stream_replay_seconds == 300);
+	CHECK(c.tick == 1 && c.tick_ms == 10000);
 	CHECK(config_workers(&c) >= 2);
 	char sp[256];
 	CHECK_STR_EQ(config_stats_socket(&c, sp, sizeof sp), "data/dk.sock");
@@ -1368,7 +1429,7 @@ static void test_config(void)
 				   "  vm_gc_pause = 200, db_cache_kb = 0, db_mmap_bytes = 0, db_checkpoint_ms = 0,\n"
 				   "  max_streams = 3, max_streams_per_ip = 0, stream_queue_bytes = 4096,\n"
 				   "  stream_heartbeat_ms = 250, stream_replay_events = 0, stream_replay_seconds = 10,\n"
-				   "  pbkdf2_iterations = 1000, unknown = { nested = true } }\n",
+				   "  tick = false, tick_ms = 5, pbkdf2_iterations = 1000, unknown = { nested = true } }\n",
 				   err, sizeof err) == 0);
 	CHECK_STR_EQ(c.bind, "::1");
 	CHECK(c.port == 9001 && c.workers == 2 && c.spares == 3 && c.dev == 0);
@@ -1385,6 +1446,7 @@ static void test_config(void)
 	CHECK(c.db_cache_kb == 0 && c.db_mmap_bytes == 0 && c.db_checkpoint_ms == 0);
 	CHECK(c.max_streams == 3 && c.max_streams_per_ip == 0 && c.stream_queue_bytes == 4096);
 	CHECK(c.stream_heartbeat_ms == 250 && c.stream_replay_events == 0 && c.stream_replay_seconds == 10);
+	CHECK(c.tick == 0 && c.tick_ms == 10000);                /* tick_ms is no config key */
 	CHECK(config_stats_socket(&c, sp, sizeof sp) == NULL);   /* "" = no socket */
 	config_free(&c);
 
@@ -1470,6 +1532,7 @@ int main(void)
 		http_force_poll(use_poll);
 		srv s;
 		config_defaults(&s.cfg);
+		s.cfg.tick = 0;
 		s.cfg.port = 0;
 		s.cfg.workers = 4;
 		s.cfg.request_timeout = 1;
@@ -1508,6 +1571,7 @@ int main(void)
 
 	test_backpressure();
 	test_stats_socket();
+	test_tick();
 	test_max_conns();
 	test_ipv6();
 

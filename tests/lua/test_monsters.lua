@@ -449,7 +449,7 @@ function T.monsters_cast_and_use_items()
 	for seed = 1, 20 do
 		f = fight(recorder(seed).rand, m)
 		f.max_allies = 1
-		engine.summon(f, "wolf", { turns = 9 }, state.player(f))
+		engine.summon(f, "wolf", { ticks = 9 }, state.player(f))
 		local wolf = state.allies(f)[1]
 		local before = wolf.hp
 		r = round.play(f, { kind = "continue" })
@@ -470,7 +470,7 @@ function T.monsters_cast_and_use_items()
 	m = test_monster({ attack_weight = 0 }, { spells = { { spell = "poison" } } })
 	f = fight(recorder(64).rand, m)
 	r = round.play(f, { kind = "continue" })
-	eq(lines(r.enemies), "The monster casts Poison. You are poisoned for 3 turns.")
+	eq(lines(r.enemies), "The monster casts Poison. You are poisoned for 30 seconds.")
 	eq(state.player(r.f).statuses[1].key, "poison")
 	eq(state.player(r.f).statuses[1].source, state.side(r.f, "enemy", true)[1].id)
 	-- a buff on itself counts in its attacks
@@ -497,7 +497,7 @@ function T.refused_after_all_attacks_instead()
 		local m = test_monster({ attack_weight = 0 }, { spells = { { spell = "hurt" } } })
 		local f, c = fight(recorder(71).rand, m)
 		f.max_allies = 1
-		engine.summon(f, "wolf", { turns = 9 }, state.player(f))
+		engine.summon(f, "wolf", { ticks = 9 }, state.player(f))
 		local cand = ai.actions(f, c)[2]
 		eq(cand.kind, "spell")
 		f.out = {}

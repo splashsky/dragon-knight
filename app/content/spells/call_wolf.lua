@@ -6,8 +6,8 @@ local function can_cast(s)
 end
 
 local function cast(s)
-	s:summon("wolf", { turns = s.power })
-	s:say("cast", s.name, s.power)
+	s:summon("wolf", { ticks = s.power })
+	s:say("cast", s.name, s:seconds(s.power))
 end
 
 return {
@@ -23,7 +23,7 @@ reach, and takes a blow meant for its master when a monster is in the mood.]],
 	target = "self",
 	uses = { summons = { "wolf" } },
 	messages = {
-		cast = "You have cast the %s spell. A wolf joins the fight for %d rounds.",
+		cast = "You have cast the %s spell. A wolf joins the fight for %d seconds.",
 		no_room = "You can't call another ally now. Please go back and try again.",
 	},
 	can_cast = can_cast,

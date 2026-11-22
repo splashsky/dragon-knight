@@ -5,16 +5,17 @@
 --
 -- Statuses: one instance per status and bearer. Applying one again replaces the instance:
 -- the old one's on_remove runs (not on_expire), then the new one's on_apply, with the new
--- duration and params even when shorter. A status counts the bearer's turns: it ticks
--- (on_tick at tick_on) and counts down only for turns that began after it was applied,
--- and runs out (on_expire) when its turns are used up; turns_left nil lasts until removed
--- (cured, replaced) or the end of the fight. A status blocks the bearer's action while
--- it has blocks_action (true, or a function returning true).
+-- duration and params even when shorter. A status counts the game's clock ticks (10 s,
+-- lib/clock.lua; fight/round.lua round.advance plays them): on every tick after the one it
+-- was applied in it ticks (on_tick) and counts down, and it runs out (on_expire) when its
+-- ticks are used up; ticks_left nil lasts until removed (cured, replaced) or the end of the
+-- fight. A status blocks the bearer's action while it has blocks_action (true, or a
+-- function returning true). Allies count the ticks too, and leave when theirs run out.
 --
 -- Robustness: an error in status or summon code is logged as a warning and removes that
 -- status or summon (without its hooks); the round goes on. A combatant holds at most
--- MAX_STATUSES statuses (more are not applied, logged) and a round runs status and summon
--- code at most MAX_TICKS times (the rest is skipped, logged).
+-- MAX_STATUSES statuses (more are not applied, logged) and a round (or a clock tick) runs
+-- status and summon code at most MAX_RUNS times (the rest is skipped, logged).
 local action = require("lib.action")
 local items = require("lib.items")
 local load = require("lib.content.load")
@@ -30,7 +31,7 @@ local engine = {}
 engine.listeners = {}
 
 engine.MAX_STATUSES = 10
-engine.MAX_TICKS = 100
+engine.MAX_RUNS = 100
 
 local function warn(fmt, ...)
 	dk.log("warn", fmt:format(...))
@@ -54,8 +55,8 @@ local function name_of(f, c)
 	return c.row and c.row.name
 end
 
--- c starts a step of kind `kind` ("attack", "spell", "item", "status", "summon", "blocked",
--- "run", "ambush", "wave"). Returns the step it interrupts, for engine.done.
+-- c starts a step of kind `kind` ("attack", "spell", "item", "guard", "status", "summon",
+-- "blocked", "run", "ambush", "wave"). Returns the step it interrupts, for engine.done.
 function engine.doing(f, c, kind)
 	if not f.trace then return nil end
 	local prev = f.doing
@@ -77,14 +78,14 @@ end
 
 local function status_list(c)
 	local out = {}
-	for _, s in ipairs(c.statuses) do out[#out + 1] = { key = s.key, name = s.row.name, turns = s.turns_left, icon = s.row.icon } end
+	for _, s in ipairs(c.statuses) do out[#out + 1] = { key = s.key, name = s.row.name, ticks = s.ticks_left, icon = s.row.icon } end
 	return out
 end
 
 local function trace_status(f, c, inst, change)
 	if not f.trace then return end
 	trace(f, { status = change, id = c.id, side = c.side, name = name_of(f, c), key = inst.key, label = inst.row.name,
-		turns = inst.turns_left, list = status_list(c) })
+		ticks = inst.ticks_left, list = status_list(c) })
 end
 
 -- A line for the page (the current part of the round, f.out).
@@ -112,7 +113,7 @@ end
 local function status_view(c)
 	local out = {}
 	for _, s in ipairs(c.statuses) do
-		out[#out + 1] = { key = s.key, name = s.row.name, kind = s.row.kind, turns_left = s.turns_left, data = s.data,
+		out[#out + 1] = { key = s.key, name = s.row.name, kind = s.row.kind, ticks_left = s.ticks_left, data = s.data,
 			resist = s.row.resist, ward = s.row.ward }
 	end
 	return out
@@ -160,18 +161,23 @@ end
 ---------------------------------------------------------------------------------------
 -- Running content code
 
--- One more run of status or summon code this round, or false (the cap).
-local function tick_budget(f)
-	f.ticks = (f.ticks or 0) + 1
-	if f.ticks > engine.MAX_TICKS then
-		if not f.ticks_warned then
-			warn("fight of user %s: more than %d runs of status and summon code in one round; the rest is skipped",
-				tostring(f.user_id), engine.MAX_TICKS)
-			f.ticks_warned = true
+-- One more run of status or summon code this round (or clock tick), or false (the cap).
+local function code_budget(f)
+	f.runs = (f.runs or 0) + 1
+	if f.runs > engine.MAX_RUNS then
+		if not f.runs_warned then
+			warn("fight of user %s: more than %d runs of status and summon code in one round or tick; the rest is skipped",
+				tostring(f.user_id), engine.MAX_RUNS)
+			f.runs_warned = true
 		end
 		return false
 	end
 	return true
+end
+
+-- A new round or clock tick: status and summon code may run MAX_RUNS times again.
+function engine.budget(f)
+	f.runs, f.runs_warned = 0, nil
 end
 
 local function find(c, key)
@@ -211,13 +217,13 @@ function engine.status_hook(f, c, inst, fname, check, ...)
 	local module = load.module("statuses", inst.key)
 	local fn = module and module[fname]
 	if type(fn) ~= "function" then return true, nil end
-	if not tick_budget(f) then return false end
+	if not code_budget(f) then return false end
 	local bearer = engine.handle(f, c)
 	local src = inst.source and state.get(f, inst.source)
 	local r = action.call({
 		kind = "status", entity = inst.row, module = module, fn = fn, args = table.pack(...), check = check, plain = true,
 		caster = bearer, target = bearer, in_fight = f.in_fight, rand = f.rand, data = inst.data,
-		fields = { bearer = bearer, source = src and engine.handle(f, src) or nil, turns_left = inst.turns_left,
+		fields = { bearer = bearer, source = src and engine.handle(f, src) or nil, ticks_left = inst.ticks_left,
 			round = f.round },
 	})
 	if not r.ok then
@@ -248,12 +254,12 @@ function engine.summon_hook(f, c, fname, target)
 	local module = load.module("summons", c.row.key)
 	local fn = module and module[fname]
 	if type(fn) ~= "function" then return true, false end
-	if not tick_budget(f) then return false, true end
+	if not code_budget(f) then return false, true end
 	local me = engine.handle(f, c)
 	local r = action.call({
 		kind = "summon", entity = c.row, module = module, fn = fn, caster = me, plain = true,
 		target = target and engine.handle(f, target) or nil, in_fight = f.in_fight, rand = f.rand, data = c.data,
-		fields = { self = me, turns_left = c.turns_left, round = f.round },
+		fields = { self = me, ticks_left = c.ticks_left, round = f.round },
 	})
 	if not r.ok then
 		warn("summon %s failed (it leaves the fight): %s", label(f, c), tostring(r.err or r.refused))
@@ -299,7 +305,8 @@ end
 -- Statuses
 
 -- Applies status `key` to c (replacing an instance it has). params: names and values
--- (lib/action.lua action.params); turns (0 or absent: the status's turns) is the duration.
+-- (lib/action.lua action.params); ticks (0 or absent: the status's ticks) is the duration.
+-- It counts from the tick after f.tick (the fight's clock, or the world's).
 function engine.afflict(f, c, key, params, source)
 	local row = statuses.by_key(key)
 	if not row or row.retired ~= 0 or not load.module("statuses", key) then
@@ -317,11 +324,11 @@ function engine.afflict(f, c, key, params, source)
 		return
 	end
 	local data = copy(params)
-	local turns = data.turns
-	data.turns = nil
-	if turns == nil or turns == 0 then turns = row.turns end
-	local inst = { status_id = row.id, key = key, row = row, turns_left = turns > 0 and turns or nil, data = data,
-		applied_round = f.round, source = source and source.id or nil }
+	local ticks = data.ticks
+	data.ticks = nil
+	if ticks == nil or ticks == 0 then ticks = row.ticks end
+	local inst = { status_id = row.id, key = key, row = row, ticks_left = ticks > 0 and ticks or nil, data = data,
+		tick = f.tick or 0, source = source and source.id or nil }
 	c.statuses[#c.statuses + 1] = inst
 	trace_status(f, c, inst, "add")
 	engine.status_hook(f, c, inst, "on_apply")
@@ -333,32 +340,41 @@ function engine.cure(f, c, key)
 	if inst then engine.end_status(f, c, inst, "remove") end
 end
 
--- Statuses that tick at the start of c's turn; from now on c's statuses count this turn.
-function engine.turn_start(f, c)
-	local list = copy(c.statuses)
-	for _, inst in ipairs(list) do inst.seen = true end
-	for _, inst in ipairs(list) do
-		if present(c, inst) and inst.row.tick_on == "turn_start" then engine.status_hook(f, c, inst, "on_tick") end
-	end
+-- Ends c's status `key`, when it has it, as if it ran out (on_expire).
+function engine.expire(f, c, key)
+	local inst = find(c, key)
+	if not inst then return end
+	local prev = engine.doing(f, c, "status")
+	engine.end_status(f, c, inst, "expire")
+	engine.done(f, prev)
 end
 
--- The end of c's turn: turn_end ticks, then the countdown of the statuses that counted
--- this turn (those that run out expire).
-function engine.turn_end(f, c)
-	local list = copy(c.statuses)
+-- Clock tick k for c: each of its statuses not counted up to k yet (applied before it)
+-- ticks (on_tick), then counts down; those that run out expire. Returns whether any of
+-- them did something on the tick (has on_tick or a duration).
+function engine.tick(f, c, k)
+	local list, counted = {}, false
+	for _, inst in ipairs(c.statuses) do
+		if (inst.tick or 0) < k then
+			list[#list + 1] = inst
+			local module = load.module("statuses", inst.key)
+			if inst.ticks_left or (module and type(module.on_tick) == "function") then counted = true end
+		end
+	end
 	for _, inst in ipairs(list) do
-		if inst.seen and present(c, inst) and inst.row.tick_on == "turn_end" then engine.status_hook(f, c, inst, "on_tick") end
+		if present(c, inst) then engine.status_hook(f, c, inst, "on_tick") end
 	end
 	local prev = engine.doing(f, c, "status")
 	for _, inst in ipairs(list) do
-		if inst.seen and present(c, inst) and inst.turns_left then
-			inst.turns_left = inst.turns_left - 1
-			if inst.turns_left <= 0 then engine.end_status(f, c, inst, "expire")
-			else trace_status(f, c, inst, "turns") end
+		inst.tick = k
+		if present(c, inst) and inst.ticks_left then
+			inst.ticks_left = inst.ticks_left - 1
+			if inst.ticks_left <= 0 then engine.end_status(f, c, inst, "expire")
+			else trace_status(f, c, inst, "ticks") end
 		end
-		inst.seen = nil
 	end
 	engine.done(f, prev)
+	return counted
 end
 
 -- Whether a status keeps c from acting now; returns the status too.
@@ -429,8 +445,8 @@ end
 ---------------------------------------------------------------------------------------
 -- Summons
 
--- A new ally for the player's side: summon `key` with params (turns: rounds it stays, 0
--- or absent: the summon's turns; the rest is its a.data).
+-- A new ally for the player's side: summon `key` with params (ticks: clock ticks it stays,
+-- 0 or absent: the summon's ticks; the rest is its a.data).
 function engine.summon(f, key, params, by)
 	local row = summons.by_key(key)
 	if not row or row.retired ~= 0 then
@@ -442,12 +458,12 @@ function engine.summon(f, key, params, by)
 		return
 	end
 	local data = copy(params)
-	local turns = data.turns
-	data.turns = nil
-	if turns == nil or turns == 0 then turns = row.turns end
+	local ticks = data.ticks
+	data.ticks = nil
+	if ticks == nil or ticks == 0 then ticks = row.ticks end
 	local c = state.add(f, { side = "ally", kind = "summon", entity_id = row.id, hp = row.hp, maxhp = row.hp,
-		turns_left = turns > 0 and turns or nil, data = data, row = row })
-	trace(f, { summon = "join", id = c.id, name = row.name, hp = c.hp, max = c.maxhp, turns = c.turns_left })
+		ticks_left = ticks > 0 and ticks or nil, data = data, row = row })
+	trace(f, { summon = "join", id = c.id, name = row.name, hp = c.hp, max = c.maxhp, ticks = c.ticks_left })
 	engine.summon_hook(f, c, "on_summon")
 end
 
@@ -464,22 +480,21 @@ function engine.reap(f)
 	end
 end
 
--- The end of the round for an ally that acted: one round fewer; when none are left it
--- leaves (on_expire, or "Your X leaves the fight.").
-function engine.summon_round(f, c)
-	if not c.acted then return end
-	c.acted = nil
-	if not c.turns_left then return end
-	c.turns_left = c.turns_left - 1
+-- A clock tick for ally c: one tick fewer; when none are left it leaves (on_expire, or
+-- "Your X leaves the fight."). Returns whether it counted (it has a duration).
+function engine.summon_tick(f, c)
+	if not c.ticks_left then return false end
+	c.ticks_left = c.ticks_left - 1
 	local prev = engine.doing(f, c, "summon")
-	if c.turns_left <= 0 then
+	if c.ticks_left <= 0 then
 		local _, had = engine.summon_hook(f, c, "on_expire")
 		if not had then say(f, ("Your %s leaves the fight."):format(c.row.name)) end
 		leave(f, c)
 	else
-		trace(f, { summon = "turns", id = c.id, name = c.row.name, turns = c.turns_left })
+		trace(f, { summon = "ticks", id = c.id, name = c.row.name, ticks = c.ticks_left })
 	end
 	engine.done(f, prev)
+	return true
 end
 
 ---------------------------------------------------------------------------------------
@@ -556,12 +571,5 @@ apply = function(f, events, source)
 	end
 end
 engine.apply = apply
-
--- A map move with world statuses (outside fights): the player's turn, start to end.
-function engine.world_move(f)
-	local p = state.player(f)
-	engine.turn_start(f, p)
-	engine.turn_end(f, p)
-end
 
 return engine

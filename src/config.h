@@ -42,6 +42,8 @@ typedef struct {
 	int    stream_heartbeat_ms;   /* 15000: ": ping" on quiet streams (0 = none) */
 	int    stream_replay_events;  /* 200: events kept per channel for Last-Event-ID replay */
 	int    stream_replay_seconds; /* 300: ... and for how long (0 = no replay) */
+	int    tick;              /* 1   : the game's tick: a request of the server's own (POST /__tick) on each boundary of tick_ms */
+	int    tick_ms;           /* 10000: not a config key: the game's tick (clock.TICK in app/lib/clock.lua); tests shorten it */
 } dk_config;
 
 void config_defaults(dk_config *c);

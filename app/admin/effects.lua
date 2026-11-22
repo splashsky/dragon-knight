@@ -56,7 +56,7 @@ local KINDS = {
 		kind = require("lib.content.kinds.statuses"), rows = require("lib.statuses"), title = "Statuses", one = "Status",
 		scripted = true,
 		code = "on_apply, on_tick, on_expire, on_remove, modify_damage_dealt, modify_damage_taken",
-		columns = { "kind", "tick_on", "scope", "turns", "blocks_action" },
+		columns = { "kind", "scope", "ticks", "blocks_action" },
 		in_use = function(id)
 			return dk.db:value("SELECT (SELECT count(*) FROM fight_statuses WHERE status_id = ?) + " ..
 				"(SELECT count(*) FROM user_statuses WHERE status_id = ?)", id, id)
@@ -66,7 +66,7 @@ local KINDS = {
 		kind = require("lib.content.kinds.summons"), rows = require("lib.summons"), title = "Summons", one = "Summon",
 		scripted = true,
 		code = "act, on_summon, on_death, on_expire",
-		columns = { "hp", "attack", "defense", "dexterity", "turns" },
+		columns = { "hp", "attack", "defense", "dexterity", "ticks" },
 		in_use = function(id)
 			return dk.db:value("SELECT count(*) FROM fight_combatants WHERE kind = 'summon' AND entity_id = ?", id)
 		end,

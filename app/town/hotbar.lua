@@ -1,9 +1,9 @@
 -- town/hotbar.lua :: arranging the fight's hotbar (3.1, lib/hotbar.lua; docs/APP.md
 -- "Hotbar"); not while fighting (common.not_fighting: the bar stays as the fight began).
---   GET  /hotbar  the ten slots (1 Attack and 0 Run fixed; 2-9 each with a list of the
+--   GET  /hotbar  the ten slots (1 Attack, 9 Guard and 0 Run fixed; 2-8 each with a list of the
 --                 actions to put there) and the player's actions; ?saved=1 / ?reset=1 say
 --                 what the last POST did
---   POST /hotbar  save: slot2 .. slot9 = an action's key or "" (empty); every other action
+--   POST /hotbar  save: slot2 .. slot8 = an action's key or "" (empty); every other action
 --                 goes off the bar. forget (the Reset button; not "reset", which would
 --                 hide the form's reset()): forget the arrangement (the bar fills again).
 --                 Both redirect to GET /hotbar.
@@ -48,6 +48,7 @@ function page.show(req)
 		saved = req.query.saved ~= nil,
 		reset = req.query.reset ~= nil,
 		attack_icon = "/static/images/skills/attack.png",
+		guard_icon = "/static/images/skills/guard.png",
 		run_icon = "/static/images/skills/run.png",
 	})
 end

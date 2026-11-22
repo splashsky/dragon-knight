@@ -34,6 +34,7 @@ typedef struct {
 	const char  *body;         /* raw body bytes (Content-Length only; chunked => 501) */
 	size_t       body_len;
 	const char  *remote_addr;  /* "1.2.3.4" or "::1" */
+	int          tick;         /* 1: the server's own tick request (POST /__tick, see http_serve), never a network one */
 } dk_request;
 
 /* An event stream instead of a response body (resp_sse). */
@@ -81,7 +82,12 @@ typedef struct {
 	void  *ud;
 } dk_hooks;
 
-/* Bind, listen, run until SIGINT/SIGTERM, then drain and return 0. -1 on startup failure. */
+/* Bind, listen, run until SIGINT/SIGTERM, then drain and return 0. -1 on startup failure.
+ * With cfg->tick, the I/O thread also sends the game's tick on every boundary of
+ * cfg->tick_ms of the wall clock: a request of its own (POST /__tick, req->tick = 1, no
+ * connection) down the same queue to a worker and hooks->handle; its response goes
+ * nowhere and it has no access log line. A tick still running when the next is due skips
+ * that one. */
 int http_serve(const dk_config *cfg, const dk_hooks *hooks);
 
 /* Request a graceful stop from any thread (also triggered by SIGINT/SIGTERM). */

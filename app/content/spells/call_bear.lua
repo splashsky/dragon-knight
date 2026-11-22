@@ -7,8 +7,8 @@ local function can_cast(s)
 end
 
 local function cast(s)
-	s:summon("bear", { turns = s.power })
-	s:say("cast", s.name, s.power)
+	s:summon("bear", { ticks = s.power })
+	s:say("cast", s.name, s:seconds(s.power))
 end
 
 return {
@@ -25,7 +25,7 @@ and it stays only as long as the spell does.]],
 	target = "self",
 	uses = { summons = { "bear" } },
 	messages = {
-		cast = "You have cast the %s spell. A bear joins the fight for %d rounds.",
+		cast = "You have cast the %s spell. A bear joins the fight for %d seconds.",
 		no_room = "You can't call another ally now. Please go back and try again.",
 	},
 	can_cast = can_cast,

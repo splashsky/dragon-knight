@@ -1322,6 +1322,46 @@ ALTER TABLE summons ADD COLUMN element TEXT NOT NULL DEFAULT 'neutral';
 	end
 end
 
+-- 22: the server's tick and fights in real time (3.2, app/lib/tick.lua, fight/round.lua
+-- round.advance): durations are clock ticks (statuses' and summons' turns become ticks,
+-- one turn one tick; tick_on goes: statuses tick on the clock), fights save the last tick
+-- they played, the player's turn deadline and when the tick must advance them next,
+-- statuses the last tick they counted (world statuses tick on the clock too). Those in
+-- progress get tick 0, not on the clock yet: the next POST /fight or server tick starts
+-- them at its time (fight/round.lua round.advance, lib/world.lua world.advance), the turn
+-- with its 30 seconds. Admins' overrides of turns become overrides of ticks. Guard takes
+-- the hotbar's key 9: what was on it moves to the first free key of 2-8, or off the bar.
+local function v22_fights_on_the_clock()
+	local db = dk.db
+	db:exec_script([[
+ALTER TABLE statuses DROP COLUMN tick_on;
+ALTER TABLE statuses RENAME COLUMN turns TO ticks;
+ALTER TABLE summons RENAME COLUMN turns TO ticks;
+ALTER TABLE fights ADD COLUMN tick INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE fights ADD COLUMN deadline INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE fights ADD COLUMN due INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX fights_due ON fights (due) WHERE outcome = '';
+ALTER TABLE fight_combatants RENAME COLUMN turns_left TO ticks_left;
+ALTER TABLE fight_statuses RENAME COLUMN turns_left TO ticks_left;
+ALTER TABLE fight_statuses RENAME COLUMN applied_round TO tick;
+ALTER TABLE user_statuses RENAME COLUMN turns_left TO ticks_left;
+ALTER TABLE user_statuses ADD COLUMN tick INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX user_statuses_tick ON user_statuses (tick);
+UPDATE fight_statuses SET tick = 0;
+]])
+	for _, tbl in ipairs({ "content_overrides", "content_adopt" }) do
+		db:exec("UPDATE " .. tbl .. " SET field = 'ticks' WHERE kind IN ('statuses', 'summons') AND field = 'turns'")
+		db:exec("DELETE FROM " .. tbl .. " WHERE kind = 'statuses' AND field = 'tick_on'")
+	end
+	for _, r in ipairs(db:query("SELECT user_id, kind, ref_id FROM user_hotbar WHERE slot = 9 ORDER BY user_id")) do
+		local free = db:value("SELECT min(s) FROM (SELECT 2 AS s UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 " ..
+			"UNION SELECT 6 UNION SELECT 7 UNION SELECT 8) WHERE s NOT IN (SELECT slot FROM user_hotbar " ..
+			"WHERE user_id = ? AND slot IS NOT NULL)", r.user_id)
+		db:exec("UPDATE user_hotbar SET slot = ? WHERE user_id = ? AND kind = ? AND ref_id = ?", free, r.user_id, r.kind,
+			r.ref_id)
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1359,6 +1399,9 @@ migrations.STEPS = {
 	{ name = "elements and wards: resistances and status wards in place of monsters' immunity (immune 1: arcane, " ..
 		"2: arcane and sleep; admins' overrides kept), weapons' and attacks' elements, monster classes",
 		up = v21_elements_and_wards },
+	{ name = "fights in real time on the server's tick: durations in ticks, the turn's deadline (fights in progress " ..
+		"start on the clock when next played), Guard on the hotbar's key 9 (what was there moves to a free key or off the bar)",
+		up = v22_fights_on_the_clock },
 }
 
 migrations.VERSION = #migrations.STEPS

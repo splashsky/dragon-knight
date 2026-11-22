@@ -83,8 +83,10 @@ t_fight monsterer "$WITCH" 60
 t_fight_status monsterer 1 sleep 'chance=i:15'
 t_fight_status monsterer 1 poison '' 5
 t_get /fight; CS=$(t_csrf); expect_body "Monster's MP: 33"; expect_body 'name="continue"'
+# (the blocked turns end at the clock's ticks)
+t_round "csrf=$CS&continue=Continue"
 for _ in 1 2; do
-	t_round "csrf=$CS&continue=Continue"
+	t_tick; t_get /fight
 	expect_body 'You are still asleep.'; expect_body 'class="fight-monsterturn">The monster casts Pain on you for '
 	expect_body "Monster's MP: 33"
 done
@@ -94,7 +96,7 @@ t_sql "DELETE FROM fight_statuses WHERE user_id = (SELECT id FROM users $MQ)"
 t_sql "UPDATE users SET currenthp = 500 $MQ"
 t_round "csrf=$CS&fight=Fight"
 if grep -qF 'The Bog Witch casts Sleep.<br>You fall asleep.' "$BODY"; then mo_is "$T_STATUSES" "player:sleep"
-elif grep -qF 'The monster casts Poison. You are poisoned for 3 turns.' "$BODY"; then mo_is "$T_STATUSES" "player:poison/3"
+elif grep -qF 'The monster casts Poison. You are poisoned for 30 seconds.' "$BODY"; then mo_is "$T_STATUSES" "player:poison/3"
 else expect_body 'The monster casts Pain on you for '; fi
 mo_is "$(enemy mp)" 33
 t_sql "UPDATE users SET currenthp = 500 $MQ"

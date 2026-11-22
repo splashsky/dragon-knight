@@ -97,6 +97,8 @@ void config_defaults(dk_config *c)
 	c->stream_heartbeat_ms   = 15000;
 	c->stream_replay_events  = 200;
 	c->stream_replay_seconds = 300;
+	c->tick                  = 1;
+	c->tick_ms               = 10000;
 }
 
 int config_workers(const dk_config *c)
@@ -177,6 +179,7 @@ static const cfg_key cfg_keys[] = {
 	{ "stream_heartbeat_ms",   K_INT,  OFF(stream_heartbeat_ms),   0, 3600000 },
 	{ "stream_replay_events",  K_INT,  OFF(stream_replay_events),  0, 100000 },
 	{ "stream_replay_seconds", K_INT,  OFF(stream_replay_seconds), 0, 86400 },
+	{ "tick",                  K_BOOL, OFF(tick),                  0, 1 },
 };
 #undef OFF
 

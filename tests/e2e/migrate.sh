@@ -14,7 +14,11 @@
 # (schema_v14.sql, seed_v14.sql) that a fight in progress goes on, an encounter waiting for
 # GET /fight is cancelled and a won fight waiting for GET /victory is paid (and version 16's
 # items.rechargeable, version 17's user_hotbar, version 21's resistances and wards in place
-# of monsters.immune, admins' overrides of it converted). Since version
+# of monsters.immune, admins' overrides of it converted); version 21 -> 22 (schema_v21.sql,
+# seed_v21.sql) that durations become ticks (statuses' and allies' turns, fights in
+# progress, world statuses, admins' overrides), fights in progress start on the clock and
+# go on, and what sat on the hotbar's key 9 (Guard's now) moves to a free key or off the
+# bar. Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -901,8 +905,8 @@ V7_CS=$(t_csrf)
 t_round "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
 mig_sql "$V7_DB" "UPDATE users SET currenthp = 100 WHERE id = 1"
 t_round "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
-if grep -qF 'The monster is still asleep.' "$BODY"; then mig_eq "SELECT $T_SLEEP FROM users WHERE id = 1" "13" "still asleep"
-else expect_body 'The monster has woken up.'; mig_eq "SELECT $T_SLEEP FROM users WHERE id = 1" "0" "woke up"; fi
+# (3.2: asleep, its turn is skipped; it rolls to wake on the clock's ticks)
+expect_body 'The Shadow is still asleep.'; mig_eq "SELECT $T_SLEEP FROM users WHERE id = 1" "13" "still asleep"
 mig_eq "SELECT currentmp || '|' || $T_UBER_DAMAGE || '|' || $T_UBER_DEFENSE FROM users WHERE id = 1" "30|25|10" "MP spent (35 - 5), buffs kept"
 t_jar migv7w
 t_login winner v7pass1
@@ -1315,6 +1319,72 @@ t_get /victory; expect_status 200; expect_body 'You have defeated the Blue Slime
 mig_eq "SELECT experience || '|' || gold || '|' || level FROM users WHERE id = 3" "$V14_PAID" "GET /victory pays nothing"
 mig_unserve "$MIG/v14server.log"
 "$BIN" migrate --config "$MIG/v14.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v14)"
+
+t_section "migrate: version 21 database"
+# version 21 schema + its game data: a fight in progress with a status and an ally counting
+# turns, a world status, an admin's override of a status's turns, and hotbars with an
+# action on key 9 (one with a free key, one full); only step 22 runs.
+V21_DB="$MIG/v21.db"
+sed "s#db_path = \"$T/dk.db\"#db_path = \"$V21_DB\"#" "$CONFIG" > "$MIG/v21.lua"
+mig_script "$V21_DB" "$ROOT/tests/fixtures/schema_v21.sql"
+mig_script "$V21_DB" "$ROOT/tests/fixtures/seed_v21.sql"
+cat > "$MIG/v21_data.sql" <<SQL
+INSERT INTO users (id, username, email, charname, verify, charclass, level, currentaction, latitude, longitude,
+	currenthp, base_maxhp, dexterity) VALUES
+	(1, 'midfight', 'm@example.com', 'Midfight', '1', 2, 3, 'Fighting', 5, 5, 30, 30, 22500),
+	(2, 'hotkeys', 'h@example.com', 'Hotkeys', '1', 1, 9, 'In Town', 0, 0, 15, 15, 5);
+INSERT INTO fights (user_id, round, wave, data) VALUES (1, 3, 1, '');
+INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, turns_left) VALUES
+	(1, 1, 'player', 'player', NULL, 0, NULL, NULL, NULL), (1, 2, 'enemy', 'monster', 1, 1, 400, 400, NULL),
+	(1, 3, 'ally', 'summon', 1, 0, 30, 30, 4);
+INSERT INTO summons (id, key, name, hp, turns) VALUES (1, 'wolf', 'Wolf', 30, 5);
+INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, turns_left, data, applied_round)
+	VALUES (1, 2, 1, 1, NULL, 'chance=i:15', 3);
+INSERT INTO statuses (id, key, name) VALUES (4, 'regen', 'Regenerating');
+INSERT INTO user_statuses (user_id, status_id, position, turns_left, data) VALUES (2, 4, 1, 7, 'amount=i:5');
+INSERT INTO content_overrides (kind, key, field, value) VALUES ('statuses', 'poison', 'turns', '6'),
+	('summons', 'wolf', 'turns', '9'), ('statuses', 'poison', 'name', 'Envenomed');
+INSERT INTO user_hotbar (user_id, kind, ref_id, slot) VALUES (1, 'spell', 1, 2), (1, 'spell', 6, 9), (1, 'item', 66, 3),
+	(2, 'spell', 1, 2), (2, 'spell', 6, 3), (2, 'spell', 7, 4), (2, 'spell', 8, 5), (2, 'spell', 9, 6), (2, 'spell', 10, 7),
+	(2, 'spell', 11, 8), (2, 'spell', 12, 9), (2, 'spell', 13, NULL);
+PRAGMA user_version = 21;
+SQL
+mig_script "$V21_DB" "$MIG/v21_data.sql"
+MIG_DB=$V21_DB
+mig_eq "PRAGMA user_version" "21" "fixture is version 21"
+"$BIN" migrate --config "$MIG/v21.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v21) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version ([1-9]|1[0-9]|2[01]):' "$T/migrate.log" && t_fail "steps 1-21 ran on a version 21 database" || t_ok
+grep -qF "Migrating to version 22: fights in real time on the server's tick" "$T/migrate.log" && t_ok || t_fail "step 22 not reported: $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v21 stamped"
+[ "$(mig_layout "$V21_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
+	t_fail "migrated v21 schema differs from a fresh install:"
+	diff <(mig_layout "$V21_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
+}
+mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v21)"
+mig_eq "SELECT tick || ':' || deadline || ':' || due || ':' || round FROM fights" "0:0:0:3" \
+	"the fight in progress goes on the clock when next played (or ticked)"
+mig_eq "SELECT group_concat(id || '=' || coalesce(ticks_left, '-'), ' ') FROM fight_combatants" "1=- 2=- 3=4" "an ally's turns are ticks"
+mig_eq "SELECT tick || ':' || data FROM fight_statuses" "0:chance=i:15" "its status counts from then"
+mig_eq "SELECT ticks_left || ':' || tick FROM user_statuses" "7:0" "a world status's moves are ticks"
+mig_eq "SELECT group_concat(kind || ':' || key || ':' || field || '=' || value, ' ') FROM (SELECT * FROM content_overrides ORDER BY kind, key, field)" \
+	"statuses:poison:name=Envenomed statuses:poison:ticks=6 summons:wolf:ticks=9" "overrides of turns are of ticks"
+mig_eq "SELECT name || ':' || ticks FROM statuses WHERE key = 'poison'" "Envenomed:6" "and apply"
+mig_eq "SELECT ticks FROM summons WHERE key = 'wolf'" "9" "an ally's too"
+mig_eq "SELECT count(*) FROM statuses WHERE key = 'guarding'" "1" "the new status guarding"
+mig_eq "SELECT group_concat(user_id || ':' || kind || ':' || ref_id || '@' || coalesce(slot, '-'), ' ') FROM (SELECT * FROM user_hotbar ORDER BY user_id, slot IS NULL, slot, ref_id)" \
+	"1:spell:1@2 1:item:66@3 1:spell:6@4 2:spell:1@2 2:spell:6@3 2:spell:7@4 2:spell:8@5 2:spell:9@6 2:spell:10@7 2:spell:11@8 2:spell:12@- 2:spell:13@-" \
+	"key 9 to the first free key, or off a full bar"
+mig_serve "$MIG/v21.lua" "$MIG/v21server.log"
+"$BIN" user --config "$MIG/v21.lua" passwd midfight v21pass1 >/dev/null && t_ok || t_fail "dk user passwd (v21)"
+t_jar migv21; t_reset_jar
+t_login midfight v21pass1; expect_redirect /
+t_get /fight; expect_status 200; expect_body 'name="round" value="3"'; expect_body 'data-turn-ends="'
+expect_body 'Your <b>Wolf</b>: 30 / 30 HP <span class="light">(40s left)</span>'
+expect_body 'aria-keyshortcuts="9"><img src="/static/images/skills/guard.png"'
+t_round "csrf=$(t_csrf)&round=3&guard=Guard"
+mig_eq "SELECT round || ':' || tick || ':' || deadline FROM fights" "4:$((T_NOW / 10)):$((T_NOW / 10 + 3))" "on the clock, a round is played"
+mig_unserve "$MIG/v21server.log"
+"$BIN" migrate --config "$MIG/v21.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v21)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

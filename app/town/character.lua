@@ -2,6 +2,7 @@
 -- (anyone's sheet, from Who's Online) and showmap().
 local affinities = require("lib.content.affinities")
 local classes = require("lib.classes")
+local clock = require("lib.clock")
 local common = require("town.common")
 local elements = require("lib.elements")
 local game = require("lib.game")
@@ -33,12 +34,13 @@ function character.sheet(user)
 	end
 	local names = {}
 	for _, s in ipairs(spells.known(user)) do names[#names + 1] = s.name end
-	-- world statuses (lib/world.lua): they tick on map moves
-	local statuses = dk.db:query("SELECT s.name, s.resist, s.ward, us.turns_left FROM user_statuses us " ..
+	-- world statuses (lib/world.lua): they tick on the clock; the time they have left
+	local statuses = dk.db:query("SELECT s.name, s.resist, s.ward, us.ticks_left FROM user_statuses us " ..
 		"JOIN statuses s ON s.id = us.status_id WHERE us.user_id = ? ORDER BY us.position", user.id)
 	local resist, ward = s.resist, s.ward
 	for _, st in ipairs(statuses) do
 		resist, ward = elements.sum(resist, affinities.decode(st.resist)), elements.sum(ward, affinities.decode(st.ward))
+		st.left = st.ticks_left and clock.duration(st.ticks_left * clock.TICK)
 	end
 	return {
 		u = user,

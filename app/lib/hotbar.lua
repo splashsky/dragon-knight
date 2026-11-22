@@ -1,9 +1,9 @@
 -- hotbar.lua :: the fight's hotbar (3.1; docs/APP.md "Hotbar"): ten slots on the number
--- keys, 1 Attack and 0 Run (fixed, not stored), 2-9 the player's other fight actions where
--- they put them. An action is the equipped gear that casts, a fight spell known or a fight
+-- keys, 1 Attack, 9 Guard and 0 Run (fixed, not stored), 2-8 the player's other fight
+-- actions where they put them. An action is the equipped gear that casts, a fight spell known or a fight
 -- consumable in the bag (the fight menu's order), keyed "spell:<spells id>" or
 -- "item:<items id>". user_hotbar keeps every action a character has met, on the bar (slot
--- 2-9) or off it (slot NULL). One not met yet takes the first free slot, or goes off the
+-- 2-8) or off it (slot NULL). One not met yet takes the first free slot, or goes off the
 -- bar when none is free: pages show that without writing it (hotbar.arrange: GETs stay
 -- pure), and a fight's beginning writes it (hotbar.settle), so the bar never shifts under
 -- the player's fingers. One met but not at hand now (a consumable used up, gear not worn, a
@@ -14,7 +14,7 @@ local spells = require("lib.spells")
 
 local hotbar = {}
 
-hotbar.FIRST, hotbar.LAST = 2, 9   -- the slots the player arranges
+hotbar.FIRST, hotbar.LAST = 2, 8   -- the slots the player arranges (9 is Guard since 3.2)
 
 -- An action's key.
 function hotbar.key(kind, id)
@@ -84,7 +84,7 @@ local function stored(user_id)
 end
 
 -- Where `keys` (the actions at hand, in order) go: the stored slots, then each key not met
--- yet in the first free slot. Returns slot -> key (2-9; stored keys not at hand included),
+-- yet in the first free slot. Returns slot -> key (2-8; stored keys not at hand included),
 -- and the new keys: key -> slot (false: off the bar, no slot was free).
 local function place(user_id, keys)
 	local slots, met = stored(user_id)
@@ -111,7 +111,7 @@ local function keys_of(actions)
 end
 
 -- The bar as it stands for `user_id` with the actions at hand `keys` (in the fight menu's
--- order): slot -> key, slots 2-9. Reads only.
+-- order): slot -> key, slots 2-8. Reads only.
 function hotbar.arrange(user_id, keys)
 	return (place(user_id, keys))
 end
@@ -148,7 +148,7 @@ function hotbar.choices(user)
 	return list, seen
 end
 
--- Puts `chosen` (slot -> key, slots 2-9; keys from hotbar.choices) on the bar; every
+-- Puts `chosen` (slot -> key, slots 2-8; keys from hotbar.choices) on the bar; every
 -- other action met or at hand goes off it.
 function hotbar.save(user, chosen)
 	local _, met = stored(user.id)

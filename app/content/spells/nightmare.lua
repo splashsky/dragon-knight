@@ -9,7 +9,7 @@ Sleep ever could. The spell costs dearly in mana, and the Mages who use it rarel
 afterwards.]],
 	icon = "nightmare",
 	mp = 60,
-	power = 13,                  -- the chance in 15 that it stays asleep each turn
+	power = 13,                  -- the chance in 15 that it stays asleep each tick
 	messages = {
 		asleep = "You have cast the %s spell. The monster is asleep.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",

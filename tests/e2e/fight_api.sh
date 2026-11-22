@@ -3,7 +3,8 @@
 # round's events) from the same state and the same dice (X-Test-Seed, test_routes) must
 # leave the same database and say the same lines; the events' shape (spells, items,
 # statuses, summons, monster spells and items); stale rounds (a second click, an older tab)
-# in both paths; CSRF; the victory, death and drop pages; the no-JS page (the round field).
+# in both paths; CSRF; the victory, death and drop pages; the no-JS page (the round field);
+# the clock (3.2): a POST catches the fight up first, its events before the round's; Guard.
 # Sourced by tests/run.sh.
 if ! command -v python3 >/dev/null; then
 	t_section "fight api (skipped: needs python3)"
@@ -28,12 +29,13 @@ t_spells fapi "$(sp heal),$(sp hurt),$(sp sleep),$(sp poison),$(sp regen),$(sp h
 # combatants and statuses, the bag.
 FA_STATE="SELECT currenthp || ',' || currentmp || ',' || currenttp || ',' || gold || ',' || experience || ',' ||
 	currentaction || ',' || latitude || ',' || longitude || ',' || dropcode || '|' || $T_ROUND || '|' ||
-	coalesce((SELECT wave || ':' || replace(data, char(10), ';') FROM fights f WHERE f.user_id = users.id), '') || '|' ||
+	coalesce((SELECT wave || ':' || tick || ':' || deadline || ':' || due || ':' || replace(data, char(10), ';')
+		FROM fights f WHERE f.user_id = users.id), '') || '|' ||
 	coalesce((SELECT group_concat(k, ' ') FROM (SELECT c.id || ':' || c.side || ':' || c.kind || ':' || coalesce(c.entity_id, '') || ':' ||
-		coalesce(c.hp, '') || '/' || coalesce(c.maxhp, '') || ':' || coalesce(c.mp, '') || ':' || coalesce(c.turns_left, '') || ':' ||
+		coalesce(c.hp, '') || '/' || coalesce(c.maxhp, '') || ':' || coalesce(c.mp, '') || ':' || coalesce(c.ticks_left, '') || ':' ||
 		replace(c.data, char(10), ';') AS k FROM fight_combatants c WHERE c.user_id = users.id ORDER BY c.id)), '') || '|' ||
-	coalesce((SELECT group_concat(k, ' ') FROM (SELECT fs.combatant_id || ':' || fs.status_id || ':' || coalesce(fs.turns_left, '') || ':' ||
-		replace(fs.data, char(10), ';') || ':' || fs.applied_round || ':' || coalesce(fs.source, '') AS k
+	coalesce((SELECT group_concat(k, ' ') FROM (SELECT fs.combatant_id || ':' || fs.status_id || ':' || coalesce(fs.ticks_left, '') || ':' ||
+		replace(fs.data, char(10), ';') || ':' || fs.tick || ':' || coalesce(fs.source, '') AS k
 		FROM fight_statuses fs WHERE fs.user_id = users.id ORDER BY fs.combatant_id, fs.position)), '') || '|' ||
 	coalesce($T_ITEMS, '') FROM users $FAQ"
 fa_state() { t_sql "$FA_STATE"; }
@@ -54,13 +56,13 @@ raw = open(path, "rb").read()
 text = raw.decode("utf-8")
 
 ACTORS = {"player", "ally", "enemy"}
-TYPES = {"attack", "spell", "item", "status", "summon", "blocked", "run", "ambush", "wave", "speech", "say",
+TYPES = {"attack", "spell", "item", "guard", "status", "summon", "blocked", "run", "ambush", "wave", "speech", "say",
 	"victory", "death", "escape"}
 PARTS = {"player", "allies", "enemies", "ending"}
 EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon"}
 CHANGE = {"who", "id", "name", "from", "to", "max"}
-STATUS = {"who", "id", "name", "key", "status", "turns", "change", "statuses"}
-SUMMON = {"change", "id", "name", "hp", "max", "turns"}
+STATUS = {"who", "id", "name", "key", "status", "ticks", "change", "statuses"}
+SUMMON = {"change", "id", "name", "hp", "max", "ticks"}
 
 def inner(body, start, tag):
 	m = re.search(start + r'[^>]*>(.*?)</' + tag + '>', body, re.S)
@@ -119,13 +121,14 @@ def check(d):
 			assert k not in e or e[k], "empty %s list" % k
 		for s in e.get("status", []):
 			assert set(s) <= STATUS and s["who"] in ACTORS, "status %r" % s
-			assert s["change"] in ("add", "remove", "expire", "turns"), "status change %r" % s
+			assert s["change"] in ("add", "remove", "expire", "ticks"), "status change %r" % s
 			assert isinstance(s["key"], str) and isinstance(s["status"], str), "status names"
 			for x in s["statuses"]:
-				assert set(x) <= {"key", "name", "turns", "icon"}, "statuses %r" % x
+				assert set(x) <= {"key", "name", "ticks", "left", "icon"}, "statuses %r" % x
+				assert ("ticks" in x) == ("left" in x), "a duration and its words %r" % x
 				assert "icon" not in x or (isinstance(x["icon"], str) and x["icon"].startswith("/static/images/statuses/")), "status icon %r" % x
 		for s in e.get("summon", []):
-			assert set(s) <= SUMMON and s["change"] in ("join", "leave", "turns"), "summon %r" % s
+			assert set(s) <= SUMMON and s["change"] in ("join", "leave", "ticks"), "summon %r" % s
 
 if cmd == "lines-html":
 	for p in re.findall(r'<p class="fight-(?:yourturn|allyturn|monsterturn|roundend)">(.*?)</p>', text, re.S):
@@ -193,6 +196,11 @@ fa_player() {
 	fa_sql "UPDATE users SET level = 10, currenthp = 300, base_maxhp = 300, currentmp = 100, base_maxmp = 100,
 		currenttp = 10, base_maxtp = 10, strength = 30, dexterity = 30, base_attack = 0, base_defense = 0,
 		base_exp_bonus = 0, base_gold_bonus = 0, gold = 500, experience = 5000, dropcode = 0, latitude = 30, longitude = 0"
+}
+# a fight on the clock at T_START (t_fight's isn't yet: its first POST starts it at its time)
+fa_on_clock() {
+	t_sql "UPDATE fights SET tick = $((T_START / 10)), deadline = $((T_START / 10 + 3)), due = $((T_START / 10 + 3))
+		WHERE user_id = (SELECT id FROM users $FAQ)"
 }
 t_get /fight; FA_CS=$(t_csrf); expect_body 'Cheat attempt detected.'
 
@@ -334,7 +342,7 @@ done
 # the Wand (a fixed user_items id, so both runs send the same button), no MP left
 FA_WAND=900001
 fa_wand() {
-	fa_slime; fa_sql "UPDATE users SET currentmp = 0"
+	fa_slime; fa_on_clock; fa_sql "UPDATE users SET currentmp = 0"
 	t_sql "INSERT INTO user_items (id, user_id, item_id, qty, equipped, charges) SELECT $FA_WAND, u.id, i.id, 1, 'weapon', 5
 		FROM users u, items i WHERE u.username = 'fapi' AND i.key = 'wand'"
 }
@@ -354,13 +362,20 @@ expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" a
 expect_body '<span class="item-badge item-badge-charges item-badge-empty" aria-hidden="true">0/5</span>'
 
 t_section "fight api: statuses, summons, locked turns"
-fa_titan() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 149 30000; }
+fa_titan() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 149 30000; fa_on_clock; }
 fa_both poison 1 fa_titan "spell=Spell&userspell=$(sp poison)&round=2"
-fa_expect 'any(e["type"] == "spell" and e["status"][0]["key"] == "poison" and e["status"][0]["who"] == "enemy" and e["status"][0]["turns"] == 3 and e["status"][0]["status"] == "Poisoned" for e in d["events"] if "status" in e)' "Poison: the status"
-fa_expect 'any(e["type"] == "status" and e["part"] == "ending" and e["actor"] == "enemy" and e["text"].startswith("The Titan takes ") and e["hp"][0]["who"] == "enemy" for e in d["events"] if "text" in e and "hp" in e)' "Poison: the tick"
+fa_expect 'any(e["type"] == "spell" and e["status"][0]["key"] == "poison" and e["status"][0]["who"] == "enemy" and e["status"][0]["ticks"] == 3 and e["status"][0]["statuses"][0]["left"] == "30s" and e["status"][0]["status"] == "Poisoned" for e in d["events"] if "status" in e)' "Poison: the status"
+fa_expect 'not any(e["type"] == "status" and "text" in e for e in d["events"])' "Poison: no tick in the round"
+# a command a clock tick later: the fight catches up first (the poison's tick, its events
+# first), then the round
 fa_poisoned() { fa_titan; t_fight_status fapi 2 poison 'max=i:5
+min=i:2' 2; }
+T_NOW=$((T_START + 10)) fa_both "poison ticks, caught up" 2 fa_poisoned "fight=Fight&round=2"
+fa_expect 'd["events"][0]["type"] == "status" and d["events"][0]["part"] == "ending" and d["events"][0]["actor"] == "enemy" and d["events"][0]["text"].startswith("The Titan takes ") and d["events"][0]["hp"][0]["who"] == "enemy"' "Poison: the tick, caught up first"
+fa_expect 'any(e["type"] == "attack" and e["actor"] == "player" for e in d["events"])' "then the round"
+fa_poisoned_out() { fa_titan; t_fight_status fapi 2 poison 'max=i:5
 min=i:2' 1; }
-fa_both "poison runs out" 2 fa_poisoned "fight=Fight&round=2"
+T_NOW=$((T_START + 10)) fa_both "poison runs out" 2 fa_poisoned_out "fight=Fight&round=2"
 fa_expect 'any(e["actor"] == "enemy" and e["type"] == "status" and s["change"] == "expire" and s["key"] == "poison" and s["statuses"] == [] for e in d["events"] for s in e.get("status", []))' "Poison: expiry"
 fa_both regen 3 fa_titan "spell=Spell&userspell=$(sp regen)&round=2"
 fa_both wolf 4 fa_titan "spell=Spell&userspell=$(sp call_wolf)&round=2"
@@ -369,12 +384,29 @@ fa_expect 'any(e["actor"] == "ally" and e["type"] == "summon" and e["part"] == "
 fa_both "hyper beam" 5 fa_titan "spell=Spell&userspell=$(sp hyper_beam)&round=2"
 fa_expect '"name=\"continue\"" in d["fragments"]["main"] and any(s["key"] == "recharging" and s["who"] == "player" for e in d["events"] for s in e.get("status", []))'
 fa_recharging() { fa_titan; t_fight_status fapi 1 recharging '' 1; }
+# a blocked turn ends at the next tick: before it any command plays nothing; after it the
+# catch-up played it (the blocked turn, the monster), so the page's form is stale
 for cmd in "continue=Continue" "fight=Fight" "spell=Spell&userspell=$(sp heal)"; do
 	fa_both recharge 6 fa_recharging "$cmd&round=2"
-	fa_expect 'any(e["type"] == "blocked" and e["actor"] == "player" and e["text"] == "You must recharge this turn." for e in d["events"])'
+	fa_expect 'd["events"] == [] and d["round"] == 2 and "name=\"continue\"" in d["fragments"]["main"]'
+	T_NOW=$((T_START + 10)) fa_both "recharge, a tick later" 6 fa_recharging "$cmd&round=2"
+	fa_expect 'any(e["type"] == "blocked" and e["actor"] == "player" and e["text"] == "You must recharge this turn." for e in d["events"]) and d["stale"] and d["round"] == 3'
 done
 fa_both "continue, not locked" 7 fa_titan "continue=Continue&round=2"
 fa_expect 'd["events"] == [] and d["round"] == 2'
+
+t_section "fight api: Guard, and a turn that ran out"
+fa_slime; t_get /fight; FA_GUARD=$(fa_button guard)
+[ "$FA_GUARD" = "guard=Guard" ] && t_ok || t_fail "Guard sends '$FA_GUARD'"
+expect_body 'name="guard" value="Guard" title="Guard" aria-label="Guard" aria-keyshortcuts="9"><img src="/static/images/skills/guard.png"'
+fa_guarded() { fa_player; fa_sql "UPDATE users SET dexterity = 0"; t_fight fapi 2 50; fa_on_clock; }
+for seed in 1 2; do fa_both guard "$seed" fa_guarded "$FA_GUARD&round=2"; done
+fa_expect 'd["events"][0]["type"] == "guard" and d["events"][0]["text"] == "You raise your guard." and d["events"][0]["status"][0]["key"] == "guarding" and d["events"][0]["status"][0]["change"] == "add"' "Guard: the guard"
+fa_expect 'any(s["key"] == "guarding" and s["change"] == "expire" for e in d["events"] for s in e.get("status", []))' "Guard: until the next turn"
+fa_expect 'd["round"] == 3'; fa_is "$T_STATUSES" ""
+# the turn's deadline passed (30 s): the command is stale, the catch-up guarded
+T_NOW=$((T_START + 30)) fa_both "ran out" 3 fa_guarded "fight=Fight&round=2"
+fa_expect 'd["events"][0]["type"] == "guard" and d["events"][0]["text"] == "You hesitate, and raise your guard." and d["stale"] and d["round"] == 3' "a turn that ran out is a Guard"
 
 t_section "fight api: refusals"
 fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing changes, the same text both ways
@@ -388,7 +420,7 @@ fa_check_refusal() {  # fa_check_refusal SETUP 'fields' 'message': nothing chang
 	[ "$(fa_get 'd["error"]')" = "$3" ] && t_ok || t_fail "error: $(fa_get 'd.get("error")')"
 	[ "$(fa_state)" = "$before" ] && t_ok || t_fail "a refusal changed (fetch)"
 }
-fa_full() { fa_player; t_fight fapi 2 50; t_give fapi herb 1; }
+fa_full() { fa_player; t_fight fapi 2 50; fa_on_clock; t_give fapi herb 1; }
 fa_check_refusal fa_full "spell=Spell&userspell=$(sp heal)&round=2" "Your Hit Points are already full."
 fa_check_refusal fa_full "item=Use+Item&useritem=$(it herb)&round=2" "Your Hit Points are already full."
 fa_check_refusal fa_full "spell=Spell&userspell=0&round=2" "You must select a spell first."

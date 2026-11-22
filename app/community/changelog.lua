@@ -13,6 +13,10 @@ changelog.RELEASES = {
 			"Damage has an element: fire, frost, lightning, water, wind, earth, holy, shadow, arcane or poison, or plain physical blows. Monsters resist some elements and are weak to others; a few absorb them and heal. The fight says so when it matters, and the help page and the monsters' tooltips list it all. Gear can make you resist elements too, and some weapons strike with one. The hurt spells are arcane, Ember and burns are fire, poisons are poison (schema version 21, run dk migrate).",
 			"Monsters no longer have an all-or-nothing immunity to hurt and sleep spells. Each resists elements on its own, and wards off statuses by chance: a ward is how likely a sleep, a poison or a burn is to fail to take hold. The monsters that were immune still are. Your Extended Stats list your own resistances and wards.",
 			"The world has weather, and a clock: a day lasts two hours, from dawn to night. Storms form around Midworld, some small squalls, some great storms, and drift across the land toward Gilead over about two hours, raining (snowing in the cold north) on whoever is under them and leaving mud behind. The Location box shows the sky where you stand and the time of day, and while exploring you see the weather change and what is coming from the next tiles.",
+			"The server keeps the game's clock: every ten seconds the world moves on, whether you are looking at it or not, and your page catches up by itself when something changes.",
+			"Fights happen in real time. You have 30 seconds for each turn; in the last 20 a thin bar under your hotbar runs down, and when it runs out you raise your guard. Burns, poisons, sleep, charged attacks and allies last seconds instead of turns, so they keep working between your moves, and a fight you walk away from goes on without you (schema version 22, run dk migrate).",
+			"A new Guard action, always on key 9: it costs your turn and softens the blows you take until your next one. Your own hotbar keys are 2 to 8.",
+			"Effects that last outside fights, like the Regen Potion's, wear off with time instead of with your steps.",
 		},
 	},
 	{

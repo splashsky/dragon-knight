@@ -9,7 +9,7 @@ a turn at a time. Some creatures simply cannot be lulled, and the Mages who lear
 hard way have stopped asking which.]],
 	icon = "dream",
 	mp = 30,
-	power = 9,                  -- the chance in 15 that it stays asleep each turn
+	power = 9,                  -- the chance in 15 that it stays asleep each tick
 	messages = {
 		asleep = "You have cast the %s spell. The monster is asleep.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",

@@ -4,27 +4,34 @@
 --                     item=<items id> (a consumable's icon button; the form before 2.4 sent
 --                     item=Use Item + useritem=<id>, still accepted) | use_gear=<user_items
 --                     id> (an equipped item that casts a spell: a charge instead of MP) |
---                     run | continue (a turn a status blocks); fight and run are the Attack
---                     and Run icon buttons (fight=Fight, run=Run: only the name counts)
+--                     guard | run | continue (a turn a status blocks: it ends at the clock's
+--                     next tick, so nothing is played); fight, guard and run are the Attack,
+--                     Guard and Run icon buttons (fight=Fight, guard=Guard, run=Run: only the
+--                     name counts)
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
--- The fight is a model loaded and saved once per request (fight/state.lua); a POST plays at
--- most one round of the pipeline (fight/round.lua), whose dice and formulas live in
--- fight/combat.lua. This module checks the player's choice, plays it and saves; how a fight
--- begins (on a map move) and ends (paid in the winning round) is fight/encounter.lua.
--- GETs change nothing (docs/APP.md "Pure GETs"): GET /fight shows the fight with its last
--- round's lines, as the POST that played it did; GET /victory shows the rewards paid.
+-- The fight is a model loaded and saved once per request (fight/state.lua) and runs on the
+-- game's clock: a POST first catches it up to now (fight/encounter.lua encounter.advance,
+-- what the server's tick does: statuses and allies count the ticks, a turn that ran out is
+-- guarded), then plays at most one round of the pipeline (fight/round.lua), whose dice and
+-- formulas live in fight/combat.lua. This module checks the player's choice, plays it and
+-- saves; how a fight begins (on a map move) and ends (paid in the winning round) is
+-- fight/encounter.lua. GETs change nothing (docs/APP.md "Pure GETs"): GET /fight shows the
+-- fight as the last POST or tick left it, with its lines since the player's last command,
+-- and the turn's deadline for the page's timer; GET /victory shows the rewards paid.
 --
 -- Smooth fights (docs/APP.md "Fight events"; public/js/fight.js): a live request (the live
 -- client) gets the round's events with its answer, as an `events fight` frame (on the page
 -- or on the redirect the server follows), which fight.js plays before the page's regions
 -- apply. Every fight form carries the round it was shown at: a POST /fight with another
--- round (a second click, an older tab) plays nothing and shows the fight as it is now.
+-- round (a second click, an older tab, a page from before the turn ran out) plays nothing
+-- and shows the fight as it is now.
 -- A round that ends the fight (a victory, a death, a getaway) adds a scene after its
 -- events (lib/scene.lua; public/js/scene.js): the fight fades out into the page it ends on.
 local act = require("fight.act")
 local auth = require("lib.auth")
+local clock = require("lib.clock")
 local encounter = require("fight.encounter")
 local events = require("fight.events")
 local game = require("lib.game")
@@ -179,11 +186,13 @@ local function hotbar_view(user, buttons)
 	return bar, more
 end
 
--- name (turns left) and icon of each status of combatant c, for the page
+-- name, time left ("30s": its ticks left, nil without a limit) and icon of each status of
+-- combatant c, for the page
 local function status_list(c)
 	local out = {}
 	for _, s in ipairs(c.statuses) do
-		out[#out + 1] = { name = s.row.name, turns = s.turns_left, icon = schema.entity_icon("statuses", s.row.icon) }
+		out[#out + 1] = { name = s.row.name, left = s.ticks_left and events.left(s.ticks_left),
+			icon = schema.entity_icon("statuses", s.row.icon) }
 	end
 	return out
 end
@@ -205,34 +214,36 @@ local function view_of(f)
 			icon = schema.entity_icon("monsters", c.row.icon) }
 	end
 	for _, c in ipairs(state.allies(f)) do
-		allies[#allies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
+		allies[#allies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp,
+			left = c.ticks_left and events.left(c.ticks_left),
 			statuses = status_list(c), icon = schema.entity_icon("summons", c.row.icon) }
 	end
 	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p) }
 end
 
--- The events of round r (fight/events.lua), with its outcome last.
-local function round_events(r)
-	local list = events.build(r.f.trace, { hide_mp = function(id)
-		local c = state.get(r.f, id)
+-- The events of what this request did to fight f (its trace: the clock's ticks it caught
+-- up, then its round; fight/events.lua), with the outcome ("victory", "death", "escape")
+-- last; nil when it wasn't traced.
+local function fight_trace(f, outcome)
+	if not f.trace then return nil end
+	local list = events.build(f.trace, { hide_mp = function(id)
+		local c = state.get(f, id)
 		return not (c and c.row and shows_mp(c))
 	end })
-	local outcome = r.escaped and "escape" or r.victory and "victory" or r.died and "death"
-	if outcome then events.outcome(list, outcome, state.player(r.f).id, r.f.st.charname) end
+	if outcome then events.outcome(list, outcome, state.player(f).id, f.st.charname) end
 	return json.array(list)
 end
 
--- The player's choice in a POST's form (nil: none, e.g. a stale form): { kind, spell,
--- item }, plus the bag entry (a consumable) or the equipped entry (gear) it uses; or nil,
--- nil, nil, an error text (a refusal: nothing happens).
+-- The player's choice in a POST's form (nil: none, e.g. "continue"): { kind, spell, item },
+-- plus the bag entry (a consumable) or the equipped entry (gear) it uses; or nil, nil,
+-- nil, an error text (a refusal: nothing happens).
 local function choice(user, st, f, form)
-	-- a status that blocks the action (asleep, recharging, ...) leaves only "Continue"
-	if round.locked(f) and (form.run or form.fight or form.spell or form.item or form.use_gear or form.continue) ~= nil then
-		return { kind = "continue" }
-	elseif form.run ~= nil then
+	if form.run ~= nil then
 		return { kind = "run" }
 	elseif form.fight ~= nil then
 		return { kind = "attack" }
+	elseif form.guard ~= nil then
+		return { kind = "guard" }
 	elseif form.spell ~= nil then
 		-- the icon button's value, or the old select's (spell=Spell&userspell=<id>)
 		local picked = form.userspell
@@ -290,9 +301,9 @@ end
 
 local function fight_page(req, f, lines)
 	local user = req.user
-	local page = { yourturn = page_lines(lines.yourturn), allyturn = page_lines(lines.allyturn),
-		monsterturn = page_lines(lines.monsterturn), roundend = page_lines(lines.roundend), stale = lines.stale,
-		note = lines.note, dead = f.outcome == "death" }
+	local log = {}
+	for i, p in ipairs(lines.paragraphs) do log[i] = { class = "fight-" .. p.part, lines = page_lines(p.lines) } end
+	local page = { log = log, stale = lines.stale, note = lines.note, dead = f.outcome == "death" }
 	if page.dead and (f.result.taunt or "") ~= "" then page.taunt = { by = f.result.taunt_by or "", text = f.result.taunt } end
 	local shown = view_of(f)
 	for k, v in pairs(shown) do page[k] = v end
@@ -308,6 +319,7 @@ local function fight_page(req, f, lines)
 		page.locked = round.locked(f)
 		local weapon = inventory.equipped(user.id).weapon
 		page.attack_tip = tips.attack(f.st.attackpower, weapon and weapon.item.name)
+		page.guard_tip = tips.guard()
 		page.run_tip = tips.run()
 		local buttons = gear_buttons(user)
 		for _, list in ipairs({ spell_buttons(user, f.st.currentmp), usable_items(user, f) }) do
@@ -315,6 +327,13 @@ local function fight_page(req, f, lines)
 		end
 		page.bar, page.more = hotbar_view(user, buttons)
 		page.round = f.round
+		-- the turn's timer (public/js/fight.js; display only: the server's tick plays the
+		-- timeout): when it runs out (a blocked turn: at the next tick; a fight not on the
+		-- clock yet starts on it when next played) and the server's time
+		page.now = clock.now()
+		local tick, deadline = f.tick, f.deadline
+		if tick == 0 then tick = clock.tick(page.now); deadline = tick + round.TURN end
+		page.turn_ends = clock.tick_start(page.locked and tick + 1 or deadline)
 	end
 	return show(req, "Fighting", "fight/fight", page)
 end
@@ -324,11 +343,25 @@ local NO_MONSTER = "There are no monsters in this area. Please contact the game 
 -- A command that played nothing (refused, or from an older page): the fight page says so,
 -- above its commands. The refusals' texts (some from content files) were written for an
 -- error page of their own ("Please go back and try again."); on the fight page there is
--- nothing to go back to.
+-- nothing to go back to. (The events: what catching the fight up did.)
 local function note(req, f, kind, text)
 	if text then text = text:gsub("%s*Please go back and try again%.%s*$", "") end
 	dk.db:exec("UPDATE fights SET log = ? WHERE user_id = ?", encounter.with_note(f.log, kind, text), f.user_id)
-	return go(req, "/fight")
+	return go(req, "/fight", { events = fight_trace(f) })
+end
+
+-- The fight ended in this request (a round, or the clock caught up): the page it ends on,
+-- with the events and the scene.
+local function ended(req, f, how)
+	if how == "escape" then
+		return go(req, "/", { events = fight_trace(f, "escape"),
+			scene = { "escape", "You got away", "The " .. foe(f) .. " is left behind." } })
+	elseif how == "victory" then
+		return go(req, "/victory", { events = fight_trace(f, "victory"),
+			scene = { "victory", "Victory!", victory_detail(f.result), page = true } })
+	end
+	return go(req, "/fight", { events = fight_trace(f, "death"),
+		scene = { "death", "You have died", "The " .. foe(f) .. " defeated you. Half your gold is lost." } })
 end
 
 local function fight(req)
@@ -358,56 +391,59 @@ local function fight(req)
 		if not encounter.begin(user.id) then return error_page(req, NO_MONSTER) end
 		return go(req, "/fight")
 	end
-	-- A form shown at another round than the fight's (a second click, an older tab) plays
-	-- nothing: the fight page as it is, with a note.
-	local stale = sent ~= nil and sent ~= f.round
 	if post and state.won(f) then
 		-- a fight won without its payout (a database from before 3.0): paid now
-		encounter.win(user, f, nil)
-		return go(req, "/victory", { stale = stale or nil })
+		encounter.win(user, f)
+		return go(req, "/victory")
 	end
 	if not post then return fight_page(req, f, encounter.lines(f.log)) end
 	-- Every POST ends on the fight page by a redirect (Post/Redirect/Get): what it did is
-	-- saved with the fight (a round's lines, or a note), and GET /fight shows it.
-	if stale then return note(req, f, "stale") end
+	-- saved with the fight (a round's lines, or a note), and GET /fight shows it. First the
+	-- fight catches up with the clock (what the server's tick would have done by now), so
+	-- a form from before a turn that ran out is stale.
 	f.rand = rand
 	f.max_allies = game.control().max_allies or 1
-	local a, entry, gear, err = choice(user, st, f, form)
-	if err then return note(req, f, "note", err) end
-	if not a then return go(req, "/fight") end
-
 	if req.live then f.trace = {} end
+	local caught = encounter.advance(user, f, clock.tick(clock.now()))
+	f = caught.f
+	if caught.died then return ended(req, f, "death") end
+	if caught.victory then return ended(req, f, "victory") end
+	-- A form shown at another round than the fight's (a second click, an older tab, a turn
+	-- that ran out since) plays nothing: the fight page as it is, with a note.
+	if sent ~= nil and sent ~= f.round then return note(req, f, "stale") end
+	-- a turn a status blocks ends at the next tick: nothing to play now
+	if round.locked(f) then return go(req, "/fight", { events = fight_trace(f) }) end
+	local a, entry, gear, err = choice(user, f.st, f, form)
+	if err then return note(req, f, "note", err) end
+	if not a then return go(req, "/fight", { events = fight_trace(f) }) end
+
 	local r = round.play(f, a)
 	if r.refused then return note(req, f, "note", r.refused) end
 	if entry then inventory.take(entry, 1) end
 	if gear and inventory.spend_charge(gear) then
-		r.player = r.player or {}
 		r.player[#r.player + 1] = "Your " .. gear.item.name .. " is used up."
 	end
 	f = r.f
-	local evs = f.trace and round_events(r) or json.array()
+	f.log = encounter.log_of(round.lines(r, caught.lines))
 	if r.escaped then
 		-- fixed: legacy always let the player escape (a failed run's damage was never saved,
 		-- and a fatal blow left them 'Exploring' at 0,0) and kept the fight state.
 		state.clear(user.id)
 		encounter.save_player(user.id, f.st)
 		dk.db:exec("UPDATE users SET currentaction = 'Exploring' WHERE id = ?", user.id)
-		return go(req, "/", { events = evs, scene = { "escape", "You got away", "The " .. foe(f) .. " is left behind." } })
+		return ended(req, f, "escape")
 	elseif r.victory then
 		encounter.save_player(user.id, f.st)
-		encounter.win(user, f, r)
-		return go(req, "/victory", { events = evs, scene = { "victory", "Victory!", victory_detail(f.result), page = true } })
+		encounter.win(user, f)
+		return ended(req, f, "victory")
 	elseif r.died then
-		local by = foe(f)
-		encounter.die(user, r)
-		return go(req, "/fight", { events = evs,
-			scene = { "death", "You have died", "The " .. by .. " defeated you. Half your gold is lost." } })
+		encounter.die(user, f)
+		return ended(req, f, "death")
 	end
-	f.round = f.round + 1
-	f.log = encounter.log_of(r)
+	round.next_turn(f)
 	state.save(f)
 	encounter.save_player(user.id, f.st)
-	return go(req, "/fight", { events = evs })
+	return go(req, "/fight", { events = fight_trace(f) })
 end
 
 -- The pending drop (users.dropcode: an items.id), or nil.

@@ -298,6 +298,7 @@ public/images/skills/frostbite.png	Icons/SkillsIcons/Bonus/Skill1_Standart/frost
 public/images/skills/fury.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_188_rage.png	-
 public/images/skills/gaia.png	Icons/SkillsIcons/Skillicons2/Skill_standart/healing.png	-
 public/images/skills/grit.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_460_absorb.png	-
+public/images/skills/guard.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_255_magicshield.png	-
 public/images/skills/hunters_mark.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Y_shoot.png	-
 public/images/skills/hurt.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Light_blow.png	-
 public/images/skills/hyper_beam.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Big_Light_arrow.png	-
@@ -339,6 +340,7 @@ public/images/skills/whiteout.png	Icons/SkillsIcons/Bonus/Skill1_Standart/blizza
 public/images/skills/withering.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Wound.png	-
 public/images/statuses/burning.png	Icons/SkillsIcons/Bonus/Skill1_Standart/fireball.png	-
 public/images/statuses/charging.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Sun.png	-
+public/images/statuses/guarding.png	Icons/SkillsIcons/Bonus/Skill2_Standart/shield4.png	-
 public/images/statuses/marked.png	Icons/SkillsIcons/Skillicons2/Skill_standart/devil_mark.png	-
 public/images/statuses/poison.png	Icons/SkillsIcons/Skillicons2/Skill_standart/venom.png	-
 public/images/statuses/recharging.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_115_timestop.png	-

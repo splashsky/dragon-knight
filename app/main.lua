@@ -43,7 +43,8 @@ local function dispatch(req)
 		if params == "405" then return view.method_not_allowed(req, allowed) end
 		return view.not_found(req)
 	end
-	if req.method == "POST" and not csrf.verify(req) then
+	-- (the server's tick, req.tick, is the engine's own request: routes/tick.lua)
+	if req.method == "POST" and not req.tick and not csrf.verify(req) then
 		return view.csrf_failed(req)
 	end
 	-- end-to-end tests replay the same dice through two paths (tests/e2e/fight_api.sh) and

@@ -1,9 +1,9 @@
 -- app/content/statuses/burning.lua :: a fire on the bearer that burns it for a fixed amount
--- at the end of each of its turns (the Ember spell: s.target:afflict("burning", { turns = n,
+-- on every tick of the clock (the Ember spell: s.target:afflict("burning", { ticks = n,
 -- amount = m })). Unlike poison the damage doesn't vary. Fire damage.
 return {
 	name = "Burning",
-	description = "Takes fire damage at the end of every turn.",
+	description = "Takes fire damage every 10 seconds.",
 	lore = [[
 Fire caught on the clothes or the skin, from an Ember or a torch that came too close. It
 does the same damage each turn and doesn't ease off, so it is over when it has burned
@@ -11,8 +11,7 @@ itself out. Rolling on the ground helps. Mages who cast fire at close range lear
 carry a wet cloak.]],
 	icon = "burning",
 	kind = "harmful",
-	tick_on = "turn_end",
-	turns = 3,
+	ticks = 3,
 	data = { amount = 7 },
 	messages = {
 		hurt = "The %s burns for %d damage.",

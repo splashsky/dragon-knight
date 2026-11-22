@@ -22,7 +22,7 @@ Magic Points: {{ u.currentmp }} / {{ s.maxmp }}<br>
 Travel Points: {{ u.currenttp }} / {{ s.maxtp }}<br><br>
 {%- if full and #statuses > 0 then %}
 
-<span class="charsheet-statuses">Statuses: {% for i, st in ipairs(statuses) do %}{% if i > 1 then %}, {% end %}{{ st.name }}{% if st.turns_left then %} <span class="light">({{ st.turns_left }} {{ st.turns_left == 1 and "move" or "moves" }})</span>{% end %}{% end %}</span><br><br>
+<span class="charsheet-statuses">Statuses: {% for i, st in ipairs(statuses) do %}{% if i > 1 then %}, {% end %}{{ st.name }}{% if st.left then %} <span class="light">({{ st.left }})</span>{% end %}{% end %}</span><br><br>
 {%- end %}
 
 Strength: {{ s.strength }}<br>

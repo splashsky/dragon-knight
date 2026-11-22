@@ -81,8 +81,8 @@ local function model(n, taken, in_fight)
 	local k = r(1, 4)
 	c.hp = k == 1 and c.maxhp or k == 2 and 1 or k == 3 and math.max(1, c.maxhp // 5) or r(1, c.maxhp)
 	c.mp = r(0, c.maxmp or 0)
-	if taken then engine.summon(f, "wolf", { turns = 3 }, state.player(f)) end
-	if n % 3 == 0 then engine.afflict(f, state.player(f), "poison", { turns = 3 }) end
+	if taken then engine.summon(f, "wolf", { ticks = 3 }, state.player(f)) end
+	if n % 3 == 0 then engine.afflict(f, state.player(f), "poison", { ticks = 3 }) end
 	return f
 end
 
@@ -107,7 +107,7 @@ local function check_events(events, what)
 		elseif e.type == "summon" then
 			local row = summons.by_key(e.summon)
 			assert(row and row.retired == 0, what .. ": no summon " .. tostring(e.summon))
-			if e.params.turns then whole(e.params.turns, what .. " summon turns") end
+			if e.params.ticks then whole(e.params.ticks, what .. " summon ticks") end
 		end
 	end
 end
@@ -120,15 +120,12 @@ local function spend_mp(events)
 	return total
 end
 
--- What the spell leaves behind: two turns of every status, an attack through the damage
--- modifiers each way.
+-- What the spell leaves behind: two clock ticks of every status, an attack through the
+-- damage modifiers each way.
 local function play_on(f, what)
 	local player, enemy = state.player(f), enemy_of(f)
-	for _ = 1, 2 do
-		for _, c in ipairs({ enemy, player }) do
-			engine.turn_start(f, c)
-			engine.turn_end(f, c)
-		end
+	for k = 1, 2 do
+		for _, c in ipairs({ enemy, player }) do engine.tick(f, c, (f.tick or 0) + k) end
 	end
 	for _, pair in ipairs({ { player, enemy }, { enemy, player } }) do
 		for _, d in ipairs({ 0, 1, 9, 250 }) do
@@ -303,12 +300,12 @@ end
 function T.damage_statuses_change_attacks()
 	local f = model(1, false)
 	local c, p = enemy_of(f), state.player(f)
-	engine.afflict(f, c, "marked", { turns = 4, pct = 50 })
+	engine.afflict(f, c, "marked", { ticks = 4, pct = 50 })
 	eq(engine.modify_damage(f, p, c, 10), 15)
-	engine.afflict(f, c, "weakened", { turns = 4, pct = 50 })
+	engine.afflict(f, c, "weakened", { ticks = 4, pct = 50 })
 	eq(engine.modify_damage(f, c, p, 10), 5)
 	engine.cure(f, c, "weakened")
-	engine.afflict(f, c, "venom", { turns = 4, min = 1, max = 2, pct = 20 })
+	engine.afflict(f, c, "venom", { ticks = 4, min = 1, max = 2, pct = 20 })
 	eq(engine.modify_damage(f, c, p, 10), 8)
 end
 
@@ -317,18 +314,16 @@ function T.withering_heals_its_caster()
 	local c, p = enemy_of(f), state.player(f)
 	f.st.currenthp, f.st.maxhp = 10, 500
 	c.hp = 400
-	engine.afflict(f, c, "withering", { turns = 3, min = 14, max = 24 }, p)
-	engine.turn_start(f, c)
-	engine.turn_end(f, c)
+	engine.afflict(f, c, "withering", { ticks = 3, min = 14, max = 24 }, p)
+	engine.tick(f, c, 1)
 	assert(c.hp < 400, "the monster lost HP")
 	eq(f.st.currenthp, 10 + (400 - c.hp), "the caster gained what it lost")
 	-- without a source (it left the fight) it still drains
 	local f2 = model(2, false)
 	local c2 = enemy_of(f2)
 	c2.hp = 100
-	engine.afflict(f2, c2, "withering", { turns = 3, min = 5, max = 5 })
-	engine.turn_start(f2, c2)
-	engine.turn_end(f2, c2)
+	engine.afflict(f2, c2, "withering", { ticks = 3, min = 5, max = 5 })
+	engine.tick(f2, c2, 1)
 	eq(c2.hp, 95)
 end
 

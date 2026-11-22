@@ -43,6 +43,7 @@ return {
 	dev = true,
 	pbkdf2_iterations = 1000,
 	test_routes = true,
+	tick = false,
 	stream_heartbeat_ms = 1000,
 	online_seconds = 600,
 	presence_sweep_seconds = 60,
@@ -79,8 +80,9 @@ t_reset_jar() { rm -f "$JAR"; }
 
 # Every request pins the game's clock (X-Test-Now, app/lib/clock.lua): the weather is the
 # same on every run and doesn't change between two requests. T_NOW=<unix> t_get / pins
-# another time (tests/e2e/weather.sh).
-T_NOW=4000000000
+# another time (tests/e2e/weather.sh); t_tick moves it on. Every script starts at T_START.
+T_START=4000000000
+T_NOW=$T_START
 # t_req METHOD PATH [extra curl args...] -> sets STATUS, $BODY, $HEADERS
 t_req() {
 	local method=$1 path=$2
@@ -257,8 +259,9 @@ T_KNOWN="(SELECT group_concat(spell_id) FROM (SELECT spell_id FROM user_spells W
 # t_fight_new USER: an encounter begins where USER stands, as on a map move (the monster
 # picked, its first strike played when quicker: POST /__test/encounter, with the current
 # jar, which must be USER's; $BODY is then the fight page). t_fight_clear USER: no fight
-# (the action is left alone). t_fight_status USER WHO KEY [DATA [TURNS]]: a status
-# on the player (WHO 1) or the monster (2); DATA like 'chance=i:5'.
+# (the action is left alone). t_fight_status USER WHO KEY [DATA [TICKS]]: a status
+# on the player (WHO 1) or the monster (2); DATA like 'chance=i:5'. A fight made here isn't
+# on the clock yet: the next POST /fight (or the tick: t_tick) starts it at its time.
 # (the sqlite3 shell has foreign keys off: no cascade, so every table is cleared here)
 t_fight_clear() {
 	t_sql "DELETE FROM fight_statuses WHERE user_id = (SELECT id FROM users WHERE username = '$1');
@@ -281,6 +284,14 @@ t_fight() {
 			SELECT u.id, 2, 'enemy', 'monster', m.id, 1, $3, m.maxhp FROM users u, monsters m
 			WHERE u.username = '$1' AND m.id = $2"
 }
+# t_tick [SECONDS]: the clock moves on SECONDS (default 10: one tick; $T_NOW too, until
+# the next script), then the server's tick runs there (POST /__test/tick with the current
+# jar, logged in; the e2e server's own tick is off); $BODY says what it advanced.
+t_tick() {
+	T_NOW=$((T_NOW + ${1:-10}))
+	t_get /changepassword
+	t_post /__test/tick "csrf=$(t_csrf)"
+}
 # t_round 'fields' [curl args]: POST /fight like a form, following its redirect back to the
 # fight page (a round, a refusal's note, a stale form: Post/Redirect/Get), so $BODY is the
 # page it shows; any other answer (a victory's redirect, a 403) as it is.
@@ -296,14 +307,14 @@ t_fight_win() {
 	t_get /victory
 }
 t_fight_status() {
-	t_sql "INSERT OR REPLACE INTO fight_statuses (user_id, combatant_id, status_id, position, turns_left, data, applied_round)
+	t_sql "INSERT OR REPLACE INTO fight_statuses (user_id, combatant_id, status_id, position, ticks_left, data, tick)
 		SELECT u.id, $2, s.id, 1 + (SELECT count(*) FROM fight_statuses x WHERE x.user_id = u.id AND x.combatant_id = $2),
 		${5:-NULL}, '${4:-}', 1 FROM users u, statuses s WHERE u.username = '$1' AND s.key = '$3'"
 }
 # SQL expressions for a users row's fight in progress (in a SELECT ... FROM users; a finished
 # fight kept for its page doesn't count): its round (0: none),
 # the monster's id and HP (0: none), its sleep chance, the player's buffs (0: none), and
-# every status as "player:key/turns,enemy:key" (turns: when limited).
+# every status as "player:key/ticks,enemy:key" (ticks: when limited).
 T_FIGHTING="EXISTS (SELECT 1 FROM fights f WHERE f.user_id = users.id AND f.outcome = '')"
 T_ROUND="coalesce((SELECT round FROM fights f WHERE f.user_id = users.id AND f.outcome = ''), 0)"
 T_MONSTER="coalesce((SELECT entity_id FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'enemy' AND $T_FIGHTING ORDER BY c.id LIMIT 1), 0)"
@@ -314,10 +325,10 @@ t_status_value() {  # t_status_value WHO KEY FIELD -> SQL expression (0 when abs
 T_SLEEP=$(t_status_value enemy sleep chance)
 T_UBER_DAMAGE=$(t_status_value player uber_damage pct)
 T_UBER_DEFENSE=$(t_status_value player uber_defense pct)
-T_STATUSES="coalesce((SELECT group_concat(k) FROM (SELECT c.side || ':' || s.key || coalesce('/' || fs.turns_left, '') AS k
+T_STATUSES="coalesce((SELECT group_concat(k) FROM (SELECT c.side || ':' || s.key || coalesce('/' || fs.ticks_left, '') AS k
 	FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id JOIN fight_combatants c ON c.user_id = fs.user_id AND c.id = fs.combatant_id
 	WHERE fs.user_id = users.id AND $T_FIGHTING ORDER BY fs.combatant_id, fs.position)), '')"
-T_WORLD="coalesce((SELECT group_concat(k) FROM (SELECT s.key || coalesce('/' || us.turns_left, '') AS k
+T_WORLD="coalesce((SELECT group_concat(k) FROM (SELECT s.key || coalesce('/' || us.ticks_left, '') AS k
 	FROM user_statuses us JOIN statuses s ON s.id = us.status_id WHERE us.user_id = users.id ORDER BY us.position)), '')"
 
 # Wait (max ~5 s) until GET PATH contains TEXT; for hot-reload checks.
@@ -678,6 +689,7 @@ for f in "$ROOT"/tests/e2e/*.sh; do
 		case ",$E2E_ONLY," in *",$(basename "$f" .sh),"*) ;; *) continue ;; esac
 	fi
 	t_jar default
+	T_NOW=$T_START
 	# shellcheck source=/dev/null
 	. "$f"
 done

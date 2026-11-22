@@ -295,7 +295,7 @@ button.buy-choice:focus-visible { outline: solid 2px currentColor; outline-offse
 .shop-tip-body p { margin: 0 0 0.35em; }
 .shop-tip-body p:last-child { margin-bottom: 0; }
 
-/* arranging the hotbar (town/hotbar.html; the slots are fight.css's): each of 2-9 with its
+/* arranging the hotbar (town/hotbar.html; the slots are fight.css's): each of 2-8 with its
 	list under it; the actions as tiles with their names. With hotbar.js the tiles drag:
 	where one would drop is outlined */
 .hotbar-note { font-weight: bold; }

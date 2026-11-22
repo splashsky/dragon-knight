@@ -1,6 +1,6 @@
 -- content/kinds/summons.lua :: summons (app/content/summons/<key>.lua) -> the summons
 -- table. A summon is an ally that fights alongside the player for a while (a spell's
--- s:summon("wolf", { turns = 5 })). Its numbers and message strings are data, synced and
+-- s:summon("wolf", { ticks = 5 })). Its numbers and message strings are data, synced and
 -- overridable; what it does on its turn is its act function (plus the optional
 -- on_summon, on_death, on_expire), which stays in the file. Its resistances and wards
 -- (resist, ward: lib/content/affinities.lua) and the element of its attacks (`element`, for
@@ -29,8 +29,9 @@ summons.fields = {
 		help = "Takes the place of the player's defense power when a monster attacks it." },
 	{ name = "dexterity", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Dexterity",
 		help = "Its chance to dodge a monster's attack, like the player's dexterity." },
-	{ name = "turns", type = "int", default = 0, min = 0, max = 10000, admin = true, label = "Turns",
-		help = "How many rounds it stays when summoned without a duration; 0: until the end of the fight." },
+	{ name = "ticks", type = "int", default = 0, min = 0, max = 10000, admin = true, label = "Ticks",
+		help = "How long it stays when summoned without a duration, in ticks of the game's clock (10 seconds " ..
+			"each); 0: until the end of the fight." },
 	{ name = "element", type = "choice", values = elements.KEYS, default = "neutral", admin = true, label = "Element",
 		help = "The element of its attacks." },
 }

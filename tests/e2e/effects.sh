@@ -1,8 +1,9 @@
 # tests/e2e/effects.sh :: the fight engine through HTTP (2.2): the example spells and
 # items with statuses (Poison, Regen, Hyper Beam, Solar Beam, Call Wolf, Antidote, Regen
 # Potion), the fight page's statuses, allies and locked "Continue" turn, world statuses
-# on map moves and on the character page, and the allies setting. No class learns the new
-# spells: the test character is given them. Sourced by tests/run.sh.
+# and the character page, and the allies setting; since 3.2 on the clock (t_tick: the
+# server's tick, the clock moved on a tick). No class learns the new spells: the test
+# character is given them. Sourced by tests/run.sh.
 if ! t_has_sql; then
 	t_section "effects (skipped: needs sqlite3 or python3)"
 else
@@ -29,27 +30,33 @@ t_section "effects: Poison"
 t_fight effector 149 30000   # a Titan with 30000 HP, no immunity
 t_get /fight; CS=$(t_csrf); expect_body "name=\"spell\" value=\"$(sp poison)\" title=\"Poison ("
 t_round "csrf=$CS&spell=Spell&userspell=$(sp poison)"
-expect_body 'You have cast the Poison spell. The monster is poisoned for 3 turns.'
-expect_body 'class="fight-roundend">The Titan takes '
-expect_body '<b>Titan</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned <span class="light">(2 turns)</span></span>'
-expect_body 'class="fight-status-icon" src="/static/images/statuses/poison.png"'
+expect_body 'You have cast the Poison spell. The monster is poisoned for 30 seconds.'
+expect_no_body 'class="fight-roundend"'
+expect_body '<b>Titan</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned <span class="light">(30s)</span></span>'
+ef_is "$T_STATUSES" "enemy:poison/3"
+# the clock's next tick: it ticks (its line in the fight's log, after the round's), and counts down
+t_tick; expect_body 'tick 400000001: '
+t_get /fight; expect_body 'You have cast the Poison spell.'; expect_body 'class="fight-roundend">The Titan takes '
+expect_body 'Poisoned <span class="light">(20s)</span>'
 ef_is "$T_STATUSES" "enemy:poison/2"
 hp=$(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")
 [ "$hp" -ge 29994 ] && [ "$hp" -le 29998 ] && t_ok || t_fail "poison damage: monster HP $hp"
-t_round "csrf=$CS&fight=Fight"; t_round "csrf=$CS&fight=Fight"
-ef_is "$T_STATUSES" ""; expect_no_body 'Poisoned'
+t_tick; t_tick
+ef_is "$T_STATUSES" ""; t_get /fight; expect_no_body 'Poisoned'; CS=$(t_csrf)
 
 t_section "effects: Hyper Beam locks the next turn"
 t_round "csrf=$CS&spell=Spell&userspell=$(sp hyper_beam)"
 expect_body 'You have cast the Hyper Beam spell for'; expect_body 'You must recharge next turn.'
 expect_body "You can't act this turn."; expect_body 'name="continue" value="Continue"'
 expect_no_body 'name="fight"'; expect_no_body 'name="run"'
-expect_body '<b>You</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/recharging.png" width="16" height="16" alt="">Recharging <span class="light">(1 turn)</span></span>'
-MP=$(t_sql "SELECT currentmp FROM users $EQ")
-# any command while locked is the turn's "Continue" (no attack, no spell, no escape)
+expect_body '<b>You</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/recharging.png" width="16" height="16" alt="">Recharging <span class="light">(10s)</span></span>'
+MP=$(t_sql "SELECT currentmp FROM users $EQ"); FIGHT=$(t_sql "SELECT $T_ROUND FROM users $EQ")
+# the turn ends at the clock's next tick: a command now plays nothing (no attack, no spell)
 t_round "csrf=$CS&spell=Spell&userspell=$(sp heal)"
-expect_body 'You must recharge this turn.'; expect_no_body 'You have cast'; expect_body 'name="fight"'
-ef_is currentmp "$MP"; ef_is "$T_STATUSES" ""
+expect_body "You can't act this turn."; ef_is currentmp "$MP"; ef_is "$T_ROUND" "$FIGHT"
+t_tick
+t_get /fight; expect_body 'You must recharge this turn.'; expect_body 'name="fight"'
+ef_is currentmp "$MP"; ef_is "$T_STATUSES" ""; CS=$(t_csrf)
 
 t_section "effects: Solar Beam charges, then fires"
 t_round "csrf=$CS&spell=Spell&userspell=$(sp solar_beam)"
@@ -59,8 +66,10 @@ ef_is "(SELECT data FROM fight_statuses fs WHERE fs.user_id = users.id)" "entity
 from=s:spell
 release=s:release"
 hp=$(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")
-t_round "csrf=$CS&continue=Continue"
-expect_body 'The Solar Beam fires for'; expect_body 'name="fight"'
+# at the next tick: the blocked turn ends, then the charge runs out and the beam fires
+t_tick
+t_get /fight; expect_body 'You are gathering power.'; expect_body 'The Solar Beam fires for'; expect_body 'name="fight"'
+CS=$(t_csrf)
 dmg=$((hp - $(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")))
 [ "$dmg" -ge 75 ] && [ "$dmg" -le 90 ] && t_ok || t_fail "solar beam damage $dmg"
 # Continue when nothing locks the turn does nothing (the page shows the last round again)
@@ -72,17 +81,18 @@ t_section "effects: Call Wolf"
 # the monster sleeps through this part (a chance of 15 in 15 to stay asleep)
 t_fight_status effector 2 sleep 'chance=i:15'
 t_round "csrf=$CS&spell=Spell&userspell=$(sp call_wolf)"
-expect_body 'You have cast the Call Wolf spell. A wolf joins the fight for 5 rounds.'
+expect_body 'You have cast the Call Wolf spell. A wolf joins the fight for 50 seconds.'
 expect_body 'class="fight-allyturn">Your Wolf bites the monster for'
-expect_body 'class="fight-monsterturn">The monster is still asleep.'
-expect_body 'Your <b>Wolf</b>: 30 / 30 HP <span class="light">(4 rounds left)</span>'
+expect_body 'class="fight-monsterturn">The Titan is still asleep.'
+expect_body 'Your <b>Wolf</b>: 30 / 30 HP <span class="light">(50s left)</span>'
 ef_is "(SELECT group_concat(side || ':' || kind) FROM fight_combatants c WHERE c.user_id = users.id)" "player:player,enemy:monster,ally:summon"
 MP=$(t_sql "SELECT currentmp FROM users $EQ")
 t_round "csrf=$CS&spell=Spell&userspell=$(sp call_wolf)"; expect_body 'You can&#39;t call another ally now.'
 ef_is currentmp "$MP"
-for _ in 1 2 3; do t_round "csrf=$CS&fight=Fight"; done
-expect_body '(1 round left)'
-t_round "csrf=$CS&fight=Fight"; expect_body 'Your Wolf runs off into the wild.'; expect_no_body 'Your <b>Wolf</b>'
+# it stays its ticks of the clock (rounds or not)
+for _ in 1 2 3 4; do t_tick; done
+t_get /fight; expect_body '(10s left)'
+t_tick; t_get /fight; expect_body 'Your Wolf runs off into the wild.'; expect_no_body 'Your <b>Wolf</b>'; CS=$(t_csrf)
 ef_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id AND side = 'ally')" 0
 # no allies allowed: refused
 t_sql "UPDATE control SET max_allies = 0"
@@ -119,19 +129,22 @@ t_section "effects: world statuses (Regen in town, the Regen Potion)"
 ef_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0, currenthp = 100, currentmp = 100"
 t_get /; expect_body "action=\"/spell/$(sp regen)\""
 t_post "/spell/$(sp regen)" "csrf=$(t_csrf)"
-expect_body 'You have cast the Regen spell, and will regenerate 6 Hit Points for the next 5 moves.'
+expect_body 'You have cast the Regen spell, and will regenerate 6 Hit Points for 50 seconds.'
 ef_is "$T_WORLD" "regen/5"; ef_is currentmp 92
-t_get /character; expect_body 'Statuses: Regenerating <span class="light">(5 moves)</span>'
-# moves tick (before the roll for a fight)
+t_get /character; expect_body 'Statuses: Regenerating <span class="light">(50s)</span>'
+# the clock's ticks count them (moves don't). The move may begin an encounter (1 in 5):
+# its fight goes, and the character is back to exploring (a fighting one's world statuses
+# let the ticks pass them by).
 t_get /; ECS=$(t_csrf)
-for _ in 1 2; do
-	ef_sql "UPDATE users SET currentaction = 'Exploring', latitude = 3, longitude = 3"; t_fight_clear effector
-	t_post /move "csrf=$ECS&north=North"
-done
+ef_sql "UPDATE users SET currentaction = 'Exploring', latitude = 3, longitude = 3"; t_fight_clear effector
+t_post /move "csrf=$ECS&north=North"; t_fight_clear effector
+ef_sql "UPDATE users SET currentaction = 'Exploring'"
+ef_is "$T_WORLD" "regen/5"; ef_is currenthp 100
+t_tick; t_tick
 ef_is "$T_WORLD" "regen/3"; ef_is currenthp 112
 # a fight doesn't end them, nor tick them
 ef_sql "UPDATE users SET currentaction = 'Exploring'"; t_fight effector 149 30000
-t_get /fight; t_round "csrf=$(t_csrf)&fight=Fight"
+t_get /fight; t_round "csrf=$(t_csrf)&fight=Fight"; t_tick
 ef_is "$T_WORLD" "regen/3"; ef_is "$T_STATUSES" ""
 t_fight_clear effector
 # the Regen Potion from the bag: replaces the spell's regen (5 for the next 10 moves)
@@ -139,7 +152,7 @@ t_give effector regen_potion 1
 ef_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0"
 t_get /inventory; RP=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE i.key = 'regen_potion' AND ui.user_id = (SELECT id FROM users $EQ)")
 t_post "/inventory/use/$RP" "csrf=$(t_csrf)"
-expect_body 'You have used the Regen Potion, and will regenerate 5 Hit Points for the next 10 moves.'
+expect_body 'You have used the Regen Potion, and will regenerate 5 Hit Points for 100 seconds.'
 ef_is "$T_WORLD" "regen/10"
 # the Antidote in town: nothing harmful to cure
 AN=$(t_sql "SELECT min(ui.id) FROM user_items ui JOIN items i ON i.id = ui.item_id WHERE i.key = 'antidote' AND ui.user_id = (SELECT id FROM users $EQ)")

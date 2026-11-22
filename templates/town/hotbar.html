@@ -1,11 +1,11 @@
 {#- Arranging the hotbar (GET /hotbar, town/hotbar.lua; docs/APP.md "Hotbar"): the ten slots
-		as the fight shows them, 1 Attack and 0 Run fixed, each of 2-9 with its action's tile
+		as the fight shows them, 1 Attack, 9 Guard and 0 Run fixed, each of 2-8 with its action's tile
 		(greyed when it isn't at hand) and a list of the actions to put there ("Empty" first);
 		Save and Reset. Then the player's actions, each saying where it is. With JavaScript
 		(hotbar.js, html.dk-hotbar-js) the tiles can be dragged onto the slots, between them
 		(a swap) and out of them (emptied), which fills the lists and saves. ctx: slots ({ n,
 		action }), choices (the actions: { key, kind, name, icon, label, tip, away, slot }),
-		saved, reset, attack_icon, run_icon. -#}
+		saved, reset, attack_icon, guard_icon, run_icon. -#}
 <section class="hotbar-page" data-hotbar-page>
 <h1 class="title page-title">Hotbar</h1>
 {%- if saved then %}
@@ -13,7 +13,7 @@
 {%- elseif reset then %}
 <p class="hotbar-note" role="status">Your hotbar is back to its first arrangement: your actions fill it in the fight menu's order.</p>
 {%- end %}
-<p>In a fight, press a number key (or click) to act: 1 is always Attack and 0 always Run. Put your other actions on 2 to 9. An action you get later takes the first free key when your next fight begins; the rest wait under More in the fight menu.</p>
+<p>In a fight, press a number key (or click) to act: 1 is always Attack, 9 always Guard and 0 always Run. Put your other actions on 2 to 8. An action you get later takes the first free key when your next fight begins; the rest wait under More in the fight menu.</p>
 <form class="hotbar-form" method="post" action="/hotbar">
 {{{ csrf_field() }}}
 <ol class="hotbar-slots hotbar-edit">
@@ -26,6 +26,7 @@
 {%- for _, a in ipairs(choices) do %}<option value="{{ a.key }}"{% if s.action and a.key == s.action.key then %} selected{% end %}>{{ a.label }}</option>{% end -%}
 </select></li>
 {%- end %}
+<li class="hotbar-slot hotbar-fixed"><kbd class="hotkey">9</kbd><span class="action-btn"><img src="{{ guard_icon }}" width="44" height="44" alt=""></span><span class="hotbar-name">Guard</span></li>
 <li class="hotbar-slot hotbar-fixed"><kbd class="hotkey">0</kbd><span class="action-btn"><img src="{{ run_icon }}" width="44" height="44" alt=""></span><span class="hotbar-name">Run</span></li>
 </ol>
 <p class="hotbar-buttons"><input type="submit" name="save" value="Save"> <input type="submit" name="forget" value="Reset"></p>
