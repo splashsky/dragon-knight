@@ -178,3 +178,14 @@ that use objects) settled these engine questions:
 - **Fixtures**: the barrel and the beehive and the statuses `fuse` and `swarm` are minimal
 	and correct (no icons yet), for Phase K to tune: the barrel's blast hits everyone in full
 	(the plan's decision), its `blast` is the placer's param or `6 + 5 * level // 2`.
+
+✅ **K1. The objects, their statuses and the barrel** (schema version 26; `docs/APP.md`
+"Interactables and targeting"): the ten objects of the design, `fuse` and `swarm` tuned,
+`soaked` and `rallied`, the Explosive Barrel item (180 gold, Kalle, Narcissa and Gilead) and
+the monster-only War Standard, icons copied from the closest pictures. Decisions: the blast
+hits everyone in full, so the barrel's numbers are the design's halved (3 + 5 per 4 levels; a
+monster's 40% of its attack); the Steam Vent resists water by 90% (not immune: a spell
+refuses an immune target, and the water hit is what sets it off); the Beehive's spawn rules
+are four (sun or heat on open ground, sun or heat on the hills and in the shallows, under the
+trees, the Weald's hills and shallows). Monster patterns, area spells, Gale and Knock Over
+are K2 and later.

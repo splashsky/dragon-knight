@@ -2819,12 +2819,32 @@ return {
 	choices; the `object` events (`place`, `blast`, `leave`: [Fight
 	events](#fight-events-smooth-fights)) that fight.js plays (a card made, a flash, faded;
 	nothing moves with `prefers-reduced-motion`). The Battlefield line stays as it is.
-- **The examples** (fixtures of the engine, for the content phase to tune): the Explosive
-	Barrel (fire or lightning lights its fuse, water douses it, burning taking hold anywhere
-	may light it in a wind, its blast is `o:hurt_all` with fire; it appears by itself in the
-	Diggings away from water and rain) and the Beehive (on forest ground by day and in dry
-	weather; knocked down it puts `swarm` on a creature of the side it hangs over, a fire
-	smokes the bees off), with the statuses `fuse` and `swarm`.
+- **The ten objects** (3.3, `app/content/interactables/`, `docs/plans/interactables.md`),
+	where they appear by themselves (percent; the spawn rules are the files'):
+
+	| Object | HP | Resists | Appears | Does |
+	|---|---|---|---|---|
+	| Explosive Barrel | 20 | fire 90 | the Diggings, open ground, 7%; the item; monsters | fire or lightning lights it (`fuse`, 2 ticks; not in the wet, not when `soaked`), water douses it, `burning` taking hold anywhere may light it in a wind (0, 10, 25, 50% by wind 0-3); its HP running out (a blow, the fuse) blasts everyone, objects too, in full for `data.blast` (3 + 5 per 4 levels when it appears by itself or from the item; a monster's: 40% of its attack) rolled from 80% to 100%; a barrel in range is lit (a staged chain) |
+	| Beehive | 12 | fire -50 | the Weald, 12% under the trees (18% under sun or heat; half on its hills and shallows; none at night or in wet weather) | knocked down it swarms one creature of the side it hangs over; fire (burning on it, a fire blow) smokes the bees off |
+	| Gas Pocket | 6 | none | the Thornbog, 12% (20% in fog or at night) | bursts by itself after 6 ticks (a tick before: "swells"); a fire or lightning blow, or burning on it, makes it flash (`burning` on every creature, 6% of max HP a tick, and on every object); else it bursts: `poison` on every creature and the `miasma` over the field when no aura is up |
+	| Steam Vent | 20 + 3 per level | physical 50, earth -50, fire 100, water 90 | the Ashlands (cinders), 15% | every 3rd tick scalds one creature at random (12% of max HP, water), a tick after its hiss; a water hit sets off the great eruption (30% of everyone's max HP) and quiets it; an earth blow that brings it down caps it |
+	| Standing Stone | 8 + 2 per level | physical 50, earth -50, fire, frost, lightning, poison 100 | the Greymoor, 8% (14% in fog) | leans over a side; brought down it topples there: 40% of max HP earth damage and a stun (sleep) on everyone |
+	| Dead Tree | 10 + 2 per level | fire -50, lightning -50 | a gale (wind 3) in the Weald, Greymoor, Barrens, Thornbog 25%; the Greymoor and Barrens otherwise 6% | in a gale it falls 1 tick in 4 on a creature at random; felled by someone's blow it falls on their opponents (25% of max HP); fire or lightning lights it (a fuse), and a lit tree's fall burns |
+	| Tide Pool | 8 | none | the Shoals 12%; any shallows 6%; none in snow | broken, everyone and every object is `soaked` (3 ticks) |
+	| War Banner | 10 + 1 per level | fire -100 | the Barrens 8% (none in a gale); monsters' `war_standard` | the side it flies over is `rallied` (+25% damage dealt) on every tick it stands; a gale tears it down |
+	| Campfire | 8 | water -100, fire 100 | the Copper Downs 10% (18% at night), not in damp weather | 1 tick in 3 a spark sets another object alight (`burning`); water or being soaked puts it out |
+	| Water Cactus | 10 | fire -50 | the Dry Country 12% (18% under sun or heat) | split open (not by fire) it heals the creature with the lowest share of HP by 25% of its max and puts out its fire |
+
+	The statuses: `fuse` (Lit Fuse, 2 ticks), `swarm` (Swarmed, 5 ticks: 5% of max HP a tick,
+	at least 3, blows 20% weaker; fire or a gale ends it), `soaked` (3 ticks: `resist` fire
+	25, lightning -30, frost -10; `ward` burning 60, fuse 100; the first drenching puts out
+	a burning and a fuse), `rallied` (2 ticks, +25% damage dealt). The items: the
+	**Explosive Barrel** (`items/explosive_barrel.lua`: 180 gold, stacks of 5, sold in Kalle,
+	Narcissa and Gilead (`seed.sql`; schema version 26 adds it to existing databases), fights
+	only, refused with three objects on the field; `s:place` with a `blast` of 3 + 5 per 4
+	of the player's levels, a monster's 40% of its attack) and the monster-only **War
+	Standard** (`items/war_standard.lua`, no price, sold nowhere). Their icons are copies of the closest pictures
+	(`public/images/interactables/`, `docs/icon-sources.tsv`); lore comes later.
 
 Adding an object: copy `app/content/interactables/beehive.lua` to `<key>.lua`, edit it, run
 `./dk check`; place it with `s:place("<key>")` (declare it: `uses = { interactables = {
@@ -2832,7 +2852,7 @@ Adding an object: copy `app/content/interactables/beehive.lua` to `<key>.lua`, e
 their validation, the target: default, chosen, dying, an object; placing, the hooks' order
 and arguments, a fully resisted hit, `o.data` kept, errors removing the object, a chain
 destroying each once and bounded, at most three, the barrel's fuse through `round.advance`
-and when catching up, the hive's swarm, appearing by the voice and never near Midworld, in
+and when catching up, the hive's swarm, each of the ten objects played once, appearing by the voice and never near Midworld, in
 the Midlands or at the calm place, the wind, area actions, aiming and `m:has_object`, the
 thunderstorm's bolts, the events), `tests/lua/test_patterns.lua` (states with objects on
 the field; an aimed entry reached only with its object), `tests/e2e/objects.sh` (the help
@@ -2840,7 +2860,7 @@ page, the cards and the radio group without JavaScript, `target` kept and a wron
 ignored, a hive knocked down, a lit fuse on the server's tick, the admin page),
 `tests/e2e/fight_api.sh` (a barrel's blast, form and live alike, its events),
 `tests/e2e/browser.sh` (a click chooses without a request, the keyboard, the hotbar's keys
-from a radio button), `tests/e2e/pure.sh`, `tests/e2e/migrate.sh` (step 25).
+from a radio button), `tests/e2e/pure.sh`, `tests/e2e/migrate.sh` (steps 25 and 26).
 
 ## Monsters
 

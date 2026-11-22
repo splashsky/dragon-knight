@@ -1467,6 +1467,23 @@ ALTER TABLE fight_combatants ADD COLUMN over TEXT;
 ]])
 end
 
+-- 26: the 3.3 ware: the Explosive Barrel in the shops of Kalle, Narcissa and Gilead (a fresh
+-- install's lists, seed.sql), added to the towns' by key without touching anything else they
+-- sell. Nothing else changes: the objects are content files.
+local V26_WARES = {
+	[4] = { "explosive_barrel" },
+	[5] = { "explosive_barrel" },
+	[7] = { "explosive_barrel" },
+}
+
+local function v26_wares()
+	for town, keys in pairs(V26_WARES) do
+		for _, key in ipairs(keys) do
+			dk.db:exec("INSERT OR IGNORE INTO town_items (town_id, item_key) SELECT id, ? FROM towns WHERE id = ?", key, town)
+		end
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1513,6 +1530,7 @@ migrations.STEPS = {
 		"in the towns' shops", up = v24_wares },
 	{ name = "interactables: objects on the battlefield, a content kind and combatants of their own side; the fields' " ..
 		"wind, area spells and items, monsters' loadout entries aiming at an object", up = v25_interactables },
+	{ name = "the 3.3 ware: the Explosive Barrel in the shops of Kalle, Narcissa and Gilead", up = v26_wares },
 }
 
 migrations.VERSION = #migrations.STEPS

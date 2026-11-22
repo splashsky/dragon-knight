@@ -1,16 +1,25 @@
 -- app/content/interactables/beehive.lua :: a straw skep of bees in the branches (docs/APP.md
 -- "Interactables and targeting"). It appears by itself on forest ground by day and in dry
--- weather, hanging over one side of the field. Knocked down, the bees swarm one creature of
+-- weather (more under the sun, less on the hills and in the shallows of the Weald), hanging
+-- over one side of the field. Knocked down, the bees swarm one creature of
 -- that side (the status swarm); a fire on it, or a fire's blow bringing it down, smokes them
 -- off instead.
+local STAY_IN = { "night", "rain", "downpour", "thunderstorm", "snow", "blizzard" }
+
 return {
 	name = "Beehive",
 	description = "A skep full of bees in the branches. Knocked down, it swarms someone on the side it hangs over; fire "
 		.. "smokes the bees off.",
+	icon = "beehive",
 	hp = 12,
 	resist = { fire = -50 },
+	-- the Weald's: 12% under its trees (18% when the bees are out, under sun or heat), half that on
+	-- its hills and in its shallows; none at night or in wet weather (the bees stay in)
 	spawn = {
-		{ fields = { "forest" }, unless = { "night", "rain", "downpour", "thunderstorm", "snow", "blizzard" }, chance = 12 },
+		{ biomes = { "weald" }, features = { "none" }, fields = { "sun", "heat" }, unless = STAY_IN, chance = 18 },
+		{ biomes = { "weald" }, features = { "hill", "lake", "pond" }, fields = { "sun", "heat" }, unless = STAY_IN, chance = 9 },
+		{ fields = { "forest" }, unless = STAY_IN, chance = 12 },
+		{ biomes = { "weald" }, features = { "hill", "lake", "pond" }, unless = STAY_IN, chance = 6 },
 	},
 	data = { ticks = 5, pct = 5, min = 3, slow = 20 },   -- the swarm's
 	messages = {

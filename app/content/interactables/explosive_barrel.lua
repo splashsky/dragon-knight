@@ -4,6 +4,8 @@
 -- out (a blow, or the fuse burning down) it blasts everyone on the field with fire, its
 -- placer included. Placed with a `blast` (the item's or monster's: s:place("explosive_barrel",
 -- { blast = n })); one that appears by itself in the Diggings blasts by the land's level.
+-- The blast hits everyone in full, so its numbers are half of what a blast sparing its placer
+-- would have: 3 + 5 per 4 levels (level 21: 29; level 50: 65), rolled from 80% to 100%.
 local DAMP = { "rain", "downpour", "thunderstorm", "blizzard", "shallows" }
 -- percent chance, by the wind (0 to 3), that burning put on anyone lights it
 local LIGHTING = { 0, 10, 25, 50 }
@@ -22,16 +24,17 @@ end
 
 return {
 	name = "Explosive Barrel",
-	description = "A keg of blasting powder. Fire or lightning lights its fuse, water douses it; when it goes, it blasts "
-		.. "everyone on the field with fire.",
+	description = "A keg of blasting powder. Fire or lightning lights its fuse (20 seconds), water douses it; when it "
+		.. "goes, it blasts everyone on the field, whoever put it there too, with fire: 3 + 5 per 4 levels, 80% to 100% of it.",
+	icon = "explosive_barrel",
 	hp = 20,
 	resist = { fire = 90 },
 	spawn = {
 		{ biomes = { "diggings" }, features = { "none" }, unless = DAMP, chance = 7 },
 	},
-	data = { blast = 0 },   -- the fire it deals (0: by its level, 6 + 5 per 2 levels)
+	data = { blast = 0 },   -- the fire it deals (0: by its level, 3 + 5 per 4 levels)
 	messages = {
-		placed = "A barrel of blasting powder stands on the field.",
+		placed = "A barrel of blasting powder stands on the field, a rag fuse tied on.",
 		lit = "The barrel's fuse sputters alight!",
 		doused = "The water douses the barrel's fuse.",
 		blast = "The barrel goes up!",
@@ -40,7 +43,7 @@ return {
 	},
 	uses = { statuses = { "fuse", "burning" }, fields = DAMP },
 	on_place = function(o)
-		if o.data.blast <= 0 then o.data.blast = 6 + 5 * o.level // 2 end
+		if o.data.blast <= 0 then o.data.blast = 3 + 5 * o.level // 4 end
 		o:say("placed")
 	end,
 	on_damage = function(o, _, element)

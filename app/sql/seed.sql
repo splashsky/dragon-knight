@@ -316,7 +316,8 @@ INSERT INTO town_maps (town_id, map_id) VALUES (8, 7);
 -- town_items (by item key): the original items lists (Bris: its full list, fixed), plus Herbs
 -- everywhere and Potions and Ethers from Roma on (new in 2.1), the Wand in Midworld (new in
 -- 2.4), the 3.1 wares with the Antidote and the Regen Potion (migrations.lua V19_WARES), and
--- the 3.2 resistance and ward gear and ward draughts (migrations.lua V24_WARES)
+-- the 3.2 resistance and ward gear and ward draughts (migrations.lua V24_WARES), and the 3.3
+-- Explosive Barrel in Kalle, Narcissa and Gilead (migrations.lua V26_WARES)
 INSERT INTO town_items (town_id, item_key) VALUES (1, 'antidote');
 INSERT INTO town_items (town_id, item_key) VALUES (1, 'branch');
 INSERT INTO town_items (town_id, item_key) VALUES (1, 'buckler');
@@ -398,6 +399,7 @@ INSERT INTO town_items (town_id, item_key) VALUES (4, 'buckler');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'chain_mail');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'dark_axe');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'ether');
+INSERT INTO town_items (town_id, item_key) VALUES (4, 'explosive_barrel');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'fire_flask');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'fire_ward_draught');
 INSERT INTO town_items (town_id, item_key) VALUES (4, 'flame_charm');
@@ -444,6 +446,7 @@ INSERT INTO town_items (town_id, item_key) VALUES (5, 'dagger');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'dark_sword');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'ember_staff');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'ether');
+INSERT INTO town_items (town_id, item_key) VALUES (5, 'explosive_barrel');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'fire_flask');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'fire_ward_draught');
 INSERT INTO town_items (town_id, item_key) VALUES (5, 'flame_charm');
@@ -523,6 +526,7 @@ INSERT INTO town_items (town_id, item_key) VALUES (7, 'dark_sword');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'dawn_mace');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'elixir');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'ether');
+INSERT INTO town_items (town_id, item_key) VALUES (7, 'explosive_barrel');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'fire_ward_draught');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'glass_blade');
 INSERT INTO town_items (town_id, item_key) VALUES (7, 'guard_tonic');

@@ -20,7 +20,7 @@
 # go on, and what sat on the hotbar's key 9 (Guard's now) moves to a free key or off the
 # bar; version 22 -> 24 (schema_v22.sql) the fields and the 3.2 wares; version 24 -> 25
 # (schema_v24.sql) the interactables, the fields' wind, area actions and aims, a fight in
-# progress going on. Since version
+# progress going on; version 25 -> 26 the Explosive Barrel in three shops. Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -1460,7 +1460,7 @@ mig_unserve "$MIG/v22server.log"
 
 t_section "migrate: version 24 database"
 # version 24 schema (3.2.0) + its game data (version 21's seed) with a fight in progress on the
-# clock and a monster's loadout; step 25 runs: the interactables table (the sync fills it), the
+# clock and a monster's loadout; steps 25 and 26 run: the interactables table (the sync fills it), the
 # fields' wind, area spells and items, loadout entries' aim, objects' columns in the fights.
 # The fight goes on as before: no objects, its target the monster.
 V24_DB="$MIG/v24.db"
@@ -1484,15 +1484,22 @@ mig_eq "PRAGMA user_version" "24" "fixture is version 24"
 "$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v24) failed: $(cat "$T/migrate.log")"
 grep -qE 'Migrating to version ([1-9]|1[0-9]|2[0-4]):' "$T/migrate.log" && t_fail "steps 1-24 ran on a version 24 database" || t_ok
 grep -qF "Migrating to version 25: interactables" "$T/migrate.log" && t_ok || t_fail "step 25 not reported: $(cat "$T/migrate.log")"
+grep -qF "Migrating to version 26: the 3.3 ware" "$T/migrate.log" && t_ok || t_fail "step 26 not reported: $(cat "$T/migrate.log")"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v24 stamped"
 [ "$(mig_layout "$V24_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v24 schema differs from a fresh install:"
 	diff <(mig_layout "$V24_DB") <(mig_layout "$MIG/fresh.db") | head -20 >&2
 }
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v24)"
+# step 26: the Explosive Barrel in Kalle, Narcissa and Gilead only
+mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE item_key = 'explosive_barrel' ORDER BY 1)" \
+	"4,5,7" "the Explosive Barrel is sold in Kalle, Narcissa and Gilead"
+mig_eq "SELECT count(*) FROM items i JOIN town_items t ON t.item_key = i.key WHERE t.town_id = 5 AND i.key = 'explosive_barrel' AND i.retired = 0 AND i.price = 180" \
+	"1" "a ware is an item at its price in its shop"
+mig_eq "SELECT count(*) FROM town_items WHERE item_key = 'war_standard'" "0" "the war standard is sold nowhere"
 mig_eq "SELECT count(*) || '|' || sum(retired) FROM interactables" "$M_IA|0" "the objects synced"
 mig_eq "SELECT hp || ':' || resist || ':' || replace(spawn, char(10), ';') FROM interactables WHERE key = 'beehive'" \
-	"12:fire=-50:1.chance=12;1.fields=forest;1.unless=blizzard,downpour,night,rain,snow,thunderstorm" "an object's data"
+	"12:fire=-50:1.biomes=weald;1.chance=18;1.features=none;1.fields=heat,sun;1.unless=blizzard,downpour,night,rain,snow,thunderstorm;2.biomes=weald;2.chance=9;2.features=hill,lake,pond;2.fields=heat,sun;2.unless=blizzard,downpour,night,rain,snow,thunderstorm;3.chance=12;3.fields=forest;3.unless=blizzard,downpour,night,rain,snow,thunderstorm;4.biomes=weald;4.chance=6;4.features=hill,lake,pond;4.unless=blizzard,downpour,night,rain,snow,thunderstorm" "an object's data"
 mig_eq "SELECT group_concat(key || '=' || wind, ' ') FROM (SELECT key, wind FROM fields WHERE wind > 0 ORDER BY key)" \
 	"blizzard=3 cinders=1 hills=1 peaks=2 sand=1 thunderstorm=3" "the fields' wind"
 mig_eq "SELECT (SELECT sum(area) FROM spells) || '|' || (SELECT sum(area) FROM items) || '|' ||
@@ -1509,6 +1516,21 @@ t_round "csrf=$(t_csrf)&round=3&fight=Fight"; expect_body 'You attack the monste
 mig_eq "SELECT round FROM fights" "4" "a round is played"
 mig_unserve "$MIG/v24server.log"
 "$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v24)"
+
+t_section "migrate: version 25 database"
+# step 26 alone: a version 25 database whose shops lack the barrel gets it in the three towns, and nothing else
+# changes (the shops' other wares stay, whatever an admin did to them)
+MIG_DB=$V24_DB
+mig_sql "$V24_DB" "DELETE FROM town_items WHERE item_key = 'explosive_barrel'; INSERT OR IGNORE INTO town_items (town_id, item_key) VALUES (1, 'travel_tea'); DELETE FROM town_items WHERE town_id = 8 AND item_key = 'void_flask'; PRAGMA user_version = 25"
+mig_eq "PRAGMA user_version" "25" "fixture is version 25"
+"$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v25) failed: $(cat "$T/migrate.log")"
+grep -qE 'Migrating to version ([1-9]|1[0-9]|2[0-5]):' "$T/migrate.log" && t_fail "steps 1-25 ran on a version 25 database" || t_ok
+grep -qF "Migrating to version 26: the 3.3 ware" "$T/migrate.log" && t_ok || t_fail "step 26 not reported: $(cat "$T/migrate.log")"
+mig_eq "PRAGMA user_version" "$CUR_VERSION" "v25 stamped"
+mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE item_key = 'explosive_barrel' ORDER BY 1)" \
+	"4,5,7" "the Explosive Barrel is back in Kalle, Narcissa and Gilead"
+mig_eq "SELECT count(*) FROM town_items WHERE town_id = 8 AND item_key = 'void_flask'" "0" "what an admin took off a shop stays off"
+"$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v25)"
 
 t_section "migrate: partial and forced installs are current"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$MIG/partial.db\"#" "$CONFIG" > "$MIG/partial.lua"

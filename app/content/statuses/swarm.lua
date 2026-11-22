@@ -4,7 +4,8 @@
 -- fire on the bearer or a gale (wind 3) drives the bees off.
 return {
 	name = "Swarmed",
-	description = "Stung every 10 seconds, and its blows are weaker. Fire or a gale drives the bees off.",
+	description = "Stung every 10 seconds for 5% of its hit points (at least 3), and its blows are 20% weaker. Fire or a gale drives the bees off.",
+	icon = "swarm",
 	kind = "harmful",
 	ticks = 5,
 	data = { pct = 5, min = 3, slow = 20 },
