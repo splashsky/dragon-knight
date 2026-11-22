@@ -238,6 +238,22 @@ async function run(wsUrl, port) {
 	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map-svg image')"));
 	check("the player and the towns on it", await js("!!" + MW + ".querySelector('.world-map-you') && " + MW +
 		".querySelectorAll('.world-map-town').length >= 8"));
+	// the map as wide as the window, square; the legend folded under it (the page has it open),
+	// and open again once the player opened it
+	var MAP_BOX = "(function () { var s = " + MW + ".querySelector('.world-map-svg').getBoundingClientRect(), b = " + MW +
+		".querySelector('.dk-window-body'); return [Math.round(s.width), Math.round(s.height), b.clientWidth]; })()";
+	var box = await js(MAP_BOX);
+	check("the map fills the window's width, square", box[0] >= box[2] - 16 && box[0] === box[1], box);
+	check("the legend folded", await js("!" + MW + ".querySelector('details.world-map-key').open && " + MW +
+		".querySelector('details.world-map-key > summary').textContent === 'Legend'"));
+	await js(MW + ".querySelector('.world-map-key > summary').click()");
+	check("opened", await until(MW + ".querySelector('.world-map-key').open && JSON.parse(localStorage.getItem('dk-window-map')).fold === true"));
+	await js("document.querySelector('a[data-window=map]').click()");
+	await until(MW + ".hidden");
+	await js("document.querySelector('a[data-window=map]').click()");
+	check("open again with the window", await until("!" + MW + ".hidden && !!" + MW + ".querySelector('.world-map-key') && " + MW + ".querySelector('.world-map-key').open"));
+	await js(MW + ".querySelector('.world-map-key > summary').click()");
+	await until("JSON.parse(localStorage.getItem('dk-window-map')).fold === false");
 	// the server's tick says the sky moved (`sky` on its channel): the window asks for
 	// /map/sky and swaps its overlay in
 	check("the weather over it", await js("!!" + MW + ".querySelector('.world-sky[data-sky] .sky-cells')"));
@@ -270,6 +286,57 @@ async function run(wsUrl, port) {
 	check("and kept closed", await js("!JSON.parse(localStorage.getItem('dk-window-map')).open && !JSON.parse(localStorage.getItem('dk-window-stats')).open"));
 	await js("DK.visit('/')");
 	await until("location.pathname === '/' && !DK.busy()");
+
+	section = "the map's WebGL sky";
+	// windows.js loads worldgl.js once a map shows; it draws the sky on a hardware GPU only,
+	// so in headless Chrome (SwiftShader) the SVG sky stays. The test routes' switch
+	// (data-sky-test, localStorage dk-sky-gl-test) lets it draw in software: the canvas
+	// draws, the SVG sky hides, a `sky` event fetches the data again, a lost context shows
+	// the SVG sky until it is restored, and first frames judged slow keep the SVG sky.
+	var SKY = MW + ".querySelector('.world-sky')", SVG_SKY = "getComputedStyle(" + SKY + ").display !== 'none' && !!" + SKY + ".hasAttribute('data-sky')";
+	await js("localStorage.removeItem('dk-sky-gl-test')");
+	await js("document.querySelector('a[data-window=map]').click()");
+	await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-sky')");
+	check("worldgl.js loaded once a map shows", await until("!!document.querySelector('script[src=\"/static/js/worldgl.js\"]') && !!window.DKSky && " +
+		"(DKSky.info().refused !== '' || DKSky.info().shown)"), await js("window.DKSky && DKSky.info()"));
+	if (await js("/SwiftShader|llvmpipe|softpipe|Software/i.test(DKSky.info().renderer || '')")) {
+		check("software rendering: the SVG sky", await js("DKSky.info().refused === 'software rendering' && !" + MW + ".querySelector('.world-map-canvas') && " + SVG_SKY),
+			await js("DKSky.info()"));
+	}
+	await js("localStorage.setItem('dk-sky-gl-test', 'software')");
+	await nav("/");
+	check("with the test's switch: the WebGL sky", await until("!!window.DKSky && DKSky.info().shown", 10000), await js("window.DKSky && DKSky.info()"));
+	check("a frame drawn", await js("DKSky.coverage() > 0.01"), await js("DKSky.coverage()"));
+	check("the SVG sky and picture hidden, the canvas under the towns", await js("getComputedStyle(" + SKY + ").display === 'none' && !" + SKY + ".hasAttribute('data-sky') && " +
+		"getComputedStyle(" + MW + ".querySelector('.world-map-svg image')).visibility === 'hidden' && " + MW + ".querySelector('.world-map-canvas').nextElementSibling === " +
+		MW + ".querySelector('.world-map-svg') && /world\\.svg/.test(" + MW + ".querySelector('.world-map-canvas').style.backgroundImage)"));
+	// the canvas follows the map's box when the window is resized (its corner: CSS resize)
+	var CANVAS_BOX = "(function () { var s = " + MW + ".querySelector('.world-map-svg').getBoundingClientRect(), c = " + MW +
+		".querySelector('.world-map-canvas'), b = c.getBoundingClientRect(), d = Math.min(devicePixelRatio, 1.5); " +
+		"return Math.abs(s.left - b.left) < 0.5 && Math.abs(s.top - b.top) < 0.5 && Math.abs(s.width - b.width) < 0.5 && " +
+		"Math.abs(s.height - b.height) < 0.5 && c.width === Math.round(s.width * d) && c.height === Math.round(s.height * d); })()";
+	check("the canvas exactly over the map", await js(CANVAS_BOX));
+	var width0 = await js(MW + ".querySelector('.world-map-svg').getBoundingClientRect().width");
+	await js(MW + ".style.width = '420px'");
+	check("resized: the map narrower, the canvas with it", await until(MW + ".querySelector('.world-map-svg').getBoundingClientRect().width < " + (width0 - 100) +
+		" && " + CANVAS_BOX), await js(MAP_BOX));
+	await js(MW + ".style.width = ''");
+	var fetches = await js("DKSky.info().fetches");
+	await js("fetch('/__test/publish', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': " +
+		"'application/x-www-form-urlencoded', 'X-CSRF-Token': document.body.getAttribute('data-csrf') }, body: " +
+		"'channel=sky&event=sky&data=' + encodeURIComponent('{\"tick\":1}') }).then(function (r) { return r.status; })");
+	check("a sky event: the data again", await until("DKSky.info().fetches > " + fetches), await js("DKSky.info()"));
+	await js("DKSky.lose()");
+	check("a lost context: the SVG sky", await until(SVG_SKY + " && !DKSky.info().shown"));
+	await js("DKSky.restore()");
+	check("restored: the WebGL sky again", await until("DKSky.info().shown && getComputedStyle(" + SKY + ").display === 'none'"));
+	await js("localStorage.setItem('dk-sky-gl-test', 'slow')");
+	await nav("/");
+	check("first frames too slow: the SVG sky", await until("!!window.DKSky && /^slow/.test(DKSky.info().refused)") &&
+		await js("!" + MW + ".querySelector('.world-map-canvas') && " + SVG_SKY), await js("window.DKSky && DKSky.info()"));
+	await js("localStorage.removeItem('dk-sky-gl-test'); " + MW + ".querySelector('.dk-window-x').click()");
+	await nav("/");
+	await js("window.__dk = 1");
 
 	section = "the shop's dialog";
 	// an item's link opens its purchase in a dialog over the shop (modal.js): the page stays

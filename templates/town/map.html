@@ -3,9 +3,13 @@
 		north up): the land's picture (public/images/world.svg, a topographic map), the weather
 		over it as of the render (town/sky.lua: <g class="world-sky" data-sky>; live pages swap
 		it in from /map/sky when the server's tick sends `sky`), then the towns (a mark and the
-		name, in the page's font) and the player (a red ring); then a legend of the land and of
-		the weather. No JavaScript needed. -#}
-<div class="world-map">
+		name, in the page's font) and the player (a red ring); then, folding under it
+		(<details class="world-map-key">: open here, folded in the World Map window, windows.js),
+		a legend of the land and of the weather. No JavaScript needed. Where it can, the page draws the weather with WebGL
+		instead (public/js/worldgl.js, loaded by windows.js: data-sky-data, the same facts as
+		data; data-sky-relief, the land's heights), over the picture and under the towns;
+		data-sky-test (test_routes only) lets the browser test draw it in software. -#}
+<div class="world-map" data-sky-data="/map/sky/data" data-sky-relief="/static/images/world-relief.bin"{% if test then %} data-sky-test{% end %}>
 <svg class="world-map-svg" viewBox="0 0 {{ side }} {{ side }}" width="505" height="505" role="img" aria-labelledby="world-map-title">
 <title id="world-map-title">The world map: you are at {{ player.where }}</title>
 <image href="/static/images/world.svg" width="{{ side }}" height="{{ side }}"/>
@@ -15,6 +19,8 @@
 {%- end %}
 <circle class="world-map-you" cx="{{ player.x }}" cy="{{ player.y }}" r="1.7"><title>You are here ({{ player.where }})</title></circle>
 </svg>
+<details class="world-map-key" open>
+<summary>Legend</summary>
 <ul class="world-map-legend">
 {%- for _, l in ipairs(legend) do %}
 <li><svg class="world-map-swatch" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><rect width="1" height="1" fill="{{ l.colour }}"/>
@@ -35,4 +41,5 @@
 <li><svg class="world-map-swatch" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><rect width="1" height="1" fill="#8c8f96"/><path d="M.6 .1l-.35.45h.25l-.2.4.45-.5h-.25l.2-.35z" fill="#f4d35e" stroke="#5a4630" stroke-width=".04"/></svg>Thunderstorm</li>
 <li><svg class="world-map-swatch" viewBox="0 0 1 1" width="12" height="12" aria-hidden="true"><rect width="1" height="1" fill="#efe4c6"/><rect width="1" height="1" fill="#0d1b3d" fill-opacity=".38"/></svg>Night</li>
 </ul>
+</details>
 </div>

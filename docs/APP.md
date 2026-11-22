@@ -17,7 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
-| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`, `/map/sky`), `app/town/sky.lua` (the weather over the map), `app/lib/tick.lua` (`sky`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` (generated), `public/css/{dk,town}.css`, `public/js/{windows,live}.js` | `tests/lua/test_{terrain,sky}.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town}.sh` |
+| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`, `/map/sky`, `/map/sky/data`), `app/lib/mapsky.lua` (the map's sky as facts, kept once a tick), `app/town/sky.lua` (the weather over the map, SVG), `app/lib/tick.lua` (`sky`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` and `public/images/world-relief.bin` (generated), `public/css/{dk,town}.css`, `public/js/{windows,live}.js`, `public/js/worldgl.js` (the WebGL sky) | `tests/lua/test_{terrain,sky,mapsky}.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town,browser}.sh` |
 | The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
 | Fields (the battlefield: the weather's and spells' effects on a fight) | `app/fight/fields.lua`, `app/lib/fields.lua`, `app/lib/content/kinds/fields.lua`, `app/content/fields/*.lua`, `app/fight/{engine,round}.lua`, `app/community/help.lua` (`/help/fields`), `app/admin/effects.lua` | `templates/fight/battlefield.html`, `templates/community/help/fields.html`, `public/js/fight.js`, `public/css/fight.css`, `public/images/fields/*` | `tests/lua/test_fields.lua`, `tests/e2e/fields.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
@@ -481,15 +481,23 @@ on the minimal layout, in a new tab).
 	player's ring follows a move (the land's picture is a cached static file, so only the
 	page comes again: the towns, the ring and the weather's overlay). Its weather moves
 	without that: when the server's tick sends `sky`, the window swaps in `GET /map/sky`
-	and its storms glide ([Terrain and the map](#terrain-and-the-map)).
+	and its storms glide ([Terrain and the map](#terrain-and-the-map)). Once a map that
+	offers it shows (the window's, the `/map` page's: `.world-map[data-sky-data]`),
+	windows.js loads `worldgl.js` (once; then it tells it of each map shown with a
+	`dk-map-shown` DOM event), which draws the weather with WebGL where it can (the
+	WebGL sky, same section); no page loads it otherwise. A kind may name a `<details>` of
+	its page to fold in the window (`fold`: the map's legend, `.world-map-key`, open on the
+	`/map` page): folded the first time, then open or folded as the player last left it
+	(`fold` in its `localStorage` entry, so a move that fetches the map again keeps it).
 - **The window** (`<section class="dk-window dk-window-<kind>" role="dialog">`, not a
 	`<dialog>`: the game goes on under it, the arrow keys and the hotbar too;
 	`data-client`, so the live client's morph leaves it and it stays open from page to
 	page). Its strip (`.dk-window-grip`: the title, the close button `.dk-window-x` at the
 	right) moves it (pointer events, kept inside the viewport); its corner resizes it (CSS
 	`resize`); a press anywhere in one brings it in front (`z-index` from 950, in the order
-	pressed). Sizes at first: the chat 320 by 400, the map 560 by 740 (the map as large as
-	the window allows, the legends under it), the sheet 280 by 520 (scrolling). It has the page's own
+	pressed). Sizes at first: the chat 320 by 400, the map 560 by 740 (the map as wide as
+	the window, square, the folded legend under it, a grid of two or three columns when
+	open; the window scrolls when it is taller than the window), the sheet 280 by 520 (scrolling). It has the page's own
 	background (the theme's `body` image) a little darker. Whether each is open, where and
 	how big are kept in `localStorage` (`dk-window-<kind>`), so a page load opens it again
 	where it was. Escape in one closes it. A page without a window's link (logged out, the
@@ -592,7 +600,7 @@ the browser sees only the name):
 | `notices` | `clear` | `{ id }` | `/admin/broadcast` (clear) |
 | `user:<id>` | `reply` | `{ thread, title, author, url }` | a reply in a forum thread the player started or posted in (not to the one replying; at most 200 players) |
 | `user:<id>` | `logout` | `{ session }` (one session's pages) or `{ all = true }` | logout; password change, lost password, a new password set in the user editor |
-| `sky` | `sky` | `{ tick }` (the clock tick) | the server's tick (`lib/tick.lua`) every tick (the weather moves every tick): the World Map's overlays fetch `GET /map/sky` ([Terrain and the map](#terrain-and-the-map)) |
+| `sky` | `sky` | `{ tick }` (the clock tick) | the server's tick (`lib/tick.lua`) every tick (the weather moves every tick), after it kept the tick's sky (`lib/mapsky.lua`): the World Map's overlays fetch `GET /map/sky`, its WebGL sky `GET /map/sky/data` ([Terrain and the map](#terrain-and-the-map)) |
 | `user:<id>` | `stale` | `{ tab }` (the sending page's `X-DK-Tab`, or `""`) | every successful POST of the player (`main.lua`), but those that set `req.quiet` (the chat's, the banner's dismissal): their other pages ask for themselves again; the server's tick (`lib/tick.lua`, `tab` `""`: every page) when it changed the player's fight or world statuses, or the weather where an online player with a stream stands |
 | (server) | `resync`, `bye` | empty | the hub: missed events are gone / shutdown |
 
@@ -630,7 +638,23 @@ reload. No toasts in popup windows (`window.opener`).
 	tick](#the-server-tick)).
 - **The World Map's weather.** On `sky` live.js dispatches a `dk-sky` DOM event; windows.js
 	fetches `GET /map/sky` (the server's markup, whole) and swaps it into the overlays the
-	page shows ([Terrain and the map](#terrain-and-the-map)).
+	page shows ([Terrain and the map](#terrain-and-the-map)); where the map's WebGL sky
+	draws instead, `worldgl.js` fetches `GET /map/sky/data`.
+- **The one exception: the map's WebGL sky.** Everything else a page shows is the
+	server's markup; the World Map's WebGL sky (`public/js/worldgl.js`) is deliberately
+	not: the server sends the facts as data (each weather cell's sky and ground, the
+	storms, the sun and the moon, the time of day: `GET /map/sky/data`, and the land's
+	relief, a static file) and the page draws the pixels. Moving clouds, lighting and rain
+	can't be markup the server sends 30 times a second, and the facts are a tenth of the
+	SVG's bytes a tick. It stays an enhancement within limits: the SVG overlay
+	(`town/sky.lua`, `GET /map/sky`) is the **reference rendering of the same server
+	facts** (one set a tick, `lib/mapsky.lua`, read by both), shown without JavaScript or
+	WebGL2, on a software renderer, before the WebGL sky's first frame and whenever it
+	stops, and what the e2e tests check; the WebGL sky decides nothing (no game state, no
+	clock of its own: it eases between the server's ticks like the SVG storms' glide), and
+	the towns, the player's ring and their titles stay the server's SVG above it. A change
+	to what the weather is goes into the facts and both renderings; a new way to draw them
+	is the client's alone.
 
 - **One stream per browser.** Tabs elect a leader: `localStorage["dk-live-leader"]` holds
 	`{ id, t }`, renewed every 2 s; a tab finding it missing or older than 6 s claims it,
@@ -1407,8 +1431,10 @@ where a player may go.
 	and the name in the page's font, Vollkorn; a mark on the map's edge nudged inside its
 	frame, the name on the side with room: Endworld's, on the corner, above and to the
 	right) and the player's
-	red ring with a title naming where they are; under it a legend of the land and one of
-	the weather. It works without JavaScript.
+	red ring with a title naming where they are; under it, in a `<details
+	class="world-map-key" open>` ("Legend": the server's markup, the same on the page and in
+	the window, which folds it), a legend of the land and one of the weather, each a grid.
+	It works without JavaScript.
 - **The land's picture** is a static file, `public/images/world.svg` (about 145 KB, served
 	and cached like any static file), a stylized topographic map on parchment drawn by
 	`app/lib/terrain/picture.lua` from the data: the biomes as muted tints (each row's runs
@@ -1422,22 +1448,39 @@ where a player may go.
 	to the browser's serif (a picture shown as an image can't use the page's fonts); the
 	towns' names are the page's. `tools/world.sh` writes it, and `tests/lua/test_terrain.lua`
 	requires the file to be that drawing (so a change to the drawing or the palette fails
-	until it is written again).
+	until it is written again). It writes the land's relief beside it,
+	`public/images/world-relief.bin` (`terrain.relief()`, for the WebGL sky below), which
+	the test requires to be the data's too.
+- **The map's sky as facts** (`app/lib/mapsky.lua`): what the weather over the map is at a
+	tick, the same all through it (the weather's step): `mapsky.build(now)` is `{ tick,
+	phase, day, sun, moon, cells, storms }` (the time of day; the fraction of the game's
+	day; the sun's and the moon's azimuth and elevation in radians, worked out from
+	`clock.PHASES`: the sun from dawn's start to dusk's end, the moon through the night;
+	each 10-tile weather cell's sky and ground from `weather.at` at its centre, one
+	character each, `mapsky.ALPHABET[sky index * 5 + ground index]` over `mapsky.SKIES`
+	and `mapsky.GROUNDS`, 51 x 51 rows from the north; `weather.storms`: born, size, lat,
+	lon, radius). **The server's tick builds it once** (`mapsky.store`, about 5 ms: 2,601
+	`weather.at`) into one row of `meta` (`map_sky`: the tick on its first line, then the
+	facts as text, numbers exactly), and every reader in that tick takes the row
+	(`mapsky.at(now)`): both renderings below, whatever the number of open maps. A read in
+	a tick the row isn't for (the tick not run yet, `tick = false`: the tests, the CLI)
+	computes the facts without writing, so GETs stay pure.
 - **The weather over it** (`app/town/sky.lua`, `GET /map/sky`): an SVG overlay in the same
-	units, a pure function of the time (`clock.now()`), the same all through a tick (the
-	weather's step): `<g class="world-sky" data-sky="<tick>">` (the clock tick) holding its
-	patterns, `.sky-cells` (each 10-tile weather cell's sky from `weather.at` at its centre,
+	units drawn from the facts at `clock.now()` (`sky.draw(f)`, `sky.markup(now)`): the
+	reference rendering of the map's weather, shown wherever the WebGL sky isn't:
+	`<g class="world-sky" data-sky="<tick>">` (the clock tick) holding its
+	patterns, `.sky-cells` (each 10-tile weather cell's sky,
 	as runs of equal cells in a row: overcast a grey wash, fog a pale one, drizzle, rain and
 	downpour hatching of growing density over a darker wash, a thunderstorm's cells a bolt,
 	snow and blizzard flecks, heat a warm shimmer; the washes softly blurred into clouds),
-	`.sky-storms` (each storm alive, `weather.storms`, a soft disc at its centre and
+	`.sky-storms` (each storm alive, a soft disc at its centre and
 	radius, keyed by its birth, `data-storm`, placed by a CSS `transform` so it can glide,
 	with the same `transform` attribute for renderers without CSS) and `.sky-time
-	.sky-<phase>` (a wash for dawn, dusk and night). About 7-9 ms and 20-30 KB (2,601
-	weather cells; `weather.at` is cheap enough, no dedicated path). `/map/sky` answers it as
+	.sky-<phase>` (a wash for dawn, dusk and night). 20-30 KB; from the tick's row about
+	2.5 ms (computed on a miss, about 8 ms). `/map/sky` answers it as
 	`image/svg+xml` (`auth.game`, a GET: pure); `/map` carries the same group inline.
 - **The sky in real time**: the server's tick, at every tick (the weather moves every
-	tick), publishes `sky` `{ tick }` on
+	tick), keeps the tick's facts and publishes `sky` `{ tick }` on
 	the public channel `sky` ([Events](#events)); `live.js` turns it into a `dk-sky` DOM
 	event, and `windows.js` fetches `/map/sky` once and swaps it into every overlay the
 	page shows (the map window's, the `/map` page's: `[data-sky]`): the patterns, the
@@ -1446,8 +1489,60 @@ where a player may go.
 	none with `prefers-reduced-motion`): the map trails the real storm by at most a tick.
 	The server renders every byte; the script only swaps it. A page already showing that
 	tick does nothing, a hidden page does it when it shows again, and with no map open
-	nothing happens. An open map costs a `/map/sky` a tick (about 9 ms of the server's
-	time and 20-30 KB).
+	nothing happens. An open map costs a `/map/sky` a tick (about 2.5 ms of the server's
+	time and 20-30 KB), or with the WebGL sky a `/map/sky/data` (0.3 ms, 2.8 KB).
+- **The WebGL sky** (`public/js/worldgl.js`; the one exception to markup from the server,
+	[Live pages](#live-pages)): where it can, the page draws the weather itself from the
+	same facts. `GET /map/sky/data` (`auth.game`, pure) is them as JSON (`mapsky.json`:
+	`tick`, `phase`, `day`, `sun`, `moon`, `side`, `cells`, the storms with `id` (their
+	birth), `size` and `x`, `y`, `r` in the map's units; about 2.8 KB), and
+	`public/images/world-relief.bin` (generated with the picture by `tools/world.sh`:
+	`terrain.relief()`, a byte a cell: the height, plus `terrain.RELIEF_WATER` (64) on a
+	lake or a pond; 10 KB, a static file) the land it lights. The map says where they are
+	(`<div class="world-map" data-sky-data data-sky-relief>`); windows.js loads the script
+	once such a map shows ([Windows](#windows)). It puts a canvas exactly over the map's
+	SVG (to the fraction of a pixel, following its size with a `ResizeObserver`: the window
+	resized, the page's width), the land's picture as its CSS background, under the SVG (`z-index`), which keeps
+	the towns and the player above it; once its first frame is drawn it hides the SVG's
+	own picture and sky (`.world-map-glsky`) and takes `data-sky` off the sky's group, so
+	windows.js leaves it. In one shader pass, layer over layer on a transparent canvas: the
+	time of day's wash (warm at dawn, purple at dusk, blue at night, at most 0.42 so the map
+	stays readable) and light over the relief (smoothed on the client, lit and shaded by
+	the sun's or the moon's angle: low warm light at dawn and dusk, moonlight at night);
+	wet ground darker and snow lying from the high ground down (not on water); clouds of
+	drifting fractal noise as dense as each cell's sky, their shadows cast away from the
+	light; each storm a swirling mass with spiral arms and a dark core, dragging the
+	clouds round, gliding to its new place over the tick (it trails the real storm by a
+	tick, like the SVG's); fog banks on the low ground; darkening and streaks under rain;
+	falling snow; flashes in thunderstorm cells; heat's waver; the towns' lights at night
+	(and `.world-map-lit`: the town marks lit). The cells' skies fade into the next tick's
+	over 3 s. On `dk-sky` it fetches `/map/sky/data` (not when it shows that tick already;
+	a hidden page when it shows again).
+	- **When it runs**: on a hardware GPU only. No WebGL2, no context with
+		`failIfMajorPerformanceCaveat`, or a renderer known to be software (SwiftShader,
+		llvmpipe: headless Chrome hands one out anyway), and the SVG sky stays as it is
+		(the script fetches nothing more). Its first frames are timed (four, each finished
+		on the GPU): slower than 12 ms a frame, and the SVG sky stays. The device pixel
+		ratio is capped at 1.5. Its frame rate follows what is in view (the part of the map
+		in the viewport): 30 fps while rain, snow or lightning show, 15 for clouds, fog,
+		heat or a storm, else one still frame at each change. Nothing while the page is
+		hidden, the map closed (its canvas leaves the page) or scrolled out of view
+		(`IntersectionObserver`), and still frames with `prefers-reduced-motion`. A lost
+		context shows the SVG sky until it is restored (then it draws again), and keeps it
+		if it isn't within 5 s. Whenever it stops for good, the SVG sky is shown and asked
+		for again.
+	- **What it costs** (measured for 3.2 in Chromium 155): on a GPU (an RX
+		6700 XT) a frame takes 0.3-0.4 ms at the window's size and at 1920 x 1080, and the
+		browser about 10% of a core at 30 fps, 6% at 15, nothing still (the SVG map with its
+		storms gliding: 12%). In software (SwiftShader) 6 ms at the window's size and 105
+		ms at full HD, 2.5 to 10 cores: hence software is refused. The script is 36 KB (13
+		KB gzipped), fetched only with a map.
+	- **For the browser test only**: where the server has `test_routes` the map carries
+		`data-sky-test`; there `localStorage["dk-sky-gl-test"]` = `software` lets it draw
+		in software and never judges it slow, `slow` judges its first frames slow, and
+		`window.DKSky` reports on it (`info()`, `coverage()`, `bench(n)`, `lose()`,
+		`restore()`, `setLevel(fps)`, `full(w, h)`). Without `data-sky-test` none of it
+		exists.
 - **Testing**: `tests/lua/test_terrain.lua` (the data is generator v1's output byte for
 	byte, integers only, the picture is the drawing, a cell is one place, the towns plain
 	in their biomes and no feature near them, Midworld's start, the biomes' and features'
@@ -1458,14 +1553,25 @@ where a player may go.
 	`tests/e2e/terrain.sh` (the Location box, the exploring page's lines, a fight on the
 	Thornbog's field and its first line, `/help/fields`; places found in the world's data),
 	`tests/e2e/town.sh` (`/map`: the picture, the sky, the towns and the player in that
-	order, the legends). The heights: `tests/lua/test_terrain.lua` (present, reproduced
+	order, the legends folding under them, open). The heights: `tests/lua/test_terrain.lua` (present, reproduced
 	byte for byte, agreeing with the features); the weather over the map:
 	`tests/lua/test_sky.lua` (the storms' discs where `weather.storms` says, snow and rain
 	where they fall, the time of day's wash, the same all through a tick and the storms
 	moving from one to the next, the cost),
-	`tests/e2e/terrain.sh` (`/map/sky` at pinned times, pure, logged in only; the tick's
-	`sky` every tick), `tests/e2e/pure.sh`, `tests/e2e/browser.sh` (the map window
-	swaps its overlay when `sky` comes).
+	`tests/lua/test_mapsky.lua` (the facts are the weather's at pinned times, the sun by
+	day and the moon at night, the same all through a tick; the row's text round trip; the
+	tick keeps one row and both renderings read it, a doctored row showing; a read in
+	another tick computes without writing; the data's shape; the cost),
+	`tests/lua/test_terrain.lua` (the relief file is `terrain.relief()`),
+	`tests/e2e/terrain.sh` (`/map/sky` and `/map/sky/data` at pinned times, pure, logged in
+	only; the tick's `sky` every tick and the row it writes, read by both routes, a read in
+	another tick writing nothing), `tests/e2e/pure.sh`, `tests/e2e/browser.sh` (the map
+	window swaps its overlay when `sky` comes; it is as wide as the window and square, its
+	legend folded, kept open once opened; the WebGL sky: worldgl.js loaded with a
+	map, the SVG sky kept on SwiftShader; with the test's switch a frame drawn, the SVG sky
+	and picture hidden under the towns, the canvas exactly over the map and following it
+	when the window is resized, a `sky` event fetching the data, a lost context
+	showing the SVG sky until restored, slow first frames keeping it).
 
 ## The server tick
 
@@ -1501,9 +1607,11 @@ connection, a closed tab) drives it.
 		(they can't take the last hit point outside a fight); while the character fights,
 		the ticks pass them by.
 	- **The weather** (it moves every tick): the players online with an event stream whose
-		tile's weather changed since the tick before (about 4 µs a player); and `sky` `{ tick }`
-		on the public channel `sky`, for every stream: the World Map's weather moved (the
-		maps open fetch `/map/sky`: [Terrain and the map](#terrain-and-the-map)).
+		tile's weather changed since the tick before (about 4 µs a player); the World Map's
+		sky for the tick, built once into `meta` (`mapsky.store`, about 5 ms); and `sky` `{
+		tick }` on the public channel `sky`, for every stream: the World Map's weather moved
+		(the maps open fetch `/map/sky` or `/map/sky/data`, which read that row: [Terrain
+		and the map](#terrain-and-the-map)).
 	A fight or world statuses the tick changed, and a changed weather, publish `stale` on
 	`user:<id>` (with no tab: every page of the player refreshes; a player gets one per
 	run).

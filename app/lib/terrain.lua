@@ -127,6 +127,26 @@ function terrain.height(lat, lon)
 	return b <= 57 and b - 48 or b - 87
 end
 
+terrain.RELIEF_WATER = 64   -- the relief's flag for a lake or a pond
+
+-- The land's relief as bytes, a cell each (101 x 101, rows from the north, cells from the
+-- west): its height, plus RELIEF_WATER on a lake or a pond. public/images/world-relief.bin
+-- (tools/world.sh), what the World Map's WebGL sky lights and lays fog and snow by
+-- (public/js/worldgl.js).
+function terrain.relief()
+	local out = {}
+	for i = CELLS, -CELLS, -1 do
+		local row = {}
+		for j = -CELLS, CELLS do
+			local lat, lon = i * terrain.CELL, j * terrain.CELL
+			local f = terrain.at(lat, lon).feature
+			row[#row + 1] = string.char(terrain.height(lat, lon) + ((f == "lake" or f == "pond") and terrain.RELIEF_WATER or 0))
+		end
+		out[#out + 1] = table.concat(row)
+	end
+	return table.concat(out)
+end
+
 -- The land's words (lib/terrain_lines.lua): a list's variant picked by a hash of the place
 -- and the time, never by dice, so a reload shows the same line.
 local function mix(h)

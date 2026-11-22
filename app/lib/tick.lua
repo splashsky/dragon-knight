@@ -10,8 +10,9 @@
 --   - the open pages whose weather changed (lib/weather.lua weather.changed between the
 --     last tick and this one, for the players online with an event stream);
 --   - the World Map's weather: at every tick that begins a weather step (every tick: the
---     weather moves on the clock), `sky` on the public channel `sky`, so the open maps
---     fetch /map/sky (town/sky.lua).
+--     weather moves on the clock), the map's sky built once for the tick (lib/mapsky.lua,
+--     kept in meta for every reader) and `sky` on the public channel `sky`, so the open
+--     maps fetch /map/sky (town/sky.lua) or /map/sky/data (the WebGL sky).
 --
 -- A fight or a page the tick changed gets `stale` on user:<id> (the tick has no tab: every
 -- page of the player asks for itself again; public/js/live.js). The work per run is
@@ -21,6 +22,7 @@ local clock = require("lib.clock")
 local encounter = require("fight.encounter")
 local game = require("lib.game")
 local json = require("lib.json")
+local mapsky = require("lib.mapsky")
 local php = require("lib.php")
 local presence = require("lib.presence")
 local state = require("fight.state")
@@ -82,10 +84,12 @@ local function weather_pushes(n, out, told)
 	end
 end
 
--- The World Map's sky moves with the weather's steps (every tick): a tick that begins one says
--- so to every stream (`sky` { tick }); the maps open then ask for /map/sky.
+-- The World Map's sky moves with the weather's steps (every tick): a tick that begins one
+-- builds the step's sky once (mapsky.store: both /map/sky and /map/sky/data read it) and says
+-- so to every stream (`sky` { tick }); the maps open then ask for it.
 local function sky(n, out)
 	if n % weather.STEP ~= 0 then return end
+	mapsky.store(clock.tick_start(n))
 	dk.publish("sky", "sky", json.encode({ tick = n }))
 	out.sky = true
 end

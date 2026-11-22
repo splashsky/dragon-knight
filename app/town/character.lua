@@ -11,6 +11,7 @@ local game = require("lib.game")
 local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
+local mapsky = require("lib.mapsky")
 local sky = require("town.sky")
 local spells = require("lib.spells")
 local terrain = require("lib.terrain")
@@ -111,7 +112,7 @@ function character.map(req)
 	end
 	local x, y = spot(user.latitude, user.longitude)
 	return view.page(req, "Map", "town/map", {
-		side = side, towns = towns, legend = LEGEND, sky = sky.markup(clock.now()),
+		side = side, towns = towns, legend = LEGEND, sky = sky.markup(clock.now()), test = dk.config.test_routes == true,
 		player = { x = num(x), y = num(y), where = game.latitude_str(user.latitude) .. ", " .. game.longitude_str(user.longitude) },
 	}, { layout = "minimal", nav = false })
 end
@@ -121,6 +122,13 @@ end
 function character.sky(req)
 	return { status = 200, headers = { { "Content-Type", "image/svg+xml; charset=utf-8" },
 		{ "Cache-Control", "private, no-cache" } }, body = sky.svg(clock.now()) }
+end
+
+-- GET /map/sky/data: the same weather as data, for the map's WebGL sky (public/js/worldgl.js):
+-- JSON (lib/mapsky.lua mapsky.json), fetched when the server's tick sends `sky`.
+function character.sky_data(req)
+	return { status = 200, headers = { { "Content-Type", "application/json" },
+		{ "Cache-Control", "private, no-cache" } }, body = mapsky.json(mapsky.at(clock.now())) }
 end
 
 return character

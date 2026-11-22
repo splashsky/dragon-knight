@@ -2,7 +2,8 @@
 # the Location box names the biome and the feature; the exploring page says where the
 # player stands and what lies next door, in a region of its own; a fight on the land's
 # field (the Battlefield line, the fight's data, the encounter's first line); /help/fields
-# lists the terrain group; the World Map's weather (/map/sky) and the tick's `sky` event.
+# lists the terrain group; the World Map's weather (/map/sky, and as data /map/sky/data),
+# the tick's `sky` event and the sky it keeps for both (meta map_sky).
 # Places are found in the world's data (app/lib/terrain/world.lua). Sourced by tests/run.sh.
 if ! t_has_sql || ! command -v python3 >/dev/null; then
 	t_section "terrain (skipped: needs sqlite3 or python3, and python3)"
@@ -121,6 +122,19 @@ T_NOW=$((TE_NIGHT - 3000)) t_get /map/sky; expect_body '<g class="sky-time sky-d
 t_reset_jar; t_get /map/sky; expect_redirect /login
 t_login terrainer terrainpw1
 
+t_section "terrain: the World Map's weather as data (/map/sky/data)"
+# the same facts for the WebGL sky: the tick, the time of day, the sun and the moon, a
+# character per weather cell (51 x 51), the storms in the map's units; pure, at T_NOW
+t_get /map/sky/data; expect_status 200; expect_header '^content-type: application/json'
+expect_body "\"tick\":$((T_NOW / 10))}"; expect_body '"side":51,'; expect_body '"storms":['
+[ "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["cells"]), d["phase"], len(d["sun"]), len(d["moon"]))' "$BODY")" = "2601 day 2 2" ] \
+	&& t_ok || t_fail "the data's shape: $(head -c 200 "$BODY")"
+TE_DATA=$(md5sum < "$BODY"); t_get /map/sky/data; [ "$(md5sum < "$BODY")" = "$TE_DATA" ] && t_ok || t_fail "the same data again"
+T_NOW=$TE_NIGHT t_get /map/sky/data; expect_body '"phase":"night"'
+T_NOW=$((T_NOW + 10)) t_get /map/sky/data; expect_body "\"tick\":$((T_NOW / 10 + 1))}"
+t_reset_jar; t_get /map/sky/data; expect_redirect /login
+t_login terrainer terrainpw1
+
 t_section "terrain: the server's tick says the sky moved"
 # the weather moves every tick: every tick sends `sky` with its number on every stream, and
 # the overlay at that time shows that tick
@@ -130,6 +144,22 @@ t_get /map/sky; expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\"
 t_tick; live_has tesky "data: {\"tick\":$((T_NOW / 10))}"
 [ "$(live_count tesky 'event: sky')" = 2 ] && t_ok || t_fail "a sky event each tick: $(live_count tesky 'event: sky')"
 live_close tesky
+
+t_section "terrain: the tick keeps the sky once for every reader"
+# the tick writes its sky into meta (map_sky: the tick on the first line); both routes read
+# that row in its tick (a doctored row shows), and compute the sky in another without writing
+TE_ROW=$(t_sql "SELECT value FROM meta WHERE key = 'map_sky'")
+[ "${TE_ROW%%$'\n'*}" = "$((T_NOW / 10))" ] && t_ok || t_fail "the row is the tick's: ${TE_ROW%%$'\n'*}"
+t_get /map/sky/data; TE_CELLS=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["cells"])' "$BODY")
+[ "$(t_sql "SELECT instr(value, '$TE_CELLS') > 0 FROM meta WHERE key = 'map_sky'")" = 1 ] && t_ok || t_fail "the data's cells are the row's"
+t_sql "UPDATE meta SET value = replace(value, '$TE_CELLS', '$(printf '0%.0s' $(seq 2601))') WHERE key = 'map_sky'"
+t_get /map/sky/data; expect_body "\"cells\":\"$(printf '0%.0s' $(seq 2601))\""
+t_get /map/sky; expect_no_body 'class="sky-overcast"'; expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+TE_DOCTORED=$(t_sql "SELECT value FROM meta WHERE key = 'map_sky'")
+T_NOW=$((T_NOW + 10)) t_get /map/sky/data; expect_no_body "\"cells\":\"$(printf '0%.0s' $(seq 2601))\""
+[ "$(t_sql "SELECT value FROM meta WHERE key = 'map_sky'")" = "$TE_DOCTORED" ] && t_ok || t_fail "a read in another tick wrote"
+t_tick; [ "$(t_sql "SELECT substr(value, 1, instr(value, char(10)) - 1) FROM meta WHERE key = 'map_sky'")" = "$((T_NOW / 10))" ] \
+	&& t_ok || t_fail "the next tick's row"
 
 t_section "terrain: /help/fields"
 t_get /help/fields

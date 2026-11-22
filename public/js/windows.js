@@ -10,7 +10,8 @@
 // and a dialog (modal.js) leaves them working and over it. Escape in one closes it. A page
 // without a window's link (logged out, the admin panel) doesn't show that window. Without
 // JavaScript the links are their pages. The World Map's weather (the map window's, the
-// /map page's) is swapped in when the server's tick says it moved (`sky`: below).
+// /map page's) is swapped in when the server's tick says it moved (`sky`: below), or drawn
+// with WebGL where it can be (worldgl.js, loaded here once a map shows).
 (function () {
 	"use strict";
 	if (typeof document === "undefined" || !window.fetch || !window.JSON || !window.Promise) return;
@@ -19,10 +20,11 @@
 	// middle, the top right under the header); what of the page it shows (default: the content); the field
 	// focused when the player opens it; the regions (layout/main.html) whose change means
 	// it is out of date and fetched again (those that hold the right column's panels too:
-	// an answer names the outermost region that changed).
+	// an answer names the outermost region that changed); a <details> of the page folded in
+	// the window (open as the player last left it there).
 	var KINDS = {
 		chat: { title: "Babble Box", at: "corner", pick: ".chat", focus: "[name=babble]" },
-		map: { title: "World Map", at: "middle", stale: ["loc", "left", "root"] },   // the player's ring
+		map: { title: "World Map", at: "middle", stale: ["loc", "left", "root"], fold: ".world-map-key" },   // the player's ring; the legend
 		stats: { title: "Extended Stats", at: "top", stale: ["charpanel", "invpanel", "spellpanel", "right", "root"] },
 	};
 	var MARGIN = 8, Z = 950;
@@ -148,8 +150,14 @@
 			if (!part) throw new Error("nothing to show");
 			Array.prototype.forEach.call(part.querySelectorAll("[data-r]"), function (e) { e.removeAttribute("data-r"); });
 			part.removeAttribute("data-r");
+			var fold = KINDS[kind].fold && part.querySelector(KINDS[kind].fold);
+			if (fold) {
+				fold.open = !!load(kind).fold;
+				fold.addEventListener("toggle", function () { save(kind, { fold: fold.open }); });
+			}
 			w.body.textContent = "";
 			w.body.appendChild(part);
+			if (kind === "map") mapShown();
 		}).catch(function () {
 			w.body.textContent = "The " + KINDS[kind].title + " could not be loaded.";
 		}).then(function () { w.loading = null; });
@@ -208,6 +216,21 @@
 	window.addEventListener("resize", function () {
 		Object.keys(wins).forEach(function (kind) { if (isOpen(kind)) place(wins[kind].el, wins[kind].el.offsetLeft, wins[kind].el.offsetTop); });
 	});
+	// ---- the World Map's WebGL sky (worldgl.js): loaded once a map that offers it
+	// (.world-map[data-sky-data]) shows, on browsers with WebGL2; it is told of the maps
+	// shown after that (dk-map-shown). Until it draws, and wherever it can't, the SVG sky
+	// below is the map's weather.
+	var skyScript = null;
+	function mapShown() {
+		if (!document.querySelector(".world-map[data-sky-data]") || !window.WebGL2RenderingContext) return;
+		if (skyScript) { document.dispatchEvent(new CustomEvent("dk-map-shown")); return; }
+		skyScript = document.createElement("script");
+		skyScript.src = "/static/js/worldgl.js";
+		skyScript.async = true;
+		skyScript.setAttribute("data-client", "");
+		document.body.appendChild(skyScript);
+	}
+
 	// ---- the World Map's weather (town/sky.lua): when the server's tick says the sky moved
 	// (live.js: a "dk-sky" event, every tick), every overlay the page shows (the
 	// map window's, or the /map page's: <g data-sky>) is swapped for GET /map/sky's. The
@@ -268,7 +291,8 @@
 				if (wins[kind] && stale && info.regions.some(function (r) { return stale.indexOf(r) >= 0; })) wins[kind].stale = true;
 			});
 		});
-		window.DK.on("applied", sync);
+		window.DK.on("applied", function () { sync(); mapShown(); });
 	}
 	sync();
+	mapShown();   // the /map page
 })();

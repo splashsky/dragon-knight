@@ -27,7 +27,10 @@ t_section "town: the map and the character sheet (floating windows)"
 # alone; without JavaScript, the pages in a new tab
 expect_body '<a href="/map" target="_blank" data-window="map">View Map</a>'
 expect_body '<a class="charpanel-more" href="/character" target="_blank" data-window="stats">Extended Stats</a>'
-t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'; expect_body '<div class="world-map">'
+t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'
+# where it can, the page draws the weather with WebGL from data (worldgl.js; the test
+# routes let the browser test do it in software)
+expect_body '<div class="world-map" data-sky-data="/map/sky/data" data-sky-relief="/static/images/world-relief.bin" data-sky-test>'
 expect_no_body '<html'
 # the land's picture, the weather over it as of the render, then the towns and the player on
 # top (in town at Midworld: the map's centre), with legends of the land and the weather; the
@@ -42,10 +45,15 @@ expect_body '<circle class="world-map-you" cx="50.5" cy="50.5" r="1.7"><title>Yo
 [ "$(grep -o '<image href="/static/images/world.svg"\|<g class="world-sky"\|<g class="world-map-town"\|<circle class="world-map-you"' "$BODY" | uniq | tr '\n' '|')" \
 	= '<image href="/static/images/world.svg"|<g class="world-sky"|<g class="world-map-town"|<circle class="world-map-you"|' ] \
 	&& t_ok || t_fail "the map's layers in order"
+# the legend folds under the map: open on the page (the window folds it: windows.js)
+tr -d '\n' < "$BODY" | grep -qF '</svg><details class="world-map-key" open><summary>Legend</summary><ul class="world-map-legend">' \
+	&& t_ok || t_fail "the legend folding under the map"
+tr -d '\n' < "$BODY" | grep -qF 'Night</li></ul></details></div>' && t_ok || t_fail "the weather's legend in it"
 expect_body 'The Thornbog</li>'; expect_body 'Lakes and ponds</li>'; expect_body 'Peaks</li>'; expect_body 'Thunderstorm</li>'; expect_body 'Night</li>'
 tu "latitude=-3, longitude=3"
 t_get /map; expect_body '<circle class="world-map-you" cx="51.1" cy="51.1" r="1.7"><title>You are here (3S, 3E)</title></circle>'
 tu "latitude=0, longitude=0"
+t_get /static/images/world-relief.bin; expect_status 200; [ "$(wc -c < "$BODY")" = 10201 ] && t_ok || t_fail "the relief: a byte a cell"
 t_get /static/images/world.svg; expect_status 200; expect_header '^content-type: image/svg\+xml'
 expect_body '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 101 101"'
 t_get /character -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body '<div class="charsheet">'; expect_body 'Travel Points:'

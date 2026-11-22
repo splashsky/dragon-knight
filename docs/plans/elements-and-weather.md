@@ -315,6 +315,23 @@ return {
 	window and the `/map` page fetch the overlay and swap it in, the storms gliding to their
 	new places over the tick's 10 s (CSS, not with reduced motion: the map trails the real
 	storm by at most a tick). The server renders every byte.
+- **One sky a tick, and a WebGL sky over the map** (decided after a spike that measured a
+	full canvas map against the SVG: the owner chose the hybrid). The server's tick builds
+	the map's sky once a tick (each weather cell's sky and ground, the storms, the sun and
+	the moon, the time of day: `lib/mapsky.lua`) into one row of `meta`, and both
+	renderings read it: the SVG overlay (`GET /map/sky`, from about 8 ms to 2.5 ms) and the
+	same facts as data (`GET /map/sky/data`, 2.8 KB instead of 20-30 KB); a read in another
+	tick computes them without writing. The topographic SVG stays the map everywhere; where
+	the browser has a hardware GPU, `public/js/worldgl.js` (loaded only when a map shows)
+	draws the sky over it on a transparent canvas, under the towns: light by the time of
+	day over the land's relief (`public/images/world-relief.bin`), clouds and their shadows,
+	swirling storms gliding between ticks, fog on low ground, rain, snow falling and lying,
+	lightning, lit towns at night. It is the one deliberate exception to "the server
+	renders every byte" (the server sends data, the page draws pixels); the SVG sky stays
+	the reference rendering of the same facts, shown without JavaScript, WebGL2 or a
+	hardware GPU, until the first WebGL frame, when the first frames are slow and when the
+	context is lost. It runs at the rate of what shows (still, 15 or 30 fps) and not at all
+	hidden, closed or scrolled away.
 - **Climate**: the biome under a tile leans the weather's climate (its sky and ground
 	vocabularies don't change): the base sky's chances, how long mud lasts, where snow
 	falls instead of rain (each biome's snow line), and how hard storms rain over it (the

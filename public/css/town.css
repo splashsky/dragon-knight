@@ -36,6 +36,22 @@ table.inventory td + td { width: 100%; }
 @media (prefers-reduced-motion: reduce) {
 	.world-sky .sky-storm { transition: none; }
 }
+/* the WebGL sky (worldgl.js): a canvas over the map's box with the land's picture as its
+	background, under the SVG (the towns and the player); while it draws, the SVG's own
+	picture and sky are hidden, and at night the towns are lit */
+.world-map { position: relative; }
+.world-map-canvas {
+	position: absolute; z-index: 0; display: block; pointer-events: none;
+	background: center / contain no-repeat;
+}
+.world-map-canvas + .world-map-svg { position: relative; z-index: 1; }
+.world-map-glsky .world-map-svg > image { visibility: hidden; }
+.world-map-glsky .world-sky { display: none; }
+.world-map-lit .world-map-town circle { fill: #ffcf73; stroke: #3b2a1a; }
+.world-map-lit .world-map-town text { fill: #f6ecd2; stroke: #1d150c; stroke-opacity: 0.7; }
+.world-map-key { max-width: 606px; margin: 6px auto 0; text-align: left; font-size: 11px; }
+.world-map-key > summary { width: max-content; cursor: pointer; opacity: 0.8; }
+.world-map-key > summary:hover, .world-map-key > summary:focus-visible { opacity: 1; }
 .world-map-legend {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

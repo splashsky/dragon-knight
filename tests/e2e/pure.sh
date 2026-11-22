@@ -28,7 +28,7 @@ PU_ROUTES="/ /admin /admin/broadcast /admin/classes /admin/classes/#id /admin/dr
 	/admin/towns/#id /admin/users /admin/users/#id /babble /changelog /changepassword /character /character/#id
 	/dead /drop /drop/room /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/fields /help/items /hotbar
 	/help/levels /help/monsters /help/spells /inn /inventory /inventory/discard/#id /live /live/state /login
-	/lostpassword /map /map/sky /maps /maps/buy/#id /news /news/#id /ninja /online /register /shop /shop/buy/#id
+	/lostpassword /map /map/sky /map/sky/data /maps /maps/buy/#id /news /news/#id /ninja /online /register /shop /shop/buy/#id
 	/verify /victory /__test/routes"
 
 t_section "pure GETs: the list covers every GET route"

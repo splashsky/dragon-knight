@@ -1,7 +1,9 @@
 -- town/sky.lua :: the weather over the World Map (docs/APP.md "Terrain and the map"): an SVG
 -- overlay in the map's units (a cell of 5 x 5 tiles a unit, 101 x 101, north up: the land's
--- picture's, public/images/world.svg), as the weather is at `now` (lib/weather.lua). Pure:
--- GET /map/sky answers it, and /map carries it as of its render.
+-- picture's, public/images/world.svg), drawn from the map's sky at `now` (lib/mapsky.lua:
+-- the facts the server's tick keeps for its tick, from lib/weather.lua). Pure: GET /map/sky
+-- answers it, and /map carries it as of its render. It is the reference rendering of those
+-- facts: the WebGL sky (public/js/worldgl.js) draws the same ones where it can.
 --   - each 10-tile weather cell's sky, read at its centre (weather.at), as runs of equal
 --     cells in a row: overcast a grey wash, fog a pale one, drizzle, rain and downpour
 --     hatching of growing density over a cloud wash, snow and blizzard flecks, heat a warm
@@ -14,7 +16,7 @@
 -- step it shows, the same all through the step: weather.STEP is one tick) holding the
 -- patterns (defs), the cells' skies (.sky-cells), the storms (.sky-storms: each a
 -- `.sky-storm` keyed by data-storm) and the time of day (.sky-time .sky-<phase>).
-local clock = require("lib.clock")
+local mapsky = require("lib.mapsky")
 local terrain = require("lib.terrain")
 local weather = require("lib.weather")
 
@@ -73,14 +75,15 @@ local function spot(lat, lon)
 	return lon / CELL + CELLS + 0.5, CELLS + 0.5 - lat / CELL
 end
 
--- The overlay's markup at `now`: the group (without the <svg> around it).
-function sky.markup(now)
+-- The overlay's markup for the map's sky `f` (lib/mapsky.lua): the group (without the <svg>
+-- around it).
+function sky.draw(f)
 	local runs = {}
 	local bolts = {}
 	for y = LAST, FIRST, -1 do
 		local x = FIRST
 		local row = {}
-		for wx = FIRST, LAST do row[wx] = weather.at(y * WCELL + WCELL // 2, wx * WCELL + WCELL // 2, now).sky end
+		for wx = FIRST, LAST do row[wx] = mapsky.sky(f, LAST - y, wx - FIRST) end
 		while x <= LAST do
 			local s = row[x]
 			local w = 1
@@ -105,8 +108,7 @@ function sky.markup(now)
 			x = x + w
 		end
 	end
-	local step = clock.tick(now) // weather.STEP * weather.STEP
-	local out = { ("<g class=\"world-sky\" data-sky=\"%d\">"):format(step), DEFS, "<g class=\"sky-cells\">" }
+	local out = { ("<g class=\"world-sky\" data-sky=\"%d\">"):format(f.tick), DEFS, "<g class=\"sky-cells\">" }
 	-- the washes softly blurred (clouds, not squares), then the hatching and the flecks
 	out[#out + 1] = "<g filter=\"url(#sky-soft)\">"
 	for _, s in ipairs(ORDER) do
@@ -129,7 +131,7 @@ function sky.markup(now)
 			:format(table.concat(bolts))
 	end
 	out[#out + 1] = "</g><g class=\"sky-storms\">"
-	for _, s in ipairs(weather.storms(now)) do
+	for _, s in ipairs(f.storms) do
 		local x, y = spot(s.lat, s.lon)
 		local r = s.radius / CELL
 		out[#out + 1] = ("<g class=\"sky-storm sky-storm-%s\" data-storm=\"%d\" transform=\"translate(%s %s) scale(%s)\" " ..
@@ -137,7 +139,7 @@ function sky.markup(now)
 			"stroke-opacity=\".35\" stroke-width=\".025\" stroke-dasharray=\".08 .06\"/></g>"):format(
 			s.size, s.born, num(x), num(y), num(r), num(x), num(y), num(r))
 	end
-	local phase = clock.time_of_day(now)
+	local phase = f.phase
 	out[#out + 1] = ("</g><g class=\"sky-time sky-%s\">"):format(phase)
 	local time = TIME[phase]
 	if time then
@@ -145,6 +147,11 @@ function sky.markup(now)
 	end
 	out[#out + 1] = "</g></g>"
 	return table.concat(out)
+end
+
+-- The overlay's markup at `now`.
+function sky.markup(now)
+	return sky.draw(mapsky.at(now))
 end
 
 -- The overlay as an SVG document (GET /map/sky).

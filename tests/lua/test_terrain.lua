@@ -89,6 +89,28 @@ function T.the_worlds_picture_is_the_drawing_of_the_land()
 	assert(svg:find("viewBox=\"0 0 101 101\"", 1, true), "a cell a unit")
 end
 
+-- public/images/world-relief.bin is terrain.relief(): a byte a cell, the height and the water
+-- (the World Map's WebGL sky lights the land by it; tools/world.sh writes it).
+function T.the_worlds_relief_is_the_land()
+	local f = assert(io.open((dk.config.public_dir or "public") .. "/images/world-relief.bin", "rb"))
+	local bin = f:read("a")
+	f:close()
+	assert(bin == terrain.relief(), "public/images/world-relief.bin is not the land's relief: run tools/world.sh")
+	eq(#bin, (2 * CELLS + 1) * (2 * CELLS + 1), "a byte a cell")
+	local water = 0
+	for i = -CELLS, CELLS, 7 do
+		for j = -CELLS, CELLS, 3 do
+			local b = bin:byte((CELLS - i) * (2 * CELLS + 1) + j + CELLS + 1)
+			local here = terrain.at(i * CELL, j * CELL)
+			eq(b % terrain.RELIEF_WATER, terrain.height(i * CELL, j * CELL), "the height at " .. i .. "," .. j)
+			local wet = here.feature == "lake" or here.feature == "pond"
+			eq(b >= terrain.RELIEF_WATER, wet, "the water at " .. i .. "," .. j)
+			if wet then water = water + 1 end
+		end
+	end
+	assert(water > 0, "some water sampled")
+end
+
 -- Integer arithmetic only, so every Lua 5.4 on every platform makes the same world.
 function T.the_generator_counts_in_integers()
 	local f = assert(io.open(debug.getinfo(generator.text, "S").source:sub(2), "rb"))
