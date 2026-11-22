@@ -31,7 +31,7 @@ voice sounds like their own.
 	},
 	speech = {
 		start = { "We have been watching your fire, {player}.", chance = 40 },
-		turn = { "*low growl*", "Circle left. Now.", chance = 20 },
+		turn = { "*low growl*", "Circle left. Now.", { text = "The moon is up. Circle wide, pack.", when = night }, chance = 20 },
 		winning = { "Your pack is gone. Mine is not.", chance = 30 },
 		losing = { "Fall back! Fall back!", chance = 30 },
 		hurt = { "*snarls*", "You will pay for that.", chance = 25 },

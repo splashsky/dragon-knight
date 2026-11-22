@@ -32,11 +32,12 @@ spring say the snow around its lair never fully melts.
 	},
 	speech = {
 		start = { "The cold has brought you to me, {player}.", chance = 40 },
-		turn = { "*exhales frost*", "Still. Be still.", chance = 25 },
+		turn = { "*exhales frost*", "Still. Be still.", { text = "The snow listens to me, {player}.", when = snowy }, chance = 25 },
 		winning = { "Your blood is slowing, small one.", chance = 30 },
 		losing = { "The ice remembers every wound.", chance = 30 },
 		hurt = { "*shrieks*", "Warm blood... you will pay.", chance = 25 },
 		death = { "Melting... the snow... weeps.", chance = 60 },
 		victory = { "Frozen and fit to eat, {player}.", chance = 50 },
+		status = { charging = { "*draws in a long, freezing breath*", chance = 80 } },
 	},
 }

@@ -26,7 +26,11 @@ say it appears only in the hottest weeks, and that anyone who follows it is not 
 	},
 	speech = {
 		start = { "*a soft chime fills the air*", chance = 25 },
-		turn = { "*light ripples*", chance = 15 },
+		turn = {
+			"*light ripples*",
+			{ text = "*the salt flats blaze, and it brightens*", when = hot },
+			chance = 15,
+		},
 		hurt = { "*shivers and brightens*", chance = 20 },
 		losing = { "*dims, drifting away*", chance = 20 },
 		death = { "*fades to nothing*", chance = 40 },

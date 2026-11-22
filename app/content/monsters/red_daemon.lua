@@ -33,7 +33,12 @@ drink and a wet cloak.
 	},
 	speech = {
 		start = { "Stand still and burn, little thing.", "You smell of wet wool.", chance = 60 },
-		turn = { "Hotter! Hotter!", "Stand in front of me, coward.", chance = 15 },
+		turn = {
+			"Hotter! Hotter!", "Stand in front of me, coward.",
+			{ text = "The sulphur is my air. Breathe it, little thing.", when = function(m) return m:has_field("brimstone") end },
+			{ text = "Your rain makes me angry, little thing.", when = function(m) return m:has_field("rain") or m:has_field("downpour") or m:has_field("snow") or m:has_field("blizzard") end },
+			chance = 15,
+		},
 		winning = { "The hills are warm again.", chance = 35 },
 		losing = { "Cool? I am NOT cool!", chance = 45 },
 		hurt = { "Ha! You have fire in you!", chance = 20 },

@@ -21,7 +21,12 @@ it reaches its end the road will be quieter for a while.]],
 	},
 	speech = {
 		start = { "Four.", "Three. You are already counted.", chance = 40 },
-		turn = { "Two.", "One is close.", chance = 15 },
+		turn = {
+			"Two.", "One is close.",
+			{ text = "Your count is running, {player}.", when = { foe_has = { "doom" } } },
+			{ text = "Listen. The number is falling.", when = { foe_has = { "doom" } } },
+			chance = 15,
+		},
 		winning = { "Zero... and the road is quiet.", chance = 35 },
 		losing = { "The count is not yours to stop.", chance = 35 },
 		hurt = { "Hold, I am still counting!", chance = 20 },

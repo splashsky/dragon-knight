@@ -53,7 +53,11 @@ tithe of gold from the living, and he counts every coin himself.
 	},
 	speech = {
 		start = { "Kneel, living one. The crypt was expecting you.", "Your tithe is overdue.", chance = 60 },
-		turn = { "Your breath is a debt, {player}.", "Count your remaining years.", chance = 15 },
+		turn = {
+			"Your breath is a debt, {player}.", "Count your remaining years.",
+			{ text = "The grave-fog gathers. Count what you can still see.", when = function(m) return m:has_field("miasma") end },
+			chance = 15,
+		},
 		winning = { "The throne has room for one more.", chance = 35 },
 		losing = { "Impossible. My crypt has never been breached.", chance = 45 },
 		hurt = { "Fool. I cannot be hurt twice.", chance = 20 },

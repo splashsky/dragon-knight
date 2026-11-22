@@ -25,7 +25,7 @@ Kalle keep a hellhound's tooth as a charm.]],
 	},
 	speech = {
 		start = { "*snarls*", "Hot meat... good.", chance = 35 },
-		turn = { "Grrrrah!", chance = 15 },
+		turn = { "Grrrrah!", { text = "*shakes off the rain*", when = wet }, chance = 15 },
 		winning = { "Bones next.", chance = 25 },
 		hurt = { "Yaaarp!", chance = 30 },
 		death = { "*whimpers*", chance = 50 },

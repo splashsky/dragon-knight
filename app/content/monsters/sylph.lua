@@ -22,7 +22,12 @@ value them for the lightning they carry, and sylphs value nothing except being l
 	},
 	speech = {
 		start = { "Oh, a visitor! Do stay for a gust or two.", chance = 40 },
-		turn = { "Whoosh! There goes your hat!", "Too slow, too slow.", chance = 25 },
+		turn = {
+			"Whoosh! There goes your hat!", "Too slow, too slow.",
+			{ text = "Isn't the rain lovely? Drip, drip, drip.", when = function(m) return m:has_field("rain") or m:has_field("downpour") end },
+			{ text = "Hold on to your hat, {player}!", when = function(m) return m:has_field("thunderstorm") end },
+			chance = 25,
+		},
 		winning = { "Up you go, {player}!", chance = 30 },
 		losing = { "Ooh, that was a draft.", chance = 35 },
 		hurt = { "Hey, that tickled!", chance = 25 },

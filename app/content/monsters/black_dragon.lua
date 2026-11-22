@@ -24,10 +24,15 @@ though nobody has tested that lately.
 	},
 	speech = {
 		start = { "The marsh is older than your kingdom, little knight.", "Leave your shine and go.", chance = 65 },
-		turn = { "Your armour rusts in my breath.", "Patience. I have plenty.", chance = 15 },
+		turn = {
+			"Your armour rusts in my breath.", "Patience. I have plenty.",
+			{ text = "The gloom is mine. Breathe it, little knight.", when = function(m) return m:has_field("miasma") end },
+			chance = 15,
+		},
 		winning = { "Your steel is weeping, {player}.", chance = 35 },
 		losing = { "A mortal stains my marsh?", chance = 45 },
 		hurt = { "Old scales have deeper hurts.", chance = 20 },
+		status = { charging = { "*draws in a breath that hisses through the reeds*", chance = 80 } },
 		death = { "The marsh... takes me back...", chance = 80 },
 		victory = { "The reeds will keep your name.", chance = 85 },
 	},

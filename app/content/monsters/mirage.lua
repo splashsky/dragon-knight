@@ -25,7 +25,11 @@ they last saw one, then take a different road.]],
 	},
 	speech = {
 		start = { "Water? Are you sure you want water?", chance = 40 },
-		turn = { "Come closer. Closer.", "The well is just ahead.", chance = 20 },
+		turn = {
+			"Come closer. Closer.", "The well is just ahead.",
+			{ text = "The heat makes the well look so close, doesn't it?", when = hot },
+			chance = 20,
+		},
 		winning = { "Still thirsty, {player}?", chance = 30 },
 		losing = { "Gone... gone...", chance = 35 },
 		hurt = { "That was not really there.", chance = 25 },

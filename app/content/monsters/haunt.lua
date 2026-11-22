@@ -24,7 +24,11 @@ keep a whole book on them, most of it grim.]],
 	},
 	speech = {
 		start = { "Stay the night... stay forever.", chance = 40 },
-		turn = { "*rattles chains*", chance = 20 },
+		turn = {
+			"*rattles chains*",
+			{ text = "The fog is my house now, {player}. Lose your way in it.", when = function(m) return m:has_field("fog") end },
+			chance = 20,
+		},
 		winning = { "The room is ready, {player}.", chance = 30 },
 		hurt = { "Who dares lay hands on my house?", chance = 25 },
 		death = { "The door... I will finally leave it...", chance = 55 },

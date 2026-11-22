@@ -30,7 +30,7 @@ clear, and steel does better against it than any spell that might be cast at it.
 	},
 	speech = {
 		start = { "*splashes*", chance = 15 },
-		turn = { "*gurgles*", chance = 10 },
+		turn = { "*gurgles*", { text = "*swells in the rain*", when = wet }, chance = 10 },
 		winning = { "*drags down*", chance = 20 },
 		losing = { "*pours away*", chance = 15 },
 		hurt = { "*churns*", chance = 15 },

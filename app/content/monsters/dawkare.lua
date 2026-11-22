@@ -30,7 +30,11 @@ them.
 	},
 	speech = {
 		start = { "Dawkare has been waiting for you.", chance = 40 },
-		turn = { "My dawkor said you were weak.", "Stand still. It is easier.", chance = 25 },
+		turn = {
+			"My dawkor said you were weak.", "Stand still. It is easier.",
+			{ text = "Dawkare chose this ground. Sink in it.", when = function(m) return m:has_field("mud") end },
+			chance = 25,
+		},
 		winning = { "Dawkare is patient. Dawkare wins.", chance = 30 },
 		losing = { "Dawkor will not forgive this.", chance = 35 },
 		hurt = { "Grrah!", "Dawkare remembers that.", chance = 25 },

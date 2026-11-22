@@ -31,7 +31,7 @@ the life from a body faster than a blade does.
 	},
 	speech = {
 		start = { "Warm... you are warm...", chance = 40 },
-		turn = { "*moans*", "Let me share your fire.", chance = 20 },
+		turn = { "*moans*", "Let me share your fire.", { text = "Night is kind to the dead.", when = night }, chance = 20 },
 		winning = { "Cold is patient, {player}.", chance = 30 },
 		losing = { "I remember... a bell... a bell...", chance = 35 },
 		hurt = { "*wails*", chance = 20 },

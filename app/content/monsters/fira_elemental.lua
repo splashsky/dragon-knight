@@ -36,7 +36,7 @@ long stick.]],
 	},
 	speech = {
 		start = { "Fssh.", chance = 15 },
-		turn = { "Crackle.", "*flickers*", chance = 8 },
+		turn = { "Crackle.", "*flickers*", { text = "Hot. Good.", when = hot }, chance = 8 },
 		winning = { "Hiss.", chance = 15 },
 		losing = { "*roars with flame*", chance = 20 },
 		hurt = { "Pssht!", chance = 15 },

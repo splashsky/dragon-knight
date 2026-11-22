@@ -14,9 +14,8 @@ return {
 	lore = [[
 A bolt of lightning that comes out of a clear sky with a crack like a tree splitting. It
 does about two fifths of the caster's attack, and armour is no help against it. The
-storm things of the high ridges throw it, and so does the Liche Master when a lesson
-goes badly. There is no wind-up to watch for, only the crack, and by then the bolt has
-already landed.]],
+Liche Master throws it when a lesson goes badly. There is no wind-up to watch for, only
+the crack, and by then the bolt has already landed.]],
 	icon = "thunderbolt",
 	mp = 14,
 	data = { min = 35, max = 42 },   -- percent of the caster's attack

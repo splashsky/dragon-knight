@@ -36,6 +36,7 @@ they stand on his foot.
 		winning = { "I remember when these hills were young.", chance = 35 },
 		losing = { "A small one has found my weak stone?", chance = 45 },
 		hurt = { "*the ground groans*", chance = 20 },
+		status = { charging = { "*the great foot lifts from the stone*", chance = 80 } },
 		death = { "The mountain... sleeps again...", chance = 80 },
 		victory = { "The hills settle back into quiet.", chance = 85 },
 	},

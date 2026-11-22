@@ -42,7 +42,11 @@ awake usually does.
 	},
 	speech = {
 		start = { "You should have stayed in your bed.", chance = 40 },
-		turn = { "*long, thin wail*", "Count your friends, {player}. Are they all still here?", chance = 25 },
+		turn = {
+			"*long, thin wail*", "Count your friends, {player}. Are they all still here?",
+			{ text = "Dark enough for you, {player}?", when = night },
+			chance = 25,
+		},
 		winning = { "The lamp is out now.", chance = 30 },
 		losing = { "You were never meant to see my face.", chance = 30 },
 		hurt = { "*screams*", "You will be sorry.", chance = 25 },

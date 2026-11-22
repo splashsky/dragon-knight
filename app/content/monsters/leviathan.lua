@@ -26,7 +26,11 @@ kept still.
 	},
 	speech = {
 		start = { "The water carried your oar to me.", "Still your boat, {player}. Stillness is kind.", chance = 60 },
-		turn = { "The lake remembers every wreck.", "Breathe slowly. It is quieter that way.", chance = 15 },
+		turn = {
+			"The lake remembers every wreck.", "Breathe slowly. It is quieter that way.",
+			{ text = "The lake comes up to meet you, {player}.", when = function(m) return m:has_field("downpour") end },
+			chance = 15,
+		},
 		winning = { "Your boat is a splinter now.", chance = 35 },
 		losing = { "The deep does not ask permission.", chance = 40 },
 		hurt = { "Ripples. Only ripples.", chance = 20 },

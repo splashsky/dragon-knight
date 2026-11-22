@@ -51,6 +51,7 @@ king's.
 		winning = { "Another oath broken on my steel.", chance = 35 },
 		losing = { "My oath... holds.", chance = 40 },
 		hurt = { "Hm. Strong.", chance = 20 },
+		status = { charging = { "*draws the black blade back, slowly*", chance = 80 } },
 		death = { "Let the road... be free.", chance = 75 },
 		victory = { "The pass is mine again.", chance = 80 },
 	},

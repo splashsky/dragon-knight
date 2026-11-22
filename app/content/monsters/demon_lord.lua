@@ -38,7 +38,11 @@ his captains by lamplight. Those who reach him rarely leave the hall unchanged.
 	},
 	speech = {
 		start = { "A petitioner. How rare, and how brief.", "Kneel on the black glass, {player}.", chance = 60 },
-		turn = { "Your captains will not survive this day.", "Petitions are heard. Then answered.", chance = 15 },
+		turn = {
+			"Your captains will not survive this day.", "Petitions are heard. Then answered.",
+			{ text = "Sulphur in my hall, by my command. Breathe it, petitioner.", when = function(m) return m:has_field("brimstone") end },
+			chance = 15,
+		},
 		winning = { "The hall keeps all who enter.", chance = 35 },
 		losing = { "Summon my guard! Now!", chance = 45 },
 		hurt = { "A petitioner with teeth.", chance = 20 },

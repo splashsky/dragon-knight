@@ -27,7 +27,11 @@ but nobody has been close enough to check.
 	},
 	speech = {
 		start = { "The gate was never meant to open for you.", "Bow, little one. Or fall.", chance = 60 },
-		turn = { "Your pulse is loud, {player}.", "The others always run. You will not.", chance = 15 },
+		turn = {
+			"Your pulse is loud, {player}.", "The others always run. You will not.",
+			{ text = "The sulphur is mine. Breathe it, little one.", when = function(m) return m:has_field("brimstone") end },
+			chance = 15,
+		},
 		winning = { "The crack widens for me.", chance = 35 },
 		losing = { "A mortal? Impossible.", chance = 45 },
 		hurt = { "Clever. Do it again.", chance = 20 },

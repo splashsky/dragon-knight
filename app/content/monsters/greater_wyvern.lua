@@ -34,11 +34,12 @@ it dives.]],
 	},
 	speech = {
 		start = { "Kraa! Mine, the flock!", "*hisses*", chance = 30 },
-		turn = { "Grrrrrh.", "Slow little thing.", chance = 12 },
+		turn = { "Grrrrrh.", "Slow little thing.", { text = "*waits for the weather to clear*", when = function(m) return wet(m) or snowy(m) end }, chance = 12 },
 		winning = { "Kraa, kraa!", "Sheep are easier.", chance = 25 },
 		losing = { "*screams*", "Not... the flock!", chance = 30 },
 		hurt = { "Kraa!", chance = 18 },
 		death = { "*a last, long screech*", chance = 55 },
 		victory = { "*feeds quietly*", chance = 40 },
+		status = { charging = { "*tucks its wings and waits out of sight*", chance = 80 } },
 	},
 }

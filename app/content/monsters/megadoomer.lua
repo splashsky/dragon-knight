@@ -34,7 +34,12 @@ in their own heads.]],
 	},
 	speech = {
 		start = { "Nine.", "Eight.", chance = 40 },
-		turn = { "Seven.", "Six.", chance = 15 },
+		turn = {
+			"Seven.", "Six.",
+			{ text = "Three. Two. One.", when = { foe_has = { "doom" } } },
+			{ text = "The dark is good for counting.", when = night },
+			chance = 15,
+		},
 		winning = { "Three. Two.", chance = 30 },
 		losing = { "Zero is not yet.", chance = 35 },
 		hurt = { "Four...", "Five!", chance = 20 },

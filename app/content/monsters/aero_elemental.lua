@@ -26,7 +26,7 @@ rest. Hurt spells go straight through it, so it is a fight for steel and patienc
 	},
 	speech = {
 		start = { "*howls*", chance = 15 },
-		turn = { "*whistles*", chance = 10 },
+		turn = { "*whistles*", { text = "*shrieks in the storm*", when = function(m) return m:has_field("thunderstorm") end }, chance = 10 },
 		winning = { "*gusts*", chance = 20 },
 		losing = { "*drops to nothing*", chance = 15 },
 		hurt = { "*keens*", chance = 15 },

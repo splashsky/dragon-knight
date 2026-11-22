@@ -31,6 +31,7 @@ Its claws are said to remember them.
 		winning = { "Another name for the wall of my cave.", chance = 35 },
 		losing = { "You dare claim my name?", chance = 45 },
 		hurt = { "Scratch the scales, and you scratch the record.", chance = 20 },
+		status = { charging = { "*the shadows draw in toward its jaws*", chance = 80 } },
 		death = { "My list... will be... short again...", chance = 75 },
 		victory = { "One more name, carved deep.", chance = 85 },
 	},

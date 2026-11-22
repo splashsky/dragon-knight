@@ -29,7 +29,11 @@ against him. He rarely fights himself. He prefers to watch from a height and cou
 	},
 	speech = {
 		start = { "I have your name, {player}. Your knights wrote it on the walls.", "Send another wave, then.", chance = 60 },
-		turn = { "My soldiers are cheap. You are not.", "Count the dead, {player}. Then count yours.", chance = 15 },
+		turn = {
+			"My soldiers are cheap. You are not.", "Count the dead, {player}. Then count yours.",
+			{ text = "Breathe my sulphur, {player}. It is the only air you will get here.", when = function(m) return m:has_field("brimstone") end },
+			chance = 15,
+		},
 		winning = { "I knew you would come up this road.", chance = 35 },
 		losing = { "My captains will hear of this.", chance = 45 },
 		hurt = { "Acceptable. Carry on.", chance = 20 },

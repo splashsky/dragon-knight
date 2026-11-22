@@ -34,6 +34,7 @@ tried to bind it. None came back to say how it went.
 		winning = { "Another knight for the stories.", chance = 35 },
 		losing = { "A mortal has made me bleed?", chance = 45 },
 		hurt = { "Harder than my hide. Try again.", chance = 20 },
+		status = { charging = { "*the great fist draws back, slowly*", chance = 80 } },
 		death = { "The stories... will not... end...", chance = 80 },
 		victory = { "Sleep now, little one. I never will.", chance = 85 },
 	},

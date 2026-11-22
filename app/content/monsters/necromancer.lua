@@ -37,6 +37,7 @@ they are seen.
 		start = { "Another soul wanders into my garden.", "Ah, {player}. The dead whispered you would come.", chance = 65 },
 		turn = {
 			"Rise... rise...", "Do you hear them? They are calling your name.",
+			{ text = "The air is foul. Breathe deep, {player}.", when = function(m) return m:has_field("miasma") end },
 			{ text = "Sleep, {player}. The dead never wake either.", weight = 3, when = { foe_has = { "sleep" } }, once = "condition" },
 			{ text = "Your blood sours. I can smell it from here.", weight = 2, when = { foe_has = { "poison" } }, once = "condition" },
 			{ text = "Asleep and poisoned... you are halfway to my garden already.", weight = 4,

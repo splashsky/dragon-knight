@@ -47,11 +47,17 @@ armour, so most who meet one go in with a plan to get out again.
 	},
 	speech = {
 		start = { "Your armour will make a fine puddle.", chance = 40 },
-		turn = { "*exhales flame*", "Do you smell that? That is you, cooking.", chance = 25 },
+		turn = {
+			"*exhales flame*", "Do you smell that? That is you, cooking.",
+			{ text = "The heat is my own, {player}.", when = hot },
+			{ text = "It is night, and I am up. Burn.", when = night },
+			chance = 25,
+		},
 		winning = { "The forge is hot, little one.", chance = 30 },
 		losing = { "My fire is older than your kingdom.", chance = 30 },
 		hurt = { "*shrieks in fury*", "Wyrm burns for this!", chance = 25 },
 		death = { "The vents... will cool... without me.", chance = 60 },
 		victory = { "Ash for the nest, {player}.", chance = 50 },
+		status = { charging = { "*draws a deep, glowing breath*", chance = 80 } },
 	},
 }

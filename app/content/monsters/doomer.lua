@@ -28,7 +28,12 @@ die.
 	},
 	speech = {
 		start = { "The book is open, {player}. Your page is next.", chance = 50 },
-		turn = { "You have been counted.", { text = "Your sins are long, {player}. Shall I read them?", once = true }, chance = 25 },
+		turn = {
+			"You have been counted.",
+			{ text = "Your sins are long, {player}. Shall I read them?", once = true },
+			{ text = "The count has begun, {player}. It does not stop.", when = { foe_has = { "doom" } } },
+			chance = 25,
+		},
 		winning = { "The verdict is given.", chance = 30 },
 		losing = { "The book does not lie. Neither do I.", chance = 30 },
 		hurt = { "Appeals are not accepted here.", chance = 25 },

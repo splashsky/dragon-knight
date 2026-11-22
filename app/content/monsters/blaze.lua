@@ -37,7 +37,7 @@ Water helps, but a Blaze is rarely near enough to a well when it arrives.
 	},
 	speech = {
 		start = { "*roars like a chimney*", chance = 30 },
-		turn = { "*flares*", "Your town burns well.", chance = 20 },
+		turn = { "*flares*", "Your town burns well.", { text = "*crackles in the heat*", when = hot }, chance = 20 },
 		winning = { "*crackles with glee*", chance = 25 },
 		losing = { "*sinks to embers*", chance = 25 },
 		hurt = { "*hisses*", "*spits sparks*", chance = 25 },

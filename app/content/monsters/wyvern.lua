@@ -32,11 +32,12 @@ which does not always work.]],
 	},
 	speech = {
 		start = { "*hisses*", "Kraa!", chance = 20 },
-		turn = { "Grrr...", chance = 8 },
+		turn = { "Grrr...", { text = "*circles, waiting for a clear sky*", when = function(m) return wet(m) or snowy(m) end }, chance = 8 },
 		winning = { "Kraa!", chance = 20 },
 		losing = { "*screeches*", chance = 25 },
 		hurt = { "Kraa!", "*thrashes its tail*", chance = 15 },
 		death = { "*a long, falling cry*", chance = 50 },
 		victory = { "*feeds*", chance = 40 },
+		status = { charging = { "*climbs high, wings beating*", chance = 80 } },
 	},
 }

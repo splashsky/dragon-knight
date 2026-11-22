@@ -36,7 +36,11 @@ the smiths charge double for it.]],
 	},
 	speech = {
 		start = { "Run, little hunter. Run.", chance = 40 },
-		turn = { "*howls*", "Your fear is sweet, {player}.", chance = 15 },
+		turn = {
+			"*howls*", "Your fear is sweet, {player}.",
+			{ text = "The moon is up. Can you hear it calling?", when = function(m) return m:has_field("night") end },
+			chance = 15,
+		},
 		winning = { "Do you smell that, {player}? That is your fear.", chance = 30 },
 		hurt = { "Argh! That stung.", chance = 30 },
 		death = { "The moon... takes me back...", chance = 60 },

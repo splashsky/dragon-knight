@@ -27,10 +27,15 @@ who fight it see it clearly. Most remember only the cold wind that came before t
 	},
 	speech = {
 		start = { "Your lamp shows me nothing but you.", "The dark is mine, little knight.", chance = 60 },
-		turn = { "I am behind you, {player}.", "Do you feel the cold yet?", chance = 15 },
+		turn = {
+			"I am behind you, {player}.", "Do you feel the cold yet?",
+			{ text = "The night is mine now. Your lamp is no use to you.", when = function(m) return m:has_field("night") end },
+			chance = 15,
+		},
 		winning = { "You fight what you cannot see.", chance = 35 },
 		losing = { "Light... where did it come from?", chance = 40 },
 		hurt = { "A flicker. Nothing more.", chance = 20 },
+		status = { charging = { "*drinks the last of the light*", chance = 80 } },
 		death = { "Back into the dusk...", chance = 75 },
 		victory = { "The road is dark again.", chance = 80 },
 	},

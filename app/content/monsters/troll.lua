@@ -21,7 +21,11 @@ though the stone ones are usually the ones that were already dead.]],
 	},
 	speech = {
 		start = { "Who walks on Troll road?", "Troll smash little one.", chance = 50 },
-		turn = { "Hrrrrm.", "Troll hungry.", chance = 10 },
+		turn = {
+			"Hrrrrm.", "Troll hungry.",
+			{ text = "Sun burns. Troll not like sun.", when = function(m) return m:has_field("sun") or m:has_field("heat") end },
+			chance = 10,
+		},
 		winning = { "Little one breaks easy.", chance = 25 },
 		losing = { "Troll... not like this.", { text = "Troll hurt. Troll ANGRY.", once = true, when = { hp_below = 30 } }, chance = 40 },
 		hurt = { "Grrah!", "Tickles.", chance = 20 },

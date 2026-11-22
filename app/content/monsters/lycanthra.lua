@@ -39,7 +39,7 @@ in both forms say her eyes stay the same colour either way.
 	},
 	speech = {
 		start = { "Good evening, {player}. Do sit down.", chance = 40 },
-		turn = { "*low laugh*", "The moon likes you less than I do.", chance = 25 },
+		turn = { "*low laugh*", "The moon likes you less than I do.", { text = "The moon is out, and so am I.", when = night }, chance = 25 },
 		winning = { "You are very brave for a dead woman.", chance = 30 },
 		losing = { "Oh, that was not kind.", chance = 35 },
 		hurt = { "*snarls*", "How rude.", chance = 25 },

@@ -37,7 +37,7 @@ them loose on the roads to make a point. Do not count on one being frightened of
 	},
 	speech = {
 		start = { "*roars*", "You smell of fear.", chance = 40 },
-		turn = { "Grrrraaah!", chance = 15 },
+		turn = { "Grrrraaah!", { text = "*rages in the heat*", when = hot }, chance = 15 },
 		winning = { "Bones for the pit!", chance = 30 },
 		hurt = { "Hurts! Hurts!", chance = 25 },
 		losing = { "*screams*", chance = 35 },

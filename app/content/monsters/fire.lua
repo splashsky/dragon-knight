@@ -31,7 +31,7 @@ is hard to put out. Endworld scouts carry wet sacks as a matter of habit.]],
 	},
 	speech = {
 		start = { "Crackle...", chance = 30 },
-		turn = { "*hisses*", chance = 15 },
+		turn = { "*hisses*", { text = "*spreads in the heat*", when = hot }, { text = "*sputters in the rain*", when = wet }, chance = 15 },
 		winning = { "*flares up*", chance = 25 },
 		hurt = { "*sputters*", chance = 25 },
 		death = { "*dies down to embers*", chance = 50 },

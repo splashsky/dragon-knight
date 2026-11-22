@@ -31,7 +31,7 @@ it. Mages keep a charm of salt by the bed, and the wise ones say it helps.]],
 	},
 	speech = {
 		start = { "Sleep, {player}.", "Hsssss...", chance = 40 },
-		turn = { "Nnnnhh.", "You will wake screaming.", chance = 15 },
+		turn = { "Nnnnhh.", "You will wake screaming.", { text = "Nnnnhh... the dark is ours.", when = night }, chance = 15 },
 		winning = { "Your dreams are mine now.", chance = 30 },
 		losing = { "Wake, then! Wake!", chance = 35 },
 		hurt = { "*shrieks*", chance = 20 },

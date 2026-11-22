@@ -27,7 +27,7 @@ the smiths who sell it are not always honest about its purity.
 	},
 	speech = {
 		start = { "Full moon, {player}. Bad luck for you.", chance = 50 },
-		turn = { "*snarls*", "I can smell your fear.", chance = 20 },
+		turn = { "*snarls*", "I can smell your fear.", { text = "The moon is up, {player}. Now you will see.", when = night }, chance = 20 },
 		winning = { "You fight like a sheep, {player}.", chance = 30 },
 		losing = { "Not yet... the moon is still up.", chance = 35 },
 		hurt = { "Grrr...", "*howls in pain*", chance = 20 },

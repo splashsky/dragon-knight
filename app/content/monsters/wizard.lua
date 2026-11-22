@@ -51,7 +51,7 @@ which the wizards take poorly.]],
 	},
 	speech = {
 		start = { "Another fool on my road. How quaint.", chance = 50 },
-		turn = { "Mm. Interesting.", chance = 15 },
+		turn = { "Mm. Interesting.", { text = "Rain. How tiresome.", when = wet }, chance = 15 },
 		winning = { "Your armour is mine, {player}.", chance = 30 },
 		hurt = { "Impudent!", chance = 30 },
 		losing = { "Hmph. Mere luck.", chance = 40 },

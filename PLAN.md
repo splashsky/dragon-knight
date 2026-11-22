@@ -530,9 +530,11 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 client, ✅ L4 live sync, ✅ L5 measure, document, release.
 9. **3.1 hotbar** (`docs/plans/hotbar.md`): ✅ the fight's number keys (schema version 17);
 	 a layout redesign was tried and reverted.
-10. **3.2 elements and weather** (`docs/plans/elements-and-weather.md`): A elements and
-	 wards (`immune` replaced), B the clock and the weather, C fields, then content: monster
-	 patterns, new spells, statuses, fields and items, lore and flavor.
+10. **3.2 elements and weather** (`docs/plans/elements-and-weather.md`): ✅ A elements and
+	 wards (`immune` replaced; schema version 21), ✅ B the clock and the weather, ✅ T the
+	 server tick and fights in real time (schema version 22), ✅ C fields (schema version 23),
+	 ✅ content: new spells, statuses and gear (schema version 24), monster patterns, lore and
+	 flavor.
 
 ## Definition of done
 

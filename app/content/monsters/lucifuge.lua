@@ -38,6 +38,7 @@ court say he is courteous, which is worse.
 		winning = { "I was an angel once. Trust me, this is an improvement.", chance = 35 },
 		losing = { "How impolite. Very well.", chance = 45 },
 		hurt = { "Ah. That one had some manners.", chance = 20 },
+		status = { charging = { "*the blade rises, with exquisite courtesy*", chance = 80 } },
 		death = { "Heaven... will not... ask me back...", chance = 80 },
 		victory = { "The pit thanks you for your visit.", chance = 85 },
 	},

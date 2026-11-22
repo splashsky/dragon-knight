@@ -296,3 +296,33 @@ return {
 Each phase documents itself in `docs/APP.md` (its own section) and keeps `make test`
 green. The integrator reviews each diff, writes the changelog entry
 (`app/community/changelog.lua`, version `3.2.0-dev`) and commits.
+
+## Status
+
+All phases are built and merged (schema versions 21-24): ✅ A elements and wards, ✅ B the
+clock and the weather, ✅ T the server tick and fights in real time, ✅ C fields, ✅ E the
+new spells, statuses, ward draughts and gear, ✅ D' the monsters' patterns (guarded by
+`tests/lua/test_patterns.lua`), ✅ F lore and flavor.
+
+The content follows these rules, which the monster files and new spells were written to
+(the band designs themselves were working notes):
+
+- **Rotations count the monster's own turns** (`m.turn`: 1 on its first action, only turns
+	it acted), never the fight's round, which an ambush or a sleep shifts. The battlefield
+	is `m:has_field(key)`; an unknown status or field key in a condition is an error.
+- **A class's unwanted spells are switched off with `weight = 0`** (the strength-scaled
+	warrior strikes, which do nothing at a monster's strength 0; summons, which monsters
+	can't cast; whatever breaks the pattern).
+- **The original monsters keep their stock stats** (`maxhp`, `maxdam`, `armor`, `maxexp`,
+	`maxgold`, `level`; `tests/lua/monsters_original.lua`) and at least their converted
+	immunity; only `maxmp` rises where a pattern needs it, with a comment.
+- **Monster specials scale with the caster's attack** (the breaths and Heavy Blow 46-60%,
+	Thunderbolt and Water Jet 35-42%, Deluge 33-40%, Doom half the attack on expiry), so one
+	spell serves a level 6 drake and a level 47 dragon; charged ones gather for a tick
+	(`charging`, the tell) and release on the next.
+- **Field spells** target the caster, refuse while their field is up, and last 3-5 ticks;
+	the Paladin's Consecrate is the counter to the aura fields (Brimstone, Miasma) and the
+	night's shadow.
+- **Durations**: one turn became one tick (10 s) in Phase T and was kept: damage over
+	time totals the same, buffs, debuffs and allies now cover more of an engaged player's
+	actions. Tune them from play.

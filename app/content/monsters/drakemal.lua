@@ -17,6 +17,9 @@ back. Its fire is smoky and short, but close enough to singe a cloak, so keep yo
 		{ spell = "fire_breath", weight = 1, when = function(m) return m.turn % 3 == 0 end },
 	},
 	speech = {
+		status = {
+			charging = { "*draws in a long, smoky breath*", chance = 80 },
+		},
 		start = { "Turn back, little {player}. This cave is mine.", chance = 30 },
 		turn = { "*smoke curls from its nostrils*", "Grrmph.", chance = 15 },
 		hurt = { "Pah! A scratch!", "That one stung.", chance = 25 },

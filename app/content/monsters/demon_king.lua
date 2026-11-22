@@ -45,7 +45,11 @@ it.
 	},
 	speech = {
 		start = { "Midworld's little champion. I have been expecting you.", "Kneel, {player}, and I will be brief.", chance = 65 },
-		turn = { "Every road you walk was mine first.", "You are slower than the cracks, {player}.", chance = 15 },
+		turn = {
+			"Every road you walk was mine first.", "You are slower than the cracks, {player}.",
+			{ text = "My crown's sulphur is in your lungs now, {player}.", when = function(m) return m:has_field("brimstone") end },
+			chance = 15,
+		},
 		winning = { "Your kingdom will be a footnote in my records.", chance = 35 },
 		losing = { "You presume too much, mortal.", chance = 45 },
 		hurt = { "A fine blow. I will remember it.", chance = 20 },

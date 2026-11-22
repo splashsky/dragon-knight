@@ -5,10 +5,10 @@ return {
 	name = "Miasma",
 	description = "Fouls the battlefield for 40 seconds: poison and shadow hit harder, holy light is weaker, and poisons bite half again as hard.",
 	lore = [[
-A miasma is what a liche leaves in the air when it has been too long in one place.
+A miasma is what the Liche King leaves in the air when it has been too long in one place.
 Poison and shadow thicken in it, holy light thins, and a poison bites half again as
-hard. The fog is the colour of old bone and smells of the crypt beneath it. Liches at
-the dead school beyond Narcissa keep one going while they teach, and a pupil who
+hard. The fog is the colour of old bone and smells of the crypt beneath it. Necromancers
+at the dead school beyond Narcissa keep one going while they teach, and a pupil who
 breathes deep does not forget the lesson. A Paladin's Consecrate clears it at once.]],
 	icon = "miasma",
 	mp = 30,

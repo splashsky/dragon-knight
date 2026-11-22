@@ -25,7 +25,11 @@ enough to blind a man for a minute, and that is usually all it needs.
 	},
 	speech = {
 		start = { "Small one comes to the cave.", chance = 40 },
-		turn = { "*hisses*", "Smell of you is sour.", chance = 20 },
+		turn = {
+			"*hisses*", "Smell of you is sour.",
+			{ text = "Wyrm cannot see you. You cannot see Wyrm.", when = function(m) return m:has_field("fog") end },
+			chance = 20,
+		},
 		winning = { "Crawl back to your mother.", chance = 30 },
 		losing = { "Wyrm will not die in a hole.", chance = 35 },
 		hurt = { "*screams*", "Wyrm bleeds.", chance = 25 },

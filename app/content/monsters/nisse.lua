@@ -30,7 +30,7 @@ a long way on a still night.]],
 	},
 	speech = {
 		start = { "Hee hee! Mind the hay, {player}!", chance = 45 },
-		turn = { "Tee-hee.", chance = 20 },
+		turn = { "Tee-hee.", { text = "Wet, wet! Tee-hee, no hay for you.", when = wet }, chance = 20 },
 		winning = { "Your boots are mine now!", chance = 30 },
 		hurt = { "Ouch! Rude!", "No milk for you!", chance = 30 },
 		losing = { "Hee... that was not nice.", chance = 25 },

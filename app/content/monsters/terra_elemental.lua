@@ -29,7 +29,7 @@ bring a blade or a strong arm.
 	},
 	speech = {
 		start = { "*grinds*", chance = 15 },
-		turn = { "*rumble*", chance = 10 },
+		turn = { "*rumble*", { text = "*the ground gives way*", when = function(m) return m:has_field("mud") end }, chance = 10 },
 		winning = { "Crack.", chance = 20 },
 		losing = { "*the stone does not crack*", chance = 20 },
 		hurt = { "*grinds*", chance = 15 },
