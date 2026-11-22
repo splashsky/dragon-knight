@@ -1,4 +1,16 @@
 -- app/content/monsters/grey_bear.lua :: the Grey Bear (the original game's monster 63).
+local function over_you(m, key)
+	for _, o in ipairs(m.objects) do
+		if o.key == key and o.over == "player" then return true end
+	end
+	return false
+end
+
+-- a hive hangs over you and has been up a round
+local function hive_over_you(m)
+	return m.turn >= 2 and over_you(m, "beehive")
+end
+
 return {
 	name = "Grey Bear",
 	lore = [[
@@ -12,9 +24,17 @@ stream, so travellers go round by the ford. Its pelt sells well in Gilead.]],
 	maxexp = 160, maxgold = 53,
 	resist = { frost = 25 },
 	maxmp = 74,
+	spells = {
+		-- rakes down a hive that hangs over you, once it has been up a round
+		{ spell = "knock_over", weight = 8, aim = "beehive", when = hive_over_you },
+	},
 	speech = {
 		start = { "*grumbles*", chance = 20 },
-		turn = { "Grrr...", chance = 10 },
+		turn = {
+			"Grrr...",
+			{ text = "*eyes the hive over your head*", weight = 4, when = hive_over_you },
+			chance = 10,
+		},
 		winning = { "*sniffs at the pack*", chance = 20 },
 		hurt = { "ROAR!", chance = 30 },
 		losing = { "*rises on its hind legs*", chance = 25 },

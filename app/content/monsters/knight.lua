@@ -1,4 +1,9 @@
 -- app/content/monsters/knight.lua :: the Knight (the original game's monster 89).
+-- raises the banner on its opening turn, and never a second
+local function raises(m)
+	return m.turn == 1 and not m:has_object("war_banner")
+end
+
 local function buffed(m)
 	return m:has_status("uber_damage")
 end
@@ -24,6 +29,10 @@ road between Gilead and Endworld, where he challenges anyone who passes.
 	class = "warrior",
 	maxmp = 105,
 	attack_weight = 6,
+	items = {
+		-- raises the knights' standard on its opening turn: one hit brings the banner down
+		{ item = "war_standard", weight = 20, stock = 1, when = raises },
+	},
 	spells = {
 		-- opens with its war cry
 		{ spell = "war_cry", weight = 3, when = function(m) return not buffed(m) end },
@@ -52,7 +61,11 @@ road between Gilead and Endworld, where he challenges anyone who passes.
 	},
 	speech = {
 		start = { "Halt! Name yourself, traveller.", "State your business on this road.", chance = 50 },
-		turn = { "Your guard is poor.", "I have fought better men than you.", chance = 25 },
+		turn = {
+			"Your guard is poor.", "I have fought better men than you.",
+			{ text = "Raise the standard!", weight = 4, when = raises },
+			chance = 25,
+		},
 		winning = { "Yield, {player}, and you shall live.", chance = 30 },
 		losing = { "My oath... holds me still...", chance = 35 },
 		hurt = { "A fair blow.", "Ha! Strike again.", chance = 25 },

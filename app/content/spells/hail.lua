@@ -17,6 +17,11 @@ end
 return {
 	name = "Hail",
 	description = "A hailstorm over the whole field that hits every monster and every object with frost. Some monsters are immune.",
+	lore = [[
+Mages learn Hail at forty-six, after a winter on the hills above Hambry, where the stones fall
+the size of a thumb and the shepherds stop to wait them out. The spell brings the same ice
+down on the whole field, so every foe and every object takes it at once. Hambry men say it
+is the quickest way to clear a crowded road.]],
 	icon = "hail",
 	area = true,                -- hits every foe and object (s.targets)
 	mp = 30,

@@ -26,6 +26,12 @@ return {
 	name = "Explosive Barrel",
 	description = "A keg of blasting powder. Fire or lightning lights its fuse (20 seconds), water douses it; when it "
 		.. "goes, it blasts everyone on the field, whoever put it there too, with fire: 3 + 5 per 4 levels, 80% to 100% of it.",
+	lore = [[
+Kalle's miners buy blasting powder by the keg, and they haul it up to the diggings in the
+same cart as their ropes and their bread. Each of them has a story about a keg that went
+off in the wrong place, usually next to a cook fire. Bandits are said to roll barrels down
+on their pursuers, and goblins are not much more careful with them. A keg that goes off
+does not ask who rolled it, and the one who rolled it usually finds out too.]],
 	icon = "explosive_barrel",
 	hp = 20,
 	resist = { fire = 90 },

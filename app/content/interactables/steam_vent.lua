@@ -12,6 +12,12 @@ return {
 	description = "A crack in the cinders spitting steam. Every 30 seconds it scalds one creature at random (12% of its "
 		.. "hit points, as water), with a warning ten seconds before. A water hit sets it off at once, scalding everyone "
 		.. "for 30%; earth plugs it.",
+	lore = [[
+The Ashlands' cinders are full of cracks, and some of them breathe steam with a hiss that
+the people of Endworld learn to hear. The hiss comes a turn before the scald, which is time
+to step aside if you are paying attention. Some say a splash of water will set the whole
+crack off at once, and a few fools have tried it. Endworld's masons pile rubble on the
+cracks they can reach, and leave the rest to take their chances.]],
 	icon = "steam_vent",
 	hp = 20,
 	hp_per_level = 3,

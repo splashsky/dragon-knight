@@ -4,6 +4,11 @@
 return {
 	name = "War Standard",
 	description = "Raises a war banner over the user's side of the field: everyone there deals 25% more damage while it stands.",
+	lore = [[
+No one sells a war standard. The knights of the old garrisons keep one folded in the
+saddlebag and raise it on the first turn of a fight, so the men of their side fight harder
+for the sight of it. The garrison of Gilead says a standard comes down at the first good
+blow, and that a knight who has lost his banner fights like a man who has lost his temper.]],
 	icon = "war_standard",
 	category = "consumable",
 	max_stack = 1,

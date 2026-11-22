@@ -1504,7 +1504,7 @@ mig_eq "SELECT group_concat(key || '=' || wind, ' ') FROM (SELECT key, wind FROM
 	"blizzard=3 cinders=1 gale=3 hills=1 peaks=2 sand=1 thunderstorm=3" "the fields' wind"
 mig_eq "SELECT (SELECT sum(area) FROM spells) || '|' || (SELECT sum(area) FROM items) || '|' ||
 	(SELECT count(*) FROM monster_items WHERE aim <> '') || '|' || (SELECT count(*) FROM monster_spells WHERE aim <> '')" \
-	"13|0|0|0" "the area spells (3.3 content), no area items, no aims yet"
+	"13|0|8|13" "the area spells (3.3 content), no area items, the monsters' aims (8 items: the footpads' and the deserters' flasks; 13 spells: the bears', giants', aqua elemental's and witch's)"
 mig_eq "SELECT group_concat(id || ':' || coalesce(level, '-') || ':' || coalesce(over, '-'), ' ') FROM fight_combatants" \
 	"1:-:- 2:-:-" "the fight's combatants: no objects"
 mig_serve "$MIG/v24.lua" "$MIG/v24server.log"

@@ -374,7 +374,7 @@ expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" a
 expect_body '<span class="item-badge item-badge-charges item-badge-empty" aria-hidden="true">0/5</span>'
 
 t_section "fight api: statuses, summons, locked turns"
-fa_goblin() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 28 30000; fa_on_clock; }   # it only attacks, and misses
+fa_goblin() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi "$(t_sql "SELECT id FROM monsters WHERE key = 'creature'")" 30000; fa_on_clock; }   # a Creature: it only attacks, and misses (the Goblin rolls a keg out on its second turn)
 fa_both poison 1 fa_goblin "spell=Spell&userspell=$(sp poison)&round=2"
 fa_expect 'any(e["type"] == "spell" and e["status"][0]["key"] == "poison" and e["status"][0]["who"] == "enemy" and e["status"][0]["ticks"] == 3 and e["status"][0]["statuses"][0]["left"] == "30s" and e["status"][0]["status"] == "Poisoned" for e in d["events"] if "status" in e)' "Poison: the status"
 fa_expect 'not any(e["type"] == "status" and "text" in e for e in d["events"])' "Poison: no tick in the round"
@@ -383,7 +383,7 @@ fa_expect 'not any(e["type"] == "status" and "text" in e for e in d["events"])' 
 fa_poisoned() { fa_goblin; t_fight_status fapi 2 poison 'max=i:5
 min=i:2' 2; }
 T_NOW=$((T_START + 10)) fa_both "poison ticks, caught up" 2 fa_poisoned "fight=Fight&round=2"
-fa_expect 'd["events"][0]["type"] == "status" and d["events"][0]["part"] == "ending" and d["events"][0]["actor"] == "enemy" and d["events"][0]["text"].startswith("The Goblin takes ") and d["events"][0]["hp"][0]["who"] == "enemy"' "Poison: the tick, caught up first"
+fa_expect 'd["events"][0]["type"] == "status" and d["events"][0]["part"] == "ending" and d["events"][0]["actor"] == "enemy" and d["events"][0]["text"].startswith("The Creature takes ") and d["events"][0]["hp"][0]["who"] == "enemy"' "Poison: the tick, caught up first"
 fa_expect 'any(e["type"] == "attack" and e["actor"] == "player" for e in d["events"])' "then the round"
 fa_poisoned_out() { fa_goblin; t_fight_status fapi 2 poison 'max=i:5
 min=i:2' 1; }

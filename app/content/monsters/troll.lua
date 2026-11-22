@@ -1,4 +1,21 @@
 -- app/content/monsters/troll.lua :: the Troll (the original game's monster 50).
+local function over_you(m, key)
+	for _, o in ipairs(m.objects) do
+		if o.key == key and o.over == "player" then return true end
+	end
+	return false
+end
+
+-- a standing stone leans over you and has stood a round, and its fall (40% of your life, and a stun) would not kill you
+local function stone_over_you(m)
+	return m.turn >= 2 and over_you(m, "standing_stone") and m.target.hp > m.target.maxhp * 45 // 100
+end
+
+-- a dead tree stands, has stood a round, and its fall (25% of your life) would not kill you
+local function tree_falls(m)
+	return m.turn >= 2 and m.target.hp > m.target.maxhp * 3 // 10
+end
+
 return {
 	name = "Troll",
 	lore = [[
@@ -18,12 +35,17 @@ though the stone ones are usually the ones that were already dead.]],
 			return m.hp < m.maxhp * 6 // 10 and not m:has_status("regen") and not m:has_status("burning")
 				and not (m:has_field("sun") or m:has_field("heat"))
 		end },
+		-- smashes a standing stone that leans over you, once it has stood a round
+		{ spell = "knock_over", weight = 6, aim = "standing_stone", when = stone_over_you },
+		-- fells a dead tree onto you, once it has stood a round
+		{ spell = "knock_over", weight = 5, aim = "dead_tree", when = tree_falls },
 	},
 	speech = {
 		start = { "Who walks on Troll road?", "Troll smash little one.", chance = 50 },
 		turn = {
 			"Hrrrrm.", "Troll hungry.",
 			{ text = "Sun burns. Troll not like sun.", when = function(m) return m:has_field("sun") or m:has_field("heat") end },
+			{ text = "Troll smash rock. Rock fall on little one.", weight = 4, when = stone_over_you },
 			chance = 10,
 		},
 		winning = { "Little one breaks easy.", chance = 25 },

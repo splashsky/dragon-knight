@@ -15,6 +15,8 @@ changelog.RELEASES = {
 			"Ten things you may find on the field, each from its land: explosive barrels in the Diggings, beehives in the Hambry Weald, gas pockets in the Thornbog, steam vents in the Ashlands, standing stones on the Greymoor, dead trees that fall in a gale, tide pools on the Shoals, war banners in the Storm Barrens, campfires on the Copper Downs and water cactus in the Dry Country. Knock them down, set them off, or keep clear.",
 			"Buy an Explosive Barrel in Kalle, Narcissa or Gilead and roll it onto the field: hit it or set it alight, and it blasts everyone, you included (schema version 26, run dk migrate). New statuses: Swarm, Soaked, Rallied and a lit Fuse.",
 			"Rockfall, Starfall, Whiteout, Inferno, the dragons' breaths and Deluge strike everything on the other side of the field at once, objects included. New spells: Hail and Cyclone for Mages, Whirlwind for Warriors, Radiance for Paladins, and the Mage's Gale, which raises a wind over the field that fans any fire.",
+			"Monsters use the field too: goblins, bandits and deserters roll out barrels and set them off when you are close (never in the rain); bears knock down hives over your head; trolls, ogres, giants and the Titan topple standing stones and dead trees onto you; knights raise their war banners; the Aqua Elemental quenches steam vents on you; the Bog Witch bursts gas pockets. They tell you first.",
+			"Every new object, status, spell and item has its story in its tooltip and on the help pages.",
 		},
 	},
 	{

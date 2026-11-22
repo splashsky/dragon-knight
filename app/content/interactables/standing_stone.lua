@@ -15,6 +15,11 @@ return {
 	description = "A lichen-grey menhir leaning over one side of the field. Toppled, it falls on that side: 40% of each "
 		.. "creature's hit points in earth damage (at least 10) and a stun. It shrugs off most blows; arcane force and "
 		.. "earth bring it down.",
+	lore = [[
+Nobody living knows who raised the stones on the Greymoor, and the shepherds who graze
+among them have stopped guessing. The stones lean one way or another, and the herders keep
+out from under the lean. Mages from Narcissa swear an arcane bolt will tip one over, and
+the shepherds say a tremor will do the same.]],
 	icon = "standing_stone",
 	hp = 8,
 	hp_per_level = 2,

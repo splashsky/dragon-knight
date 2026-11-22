@@ -39,6 +39,12 @@ return {
 	description = "A bare, creaking snag. In a gale it comes down by itself now and then, on a creature at random. Brought "
 		.. "down by a blow it falls on the dealer's opponents: 25% of a creature's hit points (at least 6). Fire or lightning "
 		.. "lights it (20 seconds), and then its fall burns too.",
+	lore = [[
+Woodcutters call them widowmakers, and none of them will work a snag in a gale for any pay.
+They stand at the edges of the Weald, the Greymoor, the Storm Barrens and the Thornbog, dry
+as paper and ready to catch. A fighter who knows the trick aims the last blow so the trunk
+goes over on the enemy. A snag that comes down in a gale takes whoever is under it, friend
+or foe.]],
 	icon = "dead_tree",
 	hp = 10,
 	hp_per_level = 2,

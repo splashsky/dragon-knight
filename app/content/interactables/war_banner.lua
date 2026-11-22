@@ -12,6 +12,12 @@ return {
 	name = "War Banner",
 	description = "A torn standard flying over one side of the field: everyone on that side deals 25% more damage while it "
 		.. "stands. A gale tears it down, fire burns it at once.",
+	lore = [[
+The war standards of Gilead go up where the men can see them, and the men fight harder for
+the sight of one. The Storm Barrens tear more banners down than any enemy does, and the
+ballads say a standard that falls takes the courage with it. Every soldier who has served
+on the Barrens has seen one come down in a squall, and nobody talks about what happened
+next.]],
 	icon = "war_banner",
 	hp = 10,
 	hp_per_level = 1,

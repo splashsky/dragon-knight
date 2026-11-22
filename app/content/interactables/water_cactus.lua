@@ -14,6 +14,12 @@ return {
 	name = "Water Cactus",
 	description = "A ribbed cactus full of water. Split open, it heals the creature with the lowest share of hit points by "
 		.. "25% of its maximum and puts out its fire. Fire burns it to a husk.",
+	lore = [[
+Nomads crossing the Dry Country between Bris and Kalle keep a cactus cut open for the
+children, and the old ones say a cactus has more sense than a well. The water is cold,
+which surprises everyone who has only tasted the sand. Whoever is worst hurt gets the first
+of it, say the nomads, and the rest can wait. A cactus that burns is a waste, and the
+healers say so loudly.]],
 	icon = "water_cactus",
 	hp = 10,
 	resist = { fire = -50 },

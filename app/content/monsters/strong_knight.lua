@@ -1,4 +1,9 @@
 -- app/content/monsters/strong_knight.lua :: the Strong Knight (the original game's monster 104).
+-- raises the banner on its opening turn, and never a second
+local function raises(m)
+	return m.turn == 1 and not m:has_object("war_banner")
+end
+
 
 local function awake(m)
 	return not m.target:has_status("sleep")
@@ -28,6 +33,10 @@ sword, since he breaks the swords.]],
 	maxmp = 125,
 	attack_weight = 24,
 	equipment = { shield = "spiked_targe" },        -- +14 armor, +6 attack: negligible
+	items = {
+		-- raises the knights' standard on its opening turn: one hit brings the banner down
+		{ item = "war_standard", weight = 20, stock = 1, when = raises },
+	},
 	spells = {
 		-- "takes the challenge personally": rages once he is hurt
 		{ spell = "rage", weight = 14, when = function(m) return m.hp < m.maxhp // 2 and unraged(m) end },
@@ -41,7 +50,11 @@ sword, since he breaks the swords.]],
 	},
 	speech = {
 		start = { "Name yourself, {player}, and stand where I can see you.", chance = 40 },
-		turn = { "Hold!", "Is that all you have?", chance = 15 },
+		turn = {
+			"Hold!", "Is that all you have?",
+			{ text = "Raise the standard! The gate holds!", weight = 4, when = raises },
+			chance = 15,
+		},
 		winning = { "The gate stays shut.", chance = 30 },
 		losing = { "I have held worse than you!", chance = 35 },
 		hurt = { "A glancing blow.", "Harder!", chance = 20 },

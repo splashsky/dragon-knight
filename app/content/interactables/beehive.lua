@@ -10,6 +10,12 @@ return {
 	name = "Beehive",
 	description = "A skep full of bees in the branches. Knocked down, it swarms someone on the side it hangs over; fire "
 		.. "smokes the bees off.",
+	lore = [[
+Honey is the oldest trade in the Weald. The skeps hang in the branches over the paths, and
+the honey-cutters of Hambry walk under them each morning with a smoking pot on a string.
+The bees are out in the sun and stay in when the night comes on or the rain. Hunters say
+a knocked-down hive never goes for the one who swung at it, only for whoever stood under
+it.]],
 	icon = "beehive",
 	hp = 12,
 	resist = { fire = -50 },

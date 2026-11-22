@@ -2,6 +2,29 @@
 -- its equipment's attack, defense and modifiers count like a character's (maxdam 20 +
 -- 45, armor 12 + 30 + 10, maxhp 120 + 25). It works itself into a frenzy once per fight
 -- and eats its one herb when badly hurt. It doesn't roam (see goblin_shaman.lua).
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+		or m:has_field("blizzard") or m:has_field("shallows")
+end
+
+local function barrel(m)
+	for _, o in ipairs(m.objects) do
+		if o.key == "explosive_barrel" then return o end
+	end
+end
+
+-- rolls a keg onto the field on its second turn, never in damp air
+local function rolls_out(m)
+	return m.turn == 2 and not barrel(m) and not wet(m)
+end
+
+-- lights the keg from its third turn on, when you could take twice its blast (it is 40% of its attack)
+local function lights(m)
+	local b = barrel(m)
+	return m.turn >= 3 and b and not b:has_status("fuse") and not wet(m)
+		and m.target.hp > m.attack * 8 // 10
+end
+
 local function unraged(m)
 	return not m:has_status("uber_damage")
 end
@@ -44,10 +67,19 @@ he is hurt. Roadside notices offer gold for his head, and most of them are old.]
 	items = {
 		-- eats his herb under a third of his HP
 		{ item = "herb", weight = 2, stock = 1, when = function(m) return m.hp < m.maxhp // 3 end },
+		-- rolls a keg of blasting powder onto the field on its second turn
+		{ item = "explosive_barrel", weight = 5, stock = 1, when = rolls_out },
+		-- throws a Fire Flask at the keg from its third turn on, unless you could not take the blast
+		{ item = "fire_flask", weight = 12, stock = 1, aim = "explosive_barrel", when = lights },
 	},
 	speech = {
 		start = { "Hold, travellers! Your purses are ours.", chance = 50 },
-		turn = { "Keep moving, you lot. Nobody leaves.", "Eyes on the target!", chance = 25 },
+		turn = {
+			"Keep moving, you lot. Nobody leaves.", "Eyes on the target!",
+			{ text = "Bring up the powder, lads. Quietly.", weight = 4, when = rolls_out },
+			{ text = "Fire in the hole!", weight = 4, when = lights },
+			chance = 25,
+		},
 		winning = { "Pick them clean, lads!", chance = 30 },
 		losing = { "Retreat? Retreat is for cowards!", chance = 35 },
 		hurt = { "That's a fine blow. Fine.", chance = 30 },

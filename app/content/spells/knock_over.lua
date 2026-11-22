@@ -15,6 +15,12 @@ end
 return {
 	name = "Knock Over",
 	description = "A heavy swing for about three quarters of the caster's attack, whatever the armor, and twice that against an object.",
+	lore = [[
+No Mage or Warrior learns this swing; monsters use it on whatever stands in their way. The
+Troll, the Titan, the Giant and the Ogre smash a standing stone that leans over you, or fell
+a dead tree onto you, once a round has gone by and only when the fall would not finish you.
+The Bog Witch pops a gas pocket with her broom, and the bears rake down the hive over your
+head. Most of them say so first, and the card reads "over you".]],
 	icon = "knock_over",
 	mp = 2,
 	data = { min = 66, max = 83, objects = 2 },   -- percent of the caster's attack; times more against an object

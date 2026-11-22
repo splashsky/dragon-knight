@@ -10,6 +10,11 @@ local function wounded(m)
 	return m.hp < m.maxhp // 2
 end
 
+-- a gas pocket is up (the loadout aims at it) and you are not poisoned yet
+local function pops(m)
+	return m.turn >= 2 and not m.target:has_status("poison")
+end
+
 return {
 	name = "Bog Witch",
 	lore = [[
@@ -34,6 +39,8 @@ Local people leave a loaf on the path for her and walk around her patch.]],
 		{ spell = "poison", weight = 2, when = function(m) return not m.target:has_status("poison") end },
 		-- casts Pain
 		{ spell = "pain", weight = 1 },
+		-- pops a gas pocket with her broom while you are not poisoned
+		{ spell = "knock_over", weight = 6, aim = "gas_pocket", when = pops },
 	},
 	items = {
 		-- drinks from the pot (a herb) when she is under half HP
@@ -41,7 +48,11 @@ Local people leave a loaf on the path for her and walk around her patch.]],
 	},
 	speech = {
 		start = { "Oh, a visitor. Sit, sit. The tea is nearly ready.", chance = 50 },
-		turn = { "Hee. Lie down a while.", "Mind the mud, dearie.", chance = 25 },
+		turn = {
+			"Hee. Lie down a while.", "Mind the mud, dearie.",
+			{ text = "Pop goes the bubble, dearie.", weight = 4, when = function(m) return m:has_object("gas_pocket") and pops(m) end },
+			chance = 25,
+		},
 		winning = { "Nap time, {player}.", chance = 30 },
 		losing = { "Ugh, my knees...", chance = 35 },
 		hurt = { "That stung, that stung!", chance = 25 },

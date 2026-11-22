@@ -108,6 +108,8 @@ t_section "monsters: the Bandit Captain's gear and frenzy"
 BANDIT=$(mon bandit_captain)
 t_fight monsterer "$BANDIT" 145
 mo_enemy_set "maxhp = 145"   # with its Life Stone
+# in the rain, which keeps his keg of blasting powder off the field (the footpads' pattern: he plays only his gear here)
+t_sql "UPDATE fights SET data = data || char(10) || 'field_sky=s:rain' || char(10) || 'field_sky_ticks=i:30' || char(10) || 'field_sky_tick=i:0' WHERE user_id = (SELECT id FROM users $MQ)"
 t_get /fight; CS=$(t_csrf); expect_body "Monster's MP: 40"
 t_round "csrf=$CS&fight=Fight"
 expect_body 'The Bandit Captain casts Craze.<br>The Bandit Captain will deal 10% more damage until the end of this fight.'
@@ -238,8 +240,8 @@ expect_body '<td style="width: 12%">Resists Physical (50%)<br>Weak to Lightning 
 expect_body 'Spells: Hurt, Heal; Mage spells: Magic Bolt; Items: Potion (2); Equipment: Dagger'
 expect_body '>Blue Slime</td><td style="width: 9%">4</td><td style="width: 9%">3</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 8%">5</td>'
 expect_body '>Bandit Captain <span class="light">(not met at random)</span></td><td style="width: 9%">145</td><td style="width: 9%">65</td><td style="width: 9%">52</td>'
-expect_body 'Spells: Craze, Fend, Grit; Items: Herb (1); Equipment: Broadsword, Chain Mail, Small Shield, Life Stone'
-expect_body 'Spells: Sleep, Poison, Pain; Items: Herb (2) <span class="light">(its spells cost no MP)</span>'
+expect_body 'Spells: Craze, Fend, Grit; Items: Herb (1), Explosive Barrel (1), Fire Flask (1); Equipment: Broadsword, Chain Mail, Small Shield, Life Stone'
+expect_body 'Spells: Sleep, Poison, Pain, Knock Over; Items: Herb (2) <span class="light">(its spells cost no MP)</span>'
 
 t_section "monsters: cleanup"
 t_sql "DELETE FROM content_overrides WHERE kind = 'monsters'"

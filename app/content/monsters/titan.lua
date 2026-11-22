@@ -1,5 +1,22 @@
 -- app/content/monsters/titan.lua :: the Titan (the original game's monster 149).
 
+local function over_you(m, key)
+	for _, o in ipairs(m.objects) do
+		if o.key == key and o.over == "player" then return true end
+	end
+	return false
+end
+
+-- a standing stone leans over you and has stood a round, and its fall (40% of your life, and a stun) would not kill you
+local function stone_over_you(m)
+	return m.turn >= 2 and over_you(m, "standing_stone") and m.target.hp > m.target.maxhp * 45 // 100
+end
+
+-- a dead tree stands, has stood a round, and its fall (25% of your life) would not kill you
+local function tree_falls(m)
+	return m.turn >= 2 and m.target.hp > m.target.maxhp * 3 // 10
+end
+
 local function unguarded(m)
 	return not m:has_status("uber_defense")
 end
@@ -29,10 +46,18 @@ they stand on his foot.
 		{ spell = "rockfall", weight = 12, when = function(m) return m.turn % 4 == 2 end },
 		-- under a third it digs in
 		{ spell = "fend", weight = 20, when = function(m) return m.hp < m.maxhp // 3 and unguarded(m) end },
+		-- smashes a standing stone that leans over you, once it has stood a round
+		{ spell = "knock_over", weight = 6, aim = "standing_stone", when = stone_over_you },
+		-- fells a dead tree onto you, once it has stood a round
+		{ spell = "knock_over", weight = 5, aim = "dead_tree", when = tree_falls },
 	},
 	speech = {
 		start = { "*the mountain stirs*", "Something small is on my foot.", chance = 60 },
-		turn = { "I built the first wall. You are standing on its stones.", "Slow, little one.", chance = 15 },
+		turn = {
+			"I built the first wall. You are standing on its stones.", "Slow, little one.",
+			{ text = "This stone leans. I will set it right.", weight = 4, when = stone_over_you },
+			chance = 15,
+		},
 		winning = { "I remember when these hills were young.", chance = 35 },
 		losing = { "A small one has found my weak stone?", chance = 45 },
 		hurt = { "*the ground groans*", chance = 20 },

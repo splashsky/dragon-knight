@@ -4,6 +4,11 @@
 return {
 	name = "Rallied",
 	description = "Deals 25% more damage while the war banner stands.",
+	lore = [[
+The shout that goes down the line when a standard goes up, and every blade on that side
+bites harder for it. Sergeants call it the cheapest thing on a battlefield and the first
+thing to go. It lingers for a moment after the banner falls, long enough for the men to
+notice that the cheering has stopped.]],
 	icon = "rallied",
 	kind = "helpful",
 	ticks = 2,

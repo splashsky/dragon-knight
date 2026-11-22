@@ -5,6 +5,11 @@
 return {
 	name = "Swarmed",
 	description = "Stung every 10 seconds for 5% of its hit points (at least 3), and its blows are 20% weaker. Fire or a gale drives the bees off.",
+	lore = [[
+Bees in the hair and down the collar, one sting for every turn they stay. A fighter cannot
+strike well with bees about the face, and the blows come out soft and wild. A torch waved
+in the face drives them off, and so does a gale. Hunters of the Weald say a man who has
+been stung once never forgets the smell of the hive.]],
 	icon = "swarm",
 	kind = "harmful",
 	ticks = 5,

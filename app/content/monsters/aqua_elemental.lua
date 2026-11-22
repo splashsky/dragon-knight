@@ -3,6 +3,11 @@ local function wet(m)
 	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
 end
 
+-- a vent is up and the great eruption (30% of your life) would leave you above 10%
+local function quenches(m)
+	return m.turn >= 2 and m.target.hp > m.target.maxhp * 4 // 10
+end
+
 return {
 	name = "Aqua Elemental",
 	lore = [[
@@ -24,13 +29,19 @@ clear, and steel does better against it than any spell that might be cast at it.
 		{ spell = "rain_call", weight = 6, when = function(m) return not wet(m) end },
 		-- regenerates while it rains
 		{ spell = "regen", weight = 4, when = function(m) return wet(m) and not m:has_status("regen") end },
+		-- quenches a steam vent with a Water Jet (it drinks the scalding water) while you have more than 40% HP
+		{ spell = "water_jet", weight = 8, aim = "steam_vent", when = quenches },
 		-- weakens you (Enfeeble)
 		{ spell = "enfeeble", weight = 2,
 			when = function(m) return not m.target:has_status("weakened") end },
 	},
 	speech = {
 		start = { "*splashes*", chance = 15 },
-		turn = { "*gurgles*", { text = "*swells in the rain*", when = wet }, chance = 10 },
+		turn = {
+			"*gurgles*", { text = "*swells in the rain*", when = wet },
+			{ text = "*pours toward the vent*", weight = 4, when = function(m) return m:has_object("steam_vent") and quenches(m) end },
+			chance = 10,
+		},
 		winning = { "*drags down*", chance = 20 },
 		losing = { "*pours away*", chance = 15 },
 		hurt = { "*churns*", chance = 15 },

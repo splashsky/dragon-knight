@@ -43,6 +43,11 @@ return {
 	name = "Gas Pocket",
 	description = "A bubble of marsh gas under the peat. A spark or a fire makes it flash, setting everyone alight; anything "
 		.. "else makes it burst, poisoning everyone. It bursts by itself after a minute.",
+	lore = [[
+Thornbog folk call them bog-bubbles and say the marsh breathes out through them. A bubble
+swells under the peat for about a minute, quivering, before it lets go. A torch held too
+near makes one flash blue over the reeds, and that is how most folk learn. Stilt-hut
+children are told to run when a pocket quivers and not to look back.]],
 	icon = "gas_pocket",
 	hp = 6,
 	spawn = {

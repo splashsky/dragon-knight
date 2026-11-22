@@ -28,16 +28,18 @@ t_calm effector
 t_get /character; expect_no_body 'Statuses:'
 
 t_section "effects: Poison"
-t_fight effector 28 30000   # a Goblin with 30000 HP: it only attacks, with no affinities
+# a Creature with 30000 HP: it only attacks, with no affinities (not the Goblin: it rolls a keg onto the field on its second turn)
+CREATURE=$(t_sql "SELECT id FROM monsters WHERE key = 'creature'")
+t_fight effector "$CREATURE" 30000
 t_get /fight; CS=$(t_csrf); expect_body "name=\"spell\" value=\"$(sp poison)\" title=\"Poison ("
 t_round "csrf=$CS&spell=Spell&userspell=$(sp poison)"
 expect_body 'You have cast the Poison spell. The monster is poisoned for 30 seconds.'
 expect_no_body 'class="fight-roundend"'
-expect_body '<b>Goblin</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned <span class="light">(30s)</span></span>'
+expect_body '<b>Creature</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned <span class="light">(30s)</span></span>'
 ef_is "$T_STATUSES" "enemy:poison/3"
 # the clock's next tick: it ticks (its line in the fight's log, after the round's), and counts down
 t_tick; expect_body 'tick 400000001: '
-t_get /fight; expect_body 'You have cast the Poison spell.'; expect_body 'class="fight-roundend">The Goblin takes '
+t_get /fight; expect_body 'You have cast the Poison spell.'; expect_body 'class="fight-roundend">The Creature takes '
 expect_body 'Poisoned <span class="light">(20s)</span>'
 ef_is "$T_STATUSES" "enemy:poison/2"
 hp=$(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")
@@ -85,7 +87,7 @@ t_fight_status effector 2 sleep 'chance=i:15'
 t_round "csrf=$CS&spell=Spell&userspell=$(sp call_wolf)"
 expect_body 'You have cast the Call Wolf spell. A wolf joins the fight for 50 seconds.'
 expect_body 'class="fight-allyturn">Your Wolf bites the monster for'
-expect_body 'class="fight-monsterturn">The Goblin is still asleep.'
+expect_body 'class="fight-monsterturn">The Creature is still asleep.'
 expect_body 'Your <b>Wolf</b>: 30 / 30 HP <span class="light">(50s left)</span>'
 ef_is "(SELECT group_concat(side || ':' || kind) FROM fight_combatants c WHERE c.user_id = users.id)" "player:player,enemy:monster,ally:summon"
 MP=$(t_sql "SELECT currentmp FROM users $EQ")
@@ -121,7 +123,7 @@ for _ in $(seq 1 20); do   # until the monster doesn't dodge
 	[ "$STATUS" = 302 ] && break
 done
 expect_redirect /victory
-t_get /victory; expect_body 'You have defeated the Goblin.'
+t_get /victory; expect_body 'You have defeated the Creature.'
 ef_is "$T_ROUND" 0; ef_is "$T_STATUSES" ""
 # (the finished fight is kept for its page, statuses and all, until the next encounter)
 ef_is "(SELECT outcome FROM fights f WHERE f.user_id = users.id)" victory
@@ -145,7 +147,7 @@ ef_is "$T_WORLD" "regen/5"; ef_is currenthp 100
 t_tick; t_tick
 ef_is "$T_WORLD" "regen/3"; ef_is currenthp 112
 # a fight doesn't end them, nor tick them
-ef_sql "UPDATE users SET currentaction = 'Exploring'"; t_fight effector 28 30000
+ef_sql "UPDATE users SET currentaction = 'Exploring'"; t_fight effector "$CREATURE" 30000
 t_get /fight; t_round "csrf=$(t_csrf)&fight=Fight"; t_tick
 ef_is "$T_WORLD" "regen/3"; ef_is "$T_STATUSES" ""
 t_fight_clear effector

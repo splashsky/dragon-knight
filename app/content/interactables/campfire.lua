@@ -8,6 +8,12 @@ return {
 	name = "Campfire",
 	description = "A few red coals in a ring of stones. About every 30 seconds a spark flies and sets another object on the "
 		.. "field alight. Water puts it out.",
+	lore = [[
+Every goblin camp on the Copper Downs has one, and so does most of the drovers' yards out
+of Roma. Goblins say a spark that lands on your boot is the fire looking for something
+bigger, and that a barrel beside a camp is asking for trouble. The washerwomen of Roma
+keep a bucket by the door for the same reason, and they count themselves lucky when it
+hisses.]],
 	icon = "campfire",
 	hp = 8,
 	resist = { water = -100, fire = 100 },

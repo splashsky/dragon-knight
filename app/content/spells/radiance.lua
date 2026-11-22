@@ -18,6 +18,12 @@ end
 return {
 	name = "Radiance",
 	description = "Holy light over the whole field that hits every monster and every object. Some monsters are immune.",
+	lore = [[
+Paladins of Bris learn Radiance at fifty-eight, when their oaths are old enough to be trusted
+with the sun. The light falls on every foe and every object on the field, and it burns
+hardest on consecrated ground, where the holy spells all grow strong. The Paladin is never
+touched by it, which the masters say is the point of the oath. Some creatures shrug it off,
+and a Paladin who has to ask which ones has not yet learned the list.]],
 	icon = "radiance",
 	area = true,                -- hits every foe and object (s.targets)
 	mp = 32,

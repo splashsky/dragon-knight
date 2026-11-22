@@ -8,6 +8,11 @@ return {
 	name = "Tide Pool",
 	description = "A rock pool of brine. Break it and everyone on the field is soaked for 30 seconds: fires and fuses go "
 		.. "out, fire does 25% less, lightning 30% more and frost 10% more.",
+	lore = [[
+Divers who work the tidal shoals south of Bris step round the rock pools with care, since
+the crabs in them have claws to spare. Boys throw stones at them for a bet. Whoever breaks
+a pool soaks the whole field, friend and foe and every object on it, and the fishwives of
+Bris say that is the cheapest cure for a burning cloak there is.]],
 	icon = "tide_pool",
 	hp = 8,
 	spawn = {

@@ -18,6 +18,12 @@ end
 return {
 	name = "Cyclone",
 	description = "A column of wind over the whole field that hits every monster and every object. Some monsters are immune.",
+	lore = [[
+Mages learn the Cyclone at fifty-two, when their hands are steady enough to be trusted with
+a column of wind. It takes the whole field at once and does not care who was aimed at,
+which the masters say is the first lesson of the spell. Wind-readers in Hambry claim the
+column can be seen from the Weald on a clear day, and that it is never quite the same shape
+twice.]],
 	icon = "cyclone",
 	area = true,                -- hits every foe and object (s.targets)
 	mp = 38,

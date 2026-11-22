@@ -4,6 +4,10 @@
 return {
 	name = "Soaked",
 	description = "Drenched: takes 25% less fire damage, 30% more lightning and 10% more frost; burning is 60% warded off, a fuse can't be lit, and what burns is put out.",
+	lore = [[
+Wet through from a splash of brine or a water spell, and any fire on the bearer is as good
+as out. Fishermen of the Shoals say a wet man is hard to burn and easy to shock, and that a
+sailor learns both in the same storm. Nothing can light a fuse on someone this wet.]],
 	icon = "soaked",
 	kind = "neutral",
 	ticks = 3,

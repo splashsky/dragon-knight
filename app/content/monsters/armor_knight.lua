@@ -1,4 +1,9 @@
 -- app/content/monsters/armor_knight.lua :: the Armor Knight (the original game's monster 97).
+-- raises the banner on its opening turn, and never a second
+local function raises(m)
+	return m.turn == 1 and not m:has_object("war_banner")
+end
+
 local function buffed(m)
 	return m:has_status("uber_damage")
 end
@@ -22,6 +27,10 @@ enough to split a shield in one blow, and it never answers a hail.]],
 	class = "warrior",
 	maxmp = 118,
 	attack_weight = 6,
+	items = {
+		-- raises the knights' standard on its opening turn: one hit brings the banner down
+		{ item = "war_standard", weight = 20, stock = 1, when = raises },
+	},
 	spells = {
 		-- opens with its war cry
 		{ spell = "war_cry", weight = 3, when = function(m) return not buffed(m) end },
@@ -50,7 +59,11 @@ enough to split a shield in one blow, and it never answers a hail.]],
 	},
 	speech = {
 		start = { "Halt.", "Papers.", chance = 25 },
-		turn = { "...", "Clank.", chance = 8 },
+		turn = {
+			"...", "Clank.",
+			{ text = "*the standard goes up with a clank*", weight = 4, when = raises },
+			chance = 8,
+		},
 		winning = { "The visor stays shut.", chance = 20 },
 		losing = { "Dented. Not broken.", chance = 30 },
 		hurt = { "*rattles*", "Metal rings.", chance = 15 },
