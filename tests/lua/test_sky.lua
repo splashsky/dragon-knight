@@ -103,7 +103,8 @@ function T.the_overlay_is_cheap_and_small()
 	local t0 = os.clock()
 	for k = 1, n do largest = math.max(largest, #sky.markup(now + k * 600)) end
 	local ms = (os.clock() - t0) / n * 1000
-	assert(ms < 60, ("the overlay costs %.1f ms"):format(ms))
+	-- (a budget about 20 times the optimized build's: also met by `make DEBUG=1`'s sanitizers)
+	assert(ms < 150, ("the overlay costs %.1f ms"):format(ms))
 	assert(largest < 48 * 1024, "the overlay stays small: " .. largest .. " bytes")
 	print(("sky: %.1f ms, at most %d bytes"):format(ms, largest))
 end
