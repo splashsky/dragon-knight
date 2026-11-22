@@ -3031,6 +3031,17 @@ t_get /inn;   expect_body 'You do not have enough gold'
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.
 `run.sh` runs them inside a dk VM, where they can `require("lib.php")` and friends.
 
+`tests/lua/test_patterns.lua` is the contract for the monsters' fight patterns
+([Monsters](#monsters)): every monster that isn't retired fights 40 seeded states through
+`round.play` and `round.advance` (the player's level and stats around the monster's, both
+sides' HP, its MP, stock, `m.turn` and the round, statuses on either side, an ally, and no
+field or each field as the world's and as a spell's). Its conditions and actions must log no
+warnings, HP and MP stay whole numbers and MP never goes below 0; and every loadout entry
+of weight > 0, its class's too, must be eligible (weighed by `fight/ai.lua` with
+`fight/monster.lua`) in at least one state (up to 1,000 states). A failure names the
+monster, the entry, its `when` as written and how often the condition passed, the MP was
+there and `can_cast` / `can_use` allowed it.
+
 JavaScript unit tests: `tests/js/test_<name>.js` tests the pure functions of
 `public/js/<name>.js` (which exports them through `module.exports` when there is no DOM).
 `run.sh` feeds the two files on stdin to `node` (or Windows' `node.exe` under WSL; `NODE=`
