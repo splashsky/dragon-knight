@@ -161,6 +161,7 @@ t_jar default
 t_section "changelog"
 t_get /changelog;          expect_status 200
 expect_body '<h1>Dragon Knight Changelog</h1>'
+expect_body 'id="v3-3-0"'; expect_body '<a href="#v3-3-0">3.3.0</a> <span class="light">(unreleased)</span>'
 expect_body 'id="v3-2-0"'; expect_body '<a href="#v3-2-0">3.2.0</a> <span class="light">(11.22.2026)</span>'
 expect_body 'id="v3-1-0"'; expect_body '<a href="#v3-1-0">3.1.0</a> <span class="light">(11.21.2026)</span>'
 expect_body 'id="v3-0-0"'; expect_body '<a href="#v3-0-0">3.0.0</a> <span class="light">(11.21.2026)</span>'
@@ -177,5 +178,5 @@ expect_body 'Thanks to r0xes &amp; Adam. :)'
 expect_body 'Fixed problem where goldbonus was added to experience instead of gold.'
 expect_body 'id="vrc1-aero"'
 expect_body 'Initial public release.'
-t_get /login;              expect_body '<a href="/changelog">Version 3.2.0</a>'
+t_get /login;              expect_body '<a href="/changelog">Version 3.3.0-dev</a>'
 t_get /help;               expect_body 'href="/changelog">Changelog</a>'

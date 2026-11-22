@@ -8,6 +8,11 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.3.0", date = "unreleased",
+		changes = {
+		},
+	},
+	{
 		version = "3.2.0", date = "11.22.2026",
 		changes = {
 			"Damage has an element: fire, frost, lightning, water, wind, earth, holy, shadow, arcane or poison, or plain physical blows. Monsters resist some elements and are weak to others; a few absorb them and heal. The fight says so when it matters, and the help page and the monsters' tooltips list it all. Gear can make you resist elements too, and some weapons strike with one. The hurt spells are arcane, Ember and burns are fire, poisons are poison (schema version 21, run dk migrate).",
