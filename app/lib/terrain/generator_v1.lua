@@ -2,10 +2,9 @@
 -- the world's land, app/lib/terrain/world.lua, once, from SEED; the game never loads it
 -- (lib/terrain.lua reads only that data). It is kept so the data can be checked against
 -- it (tests/lua/test_terrain.lua requires its output byte for byte) and written again
--- (tools/world.sh). It is frozen when 3.2.0 is released: from then on the world is
--- permanent, and a different world is a new generator (generator_v2.lua beside this one)
--- and a deliberate commit of its data. Until then it may still change, with its data
--- written again.
+-- (tools/world.sh). It is frozen since 3.2.0's release: the world is permanent, and a
+-- different world is a new generator (generator_v2.lua beside this one) and a deliberate
+-- commit of its data.
 --
 -- Deterministic everywhere: integer hashing and integer or fixed-point arithmetic only
 -- (integer square roots, smoothstep on integers, floor divisions), no floats, so every

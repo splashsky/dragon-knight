@@ -292,9 +292,8 @@ return {
 	reads that data, so no later change to code can move a lake. Generator v1 stays in the
 	repository (integer arithmetic only, so it gives the same bytes on every platform), and a
 	test reruns it from the recorded seed and requires the committed data byte for byte.
-	Generator v1 may still change until 3.2.0 is released (its data written again with
-	it); after 3.2.0's release, a new world is a new generator (v2) and a deliberate commit
-	of its data. The
+	Generator v1 is frozen since 3.2.0's release: a new world is a new generator (v2) and
+	a deliberate commit of its data. The
 	generator: biomes seeded around each town (from what the lore already says of each),
 	carried outward by a blue-noise scatter of points (each cell takes its nearest point's
 	biome, so the land comes out in organic patches with mixed borders), then water (ponds,
@@ -468,11 +467,9 @@ Cells of 5 x 5 tiles, 101 x 101, evaluated at their centres (every town at one).
 	drawn from it, and anything later can read the land's height without the generator.
 - **Checking and changing it**: `tests/lua/test_terrain.lua` reruns v1 and requires the
 	committed `app/lib/terrain/world.lua` byte for byte; `tools/world.sh` writes it (and
-	the map's picture, `public/images/world.svg`, drawn from it). Until 3.2.0 is released,
-	generator v1 may still change, with `tools/world.sh` run and both files committed with
-	it; it is frozen at the release. After 3.2.0's release, a new world is
-	`generator_v2.lua` beside v1, pointed at by the tool and the test, and a commit of its
-	data.
+	the map's picture, `public/images/world.svg`, drawn from it). Generator v1 is frozen
+	since 3.2.0's release: a new world is `generator_v2.lua` beside v1, pointed at by the
+	tool and the test, and a commit of its data.
 
 ### 7.4 Decisions
 

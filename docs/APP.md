@@ -1369,9 +1369,8 @@ where a player may go.
 	`tools/world.sh` (`BIN=./dk tools/world.sh`) writes the file again from the generator,
 	in the project's own Lua (a scratch copy of `app/` whose `cli/check.lua` is
 	`tools/world.lua`, run by `dk check`, which needs no database): it changes nothing
-	unless generator v1 changed. **Until 3.2.0 is released** generator v1 may still change:
-	run `tools/world.sh` and commit the data and the picture with it. It is frozen at the
-	release; **after 3.2.0's release, a new world is a new generator** beside v1
+	unless generator v1 changed. Generator v1 is **frozen since 3.2.0's release**: a new
+	world is a new generator beside v1
 	(`generator_v2.lua`, its own seed), never a change to v1: point `tools/world.lua` and
 	the test at it, run `tools/world.sh`, and commit the new data as a deliberate change of
 	the world (the players' positions stay; only the land under them changes).
