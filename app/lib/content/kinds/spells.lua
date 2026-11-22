@@ -27,6 +27,8 @@ spells.fields = {
 		help = "A PNG in public/images/skills/, without \".png\" (heal: heal.png); empty: default.png." },
 	{ name = "usable_in", type = "choice", values = spells.USABLE_IN, default = "fight", label = "Usable in" },
 	{ name = "target", type = "choice", values = spells.TARGETS, default = "enemy", label = "Target" },
+	{ name = "area", type = "bool", default = false, label = "Area",
+		help = "It hits everything on the field: its code gets s.targets, every opponent and every object." },
 }
 
 local by_name = {}
@@ -44,6 +46,7 @@ function spells.validate_extra(data, flat, err)
 		err("usable_in = \"" .. flat.usable_in .. "\" needs target = \"self\" (outside fights there is no " ..
 			"enemy); use usable_in = \"fight\" for a spell cast at the enemy")
 	end
+	if flat.area == 1 and flat.usable_in ~= "fight" then err("area = true is for spells cast in fights (usable_in = \"fight\")") end
 end
 
 function spells.write_children(id, flat)

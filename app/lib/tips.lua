@@ -8,6 +8,7 @@
 local classes = require("lib.classes")
 local elements = require("lib.elements")
 local fields = require("lib.fields")
+local interactables = require("lib.interactables")
 local items = require("lib.items")
 local php = require("lib.php")
 local schema = require("lib.content.schema")
@@ -144,6 +145,22 @@ function tips.field(f, left)
 	if left then meta[#meta + 1] = left .. " left" end
 	return { title = f.name, icon = schema.entity_icon("fields", f.icon), meta = meta, lines = fields.lines(f),
 		body = f.description, lore = f.lore }
+end
+
+-- The name of field `key` (its row's), for lines naming fields.
+local function field_name(key)
+	local r = fields.by_key(key)
+	return r and r.name or key
+end
+
+-- An object on the battlefield (an interactable): its icon (when it has one) and name; its
+-- HP; its resistances, weaknesses and wards and where it appears by itself; its
+-- description; its lore.
+function tips.interactable(o)
+	local lines = interactables.affinity_lines(o)
+	for _, l in ipairs(interactables.spawn_lines(o, field_name)) do lines[#lines + 1] = "Appears by itself " .. l end
+	return { title = o.name, icon = schema.entity_icon("interactables", o.icon), meta = { interactables.hp_text(o) },
+		lines = lines, body = o.description, lore = o.lore }
 end
 
 -- The fight menu's Attack button: the player's attack power (and the weapon's name, when

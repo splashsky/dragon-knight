@@ -473,7 +473,9 @@
 	function formRequest(form, submitter) {
 		var method = (form.getAttribute("method") || "get").toLowerCase();
 		var action = form.getAttribute("action") || here();
-		if ((method !== "get" && method !== "post") || (form.target && form.target !== "_self") ||
+		// (attributes, not properties: a field named "target", the fight's target picker, hides form.target)
+		var target = form.getAttribute("target");
+		if ((method !== "get" && method !== "post") || (target && target !== "_self") ||
 			form.hasAttribute("data-native") || (form.enctype && form.enctype !== "application/x-www-form-urlencoded")) return null;
 		if (submitter && (submitter.hasAttribute("formaction") || submitter.hasAttribute("formmethod") ||
 			submitter.hasAttribute("formtarget"))) return null;

@@ -1,0 +1,23 @@
+{#- Objects spoilers (3.3; app/fight/engine.lua): every object of the battlefield with its icon,
+		HP, resistances and wards, where it appears by itself, what it does (its description) and
+		its lore. ctx: objects { object (row, decoded), hp (its HP in words), affinities (lines),
+		appears (lines: its spawn rules) }. -#}
+{{{ include("community/help/header") }}}
+
+<table class="help-table help-w75" id="objects">
+<thead>
+<tr><th colspan="4" class="help-caption">Objects</th></tr>
+<tr><th>Name</th><th>Hit Points</th><th>Affinities</th><th>Appears by itself</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(objects) do %}
+{%- local o = r.object %}
+<tr><td style="width: 40%">{% local ic = entity_icon("interactables", o.icon) %}{% if ic then %}<img class="help-icon" src="{{ ic }}" width="24" height="24" alt="">{% end %}{{ o.name }}{% if o.description ~= "" then %}<br><span class="small">{{ o.description }}</span>{% end %}{% if (o.lore or "") ~= "" then %}<div class="help-lore">{{{ paragraphs(o.lore) }}}</div>{% end %}</td><td style="width: 12%">{{ r.hp }}</td><td style="width: 20%">{% if #r.affinities > 0 then %}{% for i, l in ipairs(r.affinities) do %}{% if i > 1 then %}<br>{% end %}{{ l }}{% end %}{% else %}<span class="light">None</span>{% end %}</td><td style="width: 28%">{% if #r.appears > 0 then %}{% for i, l in ipairs(r.appears) do %}{% if i > 1 then %}<br>{% end %}{{ l }}{% end %}{% else %}<span class="light">Never: it is placed</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<p>Objects stand on the battlefield beside the fighters: they have hit points and can be hit, burnt and set off, but never
+take a turn, and a fight is won or lost on the monsters and you alone. Some turn up by themselves where the land suits them,
+never near Midworld; others are carried in and placed, by you or by a monster. A spell that hits everything on the field hits
+them too. With more than one thing to aim at, the fight page lets you pick your target.</p>
+{{{ include("community/help/footer") }}}

@@ -1,9 +1,10 @@
 // hotbar.js :: the fight's hotbar (docs/APP.md "Hotbar"). In a fight the number keys press
 // the slots' buttons (fight/fight.html: [data-hotkey] 1 Attack ... 9 Guard, 0 Run; a locked turn's
 // Continue for any of them), as a click would: the live client (client.js) sends the form
-// and fight.js plays the round. Not while a field has the keyboard (the chat), a modifier
-// is held, a dialog is open, the key repeats or a request runs; a disabled button (MP short,
-// or the forms locked while a round plays) does nothing. On /hotbar (town/hotbar.html) the
+// and fight.js plays the round; also from the target picker's radio buttons. Not while a
+// field has the keyboard (the chat), a modifier is held, a dialog is open, the key repeats
+// or a request runs; a disabled button (MP short, or the forms locked while a round plays)
+// does nothing. On /hotbar (town/hotbar.html) the
 // action tiles can be dragged onto the slots (a slot's list takes the action; where it was
 // before gets the slot's old one), between slots (a swap) and back to the actions (the slot
 // empties), and the form saves. html.dk-hotbar-js shows what needs this script (the fight's
@@ -25,7 +26,8 @@
 
 	document.addEventListener("keydown", function (ev) {
 		if (!/^[0-9]$/.test(ev.key) || ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.altKey) return;
-		if (closest(ev.target, "input, textarea, select, [contenteditable]")) return;
+		// (not while typing; the target picker's radio buttons don't take digits)
+		if (closest(ev.target, "input:not([type=radio]), textarea, select, [contenteditable]")) return;
 		var form = document.querySelector("form[data-fight]");
 		if (!form || document.querySelector("dialog[open]")) return;
 		var button = form.querySelector('[name="continue"]') ||

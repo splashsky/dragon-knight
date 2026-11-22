@@ -7,17 +7,19 @@
 -- player alone (state.world), carries the world statuses (user_statuses), which tick on
 -- the clock too (lib/world.lua).
 --
--- f = { user_id, round, wave, data = {}, st (the game.player row copy: the player's
+-- f = { user_id, round, wave, data = {} (fight-level values: the battlefield's fields, the
+-- voice, the player's target: a combatant's id), st (the game.player row copy: the player's
 -- numbers), in_fight, combatants = { c, ... } (by id), next_id, outcome ("" in progress,
 -- "victory", "death": a finished fight kept for its page, fight/encounter.lua), log (the
 -- lines since the player's last command, encounter.log_of), result = {} (a victory's
 -- rewards), tick (the last clock tick it played, lib/clock.lua; 0: not on the clock yet),
 -- deadline (the tick the player's turn runs out at: fight/round.lua) }
--- c = { id, side ("player" | "ally" | "enemy"), kind ("player" | "monster" | "summon"),
--- entity_id, wave, hp, maxhp (nil for the player: st has them), mp, maxmp (monsters),
--- ticks_left (summons), data = {} (the stock of a monster's items, stock_<position>), row
--- (the summons row; a monster's with its equipment counted: lib/monsters.lua
--- monsters.effective), statuses = { inst, ... } (in the order applied) }
+-- c = { id, side ("player" | "ally" | "enemy" | "object"), kind ("player" | "monster" |
+-- "summon" | "object"), entity_id, wave, hp, maxhp (nil for the player: st has them), mp,
+-- maxmp (monsters), ticks_left (summons), level and over (objects: its level, the side it
+-- stands over), data = {} (the stock of a monster's items, stock_<position>; an object's
+-- o.data), row (the summons or interactables row; a monster's with its equipment counted:
+-- lib/monsters.lua monsters.effective), statuses = { inst, ... } (in the order applied) }
 -- inst = { status_id, key, row (statuses row), ticks_left (nil: no limit), data (the params
 -- it was applied with), tick (the last tick it counted: at first the one it was applied
 -- in), source (a combatant id), position }
@@ -25,6 +27,8 @@
 -- code: a charged spell's release step is saved by name, the battlefield's fields by key
 -- in f.data (fight/fields.lua).
 local fields = require("fight.fields")
+local interactables = require("lib.interactables")
+local load = require("lib.content.load")
 local monsters = require("lib.monsters")
 local statuses = require("lib.statuses")
 local summons = require("lib.summons")
@@ -133,6 +137,8 @@ end
 
 function state.enemies(f) return state.side(f, "enemy") end
 function state.allies(f) return state.side(f, "ally") end
+-- the objects on the field (interactables), in the order placed
+function state.objects(f) return state.side(f, "object") end
 
 -- The waves still to come after the current one, and whether every enemy is defeated.
 function state.last_wave(f)
@@ -210,7 +216,8 @@ local function status_rows(sql, ...)
 end
 
 -- The fight of users row `user` (st: game.player(user)), or nil when there is none. Enemies
--- whose monster is gone and summons whose row is gone are left out (they can't act).
+-- whose monster is gone, summons whose row is gone and objects whose file is gone (retired)
+-- are left out (they can't act).
 function state.load(user, st)
 	local fr = dk.db:first("SELECT * FROM fights WHERE user_id = ?", user.id)
 	if not fr then return nil end
@@ -230,6 +237,10 @@ function state.load(user, st)
 			if m and c.mp == nil then c.mp = c.maxmp end
 		elseif r.kind == "summon" then
 			c.row = summons.get(r.entity_id)
+		elseif r.kind == "object" then
+			local row = interactables.get(r.entity_id)
+			c.row = row and row.retired == 0 and row or nil
+			c.level, c.over = r.level or 0, r.over
 		end
 		if r.kind == "player" or c.row then
 			state.add(f, c)
@@ -246,12 +257,19 @@ function state.load(user, st)
 end
 
 -- The next tick the server's tick must advance fight f at: the next one while anything in
--- it counts ticks (a status on anyone, an ally, a spell's field or one with on_tick), else
--- the player's turn's deadline, or the first tick before it at which the weather would change
--- the fight's fields (the world's follow it: fight/fields.lua fields.next_change).
+-- it counts ticks (a status on anyone, an ally, an object with on_tick, a spell's field or
+-- one with on_tick), else the player's turn's deadline, or the first tick before it at which
+-- the weather would change the fight's fields (the world's follow it: fight/fields.lua
+-- fields.next_change).
+local function ticking(c)
+	if c.side == "ally" or #c.statuses > 0 then return true end
+	local m = c.side == "object" and load.module("interactables", c.row.key)
+	return m and type(m.on_tick) == "function" or false
+end
+
 function state.due(f)
 	for _, c in ipairs(f.combatants) do
-		if c.side == "ally" or #c.statuses > 0 then return f.tick + 1 end
+		if ticking(c) then return f.tick + 1 end
 	end
 	if fields.ticking(f) then return f.tick + 1 end
 	return fields.next_change(f, f.deadline) or f.deadline
@@ -269,10 +287,12 @@ function state.save(f)
 	dk.db:exec("DELETE FROM fight_combatants WHERE user_id = ?", uid)
 	for _, c in ipairs(f.combatants) do
 		local player = c.side == "player"
+		local object = c.kind == "object"
 		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, ticks_left, data, " ..
-			"mp, maxmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind, c.entity_id, c.wave or 0,
-			not player and c.hp or nil, not player and c.maxhp or nil, c.ticks_left, state.encode(c.data),
-			c.kind == "monster" and c.mp or nil, c.kind == "monster" and c.maxmp or nil)
+			"mp, maxmp, level, over) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind,
+			c.entity_id, c.wave or 0, not player and c.hp or nil, not player and c.maxhp or nil, c.ticks_left,
+			state.encode(c.data), c.kind == "monster" and c.mp or nil, c.kind == "monster" and c.maxmp or nil,
+			object and c.level or nil, object and c.over or nil)
 		for i, s in ipairs(c.statuses) do
 			dk.db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, ticks_left, data, " ..
 				"tick, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, s.status_id, i, s.ticks_left,

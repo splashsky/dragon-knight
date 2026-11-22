@@ -16,14 +16,20 @@
 		seconds) and data-now (the server's time), a region of its own because data-now changes
 		on every request; fight.js draws a draining bar in it for the last seconds. The
 		battlefield's fields (3.2) are the battlefield region under the monster
-		(fight/battlefield.html). -#}
+		(fight/battlefield.html). The objects on the field (3.3) are cards like the allies', and
+		with more than one enemy or object to aim at (pick) each card holds a radio button of
+		the command form's group `target` (fight/target.html; data-target: fight.js makes the
+		card choose it), the target's card marked (fight-chosen). -#}
 <section class="box fight">
 <h1 class="title page-title">{{{ art("fighting", "Fighting") }}}</h1>
 <div class="box-body">
 {%- if stale then %}
 <p class="fight-stale">That command came from an older page, so nothing happened. This is the fight as it is now.</p>
 {%- end %}
-<div class="fight-foe">
+<div class="fight-foe{% if pick then %} fight-targetable{% if monsterid == target then %} fight-chosen{% end %}{% end %}"{% if pick then %} data-target="{{ monsterid }}"{% end %}>
+{%- if pick then %}
+{{{ include("fight/target", { id = monsterid, name = monstername, target = target }) }}}
+{%- end %}
 {%- if monstericon then %}
 <img class="fight-foe-portrait" src="{{ monstericon }}" width="72" height="72" alt="">
 {%- end %}
@@ -40,8 +46,12 @@
 {{{ include("fight/battlefield") }}}
 {%- for _, e in ipairs(enemies) do %}
 {%- if #enemies > 1 or #e.statuses > 0 then %}
-<p class="fight-combatant fight-enemy" data-fighter="{{ e.id }}"{% if #enemies > 1 then %} data-stat="hp" data-value="{{ e.hp }}" data-max="{{ e.maxhp }}"{% end %}><b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>
+{%- local choose = pick and e.hp > 0 and e.id ~= monsterid %}
+<p class="fight-combatant fight-enemy{% if choose then %} fight-targetable{% if e.id == target then %} fight-chosen{% end %}{% end %}" data-fighter="{{ e.id }}"{% if #enemies > 1 then %} data-stat="hp" data-value="{{ e.hp }}" data-max="{{ e.maxhp }}"{% end %}{% if choose then %} data-target="{{ e.id }}"{% end %}>{% if choose then %}{{{ include("fight/target", { id = e.id, name = e.name, target = target }) }}}{% end %}<b>{{ e.name }}</b>{% if #enemies > 1 then %}: {{ e.hp > 0 and e.hp or "defeated" }}{% if e.hp > 0 then %} HP{% end %}{% end %}{{{ include("fight/statuses", { statuses = e.statuses }) }}}</p>
 {%- end %}
+{%- end %}
+{%- for _, o in ipairs(objects) do %}
+<p class="fight-combatant fight-object{% if pick then %} fight-targetable{% if o.id == target then %} fight-chosen{% end %}{% end %}" data-fighter="{{ o.id }}" data-stat="hp" data-value="{{ o.hp }}" data-max="{{ o.maxhp }}"{% if pick then %} data-target="{{ o.id }}"{% end %}>{% if pick then %}{{{ include("fight/target", { id = o.id, name = o.name, target = target }) }}}{% end %}{% if o.icon then %}<img class="fight-object-icon" src="{{ o.icon }}" width="22" height="22" alt=""> {% end %}<b class="tip-term" data-tip tabindex="0">{{ o.name }}{{{ tip("interactable", o.row) }}}</b>: {{ o.hp }} / {{ o.maxhp }} HP <span class="light">({{ o.over }})</span>{{{ include("fight/statuses", { statuses = o.statuses }) }}}</p>
 {%- end %}
 {%- for _, al in ipairs(allies) do %}
 <p class="fight-combatant fight-ally" data-fighter="{{ al.id }}" data-stat="hp" data-value="{{ al.hp }}" data-max="{{ al.maxhp }}">{% if al.icon then %}<img class="fight-ally-icon" src="{{ al.icon }}" width="22" height="22" alt=""> {% end %}Your <b>{{ al.name }}</b>: {{ al.hp }} / {{ al.maxhp }} HP{% if al.left then %} <span class="light">({{ al.left }} left)</span>{% end %}{{{ include("fight/statuses", { statuses = al.statuses }) }}}</p>
@@ -68,7 +78,7 @@
 </form>
 {%- else %}
 <p>Command?</p>
-<form class="fight-command" action="/fight" method="post" data-fight>
+<form class="fight-command" id="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
 <div class="hotbar" role="group" aria-labelledby="hotbar-label"><span class="hotbar-label" id="hotbar-label">Hotbar</span>
 <ol class="hotbar-slots">

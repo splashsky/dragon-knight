@@ -362,7 +362,7 @@ t_get /character;          expect_body 'Class: Fighter &lt;b&gt;'
 t_jar admadmin
 # overrides survive a sync
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
-grep -qF "Content synced (statuses: $(ls app/content/statuses | wc -l), 0 new, 0 retired; fields: $(ls app/content/fields | wc -l), 0 new, 0 retired; summons: $(ls app/content/summons | wc -l), 0 new, 0 retired; spells: $(ls app/content/spells | wc -l), 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: $(ls app/content/items | wc -l), 0 new, 0 retired; monsters: $(ls app/content/monsters | wc -l), 0 new, 0 retired)." "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
+grep -qF "Content synced (statuses: $(ls app/content/statuses | wc -l), 0 new, 0 retired; fields: $(ls app/content/fields | wc -l), 0 new, 0 retired; interactables: $(ls app/content/interactables | wc -l), 0 new, 0 retired; summons: $(ls app/content/summons | wc -l), 0 new, 0 retired; spells: $(ls app/content/spells | wc -l), 0 new, 0 retired; classes: 3, 0 new, 0 retired; items: $(ls app/content/items | wc -l), 0 new, 0 retired; monsters: $(ls app/content/monsters | wc -l), 0 new, 0 retired)." "$T/content.log" && t_ok || t_fail "sync output: $(cat "$T/content.log")"
 admin_eq "SELECT name || '|' || start_hp FROM classes WHERE id = 2" "Fighter <b>|20" "overrides survive a sync"
 t_get /admin/classes/2
 t_post /admin/classes/2/reset "csrf=$(t_csrf)&field=name"

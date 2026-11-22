@@ -19,8 +19,9 @@
 -- applied: `blocked` stops it (with the field's blocked line) before its ward is rolled,
 -- `chance` rolls after the ward, then `ticks` and `scale` adjust what it is applied with
 -- (fields.adjust), which it keeps; `stats` are percents on the combatants' attack, defense,
--- strength and dexterity (fields.stats: the handles' numbers, which the formulas read).
--- With no fields up, every one of these is the identity and rolls nothing.
+-- strength and dexterity (fields.stats: the handles' numbers, which the formulas read). A
+-- fight's wind (0 to 3: what content reads as s.wind, t.wind, o.wind) is the highest of its
+-- fields'. With no fields up, every one of these is the identity and rolls nothing.
 local clock = require("lib.clock")
 local kind = require("lib.content.kinds.fields")
 local load = require("lib.content.load")
@@ -89,6 +90,17 @@ function fields.pct(f, element)
 	return pct_of(rows_of(set_of(f)), element)
 end
 
+local function wind_of(list)
+	local n = 0
+	for _, r in ipairs(list) do n = math.max(n, r.wind or 0) end
+	return n
+end
+
+-- The battlefield's wind, 0 (calm) to 3 (a gale): the highest of the fields' up.
+function fields.wind(f)
+	return wind_of(rows_of(set_of(f)))
+end
+
 -- The fields' percents on the stats ({ dexterity = -20 }), or nil when none.
 function fields.stats(f)
 	local out
@@ -155,13 +167,14 @@ function fields.adjust(f, key, ticks, data, srow)
 end
 
 -- The battlefield as an action's context sees it (lib/action.lua: damage, statuses taking
--- hold, s:has_field, s:field): a view of f's fields that follows the fields the action sets
--- itself (its events apply them to f afterwards, in order).
+-- hold, s:has_field, s:field, s.wind): a view of f's fields that follows the fields the
+-- action sets itself (its events apply them to f afterwards, in order).
 function fields.battlefield(f)
 	local set = set_of(f)
 	local bf = {}
 	function bf.pct(element) return pct_of(rows_of(set), element) end
 	function bf.status(key) return rule_of(rows_of(set), key) end
+	function bf.wind() return wind_of(rows_of(set)) end
 	function bf.has(key)
 		for _, g in ipairs(fields.GROUPS) do
 			if set[g] == key then return fields.row(key) ~= nil end

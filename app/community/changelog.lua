@@ -10,6 +10,8 @@ changelog.RELEASES = {
 	{
 		version = "3.3.0", date = "unreleased",
 		changes = {
+			"Choose your target: click a monster or an object on the fight page (or use the keyboard), and your attacks and spells go at it until it is gone.",
+			"Things on the battlefield: objects that stand on the field with the fighters, can be hit, can burn and can go off, some of them carried in and some found where you fight. The wind matters now: a strong wind can spread a fire. Some spells strike everything on the field at once (schema version 25, run dk migrate).",
 		},
 	},
 	{

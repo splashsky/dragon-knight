@@ -67,7 +67,8 @@ local function typed_damage(damage, typed, you)
 end
 
 -- A monster's attack (`maxdam`: its maximum damage) on `target` (a combatant handle: the
--- player, or an ally in the player's place: defense, dexterity, is_player, name).
+-- player, or an ally or an object in the player's place: defense, dexterity, is_player,
+-- side, name).
 -- `modify(damage)` applies the statuses' damage modifiers (fight/engine.lua; the original
 -- uber defense buff is one), then `typed` its element (above). Returns lines, damage (the
 -- caller takes it off the target), healed (a target that absorbs the element).
@@ -89,14 +90,16 @@ function combat.monster_attack(maxdam, target, rand, modify, typed)
 		damage, healed, note = typed_damage(damage, typed, target.is_player)
 	end
 	lines[#lines + 1] = target.is_player and ("The monster attacks you for " .. damage .. " damage.") or
-		("The monster attacks your " .. tostring(target.name) .. " for " .. damage .. " damage.")
+		("The monster attacks " .. (target.side == "object" and "the " or "your ") .. tostring(target.name) .. " for " ..
+			damage .. " damage.")
 	lines[#lines + 1] = note
 	return lines, damage, healed
 end
 
 -- The player's melee attack: `attacker` (attack, strength) on `target` (defense: a
--- monster's armor). `modify(damage)` applies the statuses' damage modifiers (the uber
--- damage buff is one), then `typed` its element (above). Returns lines, damage, healed.
+-- monster's armor; an object, side "object", is named in the line). `modify(damage)` applies
+-- the statuses' damage modifiers (the uber damage buff is one), then `typed` its element
+-- (above). Returns lines, damage, healed.
 function combat.attack(attacker, target, rand, modify, typed)
 	local lines = {}
 	local tohit = php.ceil(rand(attacker.attack * .75, attacker.attack) / 3)
@@ -115,7 +118,8 @@ function combat.attack(attacker, target, rand, modify, typed)
 		if damage < 1 then damage = 1 end
 		damage, healed, note = typed_damage(damage, typed, false)
 	end
-	lines[#lines + 1] = "You attack the monster for " .. damage .. " damage."
+	lines[#lines + 1] = "You attack the " .. (target.side == "object" and tostring(target.name) or "monster") .. " for " ..
+		damage .. " damage."
 	lines[#lines + 1] = note
 	return lines, damage, healed
 end

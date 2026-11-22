@@ -10,6 +10,7 @@ people of Endworld tie a wet cloth over the mouth before a fight. They say a man
 fire should stay out of the ash, and that the ash will find him anyway.]],
 	icon = "cinders",
 	group = "terrain",
+	wind = 1,   -- a breeze (from 0, calm, to 3)
 	damage = { fire = 15, frost = -15, wind = 10 },
 	statuses = { burning = { scale = { amount = 125 } } },
 	stats = { dexterity = -10 },

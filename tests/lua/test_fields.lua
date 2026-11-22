@@ -174,7 +174,10 @@ function T.validation()
 	local names = {}
 	for _, s in ipairs(kind.admin_fields(flat)) do names[#names + 1] = s.name end
 	names = table.concat(names, ",")
-	has(names, "name,description,lore,icon,damage.neutral,"); has(names, "stats.dexterity,statuses.sleep.scale.chance")
+	has(names, "name,description,lore,icon,wind,damage.neutral,"); has(names, "stats.dexterity,statuses.sleep.scale.chance")
+	-- the wind: 0 (calm) to 3 (a gale)
+	eq(flat.wind, 0); eq(assert(schema.validate(kind, base({ wind = 3 }))).wind, 3)
+	has(table.concat(select(2, schema.validate(kind, base({ wind = 4 }))), "|"), "field 'wind' must be an integer from 0 to 3")
 end
 
 ---------------------------------------------------------------------------------------

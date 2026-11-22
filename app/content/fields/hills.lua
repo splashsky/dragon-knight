@@ -10,6 +10,7 @@ goblins in the hills above Roma set their feet on the bare rock and not the scre
 shepherds of the downs say the man on the higher side has the better of it.]],
 	icon = "hills",
 	group = "terrain",
+	wind = 1,   -- a breeze (from 0, calm, to 3)
 	damage = { earth = 10, wind = 10 },
 	stats = { dexterity = -10 },
 }

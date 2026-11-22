@@ -17,7 +17,7 @@
 	box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.45), 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 .fight-foe-text { min-width: 0; }
-.fight-ally-icon { width: 22px; height: 22px; border-radius: 4px; vertical-align: -6px; box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35); }
+.fight-ally-icon, .fight-object-icon { width: 22px; height: 22px; border-radius: 4px; vertical-align: -6px; box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35); }
 .fight-status-icon { width: 16px; height: 16px; margin-right: 3px; border-radius: 3px; vertical-align: -3px; }
 /* the battlefield (fight/battlefield.html; 3.2): the fields up, each its icon and name with a
 	tooltip, under the monster */
@@ -25,6 +25,18 @@
 .fight-battlefield-label { font-weight: bold; margin-right: 4px; }
 .fight-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; vertical-align: top; }
 .fight-field-icon { width: 18px; height: 18px; margin-right: 4px; border-radius: 3px; vertical-align: -4px; }
+/* the target picker (fight/target.html; 3.3): with more than one enemy or object to aim at,
+	each card holds a radio button of the command form's group `target`, the target's card
+	marked. Without JavaScript the radio buttons show; with fight.js they are hidden (still
+	reached by the keyboard) and a click on the card chooses it */
+.fight-target-radio { margin: 0 6px 0 0; vertical-align: -2px; }
+.fight-targetable { border-radius: 6px; }
+.fight .box-body .fight-combatant.fight-targetable { padding: 2px 4px; margin-left: -4px; }
+.fight-chosen { box-shadow: 0 0 0 2px rgba(160, 40, 30, 0.6); }
+.fight-js .fight-target-radio { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); opacity: 0; }
+.fight-js .fight-targetable { cursor: pointer; }
+.fight-js .fight-targetable:hover { background-color: rgba(255, 255, 255, 0.25); }
+.fight-js .fight-targetable:focus-within { outline: 2px solid rgba(40, 90, 160, 0.7); outline-offset: 2px; }
 /* a monster speaking (fight/speech.lua): its line set apart from the action's */
 .fight-speech { font-style: italic; }
 .fight-taunt { font-size: 16px; }
@@ -92,6 +104,7 @@
 .fight-hurt { animation: fight-shake 0.35s ease-out; }
 .fight-healed, .fight-status-new, .fight-joined, .fight-field-new { animation: fight-glow 0.6s ease-out; }
 .fight-status-gone, .fight-field-gone { text-decoration: line-through; animation: fight-out 0.8s ease-in forwards; }
+.fight-blast { animation: fight-blast 0.7s ease-out; }
 .fight-gone { opacity: 0.4; transition: opacity 0.4s; }
 .fight-skip { margin: 0 0 1em; }
 form[data-fight] [data-fight-locked] { opacity: 0.75; }
@@ -111,11 +124,15 @@ form[data-fight] [data-fight-locked] { opacity: 0.75; }
 	from { background-color: rgba(255, 230, 120, 0.8); }
 	to { background-color: transparent; }
 }
+@keyframes fight-blast {
+	0% { background-color: rgba(255, 150, 40, 0.95); transform: scale(1.04); }
+	100% { background-color: transparent; transform: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
 	.fight-js .meter-fill, .fight-gone, .fight-clock-bar { transition: none; }
 	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone, .fight-field-new,
-	.fight-field-gone { animation: none; }
+	.fight-field-gone, .fight-blast { animation: none; }
 }
 
 /* a drop (fight/drop_offer.html; 3.1): the purchase's head and comparison (town.css .buy),

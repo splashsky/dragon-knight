@@ -12,7 +12,8 @@
 -- the flat form only notes that there is one ("items.1.when" = 1). Flat fields:
 -- "equipment.weapon" = "broadsword", "items.1.item" = "potion", "items.1.weight",
 -- "items.1.stock" (absent: no limit), "spells.1.spell" = "hurt", "spells.1.weight" (0: never
--- chosen, which switches off its class's spell of that key).
+-- chosen, which switches off its class's spell of that key), "spells.1.aim" = "beehive" (the
+-- action goes at an object of that key, and is not used while none is on the field).
 -- `speech` (what it says in a fight: fight/speech.lua) stays in the file too, read when the
 -- fight runs; it is checked here, and the statuses it answers or its conditions name are
 -- noted in the flat form ("speech.statuses" = "poison,sleep": they must exist).
@@ -105,6 +106,7 @@ function monsters.field(name)
 	end
 	if param == "weight" then return WEIGHT end
 	if param == "when" then return WHEN end
+	if param == "aim" then return key_spec(name, "interactables", "Aim " .. i) end
 	return nil
 end
 
@@ -158,6 +160,13 @@ local function entries(data, list, ref, allowed, flat, err)
 				value, msg = schema.check(STOCK, e.stock)
 				if value == nil then err(at .. ".stock " .. msg .. " (uses per encounter; leave it out for no limit)")
 				else flat[prefix .. "stock"] = value end
+			end
+			if e.aim ~= nil then
+				if not check_key(e.aim) then
+					err(at .. '.aim must be the key of an object (like "explosive_barrel"): the action goes at one of them')
+				else
+					flat[prefix .. "aim"] = e.aim
+				end
 			end
 			if e.when ~= nil then
 				if type(e.when) ~= "function" then
@@ -301,8 +310,8 @@ function monsters.validate_extra(data, flat, err)
 			end
 		end
 	end
-	entries(data, "items", "item", { item = true, weight = true, stock = true, when = true }, flat, err)
-	entries(data, "spells", "spell", { spell = true, weight = true, when = true }, flat, err)
+	entries(data, "items", "item", { item = true, weight = true, stock = true, when = true, aim = true }, flat, err)
+	entries(data, "spells", "spell", { spell = true, weight = true, when = true, aim = true }, flat, err)
 end
 
 -- The loadout's references against the other kinds' files (load.all, after the keys were
@@ -326,6 +335,11 @@ function monsters.validate_refs(flat, all, err)
 			end
 		elseif list == "spells" and spells[v] and spells[v].usable_in == "town" then
 			err(("%s: the spell '%s' can't be cast in fights"):format(f, v))
+		end
+		local entity = list == "items" and items[v] or list == "spells" and spells[v]
+		if entity and entity.target == "self" and flat[f:gsub("%.%a+$", ".aim")] then
+			err(("%s: the %s '%s' is aimed at its user: it can't aim at an object"):format(f, list == "items" and "item" or
+				"spell", v))
 		end
 	end
 end
@@ -362,16 +376,17 @@ function monsters.write_children(id, flat)
 		local p = "items." .. i .. "."
 		local item = item_ids[flat[p .. "item"]]
 		if item then
-			db:exec("INSERT INTO monster_items (monster_id, position, item_id, weight, stock, has_when) VALUES (?, ?, ?, ?, ?, ?)",
-				id, i, item, flat[p .. "weight"] or 1, flat[p .. "stock"], flat[p .. "when"] or 0)
+			db:exec("INSERT INTO monster_items (monster_id, position, item_id, weight, stock, has_when, aim) " ..
+				"VALUES (?, ?, ?, ?, ?, ?, ?)", id, i, item, flat[p .. "weight"] or 1, flat[p .. "stock"], flat[p .. "when"] or 0,
+				flat[p .. "aim"] or "")
 		end
 	end
 	for _, i in ipairs(monsters.indices(flat, "spells", "spell")) do
 		local p = "spells." .. i .. "."
 		local spell = spell_ids[flat[p .. "spell"]]
 		if spell then
-			db:exec("INSERT INTO monster_spells (monster_id, position, spell_id, weight, has_when) VALUES (?, ?, ?, ?, ?)",
-				id, i, spell, flat[p .. "weight"] or 1, flat[p .. "when"] or 0)
+			db:exec("INSERT INTO monster_spells (monster_id, position, spell_id, weight, has_when, aim) VALUES (?, ?, ?, ?, ?, ?)",
+				id, i, spell, flat[p .. "weight"] or 1, flat[p .. "when"] or 0, flat[p .. "aim"] or "")
 		end
 	end
 end

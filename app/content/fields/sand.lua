@@ -10,6 +10,7 @@ country between Bris and Kalle wrap their faces and keep to short steps. They sa
 is an enemy that never tires, and that it wins the long fight.]],
 	icon = "sand",
 	group = "terrain",
+	wind = 1,   -- a breeze (from 0, calm, to 3)
 	damage = { earth = 10, wind = 10, water = -20, frost = -10 },
 	stats = { dexterity = -15 },
 }

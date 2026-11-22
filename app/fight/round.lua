@@ -20,7 +20,8 @@
 -- spells' fields count down (fight/fields.lua; a field's on_tick runs), then a turn the
 -- player can't act in ends (a round with the blocked turn), then every combatant's statuses
 -- tick and count down (sleep may wake, a charge releases) and allies count down and leave,
--- then a turn whose deadline passed (round.TURN ticks after it began) is played as a Guard.
+-- the objects' statuses and on_tick follow (a lit fuse burning down), then a turn whose
+-- deadline passed (round.TURN ticks after it began) is played as a Guard.
 -- The server's tick (lib/tick.lua) and every POST /fight, before its command, advance the
 -- fight to now the same way (fight/encounter.lua encounter.advance).
 --
@@ -70,12 +71,13 @@ function round.locked(f)
 	return (engine.blocked(f, state.player(f)))
 end
 
--- After a step: the fight is over (r.died / r.victory) or goes on (true / false). The
--- current wave defeated with waves to come: the next one enters.
+-- After a step: allies at 0 HP leave and objects at 0 HP are destroyed (what that does
+-- counts too: a blast), then the fight is over (r.died / r.victory) or goes on (true /
+-- false). The current wave defeated with waves to come: the next one enters.
 local function over(f, r, player_struck)
+	engine.reap(f)
 	local changed = f.hp_changed
 	f.hp_changed = false
-	engine.reap(f)
 	local p = state.player(f)
 	local dead = changed and not state.alive(f, p)
 	if dead and not player_struck then r.died = true return true end
@@ -214,9 +216,9 @@ local function field_tick(f, r, k)
 end
 
 -- Clock tick k (f.tick is k): every combatant's statuses tick and count down, allies count
--- down and leave (those that joined at this tick wait for the next). Lines go to r.ending,
--- r.changed when anything counted; returns true when that ended the fight (r.died,
--- r.victory).
+-- down and leave (those that joined at this tick wait for the next), then the objects'
+-- statuses tick and their on_tick runs. Lines go to r.ending, r.changed when anything
+-- counted; returns true when that ended the fight (r.died, r.victory).
 local function clock_tick(f, r, k)
 	engine.budget(f)
 	f.hp_changed = false
@@ -224,10 +226,14 @@ local function clock_tick(f, r, k)
 	local order = { state.player(f) }
 	for _, c in ipairs(state.allies(f)) do order[#order + 1] = c end
 	for _, c in ipairs(state.enemies(f)) do order[#order + 1] = c end
+	for _, c in ipairs(state.objects(f)) do order[#order + 1] = c end
 	for _, c in ipairs(order) do
 		if state.get(f, c.id) and state.alive(f, c) then
 			if engine.tick(f, c, k) then r.changed = true end
 			if c.side == "ally" and state.get(f, c.id) and engine.summon_tick(f, c) then r.changed = true end
+			if c.side == "object" and state.get(f, c.id) and state.alive(f, c) and engine.object_tick(f, c) then
+				r.changed = true
+			end
 			if over(f, r) then return true end
 		end
 	end

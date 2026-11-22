@@ -5,7 +5,8 @@
 -- facing only the player consumes no random numbers here (the original game's rolls).
 --
 -- Candidates come from providers, functions(f, c) returning a list of
--- { kind, weight, target = "opponent" | "self", perform = function(f, c, target) }: a
+-- { kind, weight, target = "opponent" | "self", aim (an object: the target, given), perform =
+-- function(f, c, target) }: a
 -- monster's attack (weight attack_weight) and the spells and items of its loadout that it
 -- may use this turn (fight/monster.lua), an ally's file's act. More providers can join
 -- (ai.provide) without changing the round.
@@ -85,8 +86,9 @@ function ai.actions(f, c)
 end
 
 -- What c does this turn: the action, then its target (a combatant; nil when there is
--- nobody to aim at). With no eligible action of weight > 0, a fallback (a monster's attack
--- of weight 0) without a roll.
+-- nobody to aim at): the action's object when it aims at one (cand.aim, without a roll),
+-- itself for a self-targeted one, else an opponent by weight. With no eligible action of
+-- weight > 0, a fallback (a monster's attack of weight 0) without a roll.
 function ai.choose(f, c)
 	local list = ai.actions(f, c)
 	local cand = ai.pick(list, f.rand)
@@ -97,6 +99,7 @@ function ai.choose(f, c)
 	end
 	if not cand then return nil end
 	if cand.target == "self" then return cand, c end
+	if cand.aim then return cand, cand.aim end
 	local t = ai.pick(ai.targets(f, c), f.rand)
 	return cand, t and t.combatant
 end

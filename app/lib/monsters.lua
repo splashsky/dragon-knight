@@ -88,14 +88,14 @@ local function load_all()
 		local it = items.get(r.item_id)
 		if it then
 			table.insert(of(r.monster_id).items, { position = r.position, item = it, weight = r.weight, stock = r.stock,
-				has_when = r.has_when ~= 0 })
+				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
 		end
 	end
 	for _, r in ipairs(dk.db:query("SELECT * FROM monster_spells ORDER BY monster_id, position")) do
 		local sp = spells.get(r.spell_id)
 		if sp then
 			table.insert(of(r.monster_id).spells, { position = r.position, spell = sp, weight = r.weight,
-				has_when = r.has_when ~= 0 })
+				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
 		end
 	end
 	for _, lo in pairs(all) do
@@ -137,11 +137,11 @@ local function chosen(lo)
 end
 
 -- The loadout of monster row `m`: { equipment = { { slot, item }, ... } (in slot order),
--- items = { { position, item, weight, stock (nil: no limit), has_when }, ... },
--- spells = { { position, spell, weight, has_when }, ... , then its class's: { spell,
--- weight = 1, from_class = true } } } (item and spell rows; entries whose row is gone and
--- those of weight 0 are left out). A row may carry its own `loadout` table instead (tests;
--- entries may then hold their `when` function).
+-- items = { { position, item, weight, stock (nil: no limit), has_when, aim (an object's key,
+-- or nil) }, ... }, spells = { { position, spell, weight, has_when, aim }, ... , then its
+-- class's: { spell, weight = 1, from_class = true } } } (item and spell rows; entries whose
+-- row is gone and those of weight 0 are left out). A row may carry its own `loadout` table
+-- instead (tests; entries may then hold their `when` function).
 function monsters.loadout(m)
 	if m.loadout then return chosen(m.loadout) end
 	if m.id == nil then return empty() end

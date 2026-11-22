@@ -4,16 +4,19 @@
 -- weighed by the code the round uses (fight/ai.lua with fight/monster.lua as its
 -- provider). The states vary the player's level and stats around the monster's level, both
 -- sides' HP shares, the monster's MP and item stock, the turn and the round, statuses on
--- the player and on the monster, an ally, and the battlefield: no field, each field as the
--- world's, each as a spell's (and now and then a second one). Two promises:
+-- the player and on the monster, an ally, the battlefield: no field, each field as the
+-- world's, each as a spell's (and now and then a second one), and objects on the field (in
+-- two states of three one of them, each in turn, over either side). Two promises:
 --
 --   1. it fights cleanly: its conditions and actions log no warnings (an error in a `when`,
 --      a can_cast that can't be checked, ...), HP and MP stay whole numbers, MP never goes
 --      negative;
 --   2. every loadout entry of weight > 0 (its own and its class's) is eligible in at least
 --      one state: its `when` passes and its can_cast / can_use doesn't refuse, with the MP
---      to pay. A typo'd status key, an impossible condition or an unaffordable spell fails
---      with the monster, the entry and its condition.
+--      to pay (an entry that aims at an object: with one of its key on the field). A typo'd
+--      status key, an impossible condition or an unaffordable spell fails with the monster,
+--      the entry and its condition.
+local act = require("fight.act")
 local action = require("lib.action")
 local ai = require("fight.ai")
 local engine = require("fight.engine")
@@ -23,6 +26,7 @@ local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
 local sandbox = require("lib.content.sandbox")
+local spells = require("lib.spells")
 local state = require("fight.state")
 local T = {}
 
@@ -56,6 +60,13 @@ end
 local function field_rows()
 	local out = dk.db:query("SELECT key, \"group\" FROM fields WHERE retired = 0 ORDER BY key")
 	assert(#out >= 14, "the fields are synced: " .. #out)
+	return out
+end
+
+local function object_keys()
+	local out = {}
+	for _, r in ipairs(dk.db:query("SELECT key FROM interactables WHERE retired = 0 ORDER BY key")) do out[#out + 1] = r.key end
+	assert(#out >= 1, "the objects are synced: " .. #out)
 	return out
 end
 
@@ -96,11 +107,12 @@ local function scene(row, n, ctx)
 		if e.stock and r(1, 3) == 1 then c.data[state.stock_key(e.position)] = r(0, e.stock) end
 	end
 	c.data.turn = turn
-	-- statuses: each on the player one time in four, on the monster one in five
+	-- statuses: each on the player one time in four, on the monster one in five (but some
+	-- room left for what the fight puts on them)
 	local p = state.player(f)
 	for _, key in ipairs(ctx.statuses) do
-		if r(1, 4) == 1 then engine.afflict(f, p, key, {}, c) end
-		if r(1, 5) == 1 then engine.afflict(f, c, key, {}, p) end
+		if r(1, 4) == 1 and #p.statuses < 6 then engine.afflict(f, p, key, {}, c) end
+		if r(1, 5) == 1 and #c.statuses < 6 then engine.afflict(f, c, key, {}, p) end
 	end
 	if r(1, 4) == 1 then engine.summon(f, "wolf", { ticks = 3 }, p) end
 	-- the battlefield: none, each field as the world's, each as a spell's (cycling), and
@@ -123,6 +135,13 @@ local function scene(row, n, ctx)
 			f.data["field_" .. x.group] = x.key
 			label = label .. " + " .. x.key
 		end
+	end
+	-- an object on the field in two states of three (each in turn), over either side
+	if n % 3 ~= 0 then
+		local key = ctx.objects[(n // 3) % #ctx.objects + 1]
+		local over = n % 2 == 0 and "player" or "enemy"
+		engine.place(f, key, { over = over }, nil, level)
+		label = label .. "; a " .. key .. " over the " .. over
 	end
 	local what = ("%s, state %d (player level %d, HP %d/%d; monster HP %d/%d, MP %s/%s; turn %d, round %d; %s)"):format(
 		row.key, n, level, st.currenthp, maxhp, c.hp, c.maxhp, tostring(c.mp), tostring(c.maxmp), turn, f.round, label)
@@ -201,10 +220,9 @@ local function diagnose(row, list, e, ctx)
 			end
 			if passes then
 				when_ok = when_ok + 1
-				local me = engine.handle(f, c)
-				local check = action.check({ kind = kind, entity = entity, caster = me, in_fight = true,
-					target = entity.target == "self" and me or engine.handle(f, engine.target(f, c)),
-					summon_room = engine.summon_room(f, c), battlefield = fields.battlefield(f) })
+				local aim = e.aim and monster.object(f, e.aim)
+				local check = action.check(act.context(f, c, kind, entity, aim or engine.target(f, c)))
+				if e.aim and not aim then check = { refused = "no " .. e.aim .. " on the field" } end
 				if check.ok then allowed = allowed + 1 else last = check.refused or check.err or check.reason end
 			end
 		end
@@ -271,10 +289,10 @@ local function watched(warnings, seen, fn)
 	if not ok then error(err, 0) end
 end
 
-function T.every_monster_fights_cleanly_and_reaches_its_loadout()
-	local ctx = { statuses = status_keys(), fields = field_rows() }
-	local rows = monsters.active()
-	assert(#rows >= 150, "the monsters are synced: " .. #rows)
+-- Fights monster rows `rows` over the states (watched): the problems found (at most 8),
+-- how many states were played and how many loadout entries there were.
+local function fight_rows(rows)
+	local ctx = { statuses = status_keys(), fields = field_rows(), objects = object_keys() }
 	local problems, fought, entries = {}, 0, 0
 	local warnings, seen = {}, {}
 	watched(warnings, seen, function()
@@ -326,9 +344,46 @@ function T.every_monster_fights_cleanly_and_reaches_its_loadout()
 			if #problems >= 8 then break end
 		end
 	end)
+	return problems, fought, entries
+end
+
+local function report(problems)
 	if #problems > 0 then error(#problems .. " problem(s) with the monsters' patterns:\n  " .. table.concat(problems, "\n  "), 0) end
+end
+
+function T.every_monster_fights_cleanly_and_reaches_its_loadout()
+	local rows = monsters.active()
+	assert(#rows >= 150, "the monsters are synced: " .. #rows)
+	local problems, fought, entries = fight_rows(rows)
+	report(problems)
 	assert(fought >= #rows * PLAYED, "fights played: " .. fought)
 	assert(entries >= 6, "the examples' loadout entries: " .. entries)
+end
+
+-- An entry aiming at an object (aim = "<key>") is reached in the states with one on the
+-- field, and only then; one aiming at an object that never stands there is reported.
+function T.entries_aiming_at_objects_are_reached_with_the_object()
+	local hurt = assert(spells.by_key("hurt"))
+	local function aimer(aim)
+		return { id = 100001, key = "t_aimer", name = "Aimer", level = 10, maxhp = 60, maxdam = 10, armor = 3, maxexp = 1,
+			maxgold = 1, maxmp = 50, uses_mp = 1, attack_weight = 1,
+			loadout = { equipment = {}, items = {}, spells = { { position = 1, spell = hurt, weight = 3, aim = aim } } } }
+	end
+	local problems = fight_rows({ aimer("beehive") })
+	report(problems)
+	dk.db:exec("SAVEPOINT test_patterns")
+	dk.db:exec("UPDATE interactables SET retired = 1 WHERE key = 'beehive'")
+	require("lib.interactables").reload()
+	local ok, err = pcall(function()
+		problems = fight_rows({ aimer("beehive") })
+	end)
+	dk.db:exec("ROLLBACK TO test_patterns")
+	dk.db:exec("RELEASE test_patterns")
+	require("lib.interactables").reload()
+	if not ok then error(err, 0) end
+	local text = table.concat(problems, "\n")
+	assert(text:find("t_aimer: spells[1] hurt (weight 3; no when) is never eligible", 1, true), text)
+	assert(text:find("no beehive on the field", 1, true), text)
 end
 
 return T

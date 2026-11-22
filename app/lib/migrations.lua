@@ -1433,6 +1433,40 @@ local function v24_wares()
 	end
 end
 
+-- 25: interactables (3.3, docs/plans/interactables.md): objects on the battlefield, a content
+-- kind (the sync fills the table), standing in a fight as its combatants of side and kind
+-- 'object' (their level and the side they stand over in the new columns); the fields' wind,
+-- spells' and items' area, and the monsters' loadout entries that aim at an object. Fights in
+-- progress have no objects and their target is the first living enemy, as before: nothing to
+-- convert.
+local function v25_interactables()
+	dk.db:exec_script([[
+CREATE TABLE interactables (
+	id            INTEGER PRIMARY KEY,
+	key           TEXT    NOT NULL UNIQUE,
+	name          TEXT    NOT NULL DEFAULT '',
+	description   TEXT    NOT NULL DEFAULT '',
+	lore          TEXT    NOT NULL DEFAULT '',
+	icon          TEXT    NOT NULL DEFAULT '',
+	hp            INTEGER NOT NULL DEFAULT 1,
+	hp_per_level  INTEGER NOT NULL DEFAULT 0,
+	resist        TEXT    NOT NULL DEFAULT '',
+	ward          TEXT    NOT NULL DEFAULT '',
+	spawn         TEXT    NOT NULL DEFAULT '',
+	messages      TEXT    NOT NULL DEFAULT '',
+	data          TEXT    NOT NULL DEFAULT '',
+	retired       INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE fields ADD COLUMN wind INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE spells ADD COLUMN area INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE items ADD COLUMN area INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE monster_items ADD COLUMN aim TEXT NOT NULL DEFAULT '';
+ALTER TABLE monster_spells ADD COLUMN aim TEXT NOT NULL DEFAULT '';
+ALTER TABLE fight_combatants ADD COLUMN level INTEGER;
+ALTER TABLE fight_combatants ADD COLUMN over TEXT;
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1477,6 +1511,8 @@ migrations.STEPS = {
 		"loadout entries may weigh 0", up = v23_fields },
 	{ name = "the 3.2 wares: gear that resists elements and wards off statuses, elemental blades and ward draughts " ..
 		"in the towns' shops", up = v24_wares },
+	{ name = "interactables: objects on the battlefield, a content kind and combatants of their own side; the fields' " ..
+		"wind, area spells and items, monsters' loadout entries aiming at an object", up = v25_interactables },
 }
 
 migrations.VERSION = #migrations.STEPS

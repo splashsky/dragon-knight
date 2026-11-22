@@ -11,6 +11,7 @@ up, and the Hambry guards ring a bell at the gate on bad nights so the lost can 
 road.]],
 	icon = "blizzard",
 	group = "sky",
+	wind = 3,   -- a gale (from 0, calm, to 3)
 	damage = { frost = 30, fire = -30, wind = 15 },
 	statuses = {
 		burning = { blocked = true },

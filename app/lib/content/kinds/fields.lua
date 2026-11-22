@@ -42,6 +42,9 @@ fields.fields = {
 	{ name = "group", type = "choice", values = fields.GROUPS, required = true, label = "Group",
 		help = "One field per group is up: the weather's sky, ground and time, or a spell's in their place; " ..
 			"the terrain's (the ground the fight is on, never a spell's); aura fields come only from spells." },
+	{ name = "wind", type = "int", default = 0, min = 0, max = 3, admin = true, label = "Wind",
+		help = "How windy the battlefield is under it, 0 (calm) to 3 (a gale); a fight's wind is the highest of its " ..
+			"fields'." },
 }
 
 local PERCENT = { type = "int", min = -100, max = 1000, default = 0 }

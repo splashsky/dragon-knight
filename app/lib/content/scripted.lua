@@ -1,6 +1,7 @@
--- content/scripted.lua :: what the scripted kinds (spells, items, statuses, summons, fields)
--- share: their behaviour functions (a spell's cast and can_cast, an item's use and can_use, a
--- status's hooks, a summon's act, a field's on_tick), their messages, their named numbers,
+-- content/scripted.lua :: what the scripted kinds (spells, items, statuses, summons, fields,
+-- interactables) share: their behaviour functions (a spell's cast and can_cast, an item's use
+-- and can_use, a status's hooks, a summon's act, a field's on_tick, an object's hooks), their
+-- messages, their named numbers,
 -- named stages (a charged spell's release) and declared uses of other kinds. See docs/APP.md
 -- "Scripting spells and items", "Fight engine" and lib/action.lua.
 --
@@ -21,10 +22,10 @@ local IDENT = "^[%a_][%w_]*$"
 
 -- The kinds a file may declare it uses (`uses = { statuses = { "poison" } }`), so `dk
 -- check` catches a misspelled key (lib/content/load.lua checks "keys" fields with refs).
-scripted.USES = { statuses = true, summons = true, spells = true, items = true, fields = true }
+scripted.USES = { statuses = true, summons = true, spells = true, items = true, fields = true, interactables = true }
 
 -- The kinds whose rows have messages and data columns (scripted.write).
-scripted.TABLES = { spells = true, items = true, statuses = true, summons = true, fields = true }
+scripted.TABLES = { spells = true, items = true, statuses = true, summons = true, fields = true, interactables = true }
 
 -- The spec of a flat field "messages.<key>", "messages.enemy.<key>", "data.<name>" or
 -- "uses.<kind>", or nil.
@@ -134,7 +135,7 @@ function scripted.validate(data, flat, err, functions)
 		else
 			for _, k in ipairs(sorted_keys(data.uses)) do
 				if not scripted.USES[k] then
-					err("field 'uses': unknown kind " .. tostring(k) .. " (statuses, summons, spells, items or fields)")
+					err("field 'uses': unknown kind " .. tostring(k) .. " (statuses, summons, spells, items, fields or interactables)")
 				else
 					local value, msg = schema.check(scripted.field("uses." .. k), data.uses[k])
 					if value == nil then err("field 'uses." .. k .. "' " .. msg) else flat["uses." .. k] = value end

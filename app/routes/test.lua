@@ -5,7 +5,9 @@
 --   GET  /__test/routes     every route, one "<METHOD> <pattern>" per line, sorted
 --                           (tests/e2e/pure.sh checks it requests every GET route)
 --   POST /__test/encounter  an encounter begins for the caller where they stand, as a map
---                           move's 1-in-5 begins one (tests/run.sh t_fight_new)
+--                           move's 1-in-5 begins one (tests/run.sh t_fight_new); with
+--                           object=<interactable key>, that object stands on the field too
+--                           (the browser test's target picker)
 --   GET  /__test/slow?ms=N  a page that takes N ms (at most 5000; the browser test of the
 --                           live client's progress bar)
 --   POST /__test/tick       the server's tick (lib/tick.lua) at the request's time
@@ -13,6 +15,8 @@
 local auth = require("lib.auth")
 local clock = require("lib.clock")
 local encounter = require("fight.encounter")
+local engine = require("fight.engine")
+local game = require("lib.game")
 local state = require("fight.state")
 local tick = require("lib.tick")
 local view = require("lib.view")
@@ -35,8 +39,15 @@ local function begin_encounter(req)
 	local user = req.user
 	state.clear(user.id)
 	dk.db:exec("UPDATE users SET currentaction = 'Fighting', dropcode = 0 WHERE id = ?", user.id)
-	if not encounter.begin(user.id) then
+	local begun = encounter.begin(user.id)
+	if not begun then
 		return view.error(req, 500, "Error", "There are no monsters in this area.")
+	end
+	local key = req.form.object
+	if begun == "fight" and type(key) == "string" and key ~= "" then
+		local f = state.load(user, game.player(game.user(user.id)))
+		if not engine.place(f, key, {}, nil, 1) then return view.error(req, 500, "Error", "No such object: " .. key) end
+		state.save(f)
 	end
 	return view.redirect("/fight")
 end

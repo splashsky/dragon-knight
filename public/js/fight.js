@@ -1,8 +1,8 @@
 // fight.js :: smooth fights (docs/APP.md "Fight events"). A fight round sent by the live
 // client (client.js) comes back with the round's events (an `events fight` frame), which
 // this script plays on the page being shown before the page's regions apply: a line every
-// STEP ms, with the HP/MP bars and numbers, the statuses, the allies and the battlefield's
-// fields they change. Then
+// STEP ms, with the HP/MP bars and numbers, the statuses, the allies, the objects on the
+// field (placed, blasting: a flash, leaving) and the battlefield's fields they change. Then
 // the regions bring the page as the server renders it, so what stays on screen is what a
 // page load shows. A click in the middle column, any key or "Skip" finishes the round at
 // once; with prefers-reduced-motion there are no delays. The fight forms are disabled while
@@ -12,7 +12,11 @@
 // (fight/clock.html): a thin bar draining over the turn's last WARN seconds, from the
 // page's data-turn-ends and the server's time (data-now); display only, the server plays a
 // turn that runs out. Without the live client the fight forms are plain forms. Text from
-// the server goes in with textContent only.
+// the server goes in with textContent only. The target picker (fight/target.html): a click
+// on a combatant's card ([data-target]) checks its radio button, without a request (the next
+// command sends it), and marks the card; the keyboard moves through the radio buttons as
+// usual. After an answer the radios show the server's target again, unless the player picked
+// one since the last command.
 (function () {
 	"use strict";
 	var root = document.documentElement;
@@ -28,6 +32,7 @@
 	var wake = null;        // ends the current wait
 	var refocus = false;    // the keyboard was in the middle column: focus the new form
 	var pressed = null;     // name and value of the button that sent the round (refocused after)
+	var picked = false;     // a target was picked since the last command
 
 	// ---- helpers
 
@@ -221,6 +226,32 @@
 		}
 	}
 
+	// an object on the field: placed (its card, made like an ally's when the page has none),
+	// blasting (a flash) or leaving (faded)
+	function object(x) {
+		var node = $('.fight-combatant[data-fighter="' + Number(x.id) + '"]', middle());
+		if (x.change === "place") {
+			if (node) return;
+			var m = middle(), log = $("[data-fight-log]", m);
+			if (!log) return;
+			node = el("p", "fight-combatant fight-object fight-joined");
+			node.setAttribute("data-fighter", x.id);
+			node.setAttribute("data-stat", "hp");
+			node.setAttribute("data-value", x.hp);
+			node.setAttribute("data-max", x.max);
+			node.appendChild(el("b", null, x.name));
+			node.appendChild(txt(": " + x.hp + " / " + x.max + " HP"));
+			log.parentNode.insertBefore(node, $(".fight-ally", m) || $(".fight-you", m) || log);
+			bar(node);
+		} else if (node && x.change === "blast") {
+			node.classList.remove("fight-blast");
+			void node.offsetWidth;   // restart the animation
+			node.classList.add("fight-blast");
+		} else if (node && x.change === "leave") {
+			node.classList.add("fight-gone");
+		}
+	}
+
 	// the battlefield line (fight/battlefield.html): a field coming up is added, one going is
 	// struck out (the page as the server renders it follows the round)
 	function field(x) {
@@ -266,6 +297,7 @@
 		(e.tp || []).forEach(function (c) { stat("tp", c); });
 		(e.status || []).forEach(status);
 		(e.summon || []).forEach(summon);
+		(e.object || []).forEach(object);
 		(e.field || []).forEach(field);
 	}
 
@@ -357,9 +389,34 @@
 		if (!ticking && $("[data-turn-ends]")) ticking = setInterval(drawClock, 1000);
 	}
 
+	// ---- the target picker
+
+	// the cards marked as the checked radio button says
+	function marks() {
+		$$("[data-target]").forEach(function (card) {
+			var radio = $(".fight-target-radio", card);
+			card.classList.toggle("fight-chosen", !!(radio && radio.checked));
+		});
+	}
+
+	function choose(card) {
+		var radio = $(".fight-target-radio", card);
+		if (!radio || radio.disabled || radio.checked) return;
+		radio.checked = true;
+		picked = true;
+		marks();
+	}
+
+	// after an answer: the server's target, unless the player picked one since the command
+	function targets() {
+		if (!picked) $$(".fight-target-radio").forEach(function (r) { r.checked = r.defaultChecked; });
+		marks();
+	}
+
 	// after an answer: the bars of the page now, and the focus back on the button used
 	function applied() {
 		enhance(document);
+		targets();
 		startClock();
 		var m = middle();
 		if (refocus && m) {
@@ -382,13 +439,26 @@
 		var button = ev.submitter;
 		pressed = button && button.name ? { name: button.name, value: button.value } : null;
 		refocus = !!(m && document.activeElement && m.contains(document.activeElement));
+		picked = false;   // (the command sends the target picked)
 	});
 
 	document.addEventListener("click", function (ev) {
 		var m = middle();
-		if (!playing || !m || !m.contains(ev.target)) return;
+		if (!m || !m.contains(ev.target)) return;
+		if (!playing) {
+			var card = closest(ev.target, "[data-target]");
+			if (card && !closest(ev.target, "a[href], button")) choose(card);
+			return;
+		}
 		skip();
 		if (closest(ev.target, "a[href]")) ev.preventDefault();   // links wait for the round
+	});
+
+	document.addEventListener("change", function (ev) {
+		if (ev.target.classList && ev.target.classList.contains("fight-target-radio")) {
+			picked = true;
+			marks();
+		}
 	});
 
 	document.addEventListener("keydown", function (ev) {
@@ -403,5 +473,6 @@
 	}
 	root.classList.add("fight-js");
 	enhance(document);
+	marks();
 	startClock();
 })();

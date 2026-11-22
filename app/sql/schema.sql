@@ -147,7 +147,8 @@ CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 -- (when full; user_items.charges holds each one's), icon (a PNG in public/images/items/,
 -- '' = the default icon). Schema version 16: rechargeable (0: single use, gone with its
 -- last charge; 1: an inn refills it). Schema version 21: element (a weapon's attack's,
--- app/lib/elements.lua; modifiers may give resistances and wards too).
+-- app/lib/elements.lua; modifiers may give resistances and wards too). Schema version 25:
+-- area (a consumable that hits every opponent and object: its code gets s.targets).
 CREATE TABLE items (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -174,7 +175,8 @@ CREATE TABLE items (
 	charges      INTEGER NOT NULL DEFAULT 0,
 	icon         TEXT    NOT NULL DEFAULT '',
 	rechargeable INTEGER NOT NULL DEFAULT 1,
-	element      TEXT    NOT NULL DEFAULT 'neutral'
+	element      TEXT    NOT NULL DEFAULT 'neutral',
+	area         INTEGER NOT NULL DEFAULT 0
 );
 
 -- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a
@@ -220,7 +222,8 @@ CREATE TABLE monster_equipment (
 ) WITHOUT ROWID;
 
 -- The consumables a monster may use (position: the file's order), by weight (0: never;
--- schema version 23); stock: uses per encounter (NULL: no limit).
+-- schema version 23); stock: uses per encounter (NULL: no limit); aim: an interactable's key
+-- (schema version 25: the item goes at an object of that key; '' = the AI's target).
 CREATE TABLE monster_items (
 	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
 	position    INTEGER NOT NULL,
@@ -228,17 +231,19 @@ CREATE TABLE monster_items (
 	weight      INTEGER NOT NULL DEFAULT 1,
 	stock       INTEGER,
 	has_when    INTEGER NOT NULL DEFAULT 0,
+	aim         TEXT    NOT NULL DEFAULT '',
 	PRIMARY KEY (monster_id, position)
 ) WITHOUT ROWID;
 
 -- The spells a monster may cast (position: the file's order), by weight (0: never, which
--- switches off its class's spell of that key; schema version 23).
+-- switches off its class's spell of that key; schema version 23); aim: as monster_items'.
 CREATE TABLE monster_spells (
 	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
 	position    INTEGER NOT NULL,
 	spell_id    INTEGER NOT NULL REFERENCES spells (id),
 	weight      INTEGER NOT NULL DEFAULT 1,
 	has_when    INTEGER NOT NULL DEFAULT 0,
+	aim         TEXT    NOT NULL DEFAULT '',
 	PRIMARY KEY (monster_id, position)
 ) WITHOUT ROWID;
 
@@ -270,7 +275,8 @@ CREATE TABLE spells (
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
 	icon         TEXT    NOT NULL DEFAULT '',
-	lore         TEXT    NOT NULL DEFAULT ''
+	lore         TEXT    NOT NULL DEFAULT '',
+	area         INTEGER NOT NULL DEFAULT 0
 );
 
 -- Statuses: content files app/content/statuses/<key>.lua (like spells; never deleted, a
@@ -304,7 +310,8 @@ CREATE TABLE statuses (
 -- ('sky', 'ground', 'time', 'terrain', 'aura': one field per group is up); damage ("fire=-40,water=15":
 -- percent per element) and stats ("dexterity=-10": percent per stat); statuses (how
 -- statuses behave under it: "burning.blocked=1,burning.ticks=-1,sleep.scale.chance=120");
--- messages and data like a status's; on_tick is the file's code.
+-- messages and data like a status's; on_tick is the file's code. Schema version 25: wind (0
+-- calm to 3 a gale; a fight's is the highest of its fields').
 CREATE TABLE fields (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -318,7 +325,31 @@ CREATE TABLE fields (
 	statuses     TEXT    NOT NULL DEFAULT '',
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
-	retired      INTEGER NOT NULL DEFAULT 0
+	retired      INTEGER NOT NULL DEFAULT 0,
+	wind         INTEGER NOT NULL DEFAULT 0
+);
+
+-- Interactables: content files app/content/interactables/<key>.lua (schema version 25):
+-- objects on the battlefield, participants of a fight with hit points and statuses that never
+-- take a turn (app/fight/engine.lua). hp (and hp_per_level more per level of the object),
+-- resist and ward like a monster's, spawn (where it appears by itself: "1.biomes=weald\n1.chance=12"
+-- lines, lib/content/kinds/interactables.lua), messages and data like a status's; its hooks
+-- are the file's code.
+CREATE TABLE interactables (
+	id            INTEGER PRIMARY KEY,
+	key           TEXT    NOT NULL UNIQUE,
+	name          TEXT    NOT NULL DEFAULT '',
+	description   TEXT    NOT NULL DEFAULT '',
+	lore          TEXT    NOT NULL DEFAULT '',
+	icon          TEXT    NOT NULL DEFAULT '',
+	hp            INTEGER NOT NULL DEFAULT 1,
+	hp_per_level  INTEGER NOT NULL DEFAULT 0,
+	resist        TEXT    NOT NULL DEFAULT '',
+	ward          TEXT    NOT NULL DEFAULT '',
+	spawn         TEXT    NOT NULL DEFAULT '',
+	messages      TEXT    NOT NULL DEFAULT '',
+	data          TEXT    NOT NULL DEFAULT '',
+	retired       INTEGER NOT NULL DEFAULT 0
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
@@ -501,7 +532,9 @@ CREATE INDEX fights_due ON fights (due) WHERE outcome = '';
 -- an enemy's wave (0 otherwise). hp, maxhp: NULL for the player (users.currenthp and the
 -- effective stats hold them). ticks_left: clock ticks a summon stays (NULL: no limit). data:
 -- per-combatant values (a monster's immunity, the stock of its items), "name=value" lines.
--- mp, maxmp: a monster's MP (NULL otherwise; NULL for a monster: full).
+-- mp, maxmp: a monster's MP (NULL otherwise; NULL for a monster: full). Schema version 25:
+-- side and kind object (entity_id: interactables.id; data: its o.data), its level and the
+-- side it stands over ('player' or 'enemy'; NULL otherwise).
 CREATE TABLE fight_combatants (
 	user_id     INTEGER NOT NULL REFERENCES fights (user_id) ON DELETE CASCADE,
 	id          INTEGER NOT NULL,
@@ -515,6 +548,8 @@ CREATE TABLE fight_combatants (
 	data        TEXT    NOT NULL DEFAULT '',
 	mp          INTEGER,
 	maxmp       INTEGER,
+	level       INTEGER,
+	over        TEXT,
 	PRIMARY KEY (user_id, id)
 ) WITHOUT ROWID;
 

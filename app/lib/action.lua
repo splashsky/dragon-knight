@@ -6,7 +6,8 @@
 -- or use, with combatant handles for the one who acts (`s.caster`) and the one aimed at
 -- (`s.target`; the caster for self-targeted actions, nil outside fights for the others).
 -- A status's hooks get the same kind of context (`t`, with `t.bearer`), and so do a
--- summon's act (`a`, with `a.self`) and a field's on_tick (`e`, with `e.combatants`).
+-- summon's act (`a`, with `a.self`), a field's on_tick (`e`, with `e.combatants`) and an
+-- object's hooks (`o`, with `o.self`: an interactable on the battlefield).
 -- Content never writes the game state: the handles' methods (:heal, :hurt, :afflict, ...)
 -- update the handle's own view of the numbers and record events, in order; action.perform
 -- / action.call return them and the caller (fight/engine.lua) applies them to its state. A
@@ -47,7 +48,7 @@ action.MAX_TEXT = 200
 -- its statuses; its resistances and wards are read with :resist and :ward).
 local FIELDS = {
 	"id", "side", "name", "is_player", "level", "hp", "maxhp", "mp", "maxmp", "tp", "maxtp", "attack", "defense",
-	"strength", "dexterity", "attack_element",
+	"strength", "dexterity", "attack_element", "key", "over",
 }
 local DEFAULTS = {
 	level = 0, hp = 0, maxhp = 0, mp = 0, maxmp = 0, tp = 0, maxtp = 0, attack = 0, defense = 0, strength = 0,
@@ -98,8 +99,9 @@ local function derive(v)
 end
 
 -- A combatant handle. `t`: { id (the combatant's number in the fight), side ("player",
--- "ally", "enemy"), name, is_player, level, hp, maxhp, mp, maxmp, tp, maxtp, attack,
--- defense, strength, dexterity, attack_element (default "neutral"), resist, ward (its own
+-- "ally", "enemy", "object": an interactable), name, is_player, level, hp, maxhp, mp, maxmp,
+-- tp, maxtp, attack, defense, strength, dexterity, attack_element (default "neutral"), key
+-- and over (an object's: its interactable's key, the side it stands over), resist, ward (its own
 -- resistances and wards: { fire = 50 }, { sleep = 100 }; its file's and its gear's),
 -- statuses = { { key, name, kind, ticks_left, data, resist, ward }, ... } (in the order
 -- applied) }.
@@ -289,12 +291,22 @@ function Combatant:hurt(n, element)
 	if healed > 0 then
 		local gained = math.max(0, math.min(healed, v.maxhp - v.hp))
 		v.hp = v.hp + gained
-		record(ctx, self, { type = "heal", stat = "hp", amount = gained, note = note })
+		record(ctx, self, { type = "heal", stat = "hp", amount = gained, note = note, element = element })
 		return 0
 	end
 	v.hp = v.hp - dealt
-	record(ctx, self, { type = "hurt", amount = dealt, note = note })
+	record(ctx, self, { type = "hurt", amount = dealt, note = note, element = element })
 	return dealt
+end
+
+-- Objects only (side "object"): it is destroyed now, as if its HP ran out: its on_destroyed
+-- runs with `element` (default none) and the one whose action this is as the source.
+function Combatant:destroy(element)
+	if element ~= nil then element = element_key(element) end
+	local v, ctx = changing(self)
+	if v.side ~= "object" then error("only objects can be destroyed (" .. tostring(v.name) .. " is a combatant)", 2) end
+	v.hp = 0
+	record(ctx, self, { type = "destroy", element = element })
 end
 
 -- Uses up n of hp, mp or tp (a cost). Returns n.
@@ -435,6 +447,7 @@ action.KINDS = {
 	status = { content = "statuses", generic = "The %s is %s." },
 	summon = { run = "act", content = "summons", generic = "The %s acts." },
 	field = { content = "fields", generic = "The %s is caught in the %s." },
+	object = { content = "interactables", generic = "The %s stands on the field." },
 }
 
 -- The file's messages (strings and functions) under the stored strings (the database's,
@@ -460,15 +473,17 @@ local function enemy_voice(caster)
 	return not caster.is_player and caster.side ~= "ally"
 end
 
--- A context. o: { kind = "spell" | "item" | "status" | "summon" | "field", entity (the
--- content row: key, name, mp, power, decoded data and messages), module (the loaded content
--- file), caster, target (combatant handles; target may be nil), in_fight, rand (php.rand-like),
--- data (overrides of the data: a status's params), fields (more read-only fields: bearer,
--- source, self, ticks_left, round, combatants; handles, or lists of them), summon_room
--- (allies that may still join), plain (its lines are never worded for a monster: statuses,
--- summons and fields), battlefield (the fight's fields, fight/fields.lua
--- fields.battlefield: pct(element), status(key), has(key), set(key); absent: none, as
--- outside fights) }.
+-- A context. o: { kind = "spell" | "item" | "status" | "summon" | "field" | "object", entity
+-- (the content row: key, name, mp, power, decoded data and messages), module (the loaded
+-- content file), caster, target (combatant handles; target may be nil), in_fight, rand
+-- (php.rand-like), data (overrides of the data: a status's params, an object's o.data),
+-- fields (more read-only fields: bearer, source, self, ticks_left, round, level, combatants,
+-- objects, targets; handles, or lists of them), summon_room (allies that may still join),
+-- place_room (objects that may still be placed), plain (its lines are never worded for a
+-- monster: statuses, summons, fields and objects), battlefield (the fight's fields,
+-- fight/fields.lua fields.battlefield: pct(element), status(key), has(key), set(key),
+-- wind(); absent: none, as outside fights) }. s.wind is the battlefield's wind (0: calm, or
+-- outside fights).
 function action.new(o)
 	local entity, module = o.entity, o.module or {}
 	local data = {}
@@ -480,12 +495,14 @@ function action.new(o)
 		mp = entity.mp, power = entity.power or module.power or 0, data = data,
 		messages = merge_messages(module.messages, entity.messages),
 		caster = o.caster, target = o.target, in_fight = o.in_fight == true, by_player = o.caster.is_player,
-		summon_room = o.summon_room or 0,
+		summon_room = o.summon_room or 0, place_room = o.place_room or 0,
+		wind = o.battlefield and o.battlefield.wind and o.battlefield.wind() or 0,
 	}
 	for k, v in pairs(o.fields or {}) do s[k] = v end
 	setmetatable(s, ACTION_MT)
 	INNER[s] = { rand = o.rand, events = {}, running = false, checking = false, module = module,
-		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room, battlefield = o.battlefield }
+		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room, place_room = s.place_room,
+		battlefield = o.battlefield }
 	INNER[o.caster].ctx = s
 	if o.target then INNER[o.target].ctx = s end
 	for _, h in pairs(o.fields or {}) do
@@ -569,6 +586,38 @@ function Action:summon(key, params)
 	i.summon_room = i.summon_room - 1
 	record(i, self.caster, { type = "summon", summon = key, params = p })
 	return true
+end
+
+-- Puts an object on the battlefield (in a fight; s.place_room says how many more may stand
+-- there): the interactable `key` (app/content/interactables/<key>.lua) with params (names and
+-- plain values: its o.data; over = "player" or "enemy", the side it stands over, by default
+-- the caster's). The engine refuses a fourth object (check s.place_room in can_cast /
+-- can_use).
+function Action:place(key, params)
+	local i = running(self, "place")
+	if not self.in_fight then error("objects can only be placed in a fight", 2) end
+	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then error("an interactable key expected (got " .. tostring(key) .. ")", 2) end
+	local m, err = load.module("interactables", key)
+	if not m then error("no interactable '" .. key .. "' (" .. tostring(err) .. ")", 2) end
+	local p = action.params(params, "the object's params")
+	if p.over ~= nil and p.over ~= "player" and p.over ~= "enemy" then error("over must be \"player\" or \"enemy\"", 2) end
+	if i.place_room < 1 then error("no room for another object on the field (check s.place_room in can_cast / can_use)", 2) end
+	i.place_room = i.place_room - 1
+	record(i, self.caster, { type = "place", object = key, params = p })
+	return true
+end
+
+-- Every combatant and object of the context (s.combatants and s.objects: an object's hooks,
+-- a field's on_tick) takes n damage of `element` (each through its own resistance; :hurt).
+-- Returns { { target = handle, damage = what it took }, ... } in that order, for the lines.
+function Action:hurt_all(n, element)
+	running(self, "hurt_all")
+	if type(self.combatants) ~= "table" then error("hurt_all is for the hooks that see the field (objects', fields')", 2) end
+	local out = {}
+	for _, list in ipairs({ self.combatants, self.objects or {} }) do
+		for _, h in ipairs(list) do out[#out + 1] = { target = h, damage = h:hurt(n, element) } end
+	end
+	return out
 end
 
 -- Multi-stage actions (docs/APP.md "Fight engine"). charge: the caster gathers power for
@@ -722,7 +771,8 @@ function action.perform(o)
 	local module = behaviour(o, k)
 	if not module then return { reason = "cannot" } end
 	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
-		in_fight = o.in_fight, rand = o.rand, summon_room = o.summon_room, battlefield = o.battlefield })
+		in_fight = o.in_fight, rand = o.rand, summon_room = o.summon_room, place_room = o.place_room,
+		battlefield = o.battlefield, fields = o.fields })
 	local i = INNER[s]
 	local function finish(r)
 		i.running = false
@@ -762,7 +812,8 @@ function action.check(o)
 	if not module then return { reason = "cannot" } end
 	if module[k.check] == nil then return { ok = true } end
 	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
-		in_fight = o.in_fight, rand = no_dice, summon_room = o.summon_room, battlefield = o.battlefield })
+		in_fight = o.in_fight, rand = no_dice, summon_room = o.summon_room, place_room = o.place_room,
+		battlefield = o.battlefield, fields = o.fields })
 	local i = INNER[s]
 	i.running, i.checking = true, true
 	local ok, r = sandbox.call(module[k.check], s)
@@ -775,8 +826,9 @@ end
 -- Runs one function of a content file (a status hook, a summon's act, a spell's stage)
 -- with a context. o: as action.new, plus fn (the function), args (a list after the
 -- context), check (true: it only decides, like can_cast; changing anything is an error).
--- Returns { ok = true, value (what fn returned), lines, events }, or { reason = "error",
--- err } (not logged: the caller decides) or { reason = "refused", refused }.
+-- Returns { ok = true, value (what fn returned), lines, events, data (the context's data
+-- after it: an object keeps its o.data) }, or { reason = "error", err } (not logged: the
+-- caller decides) or { reason = "refused", refused }.
 function action.call(o)
 	local s = action.new(o)
 	local i = INNER[s]
@@ -788,7 +840,7 @@ function action.call(o)
 	i.checking = false
 	if not ok then return { reason = "error", err = r } end
 	if is_refusal(r) then return { reason = "refused", refused = r.text } end
-	return { ok = true, value = r, lines = lines_of(s), events = i.events }
+	return { ok = true, value = r, lines = lines_of(s), events = i.events, data = s.data }
 end
 
 return action

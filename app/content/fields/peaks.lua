@@ -11,6 +11,7 @@ they say a fight on a ledge goes to whoever keeps his feet. The dragons of the K
 breathe frost, and they know the ledges better than any man.]],
 	icon = "peaks",
 	group = "terrain",
+	wind = 2,   -- windy (from 0, calm, to 3)
 	damage = { frost = 20, wind = 20, lightning = 15, fire = -10 },
 	statuses = { burning = { ticks = -1 } },
 	stats = { dexterity = -15, strength = -10 },

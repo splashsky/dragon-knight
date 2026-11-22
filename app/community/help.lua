@@ -7,6 +7,7 @@ local clock = require("lib.clock")
 local elements = require("lib.elements")
 local fields = require("lib.fields")
 local game = require("lib.game")
+local interactables = require("lib.interactables")
 local items = require("lib.items")
 local leveling = require("lib.leveling")
 local monsters = require("lib.monsters")
@@ -130,6 +131,21 @@ function help.fields(req)
 		list[#list + 1] = { field = f, group = fields.GROUP_NAMES[f.group] or f.group, lines = fields.lines(f) }
 	end
 	return page(req, "Fields", "community/help/fields", { fields = list })
+end
+
+-- Every object of the battlefield (interactable) that isn't retired: its HP, resistances and
+-- wards, where it appears by itself (its spawn rules in words), its description and lore.
+function help.objects(req)
+	local function field_name(key)
+		local r = fields.by_key(key)
+		return r and r.name or key
+	end
+	local list = {}
+	for _, o in ipairs(interactables.active()) do
+		list[#list + 1] = { object = o, hp = interactables.hp_text(o), affinities = interactables.affinity_lines(o),
+			appears = interactables.spawn_lines(o, field_name) }
+	end
+	return page(req, "Objects", "community/help/objects", { objects = list })
 end
 
 -- Columns per class: HP (gain + milestone bonus), MP, TP (formula), Strength, Dexterity.

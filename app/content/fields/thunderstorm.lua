@@ -1,9 +1,13 @@
 -- app/content/fields/thunderstorm.lua :: a thunderstorm (the weather's sky "thunderstorm", at
--- the core of a storm; a Storm Call spell): lightning strong, no fire can catch, and now and
--- then a bolt strikes someone in the fight.
+-- the core of a storm; a Storm Call spell): lightning strong, no fire can catch, a gale, and
+-- now and then a bolt strikes someone in the fight, or an object on the field.
 local function strike(e)
 	if e:roll(1, e.data.chance) ~= 1 then return end
-	local who = e.combatants[e:roll(1, #e.combatants)]
+	local targets = {}   -- every combatant standing, then the objects on the field
+	for _, list in ipairs({ e.combatants, e.objects }) do
+		for _, h in ipairs(list) do targets[#targets + 1] = h end
+	end
+	local who = targets[e:roll(1, #targets)]
 	local dealt = who:hurt(e:roll(e.data.min, e.data.max), "lightning")
 	if who.is_player then e:say("strike_you", dealt) else e:say("strike", who.name, dealt) end
 end
@@ -19,6 +23,7 @@ fight and let the storm pass. Mages who call one with Storm Call say it is the o
 spell that asks them for a little luck.]],
 	icon = "thunderstorm",
 	group = "sky",
+	wind = 3,   -- a gale (from 0, calm, to 3)
 	damage = { lightning = 30, fire = -25, wind = 15 },
 	statuses = {
 		burning = { blocked = true },

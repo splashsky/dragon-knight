@@ -23,10 +23,10 @@ pu_path() {
 	esac
 }
 PU_ROUTES="/ /admin /admin/broadcast /admin/classes /admin/classes/#id /admin/drops /admin/items /admin/items/#id
-	/admin/fields /admin/fields/#id /admin/levels /admin/monsters /admin/monsters/#id /admin/news /admin/server /admin/settings /admin/spells
+	/admin/fields /admin/fields/#id /admin/interactables /admin/interactables/#id /admin/levels /admin/monsters /admin/monsters/#id /admin/news /admin/server /admin/settings /admin/spells
 	/admin/spells/#id /admin/statuses /admin/statuses/#id /admin/summons /admin/summons/#id /admin/towns
 	/admin/towns/#id /admin/users /admin/users/#id /babble /changelog /changepassword /character /character/#id
-	/dead /drop /drop/room /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/fields /help/items /hotbar
+	/dead /drop /drop/room /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/fields /help/items /help/objects /hotbar
 	/help/levels /help/monsters /help/spells /inn /inventory /inventory/discard/#id /live /live/state /login
 	/lostpassword /map /map/sky /map/sky/data /maps /maps/buy/#id /news /news/#id /ninja /online /register /shop /shop/buy/#id
 	/verify /victory /__test/routes"
@@ -89,7 +89,13 @@ t_fight_new pureuser
 t_fight_status pureuser 1 regen 'amount=i:5' 3
 t_sql "INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, hp, maxhp, ticks_left)
 	SELECT u.id, 9, 'ally', 'summon', s.id, 20, 30, 4 FROM users u, summons s $PQ AND s.key = 'wolf'"
+# an object on the field (the target picker shows) with a lit fuse
+t_sql "INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, hp, maxhp, data, level, over)
+	SELECT u.id, 10, 'object', 'object', i.id, 20, 20, 'blast=i:30', 5, 'enemy' FROM users u, interactables i
+	$PQ AND i.key = 'explosive_barrel'"
+t_fight_status pureuser 10 fuse '' 2
 t_get /fight; expect_body 'You are fighting a'; expect_body 'Your <b>Wolf</b>: 20 / 30 HP'
+expect_body 'name="target" value="10"'
 pu_all "fighting"
 
 t_section "pure GETs: after a victory with a drop"

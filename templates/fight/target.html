@@ -1,0 +1,6 @@
+{#- The target picker's choice of a combatant on the fight page (fight/fight.html): a radio
+		button of the group `target` in the command form (form="fight-command"), checked on the
+		fight's target. Without JavaScript an ordinary radio button; fight.js hides it and makes
+		the combatant's card choose it (data-target on the card). ctx: id, name, target (the
+		target's id). -#}
+<input class="fight-target-radio" type="radio" name="target" value="{{ id }}" form="fight-command" aria-label="Target: {{ name }}"{% if id == target then %} checked>{% else %}>{% end -%}

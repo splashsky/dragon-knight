@@ -1,5 +1,5 @@
--- content/affinities.lua :: what monsters, summons and statuses share: their `resist` and
--- `ward` tables (lib/elements.lua; docs/APP.md "Elements and wards").
+-- content/affinities.lua :: what monsters, summons, statuses and interactables share: their
+-- `resist` and `ward` tables (lib/elements.lua; docs/APP.md "Elements and wards").
 --
 -- In a file: resist = { fire = 50, frost = -50 } (percent by element, -100..200) and ward =
 -- { sleep = 100 } (percent by status key, 0..100). The flat form has them as "resist.fire"
@@ -90,7 +90,7 @@ end
 
 -- Writes both tables of a flat entity into its row (`tbl`: the kind's table).
 function affinities.write(tbl, id, flat)
-	assert(tbl == "monsters" or tbl == "summons" or tbl == "statuses", "a kind with affinities")
+	assert(tbl == "monsters" or tbl == "summons" or tbl == "statuses" or tbl == "interactables", "a kind with affinities")
 	dk.db:exec("UPDATE " .. tbl .. " SET resist = ?, ward = ? WHERE id = ?", affinities.encode(flat, "resist"),
 		affinities.encode(flat, "ward"), id)
 end

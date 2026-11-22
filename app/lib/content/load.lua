@@ -4,14 +4,14 @@
 -- without a restart). Each runs in a restricted environment (lib/content/sandbox.lua:
 -- math, string, table and a few safe functions; no dk, require, io, os, no DB). A file
 -- returns a table of data, plus functions for the scripted kinds (spells, items, statuses,
--- summons: lib/content/scripted.lua). Errors name the file.
+-- summons, fields, interactables: lib/content/scripted.lua). Errors name the file.
 local sandbox = require("lib.content.sandbox")
 local schema = require("lib.content.schema")
 
 local load = {}
 
 -- Bumped when the flat form or the sync changes meaning, to force a resync.
-load.FORMAT = "dk-content-9"
+load.FORMAT = "dk-content-10"
 
 function load.path(kind, key)
 	return (dk.config.app_dir or "app") .. "/" .. kind.dir:gsub("%.", "/") .. "/" .. key .. ".lua"

@@ -4,8 +4,8 @@
 # leave the same database and say the same lines; the events' shape (spells, items,
 # statuses, summons, monster spells and items); stale rounds (a second click, an older tab)
 # in both paths; CSRF; the victory, death and drop pages; the no-JS page (the round field);
-# the clock (3.2): a POST catches the fight up first, its events before the round's; Guard.
-# Sourced by tests/run.sh.
+# the clock (3.2): a POST catches the fight up first, its events before the round's; Guard;
+# objects (3.3): a barrel chosen as the target, knocked down, blasting. Sourced by tests/run.sh.
 if ! command -v python3 >/dev/null; then
 	t_section "fight api (skipped: needs python3)"
 else
@@ -55,15 +55,17 @@ cmd, path, req = sys.argv[1], sys.argv[2], sys.argv[-2]
 raw = open(path, "rb").read()
 text = raw.decode("utf-8")
 
-ACTORS = {"player", "ally", "enemy"}
-TYPES = {"attack", "spell", "item", "guard", "status", "summon", "blocked", "run", "ambush", "wave", "field", "speech",
-	"say", "victory", "death", "escape"}
+ACTORS = {"player", "ally", "enemy", "object"}
+TYPES = {"attack", "spell", "item", "guard", "status", "summon", "blocked", "run", "ambush", "wave", "field", "object",
+	"speech", "say", "victory", "death", "escape"}
 PARTS = {"player", "allies", "enemies", "ending"}
-EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon", "field"}
+EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon", "field",
+	"object"}
 CHANGE = {"who", "id", "name", "from", "to", "max"}
 STATUS = {"who", "id", "name", "key", "status", "ticks", "change", "statuses"}
 SUMMON = {"change", "id", "name", "hp", "max", "ticks"}
 FIELD = {"key", "name", "change", "icon"}
+OBJECT = {"change", "id", "key", "name", "hp", "max"}
 
 def inner(body, start, tag):
 	m = re.search(start + r'[^>]*>(.*?)</' + tag + '>', body, re.S)
@@ -114,7 +116,7 @@ def check(d):
 			assert "text" not in e and e["actor"] == "player", "an outcome"
 		else:
 			assert e.get("part") in PARTS, "a round's event has its part"
-			assert "text" in e or any(k in e for k in ("hp", "mp", "tp", "status", "summon", "field")), "an empty event"
+			assert "text" in e or any(k in e for k in ("hp", "mp", "tp", "status", "summon", "field", "object")), "an empty event"
 		for k in ("hp", "mp", "tp"):
 			for c in e.get(k, None) or []:
 				assert set(c) <= CHANGE and c["who"] in ACTORS, "%s change %r" % (k, c)
@@ -134,6 +136,9 @@ def check(d):
 			assert set(x) <= FIELD and x["change"] in ("add", "remove"), "field %r" % x
 			assert isinstance(x["key"], str) and isinstance(x["name"], str), "field names %r" % x
 			assert "icon" not in x or x["icon"].startswith("/static/images/fields/"), "field icon %r" % x
+		for x in e.get("object", []):
+			assert set(x) == OBJECT and x["change"] in ("place", "blast", "leave"), "object %r" % x
+			assert all(is_int(x[k]) for k in ("id", "hp", "max")) and isinstance(x["key"], str), "object numbers %r" % x
 
 if cmd == "lines-html":
 	for p in re.findall(r'<p class="fight-(?:yourturn|allyturn|monsterturn|roundend)">(.*?)</p>', text, re.S):
@@ -562,6 +567,24 @@ fa_expect '"Choose an item from your bag to discard." in d["fragments"]["main"]'
 fa_live POST /drop "csrf=$FA_CS&take=x"; fa_check; fa_expect '"Your bag is full. Make room in it first" in d["fragments"]["main"]'
 fa_is dropcode "$(it life_pebble)"
 t_items_clear fapi; fa_sql "UPDATE users SET dropcode = 0"
+
+t_section "fight api: objects"
+# an explosive barrel on the field, chosen as the target: the attack knocks it down, it blasts
+# everyone (form and live alike); its events: its HP, the blast, its lines, it leaving
+fa_barrel() {
+	fa_player; t_fight fapi 2 50
+	t_sql "INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, hp, maxhp, data, level, over)
+		SELECT u.id, 3, 'object', 'object', i.id, 1, 20, 'blast=i:10', 10, 'enemy' FROM users u, interactables i
+		$FAQ AND i.key = 'explosive_barrel'"
+}
+fa_both "a barrel's blast" 3 fa_barrel "fight=Fight&round=2&target=3"
+fa_expect 'any(e["type"] == "attack" and e["text"].startswith("You attack the Explosive Barrel for") for e in d["events"] if "text" in e)'
+fa_expect 'any(h["who"] == "object" and h["id"] == 3 and h["to"] <= 0 for e in d["events"] for h in e.get("hp", []))'
+fa_expect '[o["change"] for e in d["events"] for o in e.get("object", [])] == ["blast", "leave"]'
+fa_expect 'any(e["type"] == "object" and e["actor"] == "object" and e.get("text") == "The barrel goes up!" for e in d["events"])'
+fa_expect 'any(e.get("text", "").startswith("The blast hits you for") for e in d["events"])'
+fa_expect '"data-fighter=\"3\"" not in d["fragments"]["main"]' "gone from the page"
+fa_is "(SELECT count(*) FROM fight_combatants c WHERE c.user_id = users.id AND c.side = 'object')" 0
 
 t_section "fight api: cleanup"
 t_fight_clear fapi

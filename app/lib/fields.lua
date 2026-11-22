@@ -60,10 +60,14 @@ local function sorted_keys(t)
 	return keys
 end
 
+-- The words of a field's wind (1 to 3; none for 0, calm).
+fields.WIND = { "Wind 1 (a breeze)", "Wind 2 (windy)", "Wind 3 (a gale)" }
+
 -- What field row `f` does, as lines for its tooltip and the help page: its damage by
 -- element ("Fire damage -40%"), how statuses behave ("Burning can't take hold", "Burning
 -- lasts 10s less", "Sleep chance +20%": a value it is applied with, "Burning takes hold 50%
--- of the time"; statuses named as their wards are) and its stats ("Dexterity -20%").
+-- of the time"; statuses named as their wards are), its stats ("Dexterity -20%") and its
+-- wind ("Wind 3 (a gale)").
 function fields.lines(f)
 	local out = {}
 	for _, e in ipairs(elements.LIST) do
@@ -90,6 +94,7 @@ function fields.lines(f)
 		local n = f.stats[s] or 0
 		if n ~= 0 then out[#out + 1] = kind.STAT_NAMES[s] .. " " .. signed(n) end
 	end
+	if fields.WIND[f.wind or 0] then out[#out + 1] = fields.WIND[f.wind] end
 	return out
 end
 

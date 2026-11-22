@@ -44,9 +44,10 @@ local function fight_summary(user_id)
 	local f = dk.db:first("SELECT round, wave FROM fights WHERE user_id = ?", user_id)
 	if not f then return "None" end
 	local parts = { "round " .. f.round }
-	for _, c in ipairs(dk.db:query("SELECT c.*, coalesce(m.name, s.name) AS name FROM fight_combatants c " ..
+	for _, c in ipairs(dk.db:query("SELECT c.*, coalesce(m.name, s.name, i.name) AS name FROM fight_combatants c " ..
 			"LEFT JOIN monsters m ON c.kind = 'monster' AND m.id = c.entity_id " ..
-			"LEFT JOIN summons s ON c.kind = 'summon' AND s.id = c.entity_id WHERE c.user_id = ? ORDER BY c.id", user_id)) do
+			"LEFT JOIN summons s ON c.kind = 'summon' AND s.id = c.entity_id " ..
+			"LEFT JOIN interactables i ON c.kind = 'object' AND i.id = c.entity_id WHERE c.user_id = ? ORDER BY c.id", user_id)) do
 		local st = statuses_text("SELECT s.name, fs.ticks_left FROM fight_statuses fs JOIN statuses s ON s.id = fs.status_id " ..
 			"WHERE fs.user_id = ? AND fs.combatant_id = ? ORDER BY fs.position", user_id, c.id)
 		local who = c.side == "player" and "you" or (tostring(c.name) .. " " .. tostring(c.hp) .. "/" .. tostring(c.maxhp) .. " HP")

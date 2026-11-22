@@ -1,7 +1,8 @@
--- admin/effects.lua :: /admin/statuses, /admin/summons, /admin/monsters and /admin/fields
--- -- the statuses, summons, monsters and fields (content files
--- app/content/{statuses,summons,monsters,fields}/<key>.lua, synced into their tables; see
--- docs/APP.md "Fight engine", "Monsters", "Fields"). Like the spells page: admins override
+-- admin/effects.lua :: /admin/statuses, /admin/summons, /admin/monsters, /admin/fields and
+-- /admin/interactables -- the statuses, summons, monsters, fields and objects (content files
+-- app/content/{statuses,summons,monsters,fields,interactables}/<key>.lua, synced into their
+-- tables; see docs/APP.md "Fight engine", "Monsters", "Fields", "Interactables and
+-- targeting"). Like the spells page: admins override
 -- the names, descriptions, numbers and message strings per server (the kinds' admin_fields);
 -- "reset to file" deletes an override; what they do is the file's code, a monster's loadout
 -- the file's (shown read-only).
@@ -114,6 +115,26 @@ local KINDS = {
 				"%=s:" .. key .. "\n%")
 		end,
 		retired_note = "the file is gone, so it no longer comes up; fights where it is up drop it.",
+	},
+	interactables = {
+		kind = require("lib.content.kinds.interactables"), rows = require("lib.interactables"), title = "Objects",
+		one = "Object",
+		code = "on_place, on_damage, on_status, on_status_near, on_tick, on_destroyed",
+		intro = "Objects are content files, <code>app/content/interactables/&lt;key&gt;.lua</code>: things on the " ..
+			"battlefield that can be hit and set off (a barrel, a beehive), which never take a turn. The game picks up a " ..
+			"new or edited file on the next page load. Click one to override its name, description, icon, hit points, " ..
+			"resistances, the chances of its rules for appearing by itself, its numbers and its messages on this " ..
+			"server; what it does is the file's code.",
+		adding = "Copy one of the files in <code>app/content/interactables/</code> to a new name (the file name is its " ..
+			"key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it; spells and items " ..
+			"place it with <code>s:place(\"&lt;key&gt;\")</code>, its <code>spawn</code> rules let it appear by itself " ..
+			"(see <code>docs/APP.md</code>, \"Interactables and targeting\"). Deleting a file retires it. Run " ..
+			"<code>dk check</code> to validate the files.",
+		columns = { "hp", "hp_per_level" },
+		in_use = function(id)
+			return dk.db:value("SELECT count(*) FROM fight_combatants WHERE kind = 'object' AND entity_id = ?", id)
+		end,
+		retired_note = "the file is gone, so it no longer appears or can be placed; fights where it stands drop it.",
 	},
 }
 

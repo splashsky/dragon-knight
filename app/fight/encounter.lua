@@ -11,9 +11,11 @@
 local classes = require("lib.classes")
 local clock = require("lib.clock")
 local combat = require("fight.combat")
+local engine = require("fight.engine")
 local fields = require("fight.fields")
 local game = require("lib.game")
 local hotbar = require("lib.hotbar")
+local interactables = require("lib.interactables")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
@@ -199,12 +201,26 @@ function encounter.victory_page(res)
 	return "Victory!", ctx
 end
 
+-- An object may stand on the field from the start of fight f at (lat, lon), by the files'
+-- spawn rules (lib/interactables.lua interactables.appearing: the land, the fields up, the
+-- wind, and the fight's voice, never the dice), at the land's level (the band's highest).
+-- Returns the object placed, or nil.
+function encounter.spawn(f, lat, lon)
+	local up = {}
+	for _, x in ipairs(fields.up(f)) do up[x.key] = true end
+	local row, over = interactables.appearing({ lat = lat, lon = lon, fields = up, wind = fields.wind(f),
+		voice = f.data.voice })
+	if not row then return nil end
+	local _, level = combat.monster_levels(lat, lon)
+	return engine.place(f, row.key, { over = over }, nil, level)
+end
+
 -- An encounter begins for player `user_id`, marked Fighting by the caller (the row is read
 -- again: the caller saved the position, and a move's world statuses may have changed the
 -- HP): any older fight goes, a monster of the level band where they stand is picked (each
 -- enemy's HP rolled), the world's fields are up (fight/fields.lua), the land sets the scene
--- (lib/terrain.lua: the encounter's first line), and when it is quicker its first strike is
--- played (an ambush). Saved.
+-- (lib/terrain.lua: the encounter's first line), an object may stand on the field
+-- (encounter.spawn), and when it is quicker its first strike is played (an ambush). Saved.
 -- Returns "fight" (go on fighting), "death" (the ambush killed the player: see
 -- encounter.die), each with the monster's row, or nil when no monster can be met there
 -- (nothing changed).
@@ -231,6 +247,7 @@ function encounter.begin(user_id)
 	-- if it is quicker)
 	local opening = { terrain.fight_open(user.latitude, user.longitude, f.tick, monster.name) }
 	f.out, f.part = opening, "player"
+	encounter.spawn(f, user.latitude, user.longitude)
 	speech.start(f)
 	f.out, f.part = nil, nil
 	if not player_first then

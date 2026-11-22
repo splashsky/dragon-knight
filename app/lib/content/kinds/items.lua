@@ -51,6 +51,8 @@ items.fields = {
 	{ name = "target", type = "choice", values = { "enemy", "self" }, default = "enemy", label = "Target" },
 	{ name = "power", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Power",
 		help = "What the item's code makes of it: the HP it heals, ..." },
+	{ name = "area", type = "bool", default = false, label = "Area",
+		help = "It hits everything on the field: its code gets s.targets, every opponent and every object." },
 	-- gear that casts a spell
 	{ name = "casts", type = "key", refs = "spells", default = "", label = "Casts",
 		help = "The spell it casts in a fight while equipped (with charges instead of MP)." },
@@ -69,7 +71,7 @@ items.fields = {
 items.FUNCTIONS = { { "use", true }, { "can_use", false } }
 items.extra_keys = scripted.extra_keys(items.FUNCTIONS, { modifiers = true })
 -- fields only consumables have
-local CONSUMABLE = { usable_in = true, target = true, power = true }
+local CONSUMABLE = { usable_in = true, target = true, power = true, area = true }
 
 local by_name = {}
 for _, f in ipairs(items.fields) do by_name[f.name] = f end
@@ -134,6 +136,7 @@ function items.validate_extra(data, flat, err)
 			err("usable_in = \"" .. flat.usable_in .. "\" needs target = \"self\" (outside fights there is no " ..
 				"enemy); use usable_in = \"fight\" for an item used on the enemy")
 		end
+		if flat.area == 1 and flat.usable_in ~= "fight" then err("area = true is for items used in fights (usable_in = \"fight\")") end
 	else
 		local extra = {}
 		for name in pairs(CONSUMABLE) do

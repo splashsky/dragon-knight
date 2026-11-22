@@ -7,7 +7,8 @@
 --                     guard | run | continue (a turn a status blocks: it ends at the clock's
 --                     next tick, so nothing is played); fight, guard and run are the Attack,
 --                     Guard and Run icon buttons (fight=Fight, guard=Guard, run=Run: only the
---                     name counts)
+--                     name counts); target=<combatant id> (the target picker's radio group: an
+--                     enemy or an object the actions aim at from now on)
 --   GET      /victory victory()
 --   GET/POST /drop    drop()  -- POST: take (+ discard: a bag entry to make room) | leave
 --   GET      /dead    dead()
@@ -33,6 +34,7 @@ local act = require("fight.act")
 local auth = require("lib.auth")
 local clock = require("lib.clock")
 local encounter = require("fight.encounter")
+local engine = require("fight.engine")
 local events = require("fight.events")
 local fields = require("fight.fields")
 local game = require("lib.game")
@@ -215,11 +217,13 @@ local function battlefield(f)
 	return out
 end
 
--- What the fight page shows of the fight: the enemies of the wave, the allies, statuses,
--- the battlefield.
+-- What the fight page shows of the fight: the enemies of the wave, the allies, the objects
+-- on the field (and the side each stands over: "over you", "over the Goblin"), statuses, the
+-- battlefield, and the target (engine.target: its id) with whether there is a choice (more
+-- than one enemy or object to aim at: the target picker).
 local function view_of(f)
 	local p = state.player(f)
-	local enemies, allies = {}, {}
+	local enemies, allies, objects = {}, {}, {}
 	for _, c in ipairs(state.side(f, "enemy", true)) do
 		local mp = shows_mp(c)
 		enemies[#enemies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, mp = mp and c.mp or nil,
@@ -231,8 +235,16 @@ local function view_of(f)
 			left = c.ticks_left and events.left(c.ticks_left),
 			statuses = status_list(c), icon = schema.entity_icon("summons", c.row.icon) }
 	end
-	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p),
-		battlefield = battlefield(f) }
+	local foe = state.enemies(f)[1]
+	for _, c in ipairs(state.objects(f)) do
+		objects[#objects + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, row = c.row,
+			over = c.over == "player" and "over you" or ("over the " .. (foe and foe.row.name or "monster")),
+			statuses = status_list(c), icon = schema.entity_icon("interactables", c.row.icon) }
+	end
+	local target = engine.target(f, p)
+	return { enemies = enemies, allies = allies, objects = objects, player_id = p.id, player_statuses = status_list(p),
+		battlefield = battlefield(f), target = target and target.id,
+		choices = #state.enemies(f) + #objects }
 end
 
 -- The events of what this request did to fight f (its trace: the clock's ticks it caught
@@ -331,6 +343,8 @@ local function fight_page(req, f, lines)
 	page.monstericon = first.icon   -- its portrait (nil: none)
 	if not page.dead then
 		page.locked = round.locked(f)
+		-- the target picker (a radio group in the command form): with more than one choice
+		page.pick = not page.locked and shown.choices > 1
 		local weapon = inventory.equipped(user.id).weapon
 		page.attack_tip = tips.attack(f.st.attackpower, weapon and weapon.item.name)
 		page.guard_tip = tips.guard()
@@ -427,6 +441,11 @@ local function fight(req)
 	if sent ~= nil and sent ~= f.round then return note(req, f, "stale") end
 	-- a turn a status blocks ends at the next tick: nothing to play now
 	if round.locked(f) then return go(req, "/fight", { events = fight_trace(f) }) end
+	-- the target picker: an enemy or an object on the field to aim at from now on (anything
+	-- else is left alone: the target stays)
+	local picked = tonumber(form.target or "")
+	picked = picked and math.tointeger(picked)
+	if picked and engine.targetable(f, state.get(f, picked)) then f.data.target = picked end
 	local a, entry, gear, err = choice(user, f.st, f, form)
 	if err then return note(req, f, "note", err) end
 	if not a then return go(req, "/fight", { events = fight_trace(f) }) end

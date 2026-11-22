@@ -139,3 +139,42 @@ that use objects) settled these engine questions:
 | J. Object design | Sonnet (no repo edits) | a design of the objects per biome, the area spells, the monsters that use them |
 | K. Content | Sonnet | the objects, Swarm, the barrel item and its shops, area spells, monster patterns |
 | L. Lore and flavor | Haiku | lore and lines for the new content |
+
+## Status
+
+✅ **I. Targeting, interactables, wind, area actions, aim** (schema version 25; `docs/APP.md`
+"Interactables and targeting"). Decisions where the plan was silent:
+
+- **Objects are combatants** of side and kind `"object"` in `fight_combatants` (entity
+	`interactables.id`, its `o.data` in `data`, new columns `level` and `over`), so they reuse
+	the statuses, the handles, the trace and the HP events; `state.objects(f)` lists them.
+- **The target picker shows only with a choice**: radio buttons appear when more than one
+	enemy or object can be aimed at and the turn can be played; otherwise the page is as it
+	was. The radio buttons sit on the cards above the command form and join it with
+	`form="fight-command"`. A target that isn't targetable (the player, a dead enemy, a stale
+	form) is ignored; the choice stays in `f.data.target` after its combatant is gone, and
+	the first living enemy is aimed at meanwhile.
+- **Spawn rules** are an ordered list: the first rule that holds (all its conditions:
+	`biomes` / `features` at or within `near` tiles, `fields` one up, `unless` none up, `wind`
+	at least) gives the chance; `features = { "none" }` is a tile without one. Objects are
+	tried by key, each with its own hash of the voice (`voice:key:appears`, and `voice:key:over`
+	for the side, half and half), at the land's level (the band's highest). Nothing appears
+	within 12 tiles of Midworld (that holds the calm place) or anywhere in the Midlands.
+- **HP may grow with the level**: `hp_per_level` beside `hp` (the design's land objects
+	scale with `o.level`).
+- **The blow's source** is the combatant whose action dealt it (the player's attack or
+	spell, a monster's, an ally's act, an object's hook: the object itself); nil for a
+	status's tick, a field's `on_tick` and a fuse. A placed object stands over its placer's
+	side unless `params.over` says otherwise. `on_damage` also hears a hit the object absorbs
+	(amount 0).
+- **`o:hurt_all` returns** `{ { target, damage }, ... }` and says nothing: the file words
+	the lines. `o.objects` holds the other objects (not itself), `o.combatants` the creatures.
+- **Chains** are destroyed one after another in the same step (each once); the per-round
+	cap of content runs (`MAX_RUNS`, now counting objects' hooks too) bounds them.
+- **Thunderstorm bolts** pick among `e.combatants` and the new `e.objects` (with no object,
+	the same roll as before).
+- **The live client reads a form's `target` attribute**, not the property: the picker's
+	field named `target` hid `form.target` and sent the form natively.
+- **Fixtures**: the barrel and the beehive and the statuses `fuse` and `swarm` are minimal
+	and correct (no icons yet), for Phase K to tune: the barrel's blast hits everyone in full
+	(the plan's decision), its `blast` is the placer's param or `6 + 5 * level // 2`.

@@ -540,6 +540,41 @@ async function run(wsUrl, port) {
 	await js("DK.visit('/')");
 	await until("!DK.busy()");
 
+	// the target picker (fight.js; fight/target.html): with an object on the field each card
+	// holds a radio button, hidden; a click on a card chooses it without a request; the radio
+	// buttons take the focus and the hotbar's keys still work from there
+	section = "the target picker";
+	await js("fetch('/__test/encounter', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': " +
+		"document.body.dataset.csrf, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'object=beehive' })" +
+		".then(function () { DK.visit('/fight'); })");
+	check("the fight page", await until("location.pathname === '/fight' && document.title === 'Fighting' && !DK.busy()"));
+	await sleep(800);   // (the encounter's POST went past the live client: its stale reloads the page once)
+	await until("!DK.busy()");
+	if (await js("!!document.querySelector('form[data-fight] button[name=fight]') && !!document.querySelector('.fight-object[data-target]')")) {
+		check("the radio buttons hidden", await js("getComputedStyle(document.querySelector('.fight-target-radio')).opacity === '0'"));
+		check("the monster is the target", await js("document.querySelector('.fight-foe').classList.contains('fight-chosen') && " +
+			"document.querySelector('.fight-foe .fight-target-radio').checked"));
+		await js("window.__fetches = 0; var of = window.fetch; window.fetch = function () { window.__fetches++; " +
+			"return of.apply(window, arguments); }");
+		await js("document.querySelector('.fight-object[data-target]').click()");
+		check("a click chooses the object", await js("document.querySelector('.fight-object .fight-target-radio').checked && " +
+			"document.querySelector('.fight-object').classList.contains('fight-chosen') && " +
+			"!document.querySelector('.fight-foe').classList.contains('fight-chosen')"));
+		await sleep(300);
+		check("without a request", await js("window.__fetches === 0 && !DK.busy()"), await js("window.__fetches"));
+		await js("document.querySelector('.fight-object .fight-target-radio').focus()");
+		check("the keyboard reaches it", await js("document.activeElement.classList.contains('fight-target-radio')"));
+		await press("1", 49);
+		check("1 attacks the target chosen", await until("!DK.busy() && window.__fetches > 0 && " +
+			"/You attack the Beehive for/.test(document.querySelector('[data-r=main]').textContent)", 8000),
+			await js("document.querySelector('[data-r=main]').textContent.slice(0, 300)"));
+		check("no reload", await js("window.__dk === 1"));
+	} else {
+		check("a fight with the object", false, await js("location.pathname + ' ' + document.title"));
+	}
+	await js("DK.visit('/')");
+	await until("!DK.busy()");
+
 	section = "slow answers";
 	await js("var a = document.createElement('a'); a.href = '/__test/slow?ms=900'; a.textContent = 'slow';" +
 		"document.querySelector('[data-r=main]').appendChild(a); a.click()");
