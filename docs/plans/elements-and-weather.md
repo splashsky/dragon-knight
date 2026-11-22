@@ -22,6 +22,15 @@ Decisions (agreed with the owner):
 	exactly, so the original game's fights stay equivalent (`tests/lua/test_round.lua`).
 - Commits: one cohesive milestone at a time on `main`, in the history's `3.2: ...` style.
 	The integrator alone commits.
+- **One global clock, server-authoritative** (added during the work): a base tick of 10 s.
+	The server runs the game's tick itself (a timer in the engine sending an internal
+	request), so nothing a browser does (a refresh, a dropped connection, a closed tab)
+	drives the clock or works around it. Fights run on it: a 30-second turn timer, a
+	**Guard** action (also what a timed-out turn does), and statuses and allies that last
+	ticks instead of turns, blocking ones (sleep, charging, recharging) included. Fights are
+	**fully real time**: turns missed while away are guarded when their time comes, whether
+	a page is open or not. This gives up the original game's dice match for fights with
+	sleep; the tests switch to checking the new rules there.
 
 ## Invariants every part keeps
 
@@ -112,9 +121,9 @@ admin monster editor (`resist.<element>` and `ward.<status>` overridable).
 `app/lib/clock.lua` and `app/lib/weather.lua`: pure functions of `(latitude, longitude,
 now)` plus a fixed seed. Nothing is stored and nothing runs in the background.
 
-- **The clock**: weather moves in ticks of 60 s (`weather.TICK`). A game day lasts 2 real
+- **The clock** (`clock.lua`, the game's one source of time): a base tick of 10 s
+	(`clock.TICK`); the weather moves every 6 ticks (a minute). A game day lasts 2 real
 	hours, in four phases: `dawn`, `day`, `dusk`, `night` (night about a quarter of it).
-	`clock.time_of_day(now)` and `clock.phase_ends(now)` cover it.
 - **The grid**: the map (-250..250, `control.gamesize`) in cells of 10 x 10 tiles. Each
 	cell has a base climate from its place (fog more likely at dawn in the low south-west
 	toward Narcissa; heat by day toward Endworld; snow instead of rain north of latitude
@@ -135,23 +144,19 @@ now)` plus a fixed seed. Nothing is stored and nothing runs in the background.
 	where snow fell. Time is the phase. `storm` is the storm overhead (`{ size, name }`)
 	or nil, and `near` is the nearest storm within ~40 tiles that isn't overhead (`{
 	direction = "south-east", distance }`), for "thunder rumbles to the south-east".
-- **Changes**: `weather.change(lat, lon, now)` compares the tick before with now and
-	returns a flavor line when something changed (the sky, the ground, the phase, a storm
-	coming near or going). `weather.describe(w)` is the standing description.
-	`weather.next_change(lat, lon, now)` is the unix time of the next change at that tile,
-	scanning at most 30 ticks ahead (nil: none within 30 minutes). The words live in
+- **Changes**: `weather.change(lat, lon, now)` compares the weather step before with now
+	and returns a flavor line when something changed (the sky, the ground, the phase, a
+	storm coming near or going). `weather.describe(w)` is the standing description. The
+	server tick asks whether a tile's weather changed between two times. The words live in
 	`app/lib/weather_lines.lua`: several variants per transition, picked by hash (no
 	dice), so a reload shows the same line.
 - **Showing it**: the Location box (`loc` region) shows the weather and the time of day
 	(an icon, a label and a tooltip with the description). The exploring page shows the
 	change line when the weather changed this tick, or when the player stepped into
 	different weather. The fight page shows the battlefield (part 4).
-- **Real time**: the `loc` region carries `data-weather-next="<unix>"`.
-	`public/js/weather.js` (loaded by `layout/head.html` like the others) sets one timer
-	for that moment plus 0-3 s of jitter and then calls `DK.refresh()`, so only what
-	changed comes. It only does this while the page is visible, re-arms after every
-	answer, and does nothing without the live client. A page asks again only when its
-	player's weather really changes: at most once a tick, usually far less.
+- **Real time**: the server tick (section 6) publishes `stale` to each online player whose
+	tile's weather changed, and live.js already turns that into `DK.refresh()`, so only what
+	changed comes. No client timer: the server decides when.
 - **Cost**: `weather.at` must stay cheap enough to run on every page (a few
 	microseconds). Measure it in its unit test.
 
@@ -172,30 +177,32 @@ return {
 	damage = { fire = -40, lightning = 25, water = 15 },   -- percent, by element
 	statuses = {                      -- how statuses behave under it
 		burning = { blocked = true },   -- can't take hold
-		-- other forms: { turns = -1 } (lasts 1 turn less, at least 1),
+		-- other forms: { ticks = -1 } (lasts 1 tick less, at least 1),
 		-- { scale = { amount = 150 } } (a data value at 150%),
 		-- { chance = 50 } (takes hold 50% of the time: rolls)
 	},
 	stats = { dexterity = -10 },      -- percent on every combatant's stat (attack, defense, strength, dexterity)
 	messages = { begins = "...", ends = "...", blocked = "The rain puts the fire out before it can catch." },
-	on_round = function(e) ... end,   -- optional code at the end of each round (a storm's lightning)
+	on_tick = function(e) ... end,    -- optional code on each tick it is up (a storm's lightning)
 }
 ```
 
 - **The fields of a fight** come from two sources. The world's: the weather at the
-	player's tile when each round is played (`sky` -> the field of the same key for `sun`,
+	player's tile, followed on every tick (`sky` -> the field of the same key for `sun`,
 	`heat`, `fog`, `rain`, `downpour`, `thunderstorm`, `snow`, `blizzard`; ground `mud`
 	-> `mud`, `ice` -> `ice`; time `night` -> `night`). And spells': `s:field(key, {
-	turns = n })` (a field spell, by the player or a monster), which displaces the world's
-	field of the same group for its turns. After it ends, the weather's field comes back.
+	ticks = n })` (a field spell, by the player or a monster), which displaces the world's
+	field of the same group for its ticks. After it ends, the weather's field comes back.
 	`aura` fields come only from spells (`consecrated`, `miasma`, ...).
-- **Weather moving mid-fight**: each round starts by comparing the world's fields now with
-	those the fight saved (`f.data`). The differences become lines (the field's `begins` /
-	`ends`, or the weather's change line) in the round's first part, with `field` events
-	for `fight.js`. A field spell in effect hides the change in its group until it ends.
+- **Weather moving mid-fight**: on each tick the fight compares the world's fields with
+	those it has (`f.data`). The differences become lines (the field's `begins` / `ends`,
+	or the weather's change line) with `field` events for `fight.js`. A field spell in
+	effect hides the change in its group until it ends. Because every action first catches
+	the fight up to now, a spell cast just as the rain clears meets a clear sky: its burn
+	takes hold.
 - **Combinations** (all in one place, `fight/fields.lua`): damage multiplies through the
 	element formula's `field_pct`. Statuses: `blocked` stops a status from taking hold (with
-	the field's `blocked` line), a ward is rolled only after that, then `turns` and `scale`
+	the field's `blocked` line), a ward is rolled only after that, then `ticks` and `scale`
 	adjust the params it is applied with. The status keeps its adjusted values: rain
 	starting later doesn't shorten a burn already burning. `stats` adjusts the handles'
 	numbers that formulas read (`combat.lua` sees the adjusted dexterity). Equivalence
@@ -222,14 +229,64 @@ return {
 - **Lore and flavor**: lore for every new entity, speech touches for new mechanics, and the
 	weather lines (several variants per transition and per standing state).
 
+## 6. The server tick and fights in real time
+
+- **The server tick** (C: `src/app.c`, `src/http.c`): every 10 s, on the tick boundary,
+	the engine sends an internal request down the ordinary request path (a pool VM, the
+	transaction and its write lock, events published after the commit, errors logged), so
+	the tick needs no machinery of its own. The C side marks it internal (`req.internal`,
+	say), so no network request can pose as it, and its route refuses anything else. The
+	Lua side, `app/lib/tick.lua` `tick.run(now)`, advances everything due: fights, world
+	statuses, and weather pushes. Its work per run is bounded; what is left over continues
+	on the next run. After the server was down, the next runs catch up, because time ran
+	on.
+- **Fights on the clock**: each fight saves the last tick it processed and the player's
+	turn deadline. Advancing a fight to tick n plays every tick in order: the fields follow
+	the weather; statuses tick and run out; allies count down and leave; a charge releases
+	when its ticks are up, even between the player's turns; sleep rolls to wake. A turn
+	whose deadline passed is played as a **Guard** round at its deadline ("You hesitate,
+	and raise your guard."), whether a page is open or not. That is fully real time: a
+	player who walks away keeps guarding, every 30 seconds, until the fight ends.
+- **Turns**: the player's turn starts when the previous round ends, and its deadline is 30
+	s later (`3 ticks`). A turn the player can't act in (asleep, charging, recharging) ends
+	at the next tick instead of waiting out the 30 s. Monsters act in the round after the
+	player's action, guard or skipped turn, as before.
+- **Actions catch up first**: `POST /fight` advances the fight to now (the same code the
+	tick runs), then plays the action. So a spell cast just after the rain cleared meets the
+	clear sky, whether or not the tick has run yet.
+- **Durations are ticks**: statuses and allies last `ticks`, not turns (the content field
+	and the params are renamed: `turns` becomes `ticks`). Their hooks run on each tick
+	(`on_tick`), which replaces `tick_on` (`turn_start`, `turn_end`). The status chips show
+	time left. World statuses (outside fights) tick on the clock too, not on map moves.
+	They still can't take the last hit point. As a start one turn becomes one tick, and the
+	content phases tune the numbers.
+- **Guard**: a fight action, on the hotbar's key 9 (fixed, like 1 Attack and 0 Run; the
+	player's own keys become 2-8, and what sat on 9 moves to a free key or off the bar in a
+	schema step). It costs the turn and puts on `guarding` (helpful: damage taken -25%,
+	until the player's next turn begins). A timed-out turn is a Guard.
+- **The turn timer on the page**: the fight page carries the deadline and the server's
+	time (`data-turn-ends`, `data-now`: the page works out its clock's offset). From 20 s
+	on, `fight.js` shows a quiet warning (a thin bar draining under the hotbar, say), and
+	nothing more. It is display only: the page never sends the timeout. The server does.
+- **Pushing**: when the tick changed a fight, or the weather at an online player's tile,
+	it publishes `stale` on `user:<id>`. live.js refreshes the page, and the fight page
+	shows the lines the tick added (kept in the fight's log). GETs stay pure: they show the
+	fight as the tick last left it, at most one tick old.
+- **Tests**: the clock can be pinned (test routes only). `POST /__test/tick` runs the
+	server tick at a given time, so e2e tests step time exactly. A C test checks that the
+	timer fires and that a network request can't pose as the tick.
+- **Equivalence**: fights without statuses and without timeouts still roll the original
+	game's dice. Sleep's match with the original is retired: its tests check the new rules.
+
 ## Phases and ownership
 
 | Phase | Who | Owns |
 |---|---|---|
 | A. Elements, wards, monster classes | Opus (worktree `3.2-elements`) | `lib/elements.lua`, `lib/action.lua`, `lib/stats.lua`, `fight/*` (combat, engine, act, state, monster), content kinds (monsters, items, statuses, summons), every content file that used `immune`, the help and admin pages for monsters, migrations, their tests |
-| B. Clock and weather | Opus (worktree `3.2-weather`) | `lib/clock.lua`, `lib/weather.lua`, `lib/weather_lines.lua`, `templates/layout/nav_left.html` (`loc`), `templates/home/explore.html`, `public/js/weather.js`, `layout/head.html`, CSS for them, their tests |
+| B. Clock and weather | Opus (worktree `3.2-weather`) | `lib/clock.lua`, `lib/weather.lua`, `lib/weather_lines.lua`, `templates/layout/nav_left.html` (`loc`), `templates/home/explore.html`, CSS for them, their tests |
 | D0-D3. Monster design | Sonnet (no repo edits) | design documents in `/tmp/opencode/dk-design/` |
-| C. Fields | Opus, after A and B | `fields` kind, `fight/fields.lua`, the round's field step, fight page and events, `/help/fields` |
+| T. The server tick, fights in real time, Guard | Opus, after A and B | the C timer, `lib/tick.lua`, the fight's clock (durations in ticks, catch-up, timeouts), Guard and the hotbar's key 9, the turn timer on the page, pushes |
+| C. Fields | Opus, after T | `fields` kind, `fight/fields.lua`, fields on the tick, fight page and events, `/help/fields` |
 | E. New spells, statuses, fields, items | Sonnet, after C | new content files from the designs' wish lists |
 | D'. Monster files | Sonnet, after E | `app/content/monsters/*.lua` patterns |
 | F. Lore and flavor | Haiku, last | `lore` fields, `weather_lines.lua` variants, speech touches |
