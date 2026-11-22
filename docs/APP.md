@@ -782,7 +782,8 @@ starting with `__` are reserved.
 	URL, no image file) over a warm off-white a little darker at the edges
 	(`--icon-ground`, radial), which item pictures without a ground of their own sit on
 	everywhere (the bag, lists, the Inventory panel, tooltips, the purchase dialog). The
-	bag's cards are light (`--tile`) in a thin gold frame. Retro sets the frames to plain
+	bag's entries sit on the page itself (3.1: no frames, a hairline under each row; a quest
+	item's name in crimson, a free slot just the word). Retro sets the frames to plain
 	black (quest items red).
 - Icon buttons for items (`.spell-btn` with an `.item-badge`): the fight menu's Items and
 	Gear, the shop's wares (`town/shop.html`: grouped Weapons, Armor, Shields, Items;
@@ -2180,12 +2181,13 @@ return {
 - The drop card (3.1, `fight/drop_offer.html`, `routes/fight.lua` `drop_offer`): the
 	victory page shows it at once (a level-up's too): the purchase's look (`town.css .buy`:
 	the picture and name with its tooltip, its kind; what it changes against the piece worn
-	in its slot, or what it gives, or does) and the choices as large buttons, `POST /drop`:
+	in its slot, or what it gives, or does) and the choices as plain buttons, each with what
+	it does beside it (`.drop-why`), `POST /drop`:
 	**Equip it** (`equip=<slot>`: into its slot, or an accessory into the first empty
 	accessory slot; with all three taken, one choice per slot, "in place of" what is there;
 	the piece it replaces goes into the bag, so that needs room: otherwise the choice says
 	"No room in your bag for your Club"; equipping into an empty slot needs none), **Put it
-	in your bag** (`take`) or, with a full bag, **Make room** (`GET /drop/room`, a dialog:
+	in your bag** (`take`) or, with a full bag, **Make room** (a link, `GET /drop/room`, a dialog:
 	the bag but quest items, each with a Discard button that throws the stack away and takes
 	the drop, `take` + `discard=<entry>`), and **Leave it** (`leave`). What became of it is
 	kept on the victory page (`fights.result.drop_note`: "The Branch is in your bag.") and
@@ -2234,9 +2236,9 @@ an item that casts, see [Items](#items)), equipped in a slot
 - `/inventory` (link in the left nav, and "Bag: n / 12" in the right one) opens with the
 	character (3.1, `.inv-sheet`: name, level and class, the HP/MP/TP bars of the Character
 	panel, `game.bars`, experience, the next level and gold with their bonuses, from
-	`town/character.lua` `character.sheet`; the fighting stats as tiles: Attack, Defense,
-	Strength, Dexterity), then shows the slots
-	and the bag grid (free slots drawn) with equip, unequip, use and discard (confirmation;
+	`town/character.lua` `character.sheet`; beside it the fighting stats, Attack, Defense,
+	Strength, Dexterity, as plain figures; no frame), then shows the slots
+	and the bag grid (free slots shown) with equip, unequip, use and discard (confirmation;
 	how many for a stack; not quest items). Every action is a POST that renders the page
 	with what happened.
 

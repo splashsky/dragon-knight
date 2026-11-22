@@ -6,7 +6,7 @@
 		there; else "in place of" buttons, accessories { n, name }), notice (lines) or nil.
 		Item names carry the item's tooltip (docs/APP.md "Tooltips"). The head is the
 		character: name, level and class, the HP/MP/TP bars, experience, the next level and
-		gold (with their bonuses), then the fighting stats as tiles. -#}
+		gold (with their bonuses); beside it the fighting stats, as plain figures. -#}
 <section class="box inv">
 <h1 class="title page-title">{{{ art("inventory", "Inventory") }}}</h1>
 <div class="box-body">
@@ -29,12 +29,12 @@
 <dt>Gold</dt><dd>{{ sheet.gold }}{% if sheet.plusgold then %} <span class="light">{{ sheet.plusgold }}</span>{% end %}</dd>
 </dl>
 </div>
-<ul class="inv-sheet-stats">
-<li><span class="inv-stat-value">{{ s.attack }}</span><span class="inv-stat-label">Attack</span></li>
-<li><span class="inv-stat-value">{{ s.defense }}</span><span class="inv-stat-label">Defense</span></li>
-<li><span class="inv-stat-value">{{ s.strength }}</span><span class="inv-stat-label">Strength</span></li>
-<li><span class="inv-stat-value">{{ s.dexterity }}</span><span class="inv-stat-label">Dexterity</span></li>
-</ul>
+<dl class="inv-sheet-stats">
+<dt>Attack</dt><dd>{{ s.attack }}</dd>
+<dt>Defense</dt><dd>{{ s.defense }}</dd>
+<dt>Strength</dt><dd>{{ s.strength }}</dd>
+<dt>Dexterity</dt><dd>{{ s.dexterity }}</dd>
+</dl>
 </div>
 <h3 class="inv-heading">Equipped</h3>
 <table class="inv-equipped">

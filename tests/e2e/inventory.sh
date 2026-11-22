@@ -56,9 +56,9 @@ t_login invhero invpw1
 t_get /;                          expect_body 'href="/inventory">Inventory</a>'; expect_body '<span class="invpanel-count"><b>0</b>/12</span></a>'
 TC=$(t_csrf)
 t_get /inventory;                 expect_status 200; expect_body 'Bag (0 / 12)'
-# the head: the character as the Character panel shows it, the fighting stats as tiles
+# the head: the character as the Character panel shows it, the fighting stats beside it
 expect_body '<div class="inv-sheet">'; expect_body '<span class="meter-label">HP</span>'
-expect_body '<span class="inv-stat-value">5</span><span class="inv-stat-label">Attack</span>'
+expect_body '<dt>Attack</dt><dd>5</dd>'
 expect_body '<dt>Next level</dt>'
 [ "$(grep -c 'inv-cell inv-free' "$BODY")" = 12 ] && t_ok || t_fail "12 free slots expected"
 for s in Weapon Armor Shield 'Slot 1' 'Slot 2' 'Slot 3'; do expect_body "<td class=\"inv-slot\">$s:</td>"; done
@@ -189,7 +189,7 @@ t_post /drop "csrf=$TC&take=x";   expect_body 'The Old Key is in your bag.'
 # a gear drop into a full bag: make room first (the bag, to discard something); quest items
 # are not offered
 iv_sql "UPDATE users SET dropcode = (SELECT id FROM items WHERE key = 'ruby')"
-t_get /drop;                      expect_body '><b>Make room</b><span>Your bag is full: discard something to take the Ruby.</span>'
+t_get /drop;                      expect_body '>Make room</a> <span class="drop-why">Your bag is full: discard something to take the Ruby.</span>'
 t_get /drop/room;                 expect_body 'name="discard" value="'; expect_no_body "value=\"$KEY\""
 t_post /drop "csrf=$TC&take=x&discard=$KEY"; expect_body 'Choose an item from your bag to discard.'
 iv_is dropcode "$(t_sql "SELECT id FROM items WHERE key = 'ruby'")"

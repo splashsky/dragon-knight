@@ -148,7 +148,7 @@ f_sql "UPDATE users SET currentmp = 50"
 t_round "csrf=$CS&spell=Spell&userspell=11"
 expect_body 'You have cast the Sleep spell. The monster is asleep.'
 if grep -qF 'The monster is still asleep.' "$BODY"; then f_is "$T_SLEEP" 5; f_is "$T_STATUSES" "enemy:sleep"
-	expect_body '&mdash; Asleep</span>'
+	expect_body '&mdash; <img class="fight-status-icon" src="/static/images/statuses/sleep.png" width="16" height="16" alt="">Asleep</span>'
 else expect_body 'The monster has woken up.'; f_is "$T_SLEEP" 0; fi
 f_is currentmp 40
 t_sql "UPDATE fight_combatants SET hp = 1 WHERE side = 'enemy' AND user_id = (SELECT id FROM users $FQ)"
@@ -158,7 +158,7 @@ t_get /victory; expect_body 'You have defeated the Red Slime.'
 
 t_section "fight: every command comes back to the fight page (Post/Redirect/Get)"
 t_spells fighter 1,6
-t_fight fighter 2 500
+t_fight fighter 2 50000   # (no lucky kill before round 5)
 DEX0=$(f_col dexterity)
 f_sql "UPDATE users SET currenthp = 100, base_maxhp = 100, currentmp = 50, base_maxmp = 50, dexterity = 22500"
 t_get /fight; CS=$(t_csrf)
@@ -329,9 +329,9 @@ t_get /drop; expect_status 200; expect_body 'class="buy drop-offer"'
 expect_body 'src="/static/images/items/life_pebble.png"'; expect_body '>Life Pebble<template class="tip">'
 expect_body '<li>Max HP <b>+10</b></li>'
 # an accessory: into the first empty accessory slot, no slot to choose
-expect_body 'name="equip" value="accessory1"><b>Equip it</b><span>It goes into accessory slot 1.</span>'
+expect_body 'name="equip" value="accessory1">Equip it</button> <span class="drop-why">It goes into accessory slot 1.</span>'
 expect_no_body 'value="accessory2"'
-expect_body 'name="take" value="Take"><b>Put it in your bag</b>'; expect_body 'name="leave" value="Leave"><b>Leave it</b>'
+expect_body 'name="take" value="Take">Put it in your bag</button>'; expect_body 'name="leave" value="Leave">Leave it</button>'
 CS=$(t_csrf)
 t_post /drop "take=Take"; expect_status 403
 f_is dropcode 34
@@ -346,7 +346,7 @@ f_is dropcode 0; f_is "$T_ITEMS" "life_pebble,demons_sin@accessory1"
 # all three taken: a choice per slot, in place of what is there (into the bag)
 t_give fighter ruby 1 accessory2; t_give fighter pearl 1 accessory3
 f_sql "UPDATE users SET dropcode = 37"
-t_get /drop; expect_body 'name="equip" value="accessory2"><b>Equip it in place of your Ruby</b><span>Your Ruby goes into your bag.</span>'
+t_get /drop; expect_body 'name="equip" value="accessory2">Equip it in place of your Ruby</button> <span class="drop-why">Your Ruby goes into your bag.</span>'
 expect_body 'value="accessory1"'; expect_body 'value="accessory3"'
 t_post /drop "csrf=$CS&equip=accessory2"; expect_body 'You equipped the Magic Pebble. Your Ruby is in your bag.'
 f_is "$T_ITEMS" "life_pebble,demons_sin@accessory1,ruby,pearl@accessory3,magic_pebble@accessory2"
@@ -354,7 +354,7 @@ f_is "$T_ITEMS" "life_pebble,demons_sin@accessory1,ruby,pearl@accessory3,magic_p
 t_items_clear fighter; t_give fighter stick 1 weapon
 f_sql "UPDATE users SET dropcode = 2"
 t_get /drop; expect_body '<th scope="col">Your Stick</th><th scope="col">The Branch</th>'
-expect_body 'name="equip" value="weapon"><b>Equip it</b><span>Your Stick goes into your bag.</span>'
+expect_body 'name="equip" value="weapon">Equip it</button> <span class="drop-why">Your Stick goes into your bag.</span>'
 # a slot that isn't the item's: refused, the drop still there
 t_post /drop "csrf=$CS&equip=armor"; expect_body 'Choose where to equip the Branch.'; f_is dropcode 2
 t_post /drop "csrf=$CS&equip=weapon"; expect_body 'You equipped the Branch. Your Stick is in your bag.'
@@ -369,7 +369,7 @@ t_items_clear fighter
 # the bag (a dialog) to discard something (not a quest item, not someone else's)
 for k in stick branch club dagger hatchet axe brand poleaxe broadsword battle_axe claymore life_pebble; do t_give fighter "$k"; done
 f_sql "UPDATE users SET dropcode = 46"
-t_get /drop; expect_body '<a class="buy-choice" href="/drop/room" data-modal><b>Make room</b>'; expect_no_body 'name="take"'
+t_get /drop; expect_body '<a class="drop-room-link" href="/drop/room" data-modal>Make room</a>'; expect_no_body 'name="take"'
 expect_body 'name="equip" value="accessory1"'
 t_get /drop/room -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'
 expect_body 'Your bag is full. Discard something to take the <b>Demon&#39;s Sin</b>'; expect_body 'name="discard" value="'
@@ -387,7 +387,7 @@ t_sql "UPDATE user_items SET equipped = 'weapon' WHERE id = (SELECT min(ui.id) F
 	WHERE i.key = 'club' AND ui.user_id = (SELECT id FROM users WHERE username = 'fighter'))"
 t_give fighter herb 1
 f_sql "UPDATE users SET dropcode = 2"
-t_get /drop; expect_body '<div class="buy-choice buy-choice-off"><b>Equip it</b><span>No room in your bag for your Club.</span></div>'
+t_get /drop; expect_body '<button type="button" disabled>Equip it</button> <span class="drop-why">No room in your bag for your Club.</span>'
 t_post /drop "csrf=$CS&equip=weapon"; expect_body 'Your bag is full: there is no room for your Club.'; f_is dropcode 2
 f_sql "UPDATE users SET dropcode = 0"
 t_items_clear fighter

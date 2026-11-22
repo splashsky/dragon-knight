@@ -107,19 +107,21 @@ form[data-fight] [data-fight-locked] { opacity: 0.75; }
 	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone { animation: none; }
 }
 
-/* a drop (fight/drop_offer.html; 3.1): the purchase's look (town.css .buy) with its choices;
-	on the victory page under the caption, left-aligned; "Make room" a link drawn as a
-	choice (it opens the bag in a dialog), "Leave it" lighter. The bag in that dialog
-	(fight/drop_room.html): a row per entry, its Discard button at the right */
+/* a drop (fight/drop_offer.html; 3.1): the purchase's head and comparison (town.css .buy),
+	then the choices as plain buttons, what each does beside it; "Make room" a link (it
+	opens the bag in a dialog). On the victory page under the caption, left-aligned. The
+	bag in that dialog (fight/drop_room.html): a row per entry, its Discard button at the
+	right */
 .victory-drop { max-width: 420px; margin: 20px auto 0; text-align: left; }
 .victory-drop-head { margin: 0 0 8px; font-weight: bold; }
 .victory-drop-note { margin: 16px 0 0; font-weight: bold; }
 .drop-offer .buy-head .tip-term { display: inline-block; font-size: 19px; line-height: 1.2; }
 .drop-offer .buy-kind { display: block; }
-a.buy-choice { color: inherit; text-decoration: none; }
-a.buy-choice:hover { border-color: currentColor; background-color: #ffffff; }
-a.buy-choice:focus-visible { outline: solid 2px currentColor; outline-offset: 1px; }
-.drop-leave { background-color: transparent; }
+.dk-scene-page .drop-choices p, .drop-choices p { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; }
+.drop-choices button, .drop-room-link { flex: none; }
+.drop-choices { margin-top: 12px; }
+.drop-why { font-size: 13px; color: #5f5a50; }
+.drop-room-link { font-weight: bold; }
 .drop-room-bag { display: grid; gap: 4px; max-height: 50vh; overflow: auto; list-style: none; margin: 8px 0; padding: 0; }
 .drop-room-bag li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 4px; border-bottom: dotted 1px rgba(0, 0, 0, 0.2); }
 .drop-room-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
