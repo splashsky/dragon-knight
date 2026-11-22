@@ -449,13 +449,13 @@ function T.objects_appear_by_the_voice_away_from_midworld()
 	end
 	assert(hives > 3000 * 8 // 100 and hives < 3000 * 16 // 100, "about 12% of forest fights: " .. hives)
 	assert((sides.player or 0) > hives // 3 and (sides.enemy or 0) > hives // 3, "both sides")
-	-- what it costs, once an encounter (a budget about 20 times the optimized build's: also
-	-- met by `make DEBUG=1`'s sanitizers)
+	-- what it costs, once an encounter (0.03 ms in the optimized build; the budget leaves room
+	-- for `make DEBUG=1`'s sanitizers, which run this hashing some 50 times slower)
 	local t0 = dk.clock()
 	for voice = 1, 200 do forest.voice = voice; interactables.appearing(forest) end
 	local ms = (dk.clock() - t0) * 1000 / 200
 	print(("objects: appearing costs %.3f ms an encounter"):format(ms))
-	assert(ms < 0.5, ("appearing costs %.3f ms"):format(ms))
+	assert(ms < 2.5, ("appearing costs %.3f ms"):format(ms))
 	-- not at night (the rule's unless), not without the forest
 	forest.fields = { forest = true, night = true }
 	for voice = 1, 300 do forest.voice = voice; eq(interactables.appearing(forest), nil, "at night") end
