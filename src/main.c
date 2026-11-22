@@ -17,7 +17,7 @@
 #include "sqlite3.h"
 #include "stats.h"
 
-#define DK_VERSION "3.3.0-dev"
+#define DK_VERSION "3.3.0"
 
 static void usage(FILE *f)
 {
