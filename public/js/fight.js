@@ -172,7 +172,15 @@
 		var span = el("span", "fight-statuses");
 		list.forEach(function (x, i) {
 			span.appendChild(txt(i ? ", " : "\u2014 "));
-			var chip = el("span", "fight-status" + (s.change === "add" && x.key === s.key ? " fight-status-new" : ""), x.name);
+			var chip = el("span", "fight-status" + (s.change === "add" && x.key === s.key ? " fight-status-new" : ""));
+			if (x.icon) {
+				var icon = el("img", "fight-status-icon");
+				icon.src = x.icon;
+				icon.width = icon.height = 16;
+				icon.alt = "";
+				chip.appendChild(icon);
+			}
+			chip.appendChild(txt(x.name));
 			if (x.turns != null) {
 				chip.appendChild(txt(" "));
 				chip.appendChild(el("span", "light", "(" + x.turns + " " + (x.turns === 1 ? "turn" : "turns") + ")"));

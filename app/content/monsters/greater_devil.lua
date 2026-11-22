@@ -6,6 +6,7 @@ A senior devil of the pits under the mines, with a long red tail and a ledger th
 closes. Greater devils sign the contracts that the lesser ones carry, and they keep the
 accounts of every soul that has ever bargained with the pits. They rarely leave the deep
 stairs, so anyone who meets one has either been summoned or has come a very long way down.]],
+	icon = "greater_devil",
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 750, maxgold = 250,

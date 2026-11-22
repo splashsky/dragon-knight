@@ -8,6 +8,7 @@ mage who would not say his name. The lines are old and the wood is warm to the t
 Hambry's mages buy the shields for their guards on the road, and the guards buy them
 for the free charges. The mage's own shield, they say, is still in the back of a shop
 somewhere with the price on it.]],
+	icon = "ward_shield",
 	category = "shield",
 	price = 5000,
 	defense = 35,

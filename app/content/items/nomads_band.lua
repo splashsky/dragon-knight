@@ -6,6 +6,7 @@ A plaited band of camel hair and copper wire, worn on the upper arm by the carav
 cross the dry country between Bris and Kalle. Each knot is tied by a different hand, and each
 hand is supposed to belong to someone who walked a long way. It keeps the wearer going a
 little longer before the legs give out.]],
+	icon = "nomads_band",
 	category = "accessory",
 	drop_level = 16,
 	modifiers = { { kind = "stat", stat = "maxtp", amount = 30 } },

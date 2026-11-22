@@ -18,6 +18,7 @@ A poison in the blood, from a bite, a barbed spine or a cup of something bought 
 wrong stall. It hurts a little different each turn, sometimes worse, sometimes hardly at
 all. It wears off on its own in a few turns, and an herb or a cure stops it sooner.
 Nobody in Midworld has ever died of a single dose, only of three.]],
+	icon = "poison",
 	kind = "harmful",
 	tick_on = "turn_end",
 	turns = 3,

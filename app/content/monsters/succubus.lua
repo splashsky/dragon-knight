@@ -7,6 +7,7 @@ inns between Narcissa and Hambry. She trades warm words for a sip of a traveller
 leaves the sleepers pale and calm. Mages report that she shrugs off the hurt spells, so the
 fight is best done with blades.
 ]],
+	icon = "succubus",
 	level = 47,
 	maxhp = 265, maxdam = 240, armor = 200,
 	maxexp = 1460, maxgold = 487,

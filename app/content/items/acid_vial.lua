@@ -9,6 +9,7 @@ who wears gloves to the market and will not say where the acid comes from. It ea
 through armor plate in a few breaths, and a hunter who has been splashed will tell you it
 smells of wet pennies. Sailors buy it for barnacles, and a few of them use it on other
 things.]],
+	icon = "acid_vial",
 	category = "consumable",
 	price = 120,
 	max_stack = 10,

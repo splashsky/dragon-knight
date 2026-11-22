@@ -20,6 +20,7 @@ The Paladins of Roma say the sun rises for the one who is still standing. Dawnst
 a short, bright blow with a hymn behind it, and it is hardly ever cast by a man who feels
 well. The priests of Bris teach it to their knights along with the warning that a wounded
 man should not wait for the dawn to come to him.]],
+	icon = "dawnstrike",
 	mp = 8,
 	power = 24,                 -- the most damage it deals, plus a third more when hurt
 	messages = {

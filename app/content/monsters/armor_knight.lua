@@ -5,6 +5,7 @@ return {
 A suit of plate that walks the old barracks road east of Kalle. Nobody has ever seen what
 is inside, and the few who lifted a visor did not live to describe it. Its axe is heavy
 enough to split a shield in one blow, and it never answers a hail.]],
+	icon = "armor_knight",
 	level = 33,
 	maxhp = 130, maxdam = 115, armor = 95,
 	maxexp = 280, maxgold = 93,

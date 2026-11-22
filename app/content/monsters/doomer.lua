@@ -8,6 +8,7 @@ black coat and a book it keeps open at a page nobody can read. The few who have 
 describe it say it names the things you have done, and then it names the day you will
 die.
 ]],
+	icon = "doomer",
 	level = 32,
 	maxhp = 124, maxdam = 112, armor = 92,
 	maxexp = 270, maxgold = 90,

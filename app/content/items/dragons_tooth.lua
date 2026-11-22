@@ -5,6 +5,7 @@ return {
 A long, yellow-white tooth pried from a dragon's jaw by a hunting party out of Narcissa that
 did not all come home. It is hollow at the root and whistles when swung. Duelists hang it
 from their belt as a warning to everyone else.]],
+	icon = "dragons_tooth",
 	category = "accessory",
 	drop_level = 30,
 	modifiers = { { kind = "stat", stat = "attack", amount = 50 } },

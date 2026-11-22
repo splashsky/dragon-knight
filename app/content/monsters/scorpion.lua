@@ -5,6 +5,7 @@ return {
 A desert-bred scorpion, big as a dog and the colour of old tea, that hides under rocks along
 the road south of Roma. Its tail is the danger, and its sting leaves a hot ache that lasts
 a day. Caravan drivers shake out their boots every morning and do not trust a dark corner.]],
+	icon = "scorpion",
 	level = 5,
 	maxhp = 18, maxdam = 14, armor = 6,
 	maxexp = 20, maxgold = 7,

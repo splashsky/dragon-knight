@@ -18,6 +18,7 @@ Sleep takes hold quickly and lets go slowly, and each turn there is a small chan
 waking. A sleeping monster is no less dangerous when it wakes, and a sleeping adventurer
 is the first thing a bandit looks for. Strong sleepers are harder to put down, and some
 never sleep at all.]],
+	icon = "sleep",
 	kind = "harmful",
 	tick_on = "turn_start",
 	blocks_action = true,

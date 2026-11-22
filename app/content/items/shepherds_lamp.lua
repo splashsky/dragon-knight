@@ -9,6 +9,7 @@ storms, and the story is that the flame never went out while a single lamb was s
 The lamps are rare now, and the last one in a village is handed down like a title. The light
 it throws is thin and blue and smells of wool, and a hurt body in its glow tends to knit up
 more quickly than the wound seems to deserve.]],
+	icon = "shepherds_lamp",
 	category = "accessory",
 	drop_level = 48,
 	casts = "gaia",

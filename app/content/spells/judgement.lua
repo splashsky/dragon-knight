@@ -22,6 +22,7 @@ takes a whole turn to gather, which is a long time in a fight, and the monster g
 see it coming. The light that falls afterwards is holy and heavy, and some of it runs
 back into the Paladin's own wounds, which is why the knights of Gilead still call it
 the honest spell.]],
+	icon = "judgement",
 	mp = 32,
 	power = 140,                -- the most damage it deals
 	uses = { statuses = { "charging" } },

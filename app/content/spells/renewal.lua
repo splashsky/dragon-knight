@@ -9,6 +9,7 @@ Renewal is what a Mage learns once Gaia has stopped feeling like a miracle and s
 feeling like a bill. It draws back a large share of hit points, washes out whatever is
 harmful, and leaves a steady trickle of healing behind for a few turns. Mages in Endworld
 say it is the only spell that leaves the caster more tired than the fight did.]],
+	icon = "renewal",
 	mp = 40,
 	power = 70,                -- the most HP it restores
 	data = { amount = 10, turns = 4 },   -- regeneration per turn afterwards, and its turns

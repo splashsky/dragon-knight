@@ -22,6 +22,7 @@ Whiteout is the last thing an old Mage learns and the first thing a sensible one
 casting in a closed room. The air goes grey, the snow comes in sideways, and a beast
 caught in the middle of it tends to lie down. The Mages of Midworld say that a monster
 which is still on its feet after a Whiteout has earned its place at the top of the list.]],
+	icon = "whiteout",
 	mp = 55,
 	power = 180,                -- the most damage it deals
 	data = { chance = 9 },      -- the chance in 15 that the sleep lasts each turn

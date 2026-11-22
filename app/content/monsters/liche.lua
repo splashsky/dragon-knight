@@ -6,6 +6,7 @@ A dead mage who would not stay buried, kept upright by a bone-cold will and a sp
 has repeated for centuries. Liches are drawn to old libraries, and the ones beyond
 Narcissa have hoarded every book they could steal. Their magic is slow to start but hard
 to stop, so close the distance before the first spell is finished.]],
+	icon = "liche",
 	level = 35,
 	maxhp = 150, maxdam = 135, armor = 110,
 	maxexp = 380, maxgold = 127,

@@ -6,6 +6,7 @@ A shape made of light and suggestion that appears in the mists of the marshes pa
 Its blows are real enough, even if the figure swaying in front of you is not. Old
 travellers say to ignore what you see and listen for the blow, which is harder than it
 sounds.]],
+	icon = "illusion",
 	level = 5,
 	maxhp = 20, maxdam = 15, armor = 6,
 	maxexp = 20, maxgold = 7,

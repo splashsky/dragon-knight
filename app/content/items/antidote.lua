@@ -7,6 +7,7 @@ return {
 A bitter brown tincture sold by apothecaries in every town, in small green bottles. Healers
 say it works against poison, sleeping draughts and most of the sickness that comes off
 bog creatures. It does nothing for wounds, so do not expect it to close a cut.]],
+	icon = "antidote",
 	category = "consumable",
 	price = 30,
 	max_stack = 10,

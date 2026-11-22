@@ -7,6 +7,7 @@ something disturbs its rest. It is one of the few dragons that does not care for
 collects names instead, and it knows the name of everyone who has ever come looking for it.
 Its claws are said to remember them.
 ]],
+	icon = "dark_dragon",
 	level = 45,
 	maxhp = 245, maxdam = 215, armor = 180,
 	maxexp = 1250, maxgold = 417,

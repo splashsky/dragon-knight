@@ -5,6 +5,7 @@ return {
 A dull black medallion stamped with a face that no two wearers describe alike. It came from a
 demon feasting in the ruins past Gilead. The strength it gives is real, and so is the price
 the body pays for it.]],
+	icon = "demons_sin",
 	category = "accessory",
 	drop_level = 35,
 	modifiers = {

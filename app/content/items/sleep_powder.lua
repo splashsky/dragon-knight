@@ -8,6 +8,7 @@ A grey dust ground from poppy heads and a root the herbwives keep in tins with t
 labels scraped off. A pinch thrown into a monster's face is enough for most beasts to
 sit down and start snoring. Guards in Roma say the trick is to be upwind, and they say
 it with the air of men who have learned it the hard way.]],
+	icon = "sleep_powder",
 	category = "consumable",
 	price = 45,
 	max_stack = 10,

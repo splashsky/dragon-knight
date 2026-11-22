@@ -7,6 +7,7 @@ A full harness of thick plate, riveted at every joint and built for men who stan
 the front of a charge and never run. The armourers in Kalle say it will stop anything
 short of a mace, and that a man in it needs a rope to get up from the ground. Its
 wearers are slow to dodge, and they do not pretend otherwise.]],
+	icon = "ironclad_plate",
 	category = "armor",
 	price = 1300,
 	defense = 95,

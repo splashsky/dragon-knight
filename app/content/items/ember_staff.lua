@@ -7,6 +7,7 @@ Narcissa's fire-mages keep a brass cup of lamp oil on the head of every staff th
 which is the only thing about the design that anyone has ever explained. The oil does
 nothing for the spell, the masters say, but a student who can see the flame feels braver.
 Most of them learn to leave the cup off by their second winter.]],
+	icon = "ember_staff",
 	category = "weapon",
 	price = 1100,
 	attack = 6,

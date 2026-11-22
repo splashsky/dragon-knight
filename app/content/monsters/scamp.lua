@@ -6,6 +6,7 @@ A small, mischievous imp that lives in the woods and fields around Midworld, mos
 trouble. Scamps hide in hedges and tie boot laces together, and they laugh at anyone who
 falls for it. They are not dangerous alone, but a pack of them will empty a hungry
 traveller's bag in a minute.]],
+	icon = "scamp",
 	level = 4,
 	maxhp = 16, maxdam = 13, armor = 5,
 	maxexp = 15, maxgold = 5,

@@ -7,6 +7,7 @@ Gaia is the mother of all healing in the old Mage books, and the books give her 
 that nobody uses. The spell draws the land's own green strength into the body, which is why
 it works best outdoors and smells of crushed grass. Only the most learned Mages can speak it
 without coughing.]],
+	icon = "gaia",
 	mp = 75,
 	power = 150,                 -- the most HP it restores
 	usable_in = "both",

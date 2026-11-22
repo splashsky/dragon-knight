@@ -7,6 +7,7 @@ whatever comes up the track. It keeps to a cave and a hut of stolen timber, and 
 bones and broken carts as trophies. Ogres are slow to anger, but once angry they will
 chase a fleeing man for a mile. Traders are told to pay the toll or go the long way
 round.]],
+	icon = "ogre",
 	level = 23,
 	maxhp = 78, maxdam = 68, armor = 54,
 	maxexp = 170, maxgold = 57,

@@ -47,11 +47,11 @@ t_spells tipper 1,2,6    # Heal (5 MP), Revive (10 MP: more than the 7 MP left),
 t_fight tipper 1 4
 t_get /fight; expect_status 200
 # the monster's name: its level and lore (Blue Slime has no description)
-expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
+expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
 # each button in a span that carries its tooltip: name, MP, where, description, lore
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>'"$TP_HEAL_LORE"'</p></div></template></span>'
 # every spell has lore: Hurt's follows its description
-expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div><div class="tip-lore"><p>'
+expect_body 'value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="4"><img src="/static/images/skills/hurt.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Hurt</div><div class="tip-meta">5 MP · In fights</div><div class="tip-body"><p>Hurts the monster, whatever its armor. Some monsters are immune.</p></div><div class="tip-lore"><p>'
 expect_no_body '<div class="tip-lore"></div>'; expect_no_body '<div class="tip-body"></div>'
 # a disabled button keeps its tooltip: the span is the trigger (pointer events pass to it)
 expect_body '<span class="spell-tip spell-tip-short" data-tip><button class="spell-btn" type="submit" name="spell" value="2" title="Revive (10 MP)" aria-label="Revive (10 MP)" aria-keyshortcuts="3" disabled><img'
@@ -71,7 +71,7 @@ main = re.search(r'<main class="dk-middle" data-r="main"[^>]*>(.*?)</main>', bod
 right = re.search(r'<aside class="dk-right" data-r="right"[^>]*>(.*?)</aside>', body, re.S).group(1)
 assert '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1"' in main
 assert '<div class="tip-lore"><p>' + sys.argv[2] + '</p></div></template></span>' in main
-assert '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div>' in main
+assert '>Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div>' in main
 assert 'data-tip data-tip-side="left"><input type="hidden" name="csrf"' in right and '<div class="tip-title">Heal</div>' in right
 assert '<span class="action-tip" data-tip><button class="action-btn" type="submit" name="fight" value="Fight"' in main
 assert '<div class="tip-title">Attack</div><div class="tip-meta">Attack Power ' in main and '<div class="tip-title">Run</div>' in main
@@ -114,8 +114,12 @@ t_section "tips: the inventory panel's gear"
 t_sql "UPDATE users SET currentaction = 'In Town', latitude = 0, longitude = 0 WHERE username = 'tipper'"
 t_give tipper herb 1 && t_give tipper dagger 1 weapon
 t_get /inventory
-# an item without a picture: the slot's icon
+# an item without a picture (its file removed): the slot's icon
+mv "$T/public/images/items/dagger.png" "$T/dagger.png"; t_get /inventory
 expect_body '<li title="Weapon: Dagger" data-tip data-tip-side="left" tabindex="0"><img src="/static/images/icon_weapon.gif" width="15" height="15" alt="Weapon"><span class="invpanel-name">Dagger</span><template class="tip"><div class="tip-title">Dagger</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +8</li></ul>'
+mv "$T/dagger.png" "$T/public/images/items/dagger.png"; t_get /inventory
+# with its picture: that, in the tooltip too
+expect_body '<li title="Weapon: Dagger" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/dagger.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Dagger</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/dagger.png" width="20" height="20" alt="">Dagger</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +8</li></ul>'
 expect_body '<li title="Armor: None" data-tip data-tip-side="left"><img'
 # an item with a picture shows it instead of the slot's icon; its tooltip says its charges
 t_items_clear tipper; t_give tipper wand 1 weapon
@@ -146,7 +150,7 @@ expect_body '<td><img class="item-icon" src="/static/images/items/stick.png" wid
 expect_body '<img class="inv-icon" src="/static/images/items/herb.png" width="32" height="32" alt="">'
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_HERB"; expect_body '</p></div></template></b> x3'
 expect_body '<img class="inv-icon" src="/static/images/items/branch.png" width="32" height="32" alt="">'
-expect_body '<img class="inv-icon" src="/static/images/skills/default.png" width="32" height="32" alt="">'   # the Dagger
+expect_body '<img class="inv-icon" src="/static/images/items/dagger.png" width="32" height="32" alt="">'   # the Dagger
 expect_body '<b class="tip-term" data-tip tabindex="0"'"$TP_BRANCH"'</b>'; tp_no_xss
 expect_body "action=\"/inventory/equip/$TP_BRANCH_E\""; expect_body "action=\"/inventory/use/$TP_HERB_E\""
 expect_body "href=\"/inventory/discard/$TP_HERB_E\">Discard</a>"; expect_body 'action="/inventory/unequip/weapon"'
@@ -173,7 +177,7 @@ expect_body '<button class="spell-btn" type="submit" title="Sell Herb for 8 gold
 expect_body '<div class="tip-title">Herb</div><div class="tip-meta">Consumable</div></div></div>'
 expect_body '<div class="shop-tip-price"><span class="shop-tip-label">Sells for</span> <b class="shop-tip-gold">8 gold</b> <span class="shop-tip-label">each</span></div><div class="shop-tip-note">You have 3: 24 gold for all</div><ul class="shop-tip-effects"><li>Restores 30 hit points, in a fight or out of it.</li></ul>'
 expect_body 'title="Sell Branch for 15 gold" aria-label="Sell Branch for 15 gold"><img src="/static/images/items/branch.png"'
-expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold"><img src="/static/images/skills/default.png"'   # no picture: the default
+expect_body 'title="Sell Dagger for 45 gold" aria-label="Sell Dagger for 45 gold"><img src="/static/images/items/dagger.png"'
 # the purchase (its own design, no tooltips): the item's picture, its description escaped
 t_get /shop/buy/2; expect_status 200
 expect_body '<span class="buy-tile"><img src="/static/images/items/branch.png" width="48" height="48" alt=""></span>'

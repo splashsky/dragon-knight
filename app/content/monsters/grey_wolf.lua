@@ -5,6 +5,7 @@ return {
 A wolf gone grey with age, which makes it slower than the pack but craftier. Grey wolves follow
 the caravans out of Bris and wait for a tired horse or a lost child. Herders keep dogs against
 them, and the dogs are usually the first to go.]],
+	icon = "grey_wolf",
 	level = 13,
 	maxhp = 44, maxdam = 36, armor = 24,
 	maxexp = 82, maxgold = 27,

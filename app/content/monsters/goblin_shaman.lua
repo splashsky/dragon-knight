@@ -19,6 +19,7 @@ A goblin who picked up a few spells from a dropped spellbook and has been braggi
 it ever since. Its hurts are weak but cheap to cast, and it keeps two potions tucked in
 its belt for emergencies. Goblins say the shaman is the one to kill first, which is good
 advice from any goblin you can find.]],
+	icon = "goblin_shaman",
 	level = 5,
 	maxhp = 40, maxdam = 8, armor = 4,
 	maxexp = 12, maxgold = 15,

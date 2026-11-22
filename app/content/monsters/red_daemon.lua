@@ -7,6 +7,7 @@ Endworld. Its heat bends the air so that its shape seems to shimmer. It is quick
 proud, and it despises any foe who will not stand in front of it. Wise travellers bring a cold
 drink and a wet cloak.
 ]],
+	icon = "red_daemon",
 	level = 48,
 	maxhp = 310, maxdam = 280, armor = 230,
 	maxexp = 1880, maxgold = 627,

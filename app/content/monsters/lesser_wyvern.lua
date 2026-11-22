@@ -7,6 +7,7 @@ long neck that moves faster than a snake's. It hunts over the open plains betwee
 and Kalle, swooping down on herds and on the carts that follow them. Travellers are told
 to keep their horses under a roof when one is about, and to keep their heads down.
 ]],
+	icon = "lesser_wyvern",
 	level = 32,
 	maxhp = 122, maxdam = 110, armor = 92,
 	maxexp = 270, maxgold = 90,

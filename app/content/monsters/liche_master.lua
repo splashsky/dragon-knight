@@ -6,6 +6,7 @@ A liche that has taken on students, and then taken on the students' libraries. T
 Master runs the dead school beyond Narcissa, where the lessons are given in fire and the
 exams are fought out with the pupils. Its spells are quick and well ordered, and it
 expects its visitors to know which spell they are facing.]],
+	icon = "liche_master",
 	level = 38,
 	maxhp = 168, maxdam = 155, armor = 125,
 	maxexp = 505, maxgold = 168,

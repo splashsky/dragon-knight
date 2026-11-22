@@ -6,6 +6,7 @@ The first of the four pleaders of the hall in Hambry, who sit in judgement on an
 comes in without a receipt. An Advocate will argue your case for you, and will argue it
 into the ground. Those who have been through the hall say it is safer to bring a witness
 and a bag of coin.]],
+	icon = "advocate",
 	level = 35,
 	maxhp = 148, maxdam = 132, armor = 108,
 	maxexp = 350, maxgold = 117,

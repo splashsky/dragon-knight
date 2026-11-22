@@ -16,6 +16,7 @@ Ember is a spark in a haystack. Inferno is the haystack, the barn and the field 
 Mage who casts it only has to stay out of the smoke while the target burns. The old
 masters in Endworld say it was never meant for a fight: it was meant for clearing roads, and
 roads are what it clears.]],
+	icon = "inferno",
 	mp = 45,
 	power = 5,                  -- how many turns the fire burns
 	data = { amount = 40 },     -- hit points it burns away each turn

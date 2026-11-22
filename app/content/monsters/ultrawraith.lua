@@ -7,6 +7,7 @@ and to remember exactly how it died. It drifts through the ruined churches and t
 houses beyond Hambry, and it is drawn to the warmth of a camp fire. Its cold drains
 the life from a body faster than a blade does.
 ]],
+	icon = "ultrawraith",
 	level = 26,
 	maxhp = 90, maxdam = 82, armor = 64,
 	maxexp = 190, maxgold = 63,

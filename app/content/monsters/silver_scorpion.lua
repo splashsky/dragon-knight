@@ -6,6 +6,7 @@ A scorpion with a shell like polished tin, found under the dunes beyond Hambry. 
 turns most blades, so the trick is to find the soft place under the tail before it turns
 the other way. Dealers in Endworld pay well for an intact shell, which is one of the few
 things about the creature that anyone has ever wanted.]],
+	icon = "silver_scorpion",
 	level = 40,
 	maxhp = 30, maxdam = 160, armor = 350,
 	maxexp = 63, maxgold = 2000,

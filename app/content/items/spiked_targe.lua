@@ -7,6 +7,7 @@ A round targe of boiled oak with a ring of iron spikes around the face, each one
 as a finger. Bandits who have tried to rush a fighter behind one have mostly come away
 with their hands full of holes. Smiths in Bris make them to order, and they say the
 spikes are for show, though the fighters who carry them disagree.]],
+	icon = "spiked_targe",
 	category = "shield",
 	price = 700,
 	defense = 14,

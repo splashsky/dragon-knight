@@ -7,6 +7,7 @@ Scholars in Gilead claim Nightmare was written by a Mage who could not sleep bec
 own Sleep spells. It fills a monster's mind with dark dreams that hold it down far longer than
 Sleep ever could. The spell costs dearly in mana, and the Mages who use it rarely sleep well
 afterwards.]],
+	icon = "nightmare",
 	mp = 60,
 	power = 13,                  -- the chance in 15 that it stays asleep each turn
 	messages = {

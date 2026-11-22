@@ -5,6 +5,7 @@ return {
 A small glass bead that scholars in Roma pay to take off monsters. It is said to hold a little
 of whatever the bearer has just learned. Students wear them while studying and sell them the
 week before exams.]],
+	icon = "memory_drop",
 	category = "accessory",
 	drop_level = 5,
 	modifiers = { { kind = "stat", stat = "exp_bonus_pct", amount = 10 } },

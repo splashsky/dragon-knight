@@ -9,6 +9,7 @@ Fire caught on the clothes or the skin, from an Ember or a torch that came too c
 does the same damage each turn and doesn't ease off, so it is over when it has burned
 itself out. Rolling on the ground helps. Mages who cast fire at close range learn to
 carry a wet cloak.]],
+	icon = "burning",
 	kind = "harmful",
 	tick_on = "turn_end",
 	turns = 3,

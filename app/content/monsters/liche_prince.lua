@@ -7,6 +7,7 @@ brass on a skull that has long since forgotten its own name, and he holds court 
 great library where the stolen books are chained to the shelves. Scholars who have
 studied his spells say he never wastes a word, and that is the most frightening thing
 about him.]],
+	icon = "liche_prince",
 	level = 40,
 	maxhp = 190, maxdam = 168, armor = 138,
 	maxexp = 660, maxgold = 220,

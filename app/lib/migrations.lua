@@ -1273,6 +1273,14 @@ ALTER TABLE town_items_new RENAME TO town_items;
 	end
 end
 
+-- 20: monsters, statuses and allies have icons (3.1), like spells and items: the name of a
+-- PNG in public/images/<monsters|statuses|summons>/; the content sync fills them in.
+local function v20_more_icons()
+	for _, t in ipairs({ "monsters", "statuses", "summons" }) do
+		dk.db:exec("ALTER TABLE " .. t .. " ADD COLUMN icon TEXT NOT NULL DEFAULT ''")
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1306,6 +1314,7 @@ migrations.STEPS = {
 	{ name = "towns sell only some maps: each its neighbours' along the road", up = v18_town_maps },
 	{ name = "shop lists name items by key; the towns sell the 3.1 wares (and the Antidote and the Regen Potion)",
 		up = v19_shop_keys },
+	{ name = "monsters, statuses and allies have icons", up = v20_more_icons },
 }
 
 migrations.VERSION = #migrations.STEPS

@@ -6,6 +6,7 @@ A round shield of tough limewood with a rim of red copper, and a small brass pla
 face where the healers' sign is stamped. Surgeons in Hambry say a wounded man who keeps
 his shield up bleeds slower, and they have the stitched arms to show for it. The shield
 itself is no heavier than a buckler and sells for a good deal more.]],
+	icon = "lifeward_shield",
 	category = "shield",
 	price = 4500,
 	defense = 45,

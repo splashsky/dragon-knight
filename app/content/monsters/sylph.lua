@@ -5,6 +5,7 @@ return {
 A spirit of the wind, seen as a thin shape in the mountain passes beyond Hambry. Sylphs are playful
 and cool. They blow hats off, scatter campfires and lead climbers toward cliffs for fun. Mages
 value them for the lightning they carry, and sylphs value nothing except being left alone.]],
+	icon = "sylph",
 	level = 15,
 	maxhp = 49, maxdam = 42, armor = 28,
 	maxexp = 106, maxgold = 35,

@@ -7,6 +7,7 @@ around Roma. Left a bowl of milk, it keeps the cows healthy; crossed, it sets th
 alight and steals the boots from sleeping feet. This one has come out onto the roads,
 which the farmers take as a sign that the bowls have stopped going out. Its laugh carries
 a long way on a still night.]],
+	icon = "nisse",
 	level = 19,
 	maxhp = 60, maxdam = 52, armor = 40,
 	maxexp = 132, maxgold = 44,

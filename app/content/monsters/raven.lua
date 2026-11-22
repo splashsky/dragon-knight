@@ -5,6 +5,7 @@ return {
 A large black bird that gathers on the dead trees along the road beyond Midworld, and it is
 always watching. Ravens steal anything shiny they can carry, including the buckles off a
 traveller's pack. Hunters say a raven that circles overhead is waiting for someone to fall.]],
+	icon = "raven",
 	level = 4,
 	maxhp = 16, maxdam = 13, armor = 5,
 	maxexp = 18, maxgold = 6,

@@ -1,0 +1,355 @@
+# The game's icons and the art they were made from (Icons/: licensed packs, not in the
+# repository). icon	source	adjustments (place_icon.py options; - none). Icons made
+# before 3.1 (Midworld's wares, Heal, Magic Bolt, Attack, Run) aren't listed.
+public/images/items/acid_vial.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_14_poison.png	-
+public/images/items/angels_joy.png	Icons/ProfessionIcons/LootIcons/Loot_43_feather.png	--sat 0.15 --bright 1.15
+public/images/items/angels_love.png	Icons/ArmorIcons/RingAndNeck_Icons/Ring_37_white.png	-
+public/images/items/angels_rise.png	Icons/ProfessionIcons/LootIcons/Loot_43_feather.png	--tint #ffc233:0.55
+public/images/items/angels_truth.png	Icons/ProfessionIcons/QuestIcons/Quest_115.png	-
+public/images/items/antidote.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_19_little_flask.png	--tint #8fe07a:0.45
+public/images/items/apprentice_robe.png	Icons/MedievalIcons/ArmorMedieval/MonasticRobe.png	grey: --sat 0.1 --bright 1.9
+public/images/items/axe.png	Icons/MedievalIcons/WeponMedieval/AxeOld.png	-
+public/images/items/bards_pipe.png	Icons/ProfessionIcons/QuestIcons/Quest_12_pipe.png	-
+public/images/items/battle_axe.png	Icons/MedievalIcons/WeponMedieval/AxeViking.png	-
+public/images/items/bearclaw_totem.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_48_bearpaw.png	-
+public/images/items/bitter_draught.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_11_magic_mixture.png	-
+public/images/items/brand.png	Icons/MedievalIcons/WeponMedieval/OldSword.png	-
+public/images/items/bright_armor.png	Icons/MedievalIcons/ArmorMedieval/Cuirass.png	--bright 1.7 --tint #ffe2a0:0.35
+public/images/items/bright_sword.png	Icons/WeaponIcons/WeaponIconsVol2/Sword_v2_50.png	-
+public/images/items/broadsword.png	Icons/MedievalIcons/WeponMedieval/Sword3.png	-
+public/images/items/bronze_plate.png	Icons/MedievalIcons/ArmorMedieval/CuirassYellow.png	-
+public/images/items/chain_mail.png	Icons/MedievalIcons/ArmorMedieval/MailChest2.png	-
+public/images/items/claymore.png	Icons/MedievalIcons/WeponMedieval/SwordTwohanded2.png	-
+public/images/items/copper_ring.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_22_bronze_ring.png	-
+public/images/items/cure_all.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_36_spiritual_flask.png	-
+public/images/items/dagger.png	Icons/MedievalIcons/WeponMedieval/OldDagger.png	-
+public/images/items/dark_armor.png	Icons/MedievalIcons/ArmorMedieval/PlateMailChest2.png	--bright 0.6 --sat 0.7
+public/images/items/dark_axe.png	Icons/WeaponIcons/WeaponIconsVol2/Axe_v2_20.png	--bright 0.6 --sat 0.7
+public/images/items/dark_sword.png	Icons/WeaponIcons/WeaponIconsVol2/Sword_v2_40.png	-
+public/images/items/dawn_mace.png	Icons/MedievalIcons/WeponMedieval/MetalHammer2.png	--sat 0.15 --bright 1.15
+public/images/items/demons_fall.png	Icons/ProfessionIcons/QuestIcons/Quest_146_horns.png	--bright 0.55 --sat 0.6
+public/images/items/demons_hate.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_32_blackiron_ring.png	--tint #8a0000:0.35
+public/images/items/demons_lie.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_58_tongue.png	--bright 0.45 --sat 0.25 --tint #3a0000:0.3
+public/images/items/demons_sin.png	Icons/ProfessionIcons/LootIcons/Loot_181_demonstone.png	--tint #3a0000:0.2
+public/images/items/destiny_aegis.png	Icons/WeaponIcons/WeaponIconsVol1/shield_16.png	-
+public/images/items/destiny_blade.png	Icons/WeaponIcons/WeaponIconsVol2/Sword_v2_45.png	-
+public/images/items/destiny_raiment.png	Icons/MedievalIcons/ArmorMedieval/ScholarRobe.png	--sat 0.1 --bright 1.5
+public/images/items/diamond.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_17_brilliant.png	-
+public/images/items/dragonhide_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_28.png	-
+public/images/items/dragons_claw.png	Icons/ProfessionIcons/LootIcons/Loot_183_claw.png	--bright 0.7 --sat 0.6
+public/images/items/dragons_plate.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_25_ancient_scales.png	-
+public/images/items/dragons_scale.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_09_scaly_skin.png	-
+public/images/items/dragons_tear.png	Icons/ProfessionIcons/ResourceIcons/Res_116.png	-
+public/images/items/dragons_tooth.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_47_wildteeth.png	-
+public/images/items/dragons_wing.png	Icons/ProfessionIcons/QuestIcons/Quest_113_wing.png	-
+public/images/items/elixir.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_26_immortal_potion.png	-
+public/images/items/ember_staff.png	Icons/WeaponIcons/WeaponIconsVol2/Staff_v2_51.png	-
+public/images/items/emerald.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_04_greencrystal.png	-
+public/images/items/fire_flask.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_08_reactive_mixture.png	-
+public/images/items/fortune_drop.png	Icons/ProfessionIcons/LootIcons/Loot_05.png	-
+public/images/items/frost_fang.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_49_sharptooth.png	--hue -20 --sat 0.5 --tint #9fd8ff:0.45
+public/images/items/frost_staff.png	Icons/WeaponIcons/WeaponIconsVol1/staff_21.png	--tint #9fd8ff:0.35
+public/images/items/glass_blade.png	Icons/WeaponIcons/WeaponIconsVol1/Sword_24.png	-
+public/images/items/greatsword.png	Icons/MedievalIcons/WeponMedieval/SwordTwohanded4.png	-
+public/images/items/guard_tonic.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_45_middle_flask2.png	--sat 0.4
+public/images/items/hard_leather_armor.png	Icons/MedievalIcons/ArmorMedieval/LeatherChest1.png	-
+public/images/items/hatchet.png	Icons/WeaponIcons/WeaponIconsVol1/Axe_52.png	-
+public/images/items/hawk_eye.png	Icons/ProfessionIcons/LootIcons/Loot_150_Spyglass.png	-
+public/images/items/hi_ether.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_30_bigmana_flask.png	-
+public/images/items/hi_potion.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_55_hugegreen_flask.png	-
+public/images/items/hornet_sting.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_16_sting.png	-
+public/images/items/iron_plate.png	Icons/MedievalIcons/ArmorMedieval/PlateMailChest.png	-
+public/images/items/ironclad_plate.png	Icons/MedievalIcons/ArmorMedieval/KnightChest.png	-
+public/images/items/lamellar_armor.png	Icons/MedievalIcons/ArmorMedieval/Brigandine.png	-
+public/images/items/large_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_12.png	-
+public/images/items/life_pebble.png	Icons/ProfessionIcons/ResourceIcons/Res_16_stone.png	pre-shrunk to 50% and centred on transparent canvas
+public/images/items/life_rock.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Mining/Mining_34_red_crystal.png	-
+public/images/items/life_stone.png	Icons/ProfessionIcons/ResourceIcons/Res_13.png	-
+public/images/items/lifeward_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_05.png	-
+public/images/items/lucky_charm.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Herbalism/Herbalism_32_leaves.png	-
+public/images/items/magic_armor.png	Icons/MedievalIcons/ArmorMedieval/PlateMailChestBlue.png	--tint #7a5cff:0.25
+public/images/items/magic_pebble.png	Icons/ProfessionIcons/ResourceIcons/Res_19_stone.png	pre-shrunk to 50% and centred on transparent canvas
+public/images/items/magic_rock.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Mining/Mining_38_blue_crystal.png	-
+public/images/items/magic_stone.png	Icons/ProfessionIcons/ResourceIcons/Res_17_stone.png	-
+public/images/items/magic_sword.png	Icons/WeaponIcons/WeaponIconsVol2/Sword_v2_27.png	-
+public/images/items/memory_drop.png	Icons/ProfessionIcons/LootIcons/Loot_53_sphere.png	-
+public/images/items/nomads_band.png	Icons/ArmorIcons/RingAndNeck_Icons/bracelet_b_06.png	-
+public/images/items/obsidian.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_09_blackcrystal.png	-
+public/images/items/ogre_hide_cuirass.png	Icons/MedievalIcons/ArmorMedieval/FurChest.png	-
+public/images/items/parry_buckler.png	Icons/WeaponIcons/WeaponIconsVol1/shield_4.png	-
+public/images/items/pearl.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_07_pearl.png	-
+public/images/items/poleaxe.png	Icons/MedievalIcons/WeponMedieval/Spear4Halberd.png	-
+public/images/items/regen_potion.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_47_middlemagical_flask.png	-
+public/images/items/ruby.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_15_greatredcrystal.png	-
+public/images/items/sages_lens.png	Icons/ProfessionIcons/LootIcons/Loot_149_glasses.png	-
+public/images/items/scouts_jerkin.png	Icons/MedievalIcons/ArmorMedieval/Vest.png	--sat 0.6
+public/images/items/seraphs_joy.png	Icons/ProfessionIcons/QuestIcons/Quest_116.png	--bright 1.15 --tint #ff7a2a:0.35
+public/images/items/seraphs_love.png	Icons/ArmorIcons/RingAndNeck_Icons/Ring_22.png	--tint #ffb000:0.2
+public/images/items/seraphs_rise.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_52_redfeather.png	-
+public/images/items/seraphs_truth.png	Icons/ProfessionIcons/LootIcons/Loot_88_mirror.png	--tint #ffcc33:0.4
+public/images/items/shepherds_lamp.png	Icons/ProfessionIcons/QuestIcons/Quest_160_lamp.png	-
+public/images/items/sickle.png	Icons/MedievalIcons/WeponMedieval/Sickle.png	-
+public/images/items/silver_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_06.png	--sat 0.15
+public/images/items/sleep_powder.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Engineering/Engineering_11_powder.png	-
+public/images/items/small_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_03.png	-
+public/images/items/spark_rod.png	Icons/WeaponIcons/WeaponIconsVol2/Staff_v2_32.png	--tint #ffd34a:0.3
+public/images/items/sparrow_feather.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_13_feather.png	-
+public/images/items/spiked_targe.png	Icons/WeaponIcons/WeaponIconsVol1/shield_38.png	-
+public/images/items/starsteel_sword.png	Icons/WeaponIcons/WeaponIconsVol2/Sword_v2_26.png	-
+public/images/items/storm_lance.png	Icons/MedievalIcons/WeponMedieval/Spear7.png	--tint #7fc4ff:0.25
+public/images/items/strength_tonic.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_24_energy_potion.png	-
+public/images/items/sunsteel_mail.png	Icons/MedievalIcons/ArmorMedieval/MailChest.png	--sat 0.2 --bright 1.2 --tint #cfe8ff:0.2
+public/images/items/thornwood_bark.png	Icons/ProfessionIcons/LootIcons/Loot_154_bark.png	-
+public/images/items/thornwood_heart.png	Icons/ProfessionIcons/ResourceIcons/Res_84_heart.png	-
+public/images/items/thornwood_root.png	Icons/MedievalIcons/ResourcesMedieval/Root.png	-
+public/images/items/thornwood_thorn.png	Icons/ProfessionIcons/ResourceIcons/Res_134.png	-
+public/images/items/tinker_buckle.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Engineering/Engineering_14_gear.png	-
+public/images/items/topaz.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_02_yellowcrystal.png	-
+public/images/items/tortoise_shell.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_28_shell.png	-
+public/images/items/tower_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_26.png	-
+public/images/items/trail_snack.png	Icons/MedievalIcons/ResourcesMedieval/Bread2.png	-
+public/images/items/travel_tea.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_01_tea.png	-
+public/images/items/traveller_ring.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Jewelry/Jewelry_25_little_ring.png	-
+public/images/items/vigil_cuirass.png	Icons/MedievalIcons/ArmorMedieval/PlateMailChestYellow.png	-
+public/images/items/void_flask.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_23_black_poison.png	-
+public/images/items/vulture_plume.png	Icons/ProfessionIcons/LootIcons/Loot_45_feather.png	-
+public/images/items/war_pick.png	Icons/MedievalIcons/WeponMedieval/AxePick.png	-
+public/images/items/war_sabre.png	Icons/MedievalIcons/WeponMedieval/SwordSaber2.png	-
+public/images/items/ward_charm.png	Icons/ProfessionIcons/LootIcons/Loot_73.png	-
+public/images/items/ward_shield.png	Icons/WeaponIcons/WeaponIconsVol1/shield_33.png	--sat 0.3 --bright 1.05
+public/images/items/warhammer.png	Icons/MedievalIcons/WeponMedieval/MetalHammer.png	-
+public/images/items/weakening_dust.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Engineering/Engineering_12_powder.png	--tint #7a4ab0:0.35
+public/images/items/wolf_fang.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Skinning/skinning_49_sharptooth.png	-
+public/images/monsters/advocate.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_37.png	-
+public/images/monsters/aero_elemental.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	--tint #bfe8ff:0.4
+public/images/monsters/aqua_elemental.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_waterm.png	-
+public/images/monsters/archfiend.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_06_Hell_guard.png	-
+public/images/monsters/armor_knight.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_48.png	-
+public/images/monsters/bandit.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Robber.png	-
+public/images/monsters/bandit_captain.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Robber2.png	-
+public/images/monsters/beast.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Terrible.png	-
+public/images/monsters/behemoth.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_24.png	-
+public/images/monsters/black_daemon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_01.png	--bright 0.7 --sat 0.5
+public/images/monsters/black_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--sat 0.1 --bright 0.8
+public/images/monsters/blaze.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_FireElemental.png	--tint #ffd060:0.3 --bright 1.2
+public/images/monsters/blue_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--hue 200
+public/images/monsters/blue_slime.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Slime.png	--hue 120
+public/images/monsters/bog_witch.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Witch.png	-
+public/images/monsters/brute.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_47.png	-
+public/images/monsters/cherufiend.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_13_guard.png	-
+public/images/monsters/colossus.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_01.png	-
+public/images/monsters/creature.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_19.png	-
+public/images/monsters/critter.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_11.png	-
+public/images/monsters/dark_bear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_04.png	--bright 0.6 --sat 0.7
+public/images/monsters/dark_daemon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_01.png	--bright 0.9 --sat 0.6 --tint #3a1f5c:0.2
+public/images/monsters/dark_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--sat 0.5 --bright 0.75 --tint #3a1f5c:0.3
+public/images/monsters/dark_knight.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_48.png	-
+public/images/monsters/dark_scorpion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Scorpion.png	--bright 0.55 --sat 0.6
+public/images/monsters/dark_slime.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Slime.png	--bright 0.5 --sat 0.6
+public/images/monsters/dark_wolf.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_07.png	--bright 0.6 --sat 0.7
+public/images/monsters/dawk.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_13.png	-
+public/images/monsters/dawkare.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_13.png	--bright 1.25
+public/images/monsters/dawkin.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_13.png	--hue 30
+public/images/monsters/dawkor.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_13.png	--bright 1.1
+public/images/monsters/demagogue.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_28.png	-
+public/images/monsters/demon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_02_imp.png	-
+public/images/monsters/demon_king.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_12_skeleton_king.png	-
+public/images/monsters/demon_lord.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_05_Lilith.png	-
+public/images/monsters/demon_prince.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_07_fire.png	-
+public/images/monsters/devil.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_03_Devil.png	-
+public/images/monsters/doomer.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_05.png	-
+public/images/monsters/drake.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_13.png	-
+public/images/monsters/drakefin.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_13.png	--hue 150
+public/images/monsters/drakelor.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_13.png	--sat 0.4 --tint #6f8f7a:0.25
+public/images/monsters/drakemal.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_13.png	--bright 0.55 --sat 0.4
+public/images/monsters/dybbuk.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_21.png	-
+public/images/monsters/fanatic.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_62.png	-
+public/images/monsters/fear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_03.png	-
+public/images/monsters/fiend.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_demon.png	--tint #ff4000:0.25
+public/images/monsters/figment.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Ghost.png	--sat 0.3 --bright 1.2
+public/images/monsters/fira_elemental.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_FireElemental.png	--hue -20 --sat 1.3 --bright 0.85
+public/images/monsters/fire.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_FireElemental.png	-
+public/images/monsters/fire_raven.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_36.png	--tint #ff7a2a:0.3
+public/images/monsters/fire_wyrm.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--tint #ff7a2a:0.3
+public/images/monsters/flame.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_FireElemental.png	--tint #ff3a10:0.35
+public/images/monsters/fright.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_03 1.png	-
+public/images/monsters/frost_raven.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_36.png	--tint #9fd8ff:0.35
+public/images/monsters/frost_wyrm.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--tint #9fd8ff:0.35
+public/images/monsters/ghost.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	-
+public/images/monsters/ghoul.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_06_zombie.png	-
+public/images/monsters/giant.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Gigant_04_ogre.png	-
+public/images/monsters/goblin.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/goblin_01.png	-
+public/images/monsters/goblin_shaman.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/goblin_04.png	-
+public/images/monsters/greater_devil.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_03_Devil.png	--tint #8a0000:0.3
+public/images/monsters/greater_wyvern.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_42.png	-
+public/images/monsters/greatest_devil.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_03_Devil.png	--hue -40 --bright 0.75
+public/images/monsters/greatest_wyvern.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_42.png	--hue 110 --sat 1.2
+public/images/monsters/green_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--hue 90
+public/images/monsters/grey_bear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_04.png	-
+public/images/monsters/grey_daemon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_11_gargoyle.png	-
+public/images/monsters/grey_wolf.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_07.png	-
+public/images/monsters/haunt.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	-
+public/images/monsters/hellbeast.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_DemonicDog.png	-
+public/images/monsters/hellcat.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_08.png	--tint #ff7a2a:0.3
+public/images/monsters/hellhound.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_12_Dog.png	--tint #ff5a2a:0.3
+public/images/monsters/hellion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_demon.png	--tint #ff9a30:0.3
+public/images/monsters/horror.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_HungryDemon.png	-
+public/images/monsters/illusion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	--tint #bfe6ff:0.3
+public/images/monsters/imp.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_02_imp.png	-
+public/images/monsters/incubus.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_NightDemon.png	-
+public/images/monsters/insurgent.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_20.png	-
+public/images/monsters/knave.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Pirate.png	-
+public/images/monsters/knight.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_02_knight.png	-
+public/images/monsters/large_beast.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Gigant_03_yeti.png	-
+public/images/monsters/large_brute.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_27.png	-
+public/images/monsters/lesser_devil.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_demon.png	-
+public/images/monsters/lesser_wyvern.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_42.png	--sat 0.7 --bright 0.9
+public/images/monsters/leviathan.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_waterm.png	-
+public/images/monsters/liche.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_SkeletonMage.png	-
+public/images/monsters/liche_king.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_06.png	-
+public/images/monsters/liche_lord.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_01.png	--tint #7fa0ff:0.2
+public/images/monsters/liche_master.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_SkeletonMage.png	--tint #8a3cff:0.3
+public/images/monsters/liche_prince.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_11.png	--tint #d4a017:0.25
+public/images/monsters/lucifuge.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/God_Hades.png	-
+public/images/monsters/lycan.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_05_werewolf.png	-
+public/images/monsters/lycanthor.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_05_werewolf.png	--bright 0.6 --sat 0.7
+public/images/monsters/lycanthra.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_05_werewolf.png	--hue 200
+public/images/monsters/magician.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_46_sage.png	-
+public/images/monsters/megadoomer.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_04.png	-
+public/images/monsters/megaskeleton.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_66.png	-
+public/images/monsters/megawraith.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	--bright 0.8
+public/images/monsters/mirage.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	--tint #e8c27a:0.35 --bright 1.1
+public/images/monsters/necromancer.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_08.png	-
+public/images/monsters/nightmare.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_10_warhorse.png	--bright 0.6 --sat 0.7
+public/images/monsters/nightshade.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Flower2.png	-
+public/images/monsters/nihilist.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_27_alchemyst.png	-
+public/images/monsters/nisse.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Gnome_04.png	-
+public/images/monsters/nymph.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Satyr_w.png	-
+public/images/monsters/obsessive.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_06_Priest.png	--sat 0.8
+public/images/monsters/ogre.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Gigant_04_ogre.png	-
+public/images/monsters/orc.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Orc_01_warrior.png	-
+public/images/monsters/pale_knight.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_02_knight.png	--sat 0.15 --bright 1.15
+public/images/monsters/phantom.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_GhostKnight.png	-
+public/images/monsters/polgergeist.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Ghost.png	--tint #c060ff:0.3
+public/images/monsters/raven.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_36.png	-
+public/images/monsters/red_daemon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_01.png	-
+public/images/monsters/red_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--hue -40 --sat 1.4
+public/images/monsters/red_slime.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Slime.png	--hue 260
+public/images/monsters/renegade.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_26_barbarian.png	-
+public/images/monsters/rogue.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Assassin.png	-
+public/images/monsters/rogue_scorpion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Scorpion.png	--hue 20
+public/images/monsters/scamp.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_CuteDemon.png	-
+public/images/monsters/scorpion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Scorpion.png	-
+public/images/monsters/scoundrel.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_23_rogue.png	-
+public/images/monsters/serafiend.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_02_Archangel.png	--bright 1.2
+public/images/monsters/shade.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_03.png	-
+public/images/monsters/shadow.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	--bright 0.5 --sat 0.5
+public/images/monsters/shadow_dragon.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	--sat 0.6 --tint #6a3cb0:0.3
+public/images/monsters/shadow_raven.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_36.png	--bright 0.6 --sat 0.7
+public/images/monsters/shimmer.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	--tint #ffffff:0.4 --bright 1.2
+public/images/monsters/silver_scorpion.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Scorpion.png	--sat 0.15 --bright 1.15
+public/images/monsters/silver_slime.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Slime.png	--sat 0.15 --bright 1.15
+public/images/monsters/siren.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Ghost.png	-
+public/images/monsters/skeleton.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_01.png	-
+public/images/monsters/sorceror.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_42.png	-
+public/images/monsters/specter.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	--sat 0.4 --bright 0.85
+public/images/monsters/spirit.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Ghost.png	-
+public/images/monsters/strong_knight.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_02_knight.png	-
+public/images/monsters/succubus.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Demon_10_succubus.png	-
+public/images/monsters/sylph.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_59.png	-
+public/images/monsters/terra_elemental.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Elemental.png	-
+public/images/monsters/terror.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_Scary.png	-
+public/images/monsters/titan.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Gigant_02_old_titan.png	-
+public/images/monsters/traitor.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_23_rogue.png	--bright 0.7 --sat 0.6
+public/images/monsters/troll.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_16_troll.png	-
+public/images/monsters/ultradoomer.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_03.png	--bright 0.8
+public/images/monsters/ultraskeleton.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monster_SkeletonKing.png	-
+public/images/monsters/ultrawraith.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	--bright 0.5 --sat 0.7
+public/images/monsters/uruk.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Orc_01_warrior.png	-
+public/images/monsters/warlock.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Orc_04_warlock.png	-
+public/images/monsters/werebear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_19.png	-
+public/images/monsters/werewolf.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_05_werewolf.png	--tint #8a5a2a:0.3
+public/images/monsters/wizard.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_46_sage.png	--tint #3050b0:0.3
+public/images/monsters/wraith.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_50.png	-
+public/images/monsters/wyrm.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Creatures_11_Dragon.png	-
+public/images/monsters/wyvern.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Monsters_42.png	-
+public/images/monsters/zealot.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Human_48_priest.png	-
+public/images/skills/barrier.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_ShieldWall.png	-
+public/images/skills/blood_strike.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Critical_strike2.png	-
+public/images/skills/breath.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_WindBlow.png	-
+public/images/skills/call_bear.png	Icons/SkillsIcons/Bonus/Skill2_Standart/summon_brutal_army.png	-
+public/images/skills/call_golem.png	Icons/SkillsIcons/Skillicons2/Skill_standart/summon_golem.png	-
+public/images/skills/call_spirit.png	Icons/SkillsIcons/Skillicons2/Skill_standart/spirit.png	-
+public/images/skills/call_wolf.png	Icons/SkillsIcons/Bonus/Skill2_Standart/summon_shadow_wolf.png	-
+public/images/skills/chaos.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Death_blow3.png	-
+public/images/skills/cinder_lash.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_181_firelasso.png	-
+public/images/skills/cleanse.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Antidote.png	-
+public/images/skills/cleave.png	Icons/SkillsIcons/Bonus/Skill2_Standart/axe2.png	-
+public/images/skills/craze.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_177_rage.png	-
+public/images/skills/curse.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_437_hex.png	-
+public/images/skills/dawn.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_159_sunrays.png	-
+public/images/skills/dawnstrike.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_180_holydamage.png	-
+public/images/skills/dream.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_271_purpledream.png	-
+public/images/skills/ember.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_187_fireball.png	-
+public/images/skills/enfeeble.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_498_debuf.png	--hue 90
+public/images/skills/fend.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_255_magicshield.png	-
+public/images/skills/finishing_blow.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Critical_strike.png	-
+public/images/skills/frostbite.png	Icons/SkillsIcons/Bonus/Skill1_Standart/frost_arrow.png	-
+public/images/skills/fury.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_188_rage.png	-
+public/images/skills/gaia.png	Icons/SkillsIcons/Skillicons2/Skill_standart/healing.png	-
+public/images/skills/grit.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_460_absorb.png	-
+public/images/skills/hunters_mark.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Y_shoot.png	-
+public/images/skills/hurt.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Light_blow.png	-
+public/images/skills/hyper_beam.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Big_Light_arrow.png	-
+public/images/skills/inferno.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_182_fireblast.png	-
+public/images/skills/iron_vigil.png	Icons/SkillsIcons/Skillicons2/Skill_standart/iron_skin.png	-
+public/images/skills/judgement.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Holy_power.png	-
+public/images/skills/last_stand.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_364_laststand.png	-
+public/images/skills/life.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_176_healingwave.png	-
+public/images/skills/lightning_lance.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Big_Lightning.png	-
+public/images/skills/maim.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Death_blow2.png	-
+public/images/skills/mend.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_134_heal.png	-
+public/images/skills/mercy.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_139_heal.png	-
+public/images/skills/nightmare.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Nightmares.png	-
+public/images/skills/pain.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Death_blow.png	-
+public/images/skills/plague.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Plague.png	-
+public/images/skills/poison.png	Icons/SkillsIcons/Skillicons2/Skill_standart/poison_claw.png	-
+public/images/skills/rage.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_462_rage.png	-
+public/images/skills/reaver.png	Icons/SkillsIcons/Bonus/SkillUpdate/Standart/VampireAttack_1.png	-
+public/images/skills/regen.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_18_renew.png	-
+public/images/skills/rend.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Critical_strike4.png	-
+public/images/skills/renewal.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_151_overheal.png	-
+public/images/skills/revive.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Resurrection.png	-
+public/images/skills/rockfall.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Avalanche.png	-
+public/images/skills/sap_mind.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Shadow_bolt.png	-
+public/images/skills/second_wind.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_459_health.png	-
+public/images/skills/sleep.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_393_sleep.png	-
+public/images/skills/solar_beam.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Sun.png	-
+public/images/skills/spark.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Lightning.png	-
+public/images/skills/stand_fast.png	Icons/SkillsIcons/Bonus/Skill2_Standart/shield4.png	-
+public/images/skills/starfall.png	Icons/SkillsIcons/Skillicons2/Skill_standart/starfall.png	-
+public/images/skills/stun.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_3_stuned.png	-
+public/images/skills/tithe.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Y_cabalistic.png	-
+public/images/skills/venom.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_404_venom.png	-
+public/images/skills/war_cry.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_Cry.png	-
+public/images/skills/ward.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_245_holyshield.png	-
+public/images/skills/warlord.png	Icons/SkillsIcons/Bonus/SkillUpdate/Standart/IncreaseStrength_4.png	-
+public/images/skills/wellspring.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_333_waterwave.png	-
+public/images/skills/whiteout.png	Icons/SkillsIcons/Bonus/Skill1_Standart/blizzard.png	-
+public/images/skills/withering.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Wound.png	-
+public/images/statuses/burning.png	Icons/SkillsIcons/Bonus/Skill1_Standart/fireball.png	-
+public/images/statuses/charging.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Sun.png	-
+public/images/statuses/marked.png	Icons/SkillsIcons/Skillicons2/Skill_standart/devil_mark.png	-
+public/images/statuses/poison.png	Icons/SkillsIcons/Skillicons2/Skill_standart/venom.png	-
+public/images/statuses/recharging.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_115_timestop.png	-
+public/images/statuses/regen.png	Icons/SkillsIcons/Skillicons2/Skill_standart/healing.png	-
+public/images/statuses/sleep.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_393_sleep.png	-
+public/images/statuses/uber_damage.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_162_swordLight.png	-
+public/images/statuses/uber_defense.png	Icons/SkillsIcons/Bonus/Skill2_Standart/shield3.png	-
+public/images/statuses/venom.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_404_venom.png	-
+public/images/statuses/weakened.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_498_debuf.png	--hue 90
+public/images/statuses/withering.png	Icons/SkillsIcons/Skillicons2/Skill_standart/shadow_drain.png	-
+public/images/summons/bear.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_04.png	-
+public/images/summons/golem.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Giant_StoneGolem.png	-
+public/images/summons/spirit.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Undead_09_ghost.png	-
+public/images/summons/wolf.png	Icons/AvatarIconsMegapack/CharacterIcons/Characters_WithBackground/Animals_07.png	-

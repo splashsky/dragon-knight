@@ -6,6 +6,7 @@ A proper devil, with horns, a tail and a contract for every soul that comes near
 hold the middle ranks of the pits below the mines and answer to the greater devils above
 them. They are polite until the fight begins, and some adventurers have found the rules of
 the pit are more binding than the rules of the road.]],
+	icon = "devil",
 	level = 40,
 	maxhp = 184, maxdam = 164, armor = 135,
 	maxexp = 666, maxgold = 222,

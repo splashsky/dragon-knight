@@ -9,6 +9,7 @@ The limbs go heavy and the grip goes loose, from a chant that drains the strengt
 body. The creature is still on its feet and still means harm, but its blows land softer
 for a few turns. Warriors who have been enfeebled say it feels like hitting through wet
 sand, and they are glad when it wears off.]],
+	icon = "weakened",
 	kind = "harmful",
 	turns = 3,
 	data = { pct = 35 },

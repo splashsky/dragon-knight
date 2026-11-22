@@ -7,6 +7,7 @@ it is still the smallest. Its skin is grey and hard as a sack of gravel, and it 
 a bone club it has taken from some earlier traveller. Dawkor band together in threes,
 and a lone one is rarely so bold.
 ]],
+	icon = "dawkor",
 	level = 26,
 	maxhp = 92, maxdam = 82, armor = 64,
 	maxexp = 195, maxgold = 65,

@@ -9,6 +9,7 @@ woodcutters are not willing to climb. Whoever gets one down has to bind it with 
 sticks to anything, and most of them cut themselves on it at least once. Those who fight with
 a thorn on the wrist say it hurts a monster more than it hurts them, which is not much comfort
 at the end of a long day.]],
+	icon = "thornwood_thorn",
 	category = "accessory",
 	drop_level = 26,
 	modifiers = {

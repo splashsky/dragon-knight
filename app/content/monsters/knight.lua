@@ -7,6 +7,7 @@ name was struck from the rolls of Hambry long ago, but the armour kept on fighti
 nobody has been brave enough to take it off him. He is most often seen at dusk on the
 road between Gilead and Endworld, where he challenges anyone who passes.
 ]],
+	icon = "knight",
 	level = 30,
 	maxhp = 110, maxdam = 102, armor = 80,
 	maxexp = 240, maxgold = 80,

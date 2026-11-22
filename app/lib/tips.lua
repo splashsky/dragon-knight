@@ -8,6 +8,7 @@
 local classes = require("lib.classes")
 local items = require("lib.items")
 local php = require("lib.php")
+local schema = require("lib.content.schema")
 
 local tips = {}
 
@@ -126,9 +127,10 @@ function tips.sell(entry, price)
 	return t
 end
 
--- A monster: name; level; its description; its lore.
+-- A monster: its portrait (when it has one) and name; level; its description; its lore.
 function tips.monster(m)
-	return { title = m.name, meta = { "Level " .. m.level }, body = m.description, lore = m.lore }
+	return { title = m.name, icon = schema.entity_icon("monsters", m.icon), meta = { "Level " .. m.level },
+		body = m.description, lore = m.lore }
 end
 
 -- The fight menu's Attack button: the player's attack power (and the weapon's name, when

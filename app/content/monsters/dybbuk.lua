@@ -5,6 +5,7 @@ return {
 A restless spirit that wears a living body like a borrowed coat, and it does not give the coat
 back easily. Old women in Roma say a dybbuk takes hold of someone with a debt left unpaid to
 its family. Its blows land harder than they should, and it has no patience for talk.]],
+	icon = "dybbuk",
 	level = 9,
 	maxhp = 34, maxdam = 28, armor = 14,
 	maxexp = 50, maxgold = 17,

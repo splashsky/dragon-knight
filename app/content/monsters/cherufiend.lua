@@ -6,6 +6,7 @@ A devil that was once a guard of the pit gates and still stands like one, with a
 in one hand and a chain in the other. Cherufiends hold the stairs that lead from the mines
 down to the deeper pits, and they check every visitor's papers before they let one pass.
 Most adventurers prefer to fight their way through, which is what the Cherufiends expect.]],
+	icon = "cherufiend",
 	level = 41,
 	maxhp = 195, maxdam = 170, armor = 140,
 	maxexp = 690, maxgold = 230,

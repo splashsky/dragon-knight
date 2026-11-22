@@ -7,6 +7,7 @@ It nests in the lava vents under the hills south of Endworld, and it comes up at
 burn the grazing land on the far side of the ridge. Its fire is hot enough to melt steel
 armour, so most who meet one go in with a plan to get out again.
 ]],
+	icon = "fire_wyrm",
 	level = 32,
 	maxhp = 120, maxdam = 110, armor = 90,
 	maxexp = 260, maxgold = 87,

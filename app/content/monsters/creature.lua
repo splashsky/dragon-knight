@@ -5,6 +5,7 @@ return {
 A shaggy, four-legged thing that lives in the scrub past the Midworld road. Nobody has a
 proper name for it; the name came from a guard's report that left the box blank. Hunters
 say it is slow to anger, but it hits hard once roused, so give it room to run.]],
+	icon = "creature",
 	level = 2,
 	maxhp = 10, maxdam = 8, armor = 2,
 	maxexp = 4, maxgold = 2,

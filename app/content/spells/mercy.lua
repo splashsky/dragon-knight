@@ -8,6 +8,7 @@ return {
 A Paladin's healing is judged by how close the wound came to killing its owner. Mercy
 restores half of whatever is missing, up to a limit, so the worse the wound the more it
 gives back. The healers in Hambry say it is wasted on a scratch, and they are right.]],
+	icon = "mercy",
 	mp = 14,
 	power = 50,                 -- the most HP it restores
 	usable_in = "both",

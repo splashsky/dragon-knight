@@ -6,6 +6,7 @@ The Demon Lord rules a stronghold of demons beyond Endworld and is the last mind
 Demon Prince and the Demon King. He holds court in a hall of black glass and hears petitions from
 his captains by lamplight. Those who reach him rarely leave the hall unchanged.
 ]],
+	icon = "demon_lord",
 	level = 48,
 	maxhp = 300, maxdam = 270, armor = 220,
 	maxexp = 1820, maxgold = 607,

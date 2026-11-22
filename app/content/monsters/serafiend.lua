@@ -6,6 +6,7 @@ A seraph that fell out of the choir and kept its voice. Serafiends still speak i
 language of the heavens, and their words are sweet at first and sour by the second
 sentence. They have been seen guarding the old chapels in the hills above Roma, where the
 bells no longer ring and nobody has asked why.]],
+	icon = "serafiend",
 	level = 38,
 	maxhp = 170, maxdam = 155, armor = 125,
 	maxexp = 555, maxgold = 185,

@@ -6,6 +6,7 @@ Rows of small iron plates laced to a cloth coat, each row overlapping the one be
 the scales of a fish. The smiths of Kalle sell it cheaper than a full plate harness, and
 they will lace it to fit in an afternoon. It is better than chain, though a heavy blow
 still shifts the plates and bruises the ribs.]],
+	icon = "lamellar_armor",
 	category = "armor",
 	price = 650,
 	defense = 40,

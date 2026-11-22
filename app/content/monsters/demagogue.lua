@@ -6,6 +6,7 @@ The Demagogue is a speaker who gathers crowds in the squares of Gilead and tells
 is starving them on purpose. He is often partly right, which makes him dangerous. His followers
 pay in coin and labour. His guards are paid in the bread they took from the granary.
 ]],
+	icon = "demagogue",
 	level = 48,
 	maxhp = 290, maxdam = 260, armor = 210,
 	maxexp = 1760, maxgold = 587,

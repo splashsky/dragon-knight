@@ -7,6 +7,7 @@ usually a ruined inn or manor outside Hambry. It rattles chains, slams doors and
 the names of those who slept there. A haunt is bound to its ground, so the usual cure is
 to burn the building or lay the ghost to rest with the right rites. The Hambry priests
 keep a whole book on them, most of it grim.]],
+	icon = "haunt",
 	level = 22,
 	maxhp = 72, maxdam = 62, armor = 48,
 	maxexp = 160, maxgold = 53,

@@ -206,7 +206,7 @@ t_jar wand
 
 t_section "wand: help"
 t_get /help/items
-expect_body '<td style="width: 30%">Wand<div class="help-lore">'
+expect_body '<td style="width: 30%"><img class="help-icon" src="/static/images/items/wand.png" width="24" height="24" alt="">Wand<div class="help-lore">'
 expect_body '<td style="width: 20%">75 Gold</td><td style="width: 20%">2 Attack Power</td><td style="width: 25%">Casts Magic Bolt, 5 Charges</td>'
 
 fi

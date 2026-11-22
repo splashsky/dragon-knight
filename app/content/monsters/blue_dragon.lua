@@ -6,6 +6,7 @@ The blue dragon lives high in the cold peaks above Kalle, where the snow lies on
 for half the year. It is patient, and it hunts the mountain passes like a judge hunts
 debtors. Its breath freezes armour to the skin, so bring a warm cloak and a spare set of
 gloves, and do not expect the dragon to be impressed by either.]],
+	icon = "blue_dragon",
 	level = 39,
 	maxhp = 180, maxdam = 160, armor = 130,
 	maxexp = 605, maxgold = 202,

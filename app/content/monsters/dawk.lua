@@ -7,6 +7,7 @@ Narcissa. They come out in gangs of four or five, carrying clubs taken from the 
 they have killed. Dawks are not clever, but they are patient, and one will wait a whole
 day at a cave mouth for a traveller to come within reach. Miners leave a lamp burning at
 the entrance for that reason.]],
+	icon = "dawk",
 	level = 19,
 	maxhp = 60, maxdam = 54, armor = 40,
 	maxexp = 136, maxgold = 45,

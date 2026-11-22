@@ -9,6 +9,7 @@ Dawn is the Paladin's answer to the long wars the Demon King started, and the pr
 still written out in the oath book at the Midworld chapel. It restores a large share of the
 maximum hit points and cures every harmful effect in one go. The prayer is long, the cost
 is high, and nobody in the chapel has ever asked for a discount.]],
+	icon = "dawn",
 	mp = 80,
 	power = 40,                 -- percent of the maximum HP it restores
 	usable_in = "both",

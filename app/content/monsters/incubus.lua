@@ -7,6 +7,7 @@ Narcissa. It feeds on tired travellers who lower their guard for an hour's compa
 Hambry say a blessed cloth over the eyes breaks its illusion. It shrugs off the hurt spells
 that would finish a lesser demon, so bring steel.
 ]],
+	icon = "incubus",
 	level = 44,
 	maxhp = 230, maxdam = 205, armor = 175,
 	maxexp = 1100, maxgold = 367,

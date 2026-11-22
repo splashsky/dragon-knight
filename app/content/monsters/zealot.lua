@@ -6,6 +6,7 @@ The Fanatic's more patient brother, who has learned that a quiet voice persuades
 than a shout. Zealots walk the road between Hambry and Gilead with a lantern and a list of
 names, and they remember everyone who has ever argued with the Advocate. They fight with
 the calm of people who have already decided the outcome.]],
+	icon = "zealot",
 	level = 38,
 	maxhp = 168, maxdam = 155, armor = 125,
 	maxexp = 530, maxgold = 177,

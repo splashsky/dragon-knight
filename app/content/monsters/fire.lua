@@ -6,6 +6,7 @@ Fire is a living flame that gathers in the ash fields near Endworld, where old b
 the ground warm. It leaps from torch to thatch to tree with no sense of direction, and it
 grows when it is fed. Water and earth both slow it, though a fire that has eaten a village
 is hard to put out. Endworld scouts carry wet sacks as a matter of habit.]],
+	icon = "fire",
 	level = 24,
 	maxhp = 80, maxdam = 72, armor = 56,
 	maxexp = 175, maxgold = 58,

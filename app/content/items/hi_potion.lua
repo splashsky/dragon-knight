@@ -7,6 +7,7 @@ A deep amber draught from the big apothecary in Bris, bottled in the thick brown
 that keeps the light out. The apothecary sells it to caravan guards on contract, a dozen
 at a time, and makes them sign for each bottle. It is bitter and warm and works faster
 than a potion, which is the point of the price.]],
+	icon = "hi_potion",
 	category = "consumable",
 	price = 180,
 	max_stack = 10,

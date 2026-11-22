@@ -5,6 +5,7 @@ return {
 The pale shape of a soldier who died without his pay and still stands guard over the post. Phantoms
 haunt old barracks and ruined forts where nobody has been paid in years. Blades pass through
 them and Hurt spells do nothing, so you have to outlast the thing.]],
+	icon = "phantom",
 	level = 14,
 	maxhp = 46, maxdam = 38, armor = 24,
 	maxexp = 85, maxgold = 28,

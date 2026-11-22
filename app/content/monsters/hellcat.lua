@@ -6,6 +6,7 @@ A cat the size of a large dog, with fur singed black at the tips and eyes like c
 Hellcat prowls the rocky hills between Roma and Bris, where it waits on a ledge and drops
 on lone riders. It leaves the bones of its kills in neat piles, which the rangers read as
 a warning. Nobody has yet found a way to make one purr.]],
+	icon = "hellcat",
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 128, maxgold = 43,

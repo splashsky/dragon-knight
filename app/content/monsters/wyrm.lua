@@ -7,6 +7,7 @@ coil of scales along its back and small wings it cannot lift itself on, and it l
 the caves under the cliffs north of Roma. Its breath is more smoke than fire, but it is
 enough to blind a man for a minute, and that is usually all it needs.
 ]],
+	icon = "wyrm",
 	level = 28,
 	maxhp = 100, maxdam = 92, armor = 72,
 	maxexp = 220, maxgold = 73,

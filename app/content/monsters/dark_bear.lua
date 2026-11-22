@@ -7,6 +7,7 @@ Gilead where the trees grow too close for light. It shrugs off most hurt spells,
 are told to leave it to the swordsmen. Dark Bears keep to their own hollows and seldom
 follow a traveller out of the forest, but they will guard a den for a long time. Gilead
 furriers pay well for the hides.]],
+	icon = "dark_bear",
 	level = 24,
 	maxhp = 80, maxdam = 70, armor = 56,
 	maxexp = 175, maxgold = 58,

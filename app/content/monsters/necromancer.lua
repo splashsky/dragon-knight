@@ -7,6 +7,7 @@ keep to the old graveyards past Gilead, where they raise what they can from the 
 sell the rest to people who should know better. Most are found by their smell before
 they are seen.
 ]],
+	icon = "necromancer",
 	level = 26,
 	maxhp = 90, maxdam = 80, armor = 62,
 	maxexp = 190, maxgold = 63,

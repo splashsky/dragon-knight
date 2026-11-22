@@ -108,7 +108,7 @@ mo_enemy_set "maxhp = 145"   # with its Life Stone
 t_get /fight; CS=$(t_csrf); expect_body "Monster's MP: 40"
 t_round "csrf=$CS&fight=Fight"
 expect_body 'The Bandit Captain casts Craze.<br>The Bandit Captain will deal 10% more damage until the end of this fight.'
-expect_body '<b>Bandit Captain</b> <span class="fight-statuses">&mdash; Damage Up</span>'
+expect_body '<b>Bandit Captain</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/uber_damage.png" width="16" height="16" alt="">Damage Up</span>'
 mo_is "$(enemy mp)" 30
 # buffed already, not hurt enough for its herb: the attack
 t_round "csrf=$CS&fight=Fight"; expect_body 'You dodge the monster&#39;s attack.'; expect_no_body 'casts Craze'

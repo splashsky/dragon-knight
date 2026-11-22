@@ -9,6 +9,7 @@ at a price that is never quite explained. The thrower lights the rag and throws 
 flask breaks on the monster and the oil keeps burning on its hide until it is spent. A
 guild man in Roma says the trick is to throw it before the thing is close enough to step
 on your feet.]],
+	icon = "fire_flask",
 	category = "consumable",
 	price = 50,
 	max_stack = 10,

@@ -6,6 +6,7 @@ A shield of pale metal with a rim of gold, said to have been carried by the firs
 hold the road out of Midworld. Its face is never scratched, and the wounds of the one who
 carries it seem to close a little faster. It is rarely for sale, and buyers have to be
 known to the smiths.]],
+	icon = "destiny_aegis",
 	category = "shield",
 	price = 25000,
 	defense = 100,

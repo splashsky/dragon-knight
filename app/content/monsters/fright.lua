@@ -6,6 +6,7 @@ The Fright is a pale, thin thing that gathers in cellars and under the floors of
 abandoned mills. Miners near Hambry say it follows the sound of their picks down into
 the dark. Its touch is cold enough to stop a heart, and it seems to take its time about it.
 ]],
+	icon = "fright",
 	level = 25,
 	maxhp = 86, maxdam = 76, armor = 58,
 	maxexp = 180, maxgold = 60,

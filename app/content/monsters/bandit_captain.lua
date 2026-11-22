@@ -8,6 +8,7 @@ return {
 The leader of a bandit band, wearing a chain mail coat taken from a knight he robbed. He keeps
 his men in line with a loud voice and a sharp sword, and he carries one herb in a pouch for when
 he is hurt. Roadside notices offer gold for his head, and most of them are old.]],
+	icon = "bandit_captain",
 	description = "Well armed and armored; works itself into a frenzy and keeps a herb for emergencies.",
 	level = 12,
 	maxhp = 120, maxdam = 20, armor = 12,

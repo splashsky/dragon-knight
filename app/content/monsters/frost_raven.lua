@@ -5,6 +5,7 @@ return {
 A raven from the cold uplands north of Narcissa, where its feathers turn white with frost.
 Its beak leaves a chill that lingers in the bone, and it likes to strike from above.
 Hunters wear fur hats when they go out, and say the frost raven is the one bird they respect.]],
+	icon = "frost_raven",
 	level = 7,
 	maxhp = 26, maxdam = 20, armor = 8,
 	maxexp = 30, maxgold = 10,

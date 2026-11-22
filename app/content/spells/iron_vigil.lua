@@ -10,6 +10,7 @@ said standing up, so the knees do not give out before the dawn. Those who have k
 long one say the iron in the blood is real: the blows land softer and the cuts stop
 oozing. The priests at Gilead say it is faith; the mercenaries who drink with them say
 it is the prayer and the cold, and that they will take either.]],
+	icon = "iron_vigil",
 	mp = 28,
 	power = 35,                 -- percent less damage taken
 	data = { heal = 12 },       -- percent of your maximum HP it restores

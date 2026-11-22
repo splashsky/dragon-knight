@@ -6,6 +6,7 @@ The Shadow Dragon hunts in the hours after dusk, when the roads outside Narcissa
 watchmen light no lamps. Its scales drink light, so a torch only shows where it has been. Few
 who fight it see it clearly. Most remember only the cold wind that came before the bite.
 ]],
+	icon = "shadow_dragon",
 	level = 44,
 	maxhp = 225, maxdam = 200, armor = 170,
 	maxexp = 1010, maxgold = 337,

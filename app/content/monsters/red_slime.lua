@@ -6,6 +6,7 @@ A redder and crosser cousin of the blue slime, found in the damp cellars and dit
 Midworld. It stings a little more than its blue relative, and it does not take kindly to
 being poked. Cellar keepers swear a pinch of salt sends one back down the drain, though it
 never works twice.]],
+	icon = "red_slime",
 	level = 1,
 	maxhp = 6, maxdam = 5, armor = 1,
 	maxexp = 2, maxgold = 1,

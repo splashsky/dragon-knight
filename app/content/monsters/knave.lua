@@ -5,6 +5,7 @@ return {
 A petty crook who works the back alleys of the towns and the roads between them. A knave will
 pick your purse, then your pocket, and only then ask whether you wanted to fight. The town guard
 knows his face but seldom his name, since he changes it every few weeks.]],
+	icon = "knave",
 	level = 9,
 	maxhp = 36, maxdam = 30, armor = 15,
 	maxexp = 52, maxgold = 17,

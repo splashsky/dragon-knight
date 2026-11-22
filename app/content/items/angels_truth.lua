@@ -5,6 +5,7 @@ return {
 A small crystal lens that is cloudy until a true word is spoken close to it. Guardians drop
 them when struck down, and the judges of Narcissa keep a box of them for disputes. Those who
 wear one say they cannot lie without the lens clouding first.]],
+	icon = "angels_truth",
 	category = "accessory",
 	drop_level = 35,
 	modifiers = {

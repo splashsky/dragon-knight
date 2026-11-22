@@ -10,6 +10,7 @@ Not sleep, whatever the mages say. A Warrior who has taken a hard blow with the 
 a shield knows the look: the eyes go somewhere else for a heartbeat, and the feet forget
 what they were doing. It lasts only a turn or two, so it is a poor reason to stop
 fighting and an excellent one to swing again.]],
+	icon = "stun",
 	mp = 6,
 	power = 2,                  -- the chance in 15 that it stays dazed each turn
 	messages = {

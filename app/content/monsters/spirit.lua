@@ -7,6 +7,7 @@ Roma. A spirit cannot be cut with a sword, but it can still hurt by draining war
 memory. Priests in Bris sell a blessing that makes them easier to hit, though the priests
 disagree on whether the spirits feel the difference. Do not answer when one calls your
 name.]],
+	icon = "spirit",
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 132, maxgold = 44,

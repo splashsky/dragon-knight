@@ -7,6 +7,7 @@ edge of villages on the nights of the full moon, and the farmers around Kalle ba
 doors and keep the dogs in. They still understand speech and enjoy using it to mock the
 hunters who come looking. Silver is the only thing that reliably ends one, which is why
 the smiths charge double for it.]],
+	icon = "werewolf",
 	level = 17,
 	maxhp = 56, maxdam = 48, armor = 38,
 	maxexp = 124, maxgold = 41,

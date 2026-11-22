@@ -6,6 +6,7 @@ A caster who learned enough magic to be dangerous and not enough to be careful. 
 apprentices, quarrel with them, and then forget why. They are common in the towns past Bris,
 where the libraries are cheap and nobody checks the guild lists. Keep your distance, since
 their spells carry farther than their manners.]],
+	icon = "sorceror",
 	level = 11,
 	maxhp = 41, maxdam = 33, armor = 22,
 	maxexp = 68, maxgold = 23,

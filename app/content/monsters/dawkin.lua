@@ -7,6 +7,7 @@ lead the gangs in the mines beyond Hambry and keep the best loot for themselves,
 mostly means the miners' gold. A Dawkin is cunning enough to retreat when badly hurt and
 come back with friends. One that talks has usually already decided what it will do with
 you.]],
+	icon = "dawkin",
 	level = 21,
 	maxhp = 70, maxdam = 60, armor = 46,
 	maxexp = 155, maxgold = 52,

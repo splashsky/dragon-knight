@@ -77,7 +77,7 @@ end
 
 local function status_list(c)
 	local out = {}
-	for _, s in ipairs(c.statuses) do out[#out + 1] = { key = s.key, name = s.row.name, turns = s.turns_left } end
+	for _, s in ipairs(c.statuses) do out[#out + 1] = { key = s.key, name = s.row.name, turns = s.turns_left, icon = s.row.icon } end
 	return out
 end
 

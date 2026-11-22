@@ -5,6 +5,7 @@ return {
 A woodland spirit that sings from the edge of ponds and lures wanderers off the path. Men who
 follow the singing are found later, dry and sleepy, sitting by the water. Nymphs do not fight
 well, but they have never needed to.]],
+	icon = "nymph",
 	level = 12,
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 70, maxgold = 23,

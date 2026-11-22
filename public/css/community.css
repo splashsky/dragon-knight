@@ -167,6 +167,10 @@ table.help-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
 	text-align: center;
 	padding: 3px;
 }
+/* an entry's own icon (3.1: entity_icon) before its name: items, spells, statuses, allies;
+	the monsters' portraits larger, in a thin frame */
+.help-icon { width: 24px; height: 24px; margin-right: 6px; vertical-align: middle; }
+.help-portrait { width: 32px; height: 32px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35); }
 /* lore (content files' `lore`) under an entry */
 .help-lore { max-width: 46em; margin: 3px 0 0; font-size: 13px; font-style: italic; }
 .help-lore p { margin: 0 0 0.3em; }

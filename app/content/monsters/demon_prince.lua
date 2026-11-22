@@ -6,6 +6,7 @@ The Demon Prince commands the demons on the roads beyond Endworld and sends them
 waves. He is cleverer than his troops and knows the names of the knights who have been sent
 against him. He rarely fights himself. He prefers to watch from a height and count the dead.
 ]],
+	icon = "demon_prince",
 	level = 47,
 	maxhp = 270, maxdam = 240, armor = 200,
 	maxexp = 1520, maxgold = 507,

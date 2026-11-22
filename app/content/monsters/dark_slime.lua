@@ -5,6 +5,7 @@ return {
 A slime that has lived too long in the cellars under old towns, where the light never reaches it.
 It is darker than the blue kind, almost black, and it stings more. Cellar keepers salt the
 stairs to keep it off, which works until the salt runs out.]],
+	icon = "dark_slime",
 	level = 10,
 	maxhp = 38, maxdam = 32, armor = 18,
 	maxexp = 62, maxgold = 21,

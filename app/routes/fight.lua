@@ -37,6 +37,7 @@ local json = require("lib.json")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
 local round = require("fight.round")
+local schema = require("lib.content.schema")
 local spells = require("lib.spells")
 local state = require("fight.state")
 local tips = require("lib.tips")
@@ -178,10 +179,12 @@ local function hotbar_view(user, buttons)
 	return bar, more
 end
 
--- name (turns left) of each status of combatant c, for the page
+-- name (turns left) and icon of each status of combatant c, for the page
 local function status_list(c)
 	local out = {}
-	for _, s in ipairs(c.statuses) do out[#out + 1] = { name = s.row.name, turns = s.turns_left } end
+	for _, s in ipairs(c.statuses) do
+		out[#out + 1] = { name = s.row.name, turns = s.turns_left, icon = schema.entity_icon("statuses", s.row.icon) }
+	end
 	return out
 end
 
@@ -198,11 +201,12 @@ local function view_of(f)
 	for _, c in ipairs(state.side(f, "enemy", true)) do
 		local mp = shows_mp(c)
 		enemies[#enemies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, mp = mp and c.mp or nil,
-			maxmp = mp and c.maxmp or nil, statuses = status_list(c), row = c.row }
+			maxmp = mp and c.maxmp or nil, statuses = status_list(c), row = c.row,
+			icon = schema.entity_icon("monsters", c.row.icon) }
 	end
 	for _, c in ipairs(state.allies(f)) do
 		allies[#allies + 1] = { id = c.id, name = c.row.name, hp = c.hp, maxhp = c.maxhp, turns = c.turns_left,
-			statuses = status_list(c) }
+			statuses = status_list(c), icon = schema.entity_icon("summons", c.row.icon) }
 	end
 	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p) }
 end
@@ -299,6 +303,7 @@ local function fight_page(req, f, lines)
 	page.monstername, page.monsterhp, page.monstermp = first.name, first.hp, first.mp
 	page.monsterid, page.monstermaxhp, page.monstermaxmp = first.id, first.maxhp, first.maxmp
 	page.monster = first.row   -- its tooltip
+	page.monstericon = first.icon   -- its portrait (nil: none)
 	if not page.dead then
 		page.locked = round.locked(f)
 		local weapon = inventory.equipped(user.id).weapon

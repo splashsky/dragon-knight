@@ -7,6 +7,7 @@ traveller on the road to Endworld. It takes no shape until it is close, and then
 whatever the hero is most afraid of. A steady hand and a good night's sleep keep it at
 bay. Several soldiers from Gilead have been found sitting by the road, unharmed and unable
 to say why they stopped.]],
+	icon = "fear",
 	level = 23,
 	maxhp = 76, maxdam = 66, armor = 52,
 	maxexp = 165, maxgold = 55,

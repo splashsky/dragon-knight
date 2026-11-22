@@ -4,6 +4,7 @@ return {
 	lore = [[
 A tall kite-shaped shield of oak banded with iron, carried by footmen who stand in a line.
 It covers the body from knee to chin. It is slow to lift and very hard to get past.]],
+	icon = "large_shield",
 	category = "shield",
 	price = 2500,
 	defense = 30,

@@ -6,6 +6,7 @@ The lowest of the devils that come up from the pits under the old mines, and the
 ones most adventurers meet. Fiends are fast, strong and dull, and they fight for the
 pleasure of it rather than any plan. A fiend's skin is hot to the touch, so wear gloves
 if you must grapple with one.]],
+	icon = "fiend",
 	level = 37,
 	maxhp = 160, maxdam = 145, armor = 120,
 	maxexp = 445, maxgold = 148,

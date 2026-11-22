@@ -19,6 +19,7 @@ blood on the blade went back into the body that spilt it. Paladins who ride with
 caravans pick it up for the same reason, though they say a prayer while they do it. The
 heal is small next to a proper healing spell, but it arrives in the middle of a fight,
 where a Herb cannot reach you.]],
+	icon = "reaver",
 	mp = 12,
 	power = 50,                 -- the most damage it deals
 	data = { pct = 100 },       -- percent of your strength it deals before that limit

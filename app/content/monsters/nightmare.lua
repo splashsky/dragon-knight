@@ -5,6 +5,7 @@ return {
 A horse-shaped thing with eyes like cooling coals, said to visit sleeping travellers in the
 inns beyond Narcissa. Those who wake with bruises and no memory of the night usually blame
 it. Mages keep a charm of salt by the bed, and the wise ones say it helps.]],
+	icon = "nightmare",
 	level = 33,
 	maxhp = 138, maxdam = 125, armor = 100,
 	maxexp = 300, maxgold = 100,

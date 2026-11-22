@@ -5,6 +5,7 @@ return {
 A scorpion as black as burnt wood, hiding under stones in the dry hills past Narcissa. Its sting
 is strong enough to numb an arm for a day, and it will stab at anything that comes near its rock.
 Miners give them a wide berth, and most of them learn that only once.]],
+	icon = "dark_scorpion",
 	level = 15,
 	maxhp = 48, maxdam = 40, armor = 26,
 	maxexp = 95, maxgold = 32,

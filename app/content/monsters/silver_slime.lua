@@ -7,6 +7,7 @@ Endworld and in a few wet cellars near Gilead. Its body is bright and hard to hi
 it is said to carry a pocketful of coins from the people it has swallowed. Nobody has
 yet found a spell that will hold it still, which is why it is so seldom caught.
 ]],
+	icon = "silver_slime",
 	level = 30,
 	maxhp = 15, maxdam = 100, armor = 200,
 	maxexp = 15, maxgold = 1000,

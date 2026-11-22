@@ -5,6 +5,7 @@ return {
 A long-hafted axe with a wide, two-edged head, made for cutting through shields and the
 men behind them. Armourers in the bigger towns keep a few on the rack, and they are not
 cheap. The haft is heavy, so only strong arms swing it well.]],
+	icon = "battle_axe",
 	category = "weapon",
 	price = 1200,
 	attack = 50,

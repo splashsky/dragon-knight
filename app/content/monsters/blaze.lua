@@ -7,6 +7,7 @@ goes in the smoke. It is a fire the old way, the kind that starts in a ruined mi
 ends in a town, and it has been seen working its way along the road from Roma to Bris.
 Water helps, but a Blaze is rarely near enough to a well when it arrives.
 ]],
+	icon = "blaze",
 	level = 31,
 	maxhp = 118, maxdam = 108, armor = 84,
 	maxexp = 250, maxgold = 83,

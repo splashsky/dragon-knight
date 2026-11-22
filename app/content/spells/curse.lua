@@ -16,6 +16,7 @@ Most spells ask the world for a favour. A curse only asks it to look away for a 
 the monster's arm forgets how hard it was swinging. It is easy to cast and hard to cast
 well, and the priests of Gilead will not say who taught it to them. Against something that
 hits for three hundred a turn, nobody is shy about using it.]],
+	icon = "curse",
 	mp = 30,
 	power = 5,                  -- how many turns the weakness lasts
 	data = { pct = 50 },        -- percent less damage the monster deals

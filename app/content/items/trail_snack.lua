@@ -6,6 +6,7 @@ return {
 A square of oats, dried fruit and something sweet enough to hide the grit. Bakers in the
 market streets pack them in wax paper, and farmers' children eat them on the walk out to
 the fields. It does not fill you up, but it puts the legs back under you for a while.]],
+	icon = "trail_snack",
 	category = "consumable",
 	price = 20,
 	max_stack = 10,

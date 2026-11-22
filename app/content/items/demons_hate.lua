@@ -5,6 +5,7 @@ return {
 A black iron ring with a red thread wound through it, taken from a demon that climbed out of
 the cellars of Endworld. The wearer's strength swells as their temper rises. Mages who try it
 say their spells come out thin and bitter.]],
+	icon = "demons_hate",
 	category = "accessory",
 	drop_level = 45,
 	modifiers = {

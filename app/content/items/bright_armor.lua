@@ -6,6 +6,7 @@ A breastplate of polished silver-grey steel, worn by knights who want to be seen
 Armourers in the older towns say the bright finish takes a year of polishing, and that a
 wearer who keeps it shining learns faster in a fight. It is heavy, loud on stairs, and
 very hard to hide.]],
+	icon = "bright_armor",
 	category = "armor",
 	price = 10000,
 	defense = 175,

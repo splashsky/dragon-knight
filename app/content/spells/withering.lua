@@ -16,6 +16,7 @@ Old Gilead has a saying that the Mage who lives on other people's blood is still
 a thin one. Withering is the spell that makes the saying true. It pulls strength out of the
 target a little each turn and passes it to the caster, so a long fight can be turned around
 by a caster who is patient enough to wait for it. Most Mages who learn it stop being thin.]],
+	icon = "withering",
 	mp = 34,
 	power = 4,                  -- how many turns the drain lasts
 	data = { min = 14, max = 24 },   -- hit points drained per turn

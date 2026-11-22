@@ -5,6 +5,7 @@ return {
 The spirit of a moneylender who died still counting his debts. Specters hang around the old
 counting houses in the towns, rattling coin that is no longer there. Anyone who owes money to the
 dead is in for a nasty surprise.]],
+	icon = "specter",
 	level = 14,
 	maxhp = 46, maxdam = 38, armor = 24,
 	maxexp = 90, maxgold = 30,

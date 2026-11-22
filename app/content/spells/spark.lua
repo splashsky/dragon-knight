@@ -17,6 +17,7 @@ return {
 Every Mage has singed a finger on this one. It is cheap, it is loud, and it does little
 more than make a monster flinch. The old masters kept it in the course anyway, because a
 spark costs less than a cup of water and it still works at the end of a long fight.]],
+	icon = "spark",
 	mp = 3,
 	power = 8,                  -- the most damage it deals, before the caster's level bonus
 	messages = {

@@ -6,6 +6,7 @@ A scorpion that left the desert and took up thieving, mostly in the caravan camp
 Roma. It is cleverer than its cousins, and will dart in to take a purse or a pouch before
 you blink. Merchants in Roma keep their coin in locked chests and pay the guards to watch
 the stables.]],
+	icon = "rogue_scorpion",
 	level = 7,
 	maxhp = 28, maxdam = 22, armor = 9,
 	maxexp = 32, maxgold = 11,

@@ -5,6 +5,7 @@ return {
 A full suit of riveted iron plate, heavy enough that the wearer has to plan the day around
 it. Armourers in the larger towns make it to order, and most of the cost goes into the
 joints. It stops a sword well, though a fighter in iron tires quickly on long roads.]],
+	icon = "iron_plate",
 	category = "armor",
 	price = 2000,
 	defense = 100,

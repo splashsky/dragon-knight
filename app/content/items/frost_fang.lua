@@ -8,6 +8,7 @@ Ice wolves live high on the passes past Narcissa and rarely come down to be seen
 they lose are cold to the touch even in summer, and a frozen tooth will shatter if it is
 dropped on stone. Mages who wear one say the cold runs up their arm and into the spell, which
 is more than they can say for their own hands.]],
+	icon = "frost_fang",
 	category = "accessory",
 	drop_level = 24,
 	casts = "frostbite",

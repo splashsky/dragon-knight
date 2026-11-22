@@ -7,6 +7,7 @@ and the smiths who work it still have to test each ingot for weight. The blade i
 and takes an edge better than any road steel. Endworld's merchants sell it to the few
 who can pay, and they will tell you the price is the cost of the ore, which is true
 and not the whole story.]],
+	icon = "starsteel_sword",
 	category = "weapon",
 	price = 25000,
 	attack = 215,

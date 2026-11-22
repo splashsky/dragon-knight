@@ -6,6 +6,7 @@ The eldest of the wyvern line, which has outlived three generations of cart-driv
 road past Gilead. Its scales are the colour of old copper, and its wings are wider than
 the road is long in places. It hunts only from the high ridges, so a party that reaches the
 ridge road has already made it halfway through the fight.]],
+	icon = "greatest_wyvern",
 	level = 37,
 	maxhp = 162, maxdam = 150, armor = 120,
 	maxexp = 465, maxgold = 155,

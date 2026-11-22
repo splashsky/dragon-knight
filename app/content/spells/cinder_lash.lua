@@ -22,6 +22,7 @@ A Mage who has been on the road a week learns to read a monster before lashing i
 unhurt beast has its whole strength, and a Cinder Lash laid on it while it is still
 fresh does double the harm. Once the monster has been bloodied the lash is only a fine
 bit of fire, so Roma's guild masters tell their pupils to cast it first and talk later.]],
+	icon = "cinder_lash",
 	mp = 16,
 	power = 36,                 -- the most damage it deals (twice this at full HP)
 	messages = {

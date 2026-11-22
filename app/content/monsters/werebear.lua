@@ -7,6 +7,7 @@ heavier. They keep to the wooded slopes between Kalle and Narcissa, and they are
 dangerous in the spring, when they are hungry and the honey is not yet in. Hunters who
 meet one tend to leave their bows on the ground and run.
 ]],
+	icon = "werebear",
 	level = 26,
 	maxhp = 92, maxdam = 84, armor = 65,
 	maxexp = 195, maxgold = 65,

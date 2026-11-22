@@ -8,6 +8,7 @@ on the box. The edge will split a shield and a mail sleeve in one stroke, and it
 last a week in the hands of a careless man. A wielder who keeps it in a fight finds that
 he has less blood to lose, which is the sort of thing that makes a buyer read the label
 twice.]],
+	icon = "glass_blade",
 	category = "weapon",
 	price = 9000,
 	attack = 190,

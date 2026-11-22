@@ -8,6 +8,7 @@ A warm, steady healing that works on its own, from a prayer, a salve or a spell 
 someone has left running. In a fight it closes wounds a little each turn. On the road it
 does the same after each step, which is why the old travelers never bothered with an inn
 for the first few days. It runs out after a while and does not stack with itself.]],
+	icon = "regen",
 	kind = "helpful",
 	tick_on = "turn_end",
 	scope = "both",

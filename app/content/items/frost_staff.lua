@@ -7,6 +7,7 @@ The Kalle miners who go down after bears carry these staves, because a cave bear
 has been frosted sits down. The silver rime on the head is put on by a cold-smith who
 works the mine's winter ice pits. A Mage who buys one is usually going to the back
 passages next, and the staff does not care whether anyone thinks that is wise.]],
+	icon = "frost_staff",
 	category = "weapon",
 	price = 700,
 	attack = 6,

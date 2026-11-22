@@ -5,6 +5,7 @@ return {
 A suit of black iron plate, forged in the same mines as the dark blades and worn by many
 of the men who work them. It turns most blows, but the old soldiers say the wearer grows
 slow to learn. Few armourers will put their mark on it.]],
+	icon = "dark_armor",
 	category = "armor",
 	price = 5000,
 	defense = 150,

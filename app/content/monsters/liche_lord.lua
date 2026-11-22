@@ -7,6 +7,7 @@ ledgers and the bone-chambers in order. He is precise, patient and very fond of 
 Travellers who carry a receipt from one of his clerks are usually let past. Those without one
 are written down as missing.
 ]],
+	icon = "liche_lord",
 	level = 42,
 	maxhp = 210, maxdam = 190, armor = 155,
 	maxexp = 850, maxgold = 283,

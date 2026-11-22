@@ -5,6 +5,7 @@ return {
 The bones of a fighter, raised to walk the graveyards outside the towns by a spell nobody has
 bothered to undo. A skeleton keeps no memory of its name and no interest in yours. Its rattling
 carries a long way on a still night, which is how the watch usually knows it is coming.]],
+	icon = "skeleton",
 	level = 10,
 	maxhp = 38, maxdam = 30, armor = 18,
 	maxexp = 58, maxgold = 19,

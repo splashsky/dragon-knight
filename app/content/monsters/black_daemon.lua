@@ -7,6 +7,7 @@ the road to Endworld. Its hide is harder than any armour the smiths of Gilead ha
 shrugs off the hurt spells that stop lesser demons, and it does not sleep. Several knights have
 tried to bind it. None came back to say how it went.
 ]],
+	icon = "black_daemon",
 	level = 50,
 	maxhp = 400, maxdam = 400, armor = 280,
 	maxexp = 3000, maxgold = 1000,

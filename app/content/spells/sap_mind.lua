@@ -20,6 +20,7 @@ Some of the old texts call this the thief's spell, and the Mages of Narcissa do 
 argue. The bolt goes in as force, and on the way out it takes a little of whatever
 the monster was using to keep itself going. Nobody has ever found a way to make it
 return the favour, so the Mage who casts it is usually the one who comes out ahead.]],
+	icon = "sap_mind",
 	mp = 16,
 	power = 32,                 -- the most damage it deals; a quarter of it comes back as MP
 	messages = {

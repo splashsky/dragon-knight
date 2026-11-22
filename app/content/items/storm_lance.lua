@@ -7,6 +7,7 @@ Endworld's storm-watchers string a copper wire down the shaft of each lance and 
 from a tower in the spring. Three or four good storms and the wire holds enough charge
 to be worth carrying. Mages who buy one are warned that the lance is heavy, the spell
 costs the Mage a turn of standing still, and the wire does not forgive a wet hand.]],
+	icon = "storm_lance",
 	category = "weapon",
 	price = 35000,
 	attack = 150,

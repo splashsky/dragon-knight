@@ -6,6 +6,7 @@ A corpse that has been up too long, wandering the old battlefields near Narcissa
 for a warm meal. Ghouls eat whatever they can find, and they are not particular about the
 dead or the living. Gravediggers cover the bodies with lime and stone, which slows them
 down but does not stop them.]],
+	icon = "ghoul",
 	level = 7,
 	maxhp = 29, maxdam = 24, armor = 9,
 	maxexp = 34, maxgold = 11,

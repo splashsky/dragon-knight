@@ -8,6 +8,7 @@ the road he once guarded. He is not cruel for the sake of it, but he has done th
 not describe, and he expects the same loyalty from his men that he no longer gives to the
 crown.
 ]],
+	icon = "renegade",
 	level = 42,
 	maxhp = 205, maxdam = 185, armor = 150,
 	maxexp = 780, maxgold = 260,

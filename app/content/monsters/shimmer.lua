@@ -5,6 +5,7 @@ return {
 A shape of rippling light that drifts over the salt flats near Gilead, too bright to look at
 for long. Spells of harm do nothing to it, so only steel will end its drifting. Salt traders
 say it appears only in the hottest weeks, and that anyone who follows it is not seen again.]],
+	icon = "shimmer",
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 14,
 	maxexp = 45, maxgold = 15,

@@ -5,6 +5,7 @@ return {
 A broad plate from the belly of an adult dragon, found on the scorched road past Hambry. It
 is thick enough to stop a spear and stays warm for an hour after the beast has died. Warriors
 in Gilead have had theirs set into breastplates for generations.]],
+	icon = "dragons_plate",
 	category = "accessory",
 	drop_level = 30,
 	modifiers = { { kind = "stat", stat = "defense", amount = 50 } },

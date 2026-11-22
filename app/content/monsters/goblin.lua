@@ -5,6 +5,7 @@ return {
 Small, green and loud, goblins live in the hills along the road out of Roma and steal anything
 they can carry. They raid caravans and run before the guards arrive. A goblin will bargain, lie,
 and bargain again, and seldom keeps to any of it.]],
+	icon = "goblin",
 	level = 10,
 	maxhp = 36, maxdam = 30, armor = 15,
 	maxexp = 54, maxgold = 18,

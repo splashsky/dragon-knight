@@ -7,6 +7,7 @@ prove it by burning archives and poisoning wells. He is articulate and cold, and
 following of bored students. He says he is not cruel. He simply cannot see why anyone should be
 spared.
 ]],
+	icon = "nihilist",
 	level = 47,
 	maxhp = 280, maxdam = 250, armor = 205,
 	maxexp = 1640, maxgold = 547,

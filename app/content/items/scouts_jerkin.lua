@@ -6,6 +6,7 @@ A short jerkin of waxed canvas over a leather liner, cut so that the arms swing 
 for a bow or a knife. Scouts who run the road between the towns buy them in pairs, one
 to wear and one to dry. It takes the edge off a blow and leaves the wearer light on
 the feet.]],
+	icon = "scouts_jerkin",
 	category = "armor",
 	price = 110,
 	defense = 12,

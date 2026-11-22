@@ -11,6 +11,7 @@ where most of them are still buried. The survivors did not talk about the pass m
 they taught their recruits one rule: when you are at the end of
 your rope, stop looking for the way out and tie the knot. It does not work at full
 health, which is the point; a man who casts it early has simply misjudged the fight.]],
+	icon = "last_stand",
 	mp = 10,
 	power = 50,                 -- percent more damage dealt
 	data = { guard = 25 },      -- percent less damage taken

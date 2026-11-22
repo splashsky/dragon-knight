@@ -10,6 +10,7 @@ Every village has a man who can shout loud enough to wake the dead, and most of 
 learned it from a sergeant. The cry is nothing but breath and noise, but a Warrior who
 starts a fight roaring tends to finish it with his blood up. It costs a little wind and
 a little magic, and it steadies the shoulders as well.]],
+	icon = "war_cry",
 	mp = 6,
 	power = 8,                  -- percent more damage
 	data = { defense = 8 },     -- percent less damage taken

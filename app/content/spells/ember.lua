@@ -16,6 +16,7 @@ Mages who have been burned once never forget the first lesson: fire keeps workin
 spell is done. An Ember leaves a small, stubborn flame on the target that eats a few hit
 points every turn, the way a cook's oil spatter keeps stinging the wrist. Hunters in Roma
 swear it also makes a wolf think twice about coming back.]],
+	icon = "ember",
 	mp = 10,
 	power = 4,                  -- how many turns the fire burns
 	data = { amount = 7 },      -- hit points it burns away each turn

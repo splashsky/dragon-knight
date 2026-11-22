@@ -8,6 +8,7 @@ a month if nobody stops them. Their armour is plain black steel with the crest s
 They rarely speak, and when they do it is to name the oath they serve, which is never the
 king's.
 ]],
+	icon = "dark_knight",
 	level = 43,
 	maxhp = 220, maxdam = 200, armor = 160,
 	maxexp = 930, maxgold = 310,

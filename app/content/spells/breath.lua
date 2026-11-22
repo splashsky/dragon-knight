@@ -6,6 +6,7 @@ return {
 Old healers say Breath is a Life spell that has been left out in the wind. It draws clean
 air deep into the lungs and pulls the wounds closed with it. Few Mages can pay for the mana,
 but those who can seldom go back to herbs.]],
+	icon = "breath",
 	mp = 50,
 	power = 100,                 -- the most HP it restores
 	usable_in = "both",

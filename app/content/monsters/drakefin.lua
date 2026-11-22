@@ -5,6 +5,7 @@ return {
 A drake with long fins along its back and tail, found in the river marshes near Hambry. The
 fins make it quick in water, and it can cross a ford before a man has his boot in. Fishers
 near Hambry say a drakefin will take a line if it is hungry, and rarely lets go.]],
+	icon = "drakefin",
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 12,
 	maxexp = 40, maxgold = 13,

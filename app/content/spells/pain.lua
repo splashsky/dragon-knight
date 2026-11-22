@@ -13,6 +13,7 @@ return {
 Pain is the step up from Hurt for Mages with a few coins and a bigger grudge. The jolt is
 nastier and the target feels it for longer, though the spell does not make it any smarter.
 Many a Paladin learns it to keep a sword arm free for the other work.]],
+	icon = "pain",
 	mp = 12,
 	power = 35,                 -- the most damage it deals
 	messages = {

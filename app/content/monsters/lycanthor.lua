@@ -7,6 +7,7 @@ the hill country past Kalle, and it has learned to set traps and to wait downwin
 camp. Hunters who have survived one say it talks to its pack in a low voice, and that the
 voice sounds like their own.
 ]],
+	icon = "lycanthor",
 	level = 28,
 	maxhp = 100, maxdam = 90, armor = 70,
 	maxexp = 210, maxgold = 70,

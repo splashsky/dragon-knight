@@ -19,6 +19,7 @@ the sergeants could see where the blow landed. The trick is to swing from the hi
 let the weight of the blade do the work, which is most of what strength is good for. A
 Warrior who has done it a thousand times can cut a goblin in half and still be out of
 breath for the next one.]],
+	icon = "cleave",
 	mp = 4,
 	power = 24,                 -- the most damage it deals
 	data = { pct = 100 },       -- percent of your strength it deals before that limit

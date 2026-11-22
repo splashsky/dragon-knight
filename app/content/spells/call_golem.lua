@@ -20,6 +20,7 @@ company. It takes a long time to wake and it is slow to turn, but once it has st
 is little a monster can do about it. Paladins use it to hold a line while the rest of the
 party recovers, and then they thank it, because a golem that is not thanked seems to take
 longer to rise the next time.]],
+	icon = "call_golem",
 	mp = 40,
 	power = 4,                  -- rounds the golem stays
 	target = "self",

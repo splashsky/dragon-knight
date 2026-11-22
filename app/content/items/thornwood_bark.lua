@@ -8,6 +8,7 @@ Thornwood grows in the bog below Kalle, where the trees put out spines to keep t
 Bark stripped from the trunk dries hard enough to stop a club, and the woodcutters who dare
 to take it say it sheds rain better than any cloak. Mages dislike the stuff, since it seems
 to pull the magic out of the air around it.]],
+	icon = "thornwood_bark",
 	category = "accessory",
 	drop_level = 20,
 	modifiers = {

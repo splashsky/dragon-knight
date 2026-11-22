@@ -6,6 +6,7 @@ The Megadoomer's elder, which stands in the dead hall beneath the Hambry road an
 count that is nearly done. Its hood hides a face that nobody has described twice in the
 same way. Scholars in Gilead say the count is the only real thing about it, and that when
 it reaches its end the road will be quieter for a while.]],
+	icon = "ultradoomer",
 	level = 36,
 	maxhp = 155, maxdam = 140, armor = 115,
 	maxexp = 395, maxgold = 132,

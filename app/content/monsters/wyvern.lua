@@ -6,6 +6,7 @@ A two-legged dragon kin that nests on the cliffs above the road between Bris and
 has no fire, only a barbed tail and a bad temper, and it will hunt a cart for a whole day
 to get at the horses. Carters paint their wagons with pitch, which the wyverns hate and
 which does not always work.]],
+	icon = "wyvern",
 	level = 33,
 	maxhp = 134, maxdam = 120, armor = 95,
 	maxexp = 290, maxgold = 97,

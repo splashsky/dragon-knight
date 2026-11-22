@@ -5,6 +5,7 @@ return {
 A shimmer on the desert road that looks like water, a town, or a friend waving. Walk toward it
 and it moves off, and then it comes for you instead. Caravan drivers mark on their maps where
 they last saw one, then take a different road.]],
+	icon = "mirage",
 	level = 11,
 	maxhp = 40, maxdam = 32, armor = 20,
 	maxexp = 64, maxgold = 21,

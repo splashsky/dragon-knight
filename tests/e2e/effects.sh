@@ -31,7 +31,8 @@ t_get /fight; CS=$(t_csrf); expect_body "name=\"spell\" value=\"$(sp poison)\" t
 t_round "csrf=$CS&spell=Spell&userspell=$(sp poison)"
 expect_body 'You have cast the Poison spell. The monster is poisoned for 3 turns.'
 expect_body 'class="fight-roundend">The Titan takes '
-expect_body '<b>Titan</b> <span class="fight-statuses">&mdash; Poisoned <span class="light">(2 turns)</span></span>'
+expect_body '<b>Titan</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned <span class="light">(2 turns)</span></span>'
+expect_body 'class="fight-status-icon" src="/static/images/statuses/poison.png"'
 ef_is "$T_STATUSES" "enemy:poison/2"
 hp=$(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")
 [ "$hp" -ge 29994 ] && [ "$hp" -le 29998 ] && t_ok || t_fail "poison damage: monster HP $hp"
@@ -43,7 +44,7 @@ t_round "csrf=$CS&spell=Spell&userspell=$(sp hyper_beam)"
 expect_body 'You have cast the Hyper Beam spell for'; expect_body 'You must recharge next turn.'
 expect_body "You can't act this turn."; expect_body 'name="continue" value="Continue"'
 expect_no_body 'name="fight"'; expect_no_body 'name="run"'
-expect_body '<b>You</b> <span class="fight-statuses">&mdash; Recharging <span class="light">(1 turn)</span></span>'
+expect_body '<b>You</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/recharging.png" width="16" height="16" alt="">Recharging <span class="light">(1 turn)</span></span>'
 MP=$(t_sql "SELECT currentmp FROM users $EQ")
 # any command while locked is the turn's "Continue" (no attack, no spell, no escape)
 t_round "csrf=$CS&spell=Spell&userspell=$(sp heal)"
@@ -93,7 +94,7 @@ t_section "effects: Antidote in a fight"
 t_give effector antidote 2
 t_fight_status effector 1 poison 'max=i:3
 min=i:1' 3
-t_get /fight; CS=$(t_csrf); expect_body '<b>You</b> <span class="fight-statuses">&mdash; Poisoned'
+t_get /fight; CS=$(t_csrf); expect_body '<b>You</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/poison.png" width="16" height="16" alt="">Poisoned'
 t_round "csrf=$CS&item=Use+Item&useritem=$(it antidote)"; expect_body 'You have used the Antidote, and feel better.'
 ef_is "$T_STATUSES" ""; ef_is "$T_ITEMS" "antidote"
 t_round "csrf=$CS&item=Use+Item&useritem=$(it antidote)"; expect_body 'You don&#39;t need the Antidote now.'

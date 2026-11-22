@@ -174,6 +174,14 @@ function schema.has_icon(spec, name)
 	return type(name) == "string" and schema.valid_key(name) and dk.static_exists(schema.icon_path(spec, name))
 end
 
+-- The URL of the icon of an entity of kind `kind_name` (its "icon" field: monsters,
+-- statuses, summons, ...), or nil when it has none or its file is gone.
+function schema.entity_icon(kind_name, name)
+	local spec = schema.kind(kind_name).field("icon")
+	if spec and schema.has_icon(spec, name) then return "/static/" .. schema.icon_path(spec, name) end
+	return nil
+end
+
 -- The URL of icon `name` of an "icon" field: /static/<dir>/<name>.png, or the fallback
 -- (/static/<spec.fallback>, by default /static/<dir>/default.png) when the name is empty
 -- or invalid or its file is missing.

@@ -6,6 +6,7 @@ A breastplate etched with the same runes as the magic blades, worked on by smith
 mages together. Its wearers say their mana comes back a little faster, and that the metal
 holds a charge in cold weather. It is expensive and somewhat heavy, but few fighters who
 own one want to trade it.]],
+	icon = "magic_armor",
 	category = "armor",
 	price = 4000,
 	defense = 125,

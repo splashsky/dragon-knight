@@ -5,6 +5,7 @@ return {
 A round wooden shield with an iron rim and a leather grip, the usual pick for a fighter who
 needs the off hand free. Most warriors own one before they can afford armour. It is light
 enough to carry all day.]],
+	icon = "small_shield",
 	category = "shield",
 	price = 500,
 	defense = 10,

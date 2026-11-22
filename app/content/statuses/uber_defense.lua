@@ -9,6 +9,7 @@ A ward laid over the body, a shimmer that blunts blows for the rest of the fight
 of Midworld teach it as a plain prayer and charge little for it. It does not stop a blow
 outright; it only makes each one smaller, and the difference adds up over a long fight
 with a big monster.]],
+	icon = "uber_defense",
 	kind = "helpful",
 	data = { pct = 0 },
 	modify_damage_taken = function(t, damage)

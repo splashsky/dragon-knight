@@ -22,6 +22,7 @@ Ice on a Mage's staff is a bad sign, but ice in a monster's joints is the Mage's
 Frostbite stings the skin and stiffens the limbs, and one time in three the cold goes
 deep enough that the beast sits down and forgets the fight. Miners in Kalle swear by it
 when a cave bear wanders in from the back passages.]],
+	icon = "frostbite",
 	mp = 9,
 	power = 22,                 -- the most damage it deals
 	data = { chance = 6 },      -- the chance in 15 that the sleep lasts each turn

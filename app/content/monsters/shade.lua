@@ -6,6 +6,7 @@ A shadow that has grown a body of sorts, found in the ruined huts north of Kalle
 dark. Spells of harm pass through it as if it were smoke, so a warrior with a good sword
 does better. Old wives in Kalle leave a lamp burning in the window, which they swear keeps
 the shades away.]],
+	icon = "shade",
 	level = 3,
 	maxhp = 12, maxdam = 10, armor = 3,
 	maxexp = 10, maxgold = 3,

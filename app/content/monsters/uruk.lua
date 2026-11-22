@@ -7,6 +7,7 @@ in squads of six or eight. Unlike the lesser brutes, Uruks carry shields, keep t
 line, and wait for orders from their captain. They have a grudge against the towns for
 taking their pasture, and they say so loudly before a fight. Meet them in the open and
 they close ranks; meet them in a narrow pass and they still close ranks.]],
+	icon = "uruk",
 	level = 20,
 	maxhp = 68, maxdam = 58, armor = 44,
 	maxexp = 146, maxgold = 49,

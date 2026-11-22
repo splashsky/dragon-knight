@@ -6,6 +6,7 @@ A broad, tusked fighter from the hills beyond Narcissa, where the orcs keep thei
 their own feuds. They respect strength more than cleverness and will trade with anyone who can
 lift the same weight. Caravans that cross their valleys pay a toll, then pay another on the way
 back.]],
+	icon = "orc",
 	level = 15,
 	maxhp = 49, maxdam = 42, armor = 28,
 	maxexp = 104, maxgold = 35,

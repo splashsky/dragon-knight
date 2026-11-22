@@ -9,6 +9,7 @@ until midnight, and he sells them at cost because he says a clear eye is worth m
 clever one. Monsters drop them now and then, cracked along the same line. Anyone who wears one
 learns faster and bleeds about as fast, which is a trade the monk says every scholar should
 make consciously.]],
+	icon = "sages_lens",
 	category = "accessory",
 	drop_level = 30,
 	modifiers = {

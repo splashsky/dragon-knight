@@ -15,6 +15,7 @@ Apothecaries in Bris keep their venom in a locked cabinet and sell it by the dro
 is cheaper than the vial and does the same work: it thickens the blood, so the monster
 bleeds a little more every turn and hits a little softer. Paladins call it a sin and use
 it anyway when a fight is going badly.]],
+	icon = "venom",
 	mp = 14,
 	power = 4,                  -- how many turns the venom lasts
 	data = { min = 6, max = 12, pct = 20 },   -- hit points per turn, percent less damage dealt

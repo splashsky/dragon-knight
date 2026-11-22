@@ -122,7 +122,8 @@ def check(d):
 			assert s["change"] in ("add", "remove", "expire", "turns"), "status change %r" % s
 			assert isinstance(s["key"], str) and isinstance(s["status"], str), "status names"
 			for x in s["statuses"]:
-				assert set(x) <= {"key", "name", "turns"}, "statuses %r" % x
+				assert set(x) <= {"key", "name", "turns", "icon"}, "statuses %r" % x
+				assert "icon" not in x or (isinstance(x["icon"], str) and x["icon"].startswith("/static/images/statuses/")), "status icon %r" % x
 		for s in e.get("summon", []):
 			assert set(s) <= SUMMON and s["change"] in ("join", "leave", "turns"), "summon %r" % s
 

@@ -5,6 +5,7 @@ return {
 A caster who traded a piece of his soul for a stronger spellbook, and now has to keep trading.
 Warlocks sell charms and curses from the back rooms of the towns, and they will sell you one if you
 ask nicely. Most of them are polite until they are not.]],
+	icon = "warlock",
 	level = 15,
 	maxhp = 48, maxdam = 40, armor = 26,
 	maxexp = 100, maxgold = 33,

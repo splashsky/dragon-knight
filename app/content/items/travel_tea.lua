@@ -7,6 +7,7 @@ A pale tea of mint and bark, brewed in a tin pot at the market stalls and poured
 whatever cup the traveller brings. The road tiredness it chases is the kind a long walk
 leaves in the legs. Carters swear by it, and an innkeeper in Bris once told a customer
 that it was the only thing he had ever sold that people came back for.]],
+	icon = "travel_tea",
 	category = "consumable",
 	price = 25,
 	max_stack = 10,

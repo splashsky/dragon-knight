@@ -5,6 +5,7 @@ return {
 A roadside robber in a patched cloak, with a club or a short sword and a habit of waiting among
 the rocks. Bandits work in bands of five or six and seldom fight once they have had their pick
 of the wagon. The reason caravans now travel with guards is mostly them.]],
+	icon = "bandit",
 	level = 16,
 	maxhp = 52, maxdam = 45, armor = 30,
 	maxexp = 114, maxgold = 38,

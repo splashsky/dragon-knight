@@ -20,12 +20,15 @@
 -- an ally stays for the whole fight). Changes go with the step's latest line: a line, then
 -- what it did; a change in a step that said nothing yet is an event without text.
 local json = require("lib.json")
+local schema = require("lib.content.schema")
 
 local events = {}
 
 local function copy_list(list)
 	local out = json.array()
-	for i, s in ipairs(list or {}) do out[i] = { key = s.key, name = s.name, turns = s.turns } end
+	for i, s in ipairs(list or {}) do
+		out[i] = { key = s.key, name = s.name, turns = s.turns, icon = schema.entity_icon("statuses", s.icon) }
+	end
 	return out
 end
 

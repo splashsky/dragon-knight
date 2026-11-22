@@ -6,6 +6,7 @@ A plate of shell from a swamp tortoise nearly as big as a cart, the sort of beas
 through a whole day's fighting. Fishermen in Bris cut the plates into squares and lash them to
 a leather harness. The shells are heavy and stink for a week, but a blow that would split a
 wooden board tends to slide off them.]],
+	icon = "tortoise_shell",
 	category = "accessory",
 	drop_level = 18,
 	modifiers = { { kind = "stat", stat = "defense", amount = 35 } },

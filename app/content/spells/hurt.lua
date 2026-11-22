@@ -15,6 +15,7 @@ return {
 The first real attack spell most Mages learn, and the one they practise on sparring dummies
 until the dummies complain. It sends a sharp jolt through a monster's body, which hurts even
 when it does not kill. Wise casters cast it early, before the enemy has settled into its stride.]],
+	icon = "hurt",
 	mp = 5,
 	power = 15,                 -- the most damage it deals
 	messages = {

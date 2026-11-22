@@ -335,9 +335,9 @@ function T.spell_icons()
 	has(errors({ icon = "heal.png" }), "field 'icon' must be the name of a PNG file")
 	has(errors({ icon = "../heal" }), "field 'icon' must be the name of a PNG file")
 	has(errors({ icon = 5 }), "field 'icon' must be the name of a PNG file")
-	-- the stock files: only Heal has one
+	-- the stock files all have one
 	local files = load.kind("spells").by_key
-	eq(files.heal.icon, "heal"); eq(files.hurt.icon, "")
+	eq(files.heal.icon, "heal"); eq(files.hurt.icon, "hurt")
 	-- overridable (admin), and checked the same way
 	local spec = spell_kind.field("icon")
 	eq(spec.admin, true); eq(spec.type, "icon")
@@ -346,7 +346,7 @@ function T.spell_icons()
 	local skipped = {}
 	scratch(function()
 		sync.set_override("spells", "hurt", "icon", "nope")
-		eq(sync.effective(spell_kind, "hurt", files.hurt, skipped).icon, "", "a missing icon's override is skipped")
+		eq(sync.effective(spell_kind, "hurt", files.hurt, skipped).icon, "hurt", "a missing icon's override is skipped")
 	end)
 	has(skipped, "spell hurt: override of icon ignored (invalid value)")
 	-- URLs: the file's, or default.png when there is none, the name is bad or the file is gone
@@ -357,7 +357,7 @@ function T.spell_icons()
 	eq(spells.icon_url({ icon = "deleted_since" }), "/static/images/skills/default.png")
 	eq(spells.icon_url({ icon = "../../config" }), "/static/images/skills/default.png")
 	eq(spells.icon_url(spells.by_key("heal")), "/static/images/skills/heal.png", "synced")
-	eq(spells.icon_url(spells.by_key("hurt")), "/static/images/skills/default.png")
+	eq(spells.icon_url(spells.by_key("hurt")), "/static/images/skills/hurt.png")
 	local b = spells.buttons({ spells.by_key("heal"), spells.by_key("hurt") }, 5)
 	eq(b[1].label, "Heal (5 MP)"); eq(b[1].short, false); eq(b[1].icon, "/static/images/skills/heal.png")
 	eq(b[2].label, "Hurt (5 MP)"); eq(b[2].short, false)

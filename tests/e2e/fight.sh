@@ -194,11 +194,15 @@ f_sql "UPDATE users SET currenthp = 10, currentmp = 6, base_maxmp = 50"
 t_get /fight; CS=$(t_csrf)
 expect_body '<div class="hotbar" role="group" aria-labelledby="hotbar-label"><span class="hotbar-label" id="hotbar-label">Hotbar</span>'
 expect_body '<button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
-expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="3"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
+expect_body '<button class="spell-btn" type="submit" name="spell" value="6" title="Hurt (5 MP)" aria-label="Hurt (5 MP)" aria-keyshortcuts="3"><img src="/static/images/skills/hurt.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button>'
 expect_no_body 'name="userspell"'; expect_no_body 'value="Spell"'
 expect_no_body 'name="useritem"'; expect_no_body 'value="Use Item"'      # items are icon buttons too (2.4)
 t_get /static/images/skills/heal.png;    expect_status 200; expect_header '^content-type: image/png'
 t_get /static/images/skills/default.png; expect_status 200
+# a spell whose icon file is gone shows default.png (restored right after)
+mv "$T/public/images/skills/hurt.png" "$T/hurt.png"
+t_get /fight; expect_body 'aria-keyshortcuts="3"><img src="/static/images/skills/default.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span>'
+mv "$T/hurt.png" "$T/public/images/skills/hurt.png"
 # MP short: greyed out (disabled), and the server refuses a direct POST anyway
 f_sql "UPDATE users SET currentmp = 4"
 t_get /fight

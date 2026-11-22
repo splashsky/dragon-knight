@@ -9,6 +9,7 @@ high enough to be shot. The one that dropped this plume was as big as a farm car
 said to have followed the armies for a generation. Those who wear the plume move as if the
 ground were a little further away, and they take every blow as a warning that they have not
 got quite far enough.]],
+	icon = "vulture_plume",
 	category = "accessory",
 	drop_level = 40,
 	modifiers = {

@@ -6,6 +6,7 @@ The last of the garrison knights, bleached white by long years standing in the s
 above Kalle. He wears no crest and carries no banner, and most soldiers in the town
 think he is dead already. He is not, and his lance has not lost its edge, so do not wait
 to see whether he moves first.]],
+	icon = "pale_knight",
 	level = 39,
 	maxhp = 175, maxdam = 160, armor = 130,
 	maxexp = 580, maxgold = 193,

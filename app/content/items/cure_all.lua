@@ -8,6 +8,7 @@ abbot's seal on the cork. It was first made for the monks who came back from the
 with blood poisoning and worse, and it still tastes of the marsh. A bottle costs more
 than most people earn in a week, and the abbey says that is because it works on
 everything.]],
+	icon = "cure_all",
 	category = "consumable",
 	price = 350,
 	max_stack = 10,

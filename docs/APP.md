@@ -1024,6 +1024,33 @@ softly over a wound, it draws warmth back into tired flesh. Old soldiers say a H
 in time is worth a hundred herbs.]],
 ```
 
+## Icons
+
+Every item, spell, monster, status and ally has an icon (3.1): a square PNG named by its
+`icon` field, `public/images/<dir>/<icon>.png`: `items/`, `skills/` (spells), `monsters/`,
+`statuses/`, `summons/` (the last three since schema version 20; synced and overridable
+like the others; `dk check` fails on a missing file). Monsters' are 128×128 portraits, the
+rest 96×96. Where they show: items and spells on their buttons, in the bag, the Inventory
+panel and tooltips (see [Items](#items), [Spells](#spells)); the monster's portrait beside
+"You are fighting a ..." and its HP (`.fight-foe`, 72px) and in its tooltip; an ally's
+icon before its name and a status's before its name on the fight page (`fight/statuses.html`,
+and `fight.js` from the fight API's status lists); each entry's icon before its name on
+the help pages. Templates get an entity's own icon with `entity_icon(kind, name)` (nil
+when it has none; `schema.entity_icon`), which shows nothing rather than the spells'
+default picture.
+
+They are made from licensed icon packs kept outside the repository (`Icons/`, ignored by
+git: standard art, never the "nobg" variants; items from the weapon, armor and profession
+packs, spells and statuses from the skill packs, monsters and allies from the character
+portraits). `docs/icon-sources.tsv` lists every icon made in 3.1 with its source file and
+how it was recoloured, so any of them can be made again. `tools/icons/sheet.py` makes
+contact sheets of icons to browse (`sheet.py /tmp/sheet "Icons/.../*.png"`), and
+`tools/icons/place_icon.py SRC public/images/<dir>/<key>.png [--size N] [--hue DEG]
+[--sat F] [--bright F] [--tint #rrggbb:0.3] [--flip]` resizes and recolours one (a family's
+members from one picture: the slimes by hue, a Dark version darker, a Frost one tinted).
+Then set `icon = "<key>"` in the content file, add the line to `docs/icon-sources.tsv`
+and run `./dk check`.
+
 ## Game helpers (`lib/game.lua`)
 
 | Function | Returns |
@@ -1255,11 +1282,12 @@ return {
 	`dk check` (and the sync) fail naming the spell file otherwise (`dk.static_exists`, a
 	stat per check); an icon deleted after the sync shows `default.png` (`spells.icon_url`
 	checks the file on every call). Synced into `spells.icon` (schema version 12) and
-	overridable in the admin panel, which shows the current icon. Heal and Magic Bolt have one so far.
+	overridable in the admin panel, which shows the current icon. Every spell has one (3.1;
+	see [Icons](#icons)).
 	**Adding an icon**: put `<name>.png` in `public/images/skills/` (square; shown at 44px in
 	fights and 34px in Fast Spells, scaled by CSS), set `icon = "<name>"` in the spell file
-	and run `./dk check`. The two current PNGs are 256×256 (120–165 KB); smaller files
-	(88×88 for 2× screens) would load faster.
+	and run `./dk check`. Heal's and Magic Bolt's PNGs are 256×256 (120–165 KB); the 3.1
+	icons are 96×96 (about 20 KB), enough for 2× screens.
 - **Buttons.** The fight menu shows the spells castable in fights as icon buttons
 	(`templates/fight/action.html`): `<button type="submit" name="spell" value="<id>">` with
 	the icon, the MP cost as a badge (`.spell-mp`) and `title`/`aria-label` "Heal (5 MP)";
@@ -1761,7 +1789,8 @@ stock, immunity).
 	tp = { ... },                  -- who: player | ally | enemy; an enemy's MP only if the page shows it
 	status = { { who = "player", id = 1, name = "Fapi", key = "poison", status = "Poisoned",
 		turns = 3, change = "add",   -- add | remove | expire | turns (counted down)
-		statuses = { { key = "poison", name = "Poisoned", turns = 3 } } } },   -- the bearer's, after it
+		statuses = { { key = "poison", name = "Poisoned", turns = 3,   -- the bearer's, after it
+			icon = "/static/images/statuses/poison.png" } } } },   -- (icon: absent when none)
 	summon = { { change = "join", id = 3, name = "Wolf", hp = 30, max = 30, turns = 5 } },   -- join | leave | turns
 }
 ```
@@ -2071,8 +2100,7 @@ return {
 	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
 	(default true; with a `drop_level`), `icon`, `casts` and `charges` (below).
 - **Icons** (schema version 14): `icon = "herb"` names `public/images/items/herb.png`
-	(`[a-z0-9_]+`, square; Midworld's wares — the Stick, Branch, Club, Skivvies, Clothes,
-	Leather Armor, Reed Shield, Buckler, Herb and Wand — and the Potion and Ether have one).
+	(`[a-z0-9_]+`, square; every item has one since 3.1, see [Icons](#icons)).
 	Absent or `""`: the Inventory panel keeps the slot's icon, and icon buttons (the shop,
 	the fight menu) and the bag grid show `/static/images/skills/default.png` (the spells'
 	default). `dk check` fails, naming the item file, when the PNG is missing; an icon deleted

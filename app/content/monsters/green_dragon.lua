@@ -6,6 +6,7 @@ The green dragon lairs in the marsh-forest beyond Hambry, where the fog hides it
 is already overhead. Its breath is a sour green cloud that clings to armour and lungs for
 days after the fight. Hunters say the dragon takes only the gold it is owed and leaves the
 rest, which is more than most lords can claim.]],
+	icon = "green_dragon",
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 425, maxgold = 142,

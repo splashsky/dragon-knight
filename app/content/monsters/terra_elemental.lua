@@ -7,6 +7,7 @@ by a mage who wanted a guard and got something worse. It lives in old quarries a
 mine galleries east of Bris. Hurt spells pass through it as if it were not there, so
 bring a blade or a strong arm.
 ]],
+	icon = "terra_elemental",
 	level = 25,
 	maxhp = 88, maxdam = 80, armor = 62,
 	maxexp = 185, maxgold = 62,

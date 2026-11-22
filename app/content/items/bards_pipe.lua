@@ -9,6 +9,7 @@ Its last owner was a drunk who played it through the night until the innkeeper t
 him, and the pipe has been in a drawer ever since. The tune it plays is short and cheerful, and
 it keeps the player's breath steady in a long fight, though a body that spends its strength on
 music is no quicker on the road.]],
+	icon = "bards_pipe",
 	category = "accessory",
 	drop_level = 28,
 	modifiers = {

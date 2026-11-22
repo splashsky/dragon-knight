@@ -7,6 +7,7 @@ shake when he turns over. He is the oldest of the great beings the road-wardens 
 remembers the first towns being built. He does not hate men. He simply does not see them until
 they stand on his foot.
 ]],
+	icon = "titan",
 	level = 50,
 	maxhp = 360, maxdam = 340, armor = 270,
 	maxexp = 2400, maxgold = 800,

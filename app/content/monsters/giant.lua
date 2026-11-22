@@ -7,6 +7,7 @@ carry a whole ox up a cliff for the pleasure of eating it at the top. They do no
 much as forget them, which is worse for the man. Hunters go in pairs and leave a little salt
 meat on a rock for the giant's goodwill.
 ]],
+	icon = "giant",
 	level = 43,
 	maxhp = 220, maxdam = 200, armor = 165,
 	maxexp = 970, maxgold = 323,

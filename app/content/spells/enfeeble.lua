@@ -15,6 +15,7 @@ Every village has a grandmother who can make a big farmhand sit down and wonder 
 feels so tired. Mages learn the trick from the books instead, and it works the same way: a
 few quiet words, and the monster's blows land softer for the next few turns. It does not
 stop a monster hitting, only hitting hard.]],
+	icon = "enfeeble",
 	mp = 8,
 	power = 4,                  -- how many turns the weakness lasts
 	data = { pct = 35 },        -- percent less damage the monster deals

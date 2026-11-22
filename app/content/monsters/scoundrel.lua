@@ -5,6 +5,7 @@ return {
 A bandit who has given up pretending to be honest about it. He runs cons on the roads out of
 Kalle, sells false maps to new arrivals, and will cheat his own partners if the chance comes.
 Scoundrels are seldom brave, but they are rarely alone.]],
+	icon = "scoundrel",
 	level = 12,
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 75, maxgold = 25,

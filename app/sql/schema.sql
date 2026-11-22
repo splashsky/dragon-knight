@@ -199,7 +199,8 @@ CREATE TABLE monsters (
 	attack_weight  INTEGER NOT NULL DEFAULT 1,
 	roams          INTEGER NOT NULL DEFAULT 1,
 	retired        INTEGER NOT NULL DEFAULT 0,
-	lore           TEXT    NOT NULL DEFAULT ''
+	lore           TEXT    NOT NULL DEFAULT '',
+	icon           TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX monsters_level ON monsters (level);
 
@@ -283,7 +284,8 @@ CREATE TABLE statuses (
 	retired        INTEGER NOT NULL DEFAULT 0,
 	messages       TEXT    NOT NULL DEFAULT '',
 	data           TEXT    NOT NULL DEFAULT '',
-	lore           TEXT    NOT NULL DEFAULT ''
+	lore           TEXT    NOT NULL DEFAULT '',
+	icon           TEXT    NOT NULL DEFAULT ''
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
@@ -301,7 +303,8 @@ CREATE TABLE summons (
 	retired      INTEGER NOT NULL DEFAULT 0,
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
-	lore         TEXT    NOT NULL DEFAULT ''
+	lore         TEXT    NOT NULL DEFAULT '',
+	icon         TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE towns (

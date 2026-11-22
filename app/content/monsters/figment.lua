@@ -7,6 +7,7 @@ quite solid. It turns up in the shuttered houses of Kalle at night, wearing the 
 friend or a lost parent, and waits for a hero to come closer. Hurt spells pass straight
 through it, so warriors and their blades must do the work. Dreamers in Narcissa say a
 figment fades if you stop believing in it, which is easier said than done.]],
+	icon = "figment",
 	level = 19,
 	maxhp = 64, maxdam = 55, armor = 42,
 	maxexp = 140, maxgold = 47,

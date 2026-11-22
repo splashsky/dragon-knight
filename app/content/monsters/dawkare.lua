@@ -8,6 +8,7 @@ and they choose their ground with care, usually a narrow pass where a cart has t
 down. Gilead's guard captains warn new recruits to keep their eyes on the rocks above
 them.
 ]],
+	icon = "dawkare",
 	level = 29,
 	maxhp = 106, maxdam = 96, armor = 76,
 	maxexp = 220, maxgold = 73,

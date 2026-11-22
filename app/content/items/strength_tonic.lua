@@ -8,6 +8,7 @@ A brown, sharp-tasting tonic of ginger and black pepper, drunk from a thimble-si
 before a bout. Gladiators in Kalle drink it at the start of the pit fights, and the pit
 master sells it at cost because he says a dull fight pays him less. It does nothing for
 the next morning, and the drinkers are not expected to ask.]],
+	icon = "strength_tonic",
 	category = "consumable",
 	price = 240,
 	max_stack = 10,

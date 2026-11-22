@@ -7,6 +7,7 @@ for a share of the take. He now serves whoever pays him, and he is loyal to no o
 not paid him yet. He is not a monster, only a man who found the price of honour too high.
 He will sell the next gate too.
 ]],
+	icon = "traitor",
 	level = 45,
 	maxhp = 230, maxdam = 205, armor = 175,
 	maxexp = 1150, maxgold = 383,

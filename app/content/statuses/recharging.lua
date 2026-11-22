@@ -9,6 +9,7 @@ The strain after a spell that takes everything out of a caster. The arms go slac
 breath comes hard, and for a turn there is nothing to do but wait. Mages say the spell was
 worth it when it works, and that nobody remembers the turn afterwards. Monsters that are
 big enough to shrug off such a spell are not affected by it at all.]],
+	icon = "recharging",
 	kind = "neutral",
 	turns = 1,
 	blocks_action = true,

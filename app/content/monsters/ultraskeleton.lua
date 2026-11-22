@@ -5,6 +5,7 @@ return {
 The top of the skeleton line: a bone frame reinforced with iron and banded with old charms,
 sometimes found guarding crypts past Gilead. It does not speak, but its armour does, clanking with
 every step. Adventurers who have fought one say the second blow is always harder than the first.]],
+	icon = "ultraskeleton",
 	level = 16,
 	maxhp = 52, maxdam = 46, armor = 32,
 	maxexp = 116, maxgold = 39,

@@ -9,6 +9,7 @@ bitter white root that the pan-men dig up at night. Thrown at a monster's face, 
 the eyes and takes the weight out of its swings for a few turns. A soldier in Kalle says
 it is the only thing he has seen that makes an ogre hesitate, and he says that as if it
 were a grievance.]],
+	icon = "weakening_dust",
 	category = "consumable",
 	price = 200,
 	max_stack = 10,

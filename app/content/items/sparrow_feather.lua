@@ -6,6 +6,7 @@ A brown feather tied to a bit of waxed thread, usually found in the stubble fiel
 Midworld after the harvest. Boys who want to be runners collect them by the handful and
 argue about which one is lucky. Whatever the truth, the sparrows never seem to miss the
 feather's owner when he runs for the gate.]],
+	icon = "sparrow_feather",
 	category = "accessory",
 	drop_level = 2,
 	modifiers = { { kind = "stat", stat = "dexterity", amount = 6 } },

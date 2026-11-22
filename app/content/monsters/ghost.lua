@@ -6,6 +6,7 @@ The spirit of someone who died on the road between Midworld and Kalle and never 
 left. It drifts through old graveyards and ruined inns, moaning about a debt nobody
 remembers. Priests in Midworld will bless a grave for a few gold, which keeps most ghosts
 quiet and some of them away.]],
+	icon = "ghost",
 	level = 6,
 	maxhp = 24, maxdam = 20, armor = 8,
 	maxexp = 28, maxgold = 9,

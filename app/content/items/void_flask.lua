@@ -9,6 +9,7 @@ salt marsh and no one will say the name of. When it breaks, the shards seem to p
 light off the monster and keep it. Mercenaries in Endworld pay for the flasks by weight,
 and the glassblowers keep the receipts in a locked box, because they have had one blow
 up in a shop.]],
+	icon = "void_flask",
 	category = "consumable",
 	price = 1500,
 	max_stack = 5,

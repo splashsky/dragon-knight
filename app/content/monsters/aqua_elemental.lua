@@ -7,6 +7,7 @@ purpose. It rises out of the deep pools below Hambry and the flooded mines past 
 and it can pull a grown man under before he has time to shout. Its hide is cold and
 clear, and steel does better against it than any spell that might be cast at it.
 ]],
+	icon = "aqua_elemental",
 	level = 31,
 	maxhp = 120, maxdam = 110, armor = 90,
 	maxexp = 260, maxgold = 87,

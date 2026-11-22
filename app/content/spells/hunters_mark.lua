@@ -16,6 +16,7 @@ Hunters in the hills above Kalle chalk a sign on the track where a wounded anima
 next party knows what it is following. The spell draws the same sign in light on the
 monster's hide. For a few turns every swing of a weapon lands harder on the marked creature,
 which is why warriors cast it just before they swing.]],
+	icon = "hunters_mark",
 	mp = 12,
 	power = 4,                  -- how many turns the mark lasts
 	data = { pct = 50 },        -- percent more damage taken from weapon attacks

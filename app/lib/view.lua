@@ -8,6 +8,7 @@ local json = require("lib.json")
 local php = require("lib.php")
 local presence = require("lib.presence")
 local roles = require("lib.roles")
+local schema = require("lib.content.schema")
 local session = require("lib.session")
 local themes = require("lib.themes")
 local tips = require("lib.tips")
@@ -53,6 +54,10 @@ function base.paragraphs(s)
 	end
 	return table.concat(out)
 end
+
+-- The URL of an entity's own icon (its "icon" field: entity_icon("monsters", m.icon)), or
+-- nil when it has none (the help pages show nothing then).
+function base.entity_icon(kind, name) return schema.entity_icon(kind, name) end
 
 -- url("/shop/buy", 3) -> "/shop/buy/3"; a trailing table becomes the query string:
 -- url("/forum/thread", 7, { start = 15 }) -> "/forum/thread/7?start=15"

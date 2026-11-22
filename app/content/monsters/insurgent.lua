@@ -7,6 +7,7 @@ not pay the crown's road tax. He is not wicked, only tired of watching his neigh
 for debt. His men carry crude spears and short bows, and they know every hidden path in the
 hills better than the soldiers who chase them.
 ]],
+	icon = "insurgent",
 	level = 46,
 	maxhp = 250, maxdam = 220, armor = 190,
 	maxexp = 1300, maxgold = 433,

@@ -7,6 +7,7 @@ properly. It throws things: dishes, stones, sometimes the furniture of whoever i
 sleeping in its house. Innkeepers on the road out of Kalle pay a priest to walk the
 rooms with salt before they will let a bed go out for the night.
 ]],
+	icon = "polgergeist",
 	level = 25,
 	maxhp = 84, maxdam = 74, armor = 58,
 	maxexp = 180, maxgold = 60,

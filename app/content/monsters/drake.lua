@@ -6,6 +6,7 @@ A small scaled lizard with a bad temper and a taste for sheep, found on the hill
 Midworld and Roma. Drakes are the first dragon kin most heroes meet, and the first to be
 mistaken for one. A drake hide makes plain leather armour that keeps out the wind, if not
 much else.]],
+	icon = "drake",
 	level = 2,
 	maxhp = 11, maxdam = 10, armor = 3,
 	maxexp = 8, maxgold = 3,

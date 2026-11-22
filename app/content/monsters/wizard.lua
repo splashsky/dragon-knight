@@ -7,6 +7,7 @@ wild. They camp in ruined towers past Narcissa and pay for their keep with minor
 passing traders. Wizards are frail, but their spells can strip a warrior's armour before
 the sword is even drawn. Mages in Midworld will tell you these are no true mages at all,
 which the wizards take poorly.]],
+	icon = "wizard",
 	level = 20,
 	maxhp = 66, maxdam = 56, armor = 44,
 	maxexp = 144, maxgold = 48,

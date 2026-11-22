@@ -6,6 +6,7 @@ A drake that has grown older and sly, and now hunts the road between Roma and Br
 scales are a dull grey-green that blends into the rocks, so travellers usually see it only
 when it bites. Bris guards pay a bounty for its claws, which are sharp enough to serve as
 a needle.]],
+	icon = "drakelor",
 	level = 3,
 	maxhp = 14, maxdam = 12, armor = 4,
 	maxexp = 10, maxgold = 3,

@@ -19,6 +19,7 @@ A venom worse than the common poison, from the fangs of the deeper beasts. It ea
 blood and dulls the strength at the same time, so a venomed creature hits softer and
 bleeds on. Herb-wives in the road towns will tell you it cannot be cured by a bundle of
 leaves. They are half right: the cure takes longer and costs more.]],
+	icon = "venom",
 	kind = "harmful",
 	tick_on = "turn_end",
 	turns = 4,

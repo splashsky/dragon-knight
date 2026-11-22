@@ -6,6 +6,7 @@ The last and most narrow-minded of the pleaders' followers, who has fixed on a s
 word and will not let it go. Obsessives crowd the back rooms of the hall in Hambry, saying
 the same thing over and over until a visitor says it too. The Advocate is said to find
 them useful, which is the only reason anyone has tried to reason with one.]],
+	icon = "obsessive",
 	level = 40,
 	maxhp = 180, maxdam = 160, armor = 135,
 	maxexp = 630, maxgold = 210,

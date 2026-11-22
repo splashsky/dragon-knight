@@ -25,6 +25,7 @@ Lightning goes where it is pointed, and the trick with a lance is that it leaves
 hand for good. The Mages of Endworld fire it down the long road at anything that walks
 up it, then sit on the stones for a turn while their heads stop ringing. A monster that
 falls to the blast costs them nothing more, so the wise ones aim it carefully.]],
+	icon = "lightning_lance",
 	mp = 35,
 	power = 150,                -- the most damage it deals
 	uses = { statuses = { "recharging" } },

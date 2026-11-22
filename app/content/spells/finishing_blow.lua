@@ -10,6 +10,7 @@ Veterans call it the mercy stroke, though the monster rarely finds it merciful. 
 aimed at the gap under the ribs or the soft place behind the jaw, and it is the one
 thing a Warrior learns only by losing a few fights first. Against a creature already
 bleeding and staggering it is hardly a blow at all, just a formality with a sword.]],
+	icon = "finishing_blow",
 	mp = 20,
 	power = 100,                -- the most damage it deals (twice that when it finishes)
 	data = { pct = 100 },       -- percent of your attack it deals before that limit

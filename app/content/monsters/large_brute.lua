@@ -7,6 +7,7 @@ sensible carter will still call a nuisance rather than a disaster. It is slow to
 and very hard to stop once it has got its arms moving. Brutes of this size have been
 known to tear a loaded wagon apart for the sake of the sacks inside it.
 ]],
+	icon = "large_brute",
 	level = 29,
 	maxhp = 108, maxdam = 98, armor = 78,
 	maxexp = 230, maxgold = 77,

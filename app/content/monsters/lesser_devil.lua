@@ -6,6 +6,7 @@ A step above the fiends, and well aware of it. Lesser devils run errands for the
 ones in the pits below the mines, carrying messages and collecting debts, which they do
 with a grin. They will bargain before they fight, and a clever tongue may buy a
 way out, though rarely a cheap one.]],
+	icon = "lesser_devil",
 	level = 37,
 	maxhp = 164, maxdam = 150, armor = 120,
 	maxexp = 485, maxgold = 162,

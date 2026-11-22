@@ -428,7 +428,7 @@ expect_body '<div class="spell-grid spell-grid-small">'
 expect_body '<form class="spell-tip" method="post" action="/spell/1" data-tip data-tip-side="left"><input type="hidden" name="csrf" value="'"$TC"'"><button class="spell-btn" type="submit" title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>The first word every young Mage learns,'
 expect_body '<span class="spell-mp" aria-hidden="true">10</span></button><template class="tip"><div class="tip-title">Revive</div><div class="tip-meta">10 MP · In fights and in town</div><div class="tip-body"><p>'
 expect_no_body '<div class="tip-lore"></div>'
-expect_body '<button class="spell-btn" type="submit" title="Revive (10 MP)" aria-label="Revive (10 MP)"><img src="/static/images/skills/default.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">10</span></button>'
+expect_body '<button class="spell-btn" type="submit" title="Revive (10 MP)" aria-label="Revive (10 MP)"><img src="/static/images/skills/revive.png" width="34" height="34" alt=""><span class="spell-mp" aria-hidden="true">10</span></button>'
 expect_no_body 'action="/spell/6"'; expect_no_body ' disabled><img'
 # disabled (greyed out) only when the MP don't cover it
 tu "currentmp=7"
@@ -540,7 +540,7 @@ t_give townie stick 1 weapon; t_give townie life_pebble 1 accessory2
 for k in herb potion ether antidote branch club dagger hatchet axe brand poleaxe broadsword; do t_give townie "$k"; done
 t_get /inventory
 expect_body '<li title="Weapon: Stick" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/stick.png" width="17" height="17" alt="Weapon"><span class="invpanel-name">Stick</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/stick.png" width="20" height="20" alt="">Stick</div><div class="tip-meta">Weapon</div><ul class="tip-lines"><li>Attack Power +2</li></ul>'
-expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><span class="invpanel-badge" aria-label="Slot 2">2</span><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul>'
+expect_body '<li title="Slot 2: Life Pebble" data-tip data-tip-side="left" tabindex="0"><img class="invpanel-image" src="/static/images/items/life_pebble.png" width="17" height="17" alt="Slot 2"><span class="invpanel-name">Life Pebble</span><template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/items/life_pebble.png" width="20" height="20" alt="">Life Pebble</div><div class="tip-meta">Accessory</div><ul class="tip-lines"><li>Max HP +10</li></ul>'
 expect_body '<a class="invpanel-bag full" href="/inventory" title="Open your bag"><span>Bag</span><span class="invpanel-count"><b>12</b>/12</span></a>'
 t_items_clear townie
 

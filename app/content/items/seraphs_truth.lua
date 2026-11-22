@@ -5,6 +5,7 @@ return {
 A flawless lens of gold glass that shows the holder the true shape of any spell aimed at them.
 Seraphs drop them in the deepest halls under Endworld. Archmages keep them locked in iron boxes
 and wear them only to court.]],
+	icon = "seraphs_truth",
 	category = "accessory",
 	drop_level = 35,
 	modifiers = {

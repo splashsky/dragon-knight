@@ -7,6 +7,7 @@ toward the sound. She is immune to hurt and sleep spells, so the fight is fought
 song is never quite the same twice. Those who survive say she only ever sang one verse, and it
 was about them.
 ]],
+	icon = "siren",
 	level = 50,
 	maxhp = 68, maxdam = 400, armor = 800,
 	maxexp = 10000, maxgold = 50,

@@ -7,6 +7,7 @@ Roma's copper workers make these for the Mages who have outgrown the wand and ca
 afford anything grander. A rod takes a Spark, and a Spark is the spell every apprentice
 singes a finger on. Most Mages in Roma own one, and most keep it tucked in a belt where
 the neighbours can see it.]],
+	icon = "spark_rod",
 	category = "weapon",
 	price = 180,
 	attack = 3,

@@ -7,6 +7,7 @@ joined. She is quieter than the lycanthor and far harder to track, and she is kn
 take men's shapes to draw travellers off the road near Endworld. Those who have seen her
 in both forms say her eyes stay the same colour either way.
 ]],
+	icon = "lycanthra",
 	level = 30,
 	maxhp = 112, maxdam = 104, armor = 82,
 	maxexp = 240, maxgold = 80,

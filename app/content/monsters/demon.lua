@@ -7,6 +7,7 @@ the greatest numbers. They are strong and quick but not especially clever, which
 Demon Prince sends them in front. Towns near Narcissa keep a bell-ringer who sounds the alarm
 when a demon is seen on the road.
 ]],
+	icon = "demon",
 	level = 45,
 	maxhp = 240, maxdam = 210, armor = 180,
 	maxexp = 1200, maxgold = 400,

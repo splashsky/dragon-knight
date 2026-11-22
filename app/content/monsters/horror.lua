@@ -7,6 +7,7 @@ taller than a door and mostly mouth, and it wears the clothes of people it has e
 over the years. Travellers near Gilead have reported seeing one stand in a road
 without moving until a lantern was lit, and then it was already close.
 ]],
+	icon = "horror",
 	level = 27,
 	maxhp = 96, maxdam = 88, armor = 68,
 	maxexp = 210, maxgold = 70,

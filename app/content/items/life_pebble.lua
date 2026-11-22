@@ -5,6 +5,7 @@ return {
 A small grey pebble that slimes and rats leave behind near Midworld. Shopkeepers pay only a
 few coins for them. A traveler who carries one in a pocket swears it eases the ache of a long
 walk.]],
+	icon = "life_pebble",
 	category = "accessory",
 	drop_level = 1,
 	modifiers = { { kind = "stat", stat = "maxhp", amount = 10 } },

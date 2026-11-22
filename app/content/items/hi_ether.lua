@@ -8,6 +8,7 @@ of the college, because the smell of it set off too many fires in the old lodgin
 flask is labelled with the name of the mage who made it, and the college will refuse a
 sale to anyone it does not know. Court mages buy it by the crate and use it in the
 second hour of a long fight.]],
+	icon = "hi_ether",
 	category = "consumable",
 	price = 300,
 	max_stack = 10,

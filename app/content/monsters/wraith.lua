@@ -5,6 +5,7 @@ return {
 A wraith is what a murderer becomes when nobody buries the body. It haunts the lonely crossroads
 where the killing was done and waits for travellers who take the wrong turn. Wraiths are quiet and
 hard to hit, and their cold touch leaves a chill that lasts for days.]],
+	icon = "wraith",
 	level = 16,
 	maxhp = 50, maxdam = 45, armor = 30,
 	maxexp = 108, maxgold = 36,

@@ -7,6 +7,7 @@ and Kalle. Their breath smells of sulphur and can be smelt a mile off, which is 
 warning most travellers get. A hellhound is faster than any horse on that road, so the
 common advice is to fight from a doorway rather than run. Some of the old soldiers in
 Kalle keep a hellhound's tooth as a charm.]],
+	icon = "hellhound",
 	level = 20,
 	maxhp = 66, maxdam = 56, armor = 44,
 	maxexp = 140, maxgold = 47,

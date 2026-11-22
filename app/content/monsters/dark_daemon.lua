@@ -7,6 +7,7 @@ shadows of the deepest ruins. Most spells pass through it without harm, and its 
 blades that would pierce a dragon. Scholars say it serves the Demon King and cannot act without
 his leave. Nobody has yet asked it.
 ]],
+	icon = "dark_daemon",
 	level = 49,
 	maxhp = 340, maxdam = 320, armor = 260,
 	maxexp = 2200, maxgold = 733,

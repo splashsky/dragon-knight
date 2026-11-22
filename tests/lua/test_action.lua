@@ -531,8 +531,9 @@ function T.casting_items_validate()
 	-- icons: the item's own, or none (pages keep their old pictures) / the default
 	eq(items.icon(items.by_key("herb")), "/static/images/items/herb.png")
 	eq(items.icon(items.by_key("stick")), "/static/images/items/stick.png")
-	eq(items.icon(items.by_key("dagger")), nil)
-	eq(items.icon_url(items.by_key("dagger")), "/static/images/skills/default.png")
+	eq(items.icon(items.by_key("dagger")), "/static/images/items/dagger.png")
+	eq(items.icon({ icon = "" }), nil)
+	eq(items.icon_url({ icon = "" }), "/static/images/skills/default.png")
 	eq(items.icon({ icon = "deleted_later" }), nil)
 	eq(items.icon_url({ icon = "deleted_later" }), "/static/images/skills/default.png")
 end

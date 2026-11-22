@@ -7,6 +7,7 @@ A gold-flecked liquid sold in heavy stoppered flasks, made in a single workshop 
 by a family who will not let anyone else into the cellar. It is the only remedy the
 border towns trust to put a fighter back on both feet and a mage back on both knees. The
 family's motto is painted over the door, and the price is painted over the motto.]],
+	icon = "elixir",
 	category = "consumable",
 	price = 900,
 	max_stack = 5,

@@ -7,6 +7,7 @@ or a burning barn and goes looking for dry thatch. Smiths in Bris keep a barrel 
 by the door for them, and most of the time it is enough. They burn quickly and go out
 just as quickly, if you can hit them before they get started.
 ]],
+	icon = "flame",
 	level = 28,
 	maxhp = 100, maxdam = 90, armor = 70,
 	maxexp = 210, maxgold = 70,

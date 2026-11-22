@@ -7,6 +7,7 @@ leave a single warning about him: do not answer when his name is called. He is i
 hurt and sleep magic, so only blades and stubborn feet will bring him down. Those who survive his
 court say he is courteous, which is worse.
 ]],
+	icon = "lucifuge",
 	level = 50,
 	maxhp = 600, maxdam = 600, armor = 400,
 	maxexp = 10000, maxgold = 10000,

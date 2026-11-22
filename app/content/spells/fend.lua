@@ -6,6 +6,7 @@ return {
 A soldier's spell: a thin skin of light over the arms and chest that takes the edge off a
 blow. It does not stop a blade, but a bad hit becomes a bruise. Guards at the Hambry gate
 learn it before they learn to swing.]],
+	icon = "fend",
 	mp = 20,
 	power = 25,                 -- percent less damage taken
 	target = "self",

@@ -6,6 +6,7 @@ return {
 Revive is the cheapest way back from a bad fight, and the healing spell most Mages can afford
 at the start. It is less gentle than Heal and asks for little thought. Young Warriors in
 Midworld are told to learn it before anything else.]],
+	icon = "revive",
 	mp = 10,
 	power = 25,                 -- the most HP it restores
 	usable_in = "both",

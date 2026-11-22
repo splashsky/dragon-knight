@@ -7,6 +7,7 @@ Gilead's temple smiths forge these from the silver of a sunken bell, and every h
 a small sun cut into the flange. Paladins who swear to the temple carry one in place of
 a sword, on the grounds that a holy man should hit things he has blessed. The priests
 point out that the mace is heavy and the sun is not, so the blessing is the easy part.]],
+	icon = "dawn_mace",
 	category = "weapon",
 	price = 7000,
 	attack = 110,

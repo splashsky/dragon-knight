@@ -11,7 +11,7 @@
 <tbody>
 {%- for _, r in ipairs(monsters) do %}
 {%- local m = r.monster %}
-<tr><td style="width: 26%">{{ m.name }}{% if r.special then %} <span class="light">(not met at random)</span>{% end %}</td><td style="width: 9%">{{ m.maxhp }}</td><td style="width: 9%">{{ m.maxdam }}</td><td style="width: 9%">{{ m.armor }}</td><td style="width: 9%">{{ m.level }}</td><td style="width: 9%">{{ m.maxexp }}</td><td style="width: 9%">{{ m.maxgold }}</td><td style="width: 8%">{{ m.maxmp }}</td><td style="width: 12%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
+<tr><td style="width: 26%">{% local ic = entity_icon("monsters", m.icon) %}{% if ic then %}<img class="help-icon help-portrait" src="{{ ic }}" width="32" height="32" alt="">{% end %}{{ m.name }}{% if r.special then %} <span class="light">(not met at random)</span>{% end %}</td><td style="width: 9%">{{ m.maxhp }}</td><td style="width: 9%">{{ m.maxdam }}</td><td style="width: 9%">{{ m.armor }}</td><td style="width: 9%">{{ m.level }}</td><td style="width: 9%">{{ m.maxexp }}</td><td style="width: 9%">{{ m.maxgold }}</td><td style="width: 8%">{{ m.maxmp }}</td><td style="width: 12%">{% if r.immune then %}{{ r.immune }}{% else %}<span class="light">None</span>{% end %}</td></tr>
 {%- if (m.lore or "") ~= "" then %}
 <tr class="help-lore-row"><td colspan="9"><div class="help-lore">{{{ paragraphs(m.lore) }}}</div></td></tr>
 {%- end %}

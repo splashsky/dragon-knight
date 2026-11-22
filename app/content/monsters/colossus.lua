@@ -7,6 +7,7 @@ Endworld. It was meant to hold the pass, but its masters died, and it has stood 
 obeying the last order it was given. It moves slowly and hits very hard. It does not forgive
 anyone who crosses the line painted at its feet.
 ]],
+	icon = "colossus",
 	level = 49,
 	maxhp = 320, maxdam = 300, armor = 240,
 	maxexp = 1940, maxgold = 647,

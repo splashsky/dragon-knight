@@ -16,6 +16,7 @@ Plague is what Venom becomes when the Mage has more time and fewer scruples. The
 takes hold quickly, spreads through the blood and leaves the monster too weak to swing
 properly for many turns. Gaia's priests in Hambry will not teach it, and the Mages who do
 know it say that is the only sensible reason to keep it to themselves.]],
+	icon = "plague",
 	mp = 45,
 	power = 6,                  -- how many turns the sickness lasts
 	data = { min = 18, max = 32, pct = 35 },   -- hit points per turn, percent less damage dealt

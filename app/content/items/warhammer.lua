@@ -7,6 +7,7 @@ weight is in the head, which makes it slow to bring back into guard, and a wield
 swings it all day ends up with a sore back and a poor sense of where the next blow is
 coming from. Narcissa's armourers sell them to men who have already decided to take the
 hits.]],
+	icon = "warhammer",
 	category = "weapon",
 	price = 1800,
 	attack = 70,

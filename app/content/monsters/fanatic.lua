@@ -6,6 +6,7 @@ The loudest of the pleaders' followers, who gather in the hall in Hambry to shou
 anyone who doubts the Advocate. A Fanatic has given up sleep, food and most of its
 manners for the cause, and it does not take a no for an answer. Keep out of its path
 when the chanting starts, because the chant is usually followed by a rush.]],
+	icon = "fanatic",
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 410, maxgold = 137,

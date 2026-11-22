@@ -7,6 +7,7 @@ eats whole trees and whatever sleeps beneath them. Its path shows in the reed-be
 flattened road that runs from one ruined village to the next. It is not hungry for men, only
 for whatever is nearest.
 ]],
+	icon = "behemoth",
 	level = 48,
 	maxhp = 285, maxdam = 260, armor = 210,
 	maxexp = 1700, maxgold = 567,

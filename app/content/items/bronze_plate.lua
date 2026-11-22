@@ -5,6 +5,7 @@ return {
 A heavy bronze breastplate riveted over a leather lining, sold to guards and mercenaries
 who need more than leather. Bronze dents easily but can be beaten back into shape at any
 forge. It is a sound middle choice for the price.]],
+	icon = "bronze_plate",
 	category = "armor",
 	price = 900,
 	defense = 50,

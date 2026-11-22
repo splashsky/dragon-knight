@@ -6,6 +6,7 @@ The Hellbeast is what hellhounds and hellcats become when they are bred long eno
 fire pits under Hambry. It is larger than any of them, with horns and a hide that shrugs
 off the first blow. The cult that runs the pits keeps them as guards, and sometimes sets
 them loose on the roads to make a point. Do not count on one being frightened of fire.]],
+	icon = "hellbeast",
 	level = 22,
 	maxhp = 74, maxdam = 64, armor = 50,
 	maxexp = 165, maxgold = 55,

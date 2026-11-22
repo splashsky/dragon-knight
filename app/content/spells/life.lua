@@ -6,6 +6,7 @@ return {
 Life is the healing spell most Mages carry after Heal, and the one clerics in Bris teach for
 free. It knits torn skin and bruised ribs together with a steady warmth. Travellers on the
 road to Narcissa tend to carry it more than any potion, since the inns are a day apart.]],
+	icon = "life",
 	mp = 25,
 	power = 50,                 -- the most HP it restores
 	usable_in = "both",

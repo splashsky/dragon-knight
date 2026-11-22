@@ -5,6 +5,7 @@ return {
 A red-skinned brawler from the fire pits beyond Hambry. Hellions fight for sport and drink rather
 than gold, and they will challenge anyone who looks like a fighter. Wise travellers look like cooks
 when passing through.]],
+	icon = "hellion",
 	level = 16,
 	maxhp = 50, maxdam = 45, armor = 30,
 	maxexp = 110, maxgold = 37,

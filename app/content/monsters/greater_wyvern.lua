@@ -6,6 +6,7 @@ The larger cousin of the wyvern, grown fat on the sheep of the high pastures pas
 Shepherds count their flocks twice a day now, and the wiser ones carry a bell to scare the
 young ones off. This one is bigger than a barn and has learned to wait out of sight before
 it dives.]],
+	icon = "greater_wyvern",
 	level = 34,
 	maxhp = 145, maxdam = 130, armor = 105,
 	maxexp = 335, maxgold = 112,

@@ -24,6 +24,8 @@ statuses.fields = {
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page." },
 	schema.lore_field(),
+	{ name = "icon", type = "icon", dir = "images/statuses", default = "", admin = true, label = "Icon",
+		help = "A PNG in public/images/statuses/, without \".png\" (poison: poison.png); empty: none." },
 	{ name = "kind", type = "choice", values = statuses.KINDS, default = "neutral", label = "Kind",
 		help = "harmful statuses are what an antidote cures; helpful ones are buffs." },
 	{ name = "tick_on", type = "choice", values = statuses.TICK_ON, default = "turn_end", label = "Ticks on",

@@ -6,6 +6,7 @@ A knot of living flame that gathers wherever a fire spell has been cast badly an
 burning too long. It drifts over the scorched ground near Narcissa and feeds on whatever
 still smoulders. Fire does nothing to it, so bring steel, or a stout pair of boots and a
 long stick.]],
+	icon = "fira_elemental",
 	level = 34,
 	maxhp = 140, maxdam = 125, armor = 100,
 	maxexp = 310, maxgold = 103,

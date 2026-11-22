@@ -19,6 +19,7 @@ Bears come down from the hills above Roma in the autumn, looking for honey and n
 trouble. A few Warriors and Paladins have found a way to borrow one for a fight, by promising
 it something it wants more than the fight. The bear is not grateful, but it hits very hard,
 and it stays only as long as the spell does.]],
+	icon = "call_bear",
 	mp = 12,
 	power = 4,                  -- rounds the bear stays
 	target = "self",

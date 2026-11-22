@@ -9,6 +9,7 @@ claws are taken to the grave-mound of the clan. Those that fall from the living 
 hung on a cord by whoever finds them and carried into battle. The clan's old women say the
 bear's roar is still in the claw, and that it will give a warrior one good shout before it goes
 quiet for good.]],
+	icon = "bearclaw_totem",
 	category = "accessory",
 	drop_level = 45,
 	casts = "warlord",

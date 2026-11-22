@@ -5,6 +5,7 @@ return {
 Several skeletons fused together by a careless necromancer, which left it bigger, heavier and a
 little confused. It shambles down the old roads near Kalle dragging a cart of bones it has
 collected. It has no name, but the bones still remember how to fight.]],
+	icon = "megaskeleton",
 	level = 13,
 	maxhp = 44, maxdam = 36, armor = 24,
 	maxexp = 78, maxgold = 26,

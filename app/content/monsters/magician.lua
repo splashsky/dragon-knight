@@ -6,6 +6,7 @@ A robed caster who learned his tricks in a tower near Gilead and was thrown out 
 practising on the students. He is quick with a spell, and his fire is more dangerous than
 the sword he carries. The Gilead guards would like a word with him, but they have not yet
 found the nerve to try.]],
+	icon = "magician",
 	level = 8,
 	maxhp = 30, maxdam = 24, armor = 10,
 	maxexp = 36, maxgold = 12,

@@ -14,6 +14,7 @@ Warriors in Kalle say a man who will not step back never needs healing in time. 
 is a shout, a spent breath and a little blood: the caster takes a wound now for a much
 firmer guard for the rest of the fight. It is refused when the wound would finish you, so
 cast it early or not at all.]],
+	icon = "stand_fast",
 	mp = 8,
 	power = 28,                 -- percent less damage taken
 	data = { cost = 12 },       -- percent of the maximum HP the caster gives up

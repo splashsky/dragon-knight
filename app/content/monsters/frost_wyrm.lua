@@ -7,6 +7,7 @@ of old ice. It hunts the passes above Narcissa in the deep winter, and it prefer
 freeze its prey where it stands before it eats. Those who have crossed the pass in
 spring say the snow around its lair never fully melts.
 ]],
+	icon = "frost_wyrm",
 	level = 30,
 	maxhp = 110, maxdam = 100, armor = 80,
 	maxexp = 230, maxgold = 77,

@@ -14,6 +14,7 @@ A battle fury that fills the arms and the voice. The caster hits harder for the 
 fight, and the cost comes after, when the fury leaves and the body remembers every blow.
 Old soldiers from the road towns swear by it, and Bris has a saying about men who fight
 angry and lose their heads.]],
+	icon = "uber_damage",
 	kind = "helpful",
 	data = { pct = 0 },
 	modify_damage_dealt = more,

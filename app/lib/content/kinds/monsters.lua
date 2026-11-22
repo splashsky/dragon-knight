@@ -34,6 +34,8 @@ monsters.fields = {
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page (optional)." },
 	schema.lore_field(),
+	{ name = "icon", type = "icon", dir = "images/monsters", default = "", admin = true, label = "Icon",
+		help = "A PNG in public/images/monsters/, without \".png\" (blue_slime: blue_slime.png); empty: none." },
 	{ name = "level", type = "int", required = true, min = 1, max = 1000, admin = true, label = "Level",
 		help = "Where it is met (one level per five spaces from the center) and what it drops." },
 	{ name = "maxhp", type = "int", required = true, min = 1, max = STAT, admin = true, label = "Max Hit Points" },

@@ -18,6 +18,7 @@ Starfall is the spell the Mages of Hambry save their coin for, because it cannot
 bought in a shop. It needs a clear sky, a steady hand, and a full turn in which to
 watch the monster and do nothing else. When the star comes it is about the size of a
 cart, and the road it lands on is never the same afterwards.]],
+	icon = "starfall",
 	mp = 60,
 	power = 260,                -- the most damage it deals
 	uses = { statuses = { "charging" } },

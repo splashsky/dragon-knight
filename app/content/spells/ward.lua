@@ -7,6 +7,7 @@ Ward is the first defence a Mage learns, a thin shimmer around the body that tur
 aside now and then. It will not save a caster from a dragon, but it has spared more than one
 apprentice a bruise. Guards on the road out of Midworld are taught it before they are given
 a spear.]],
+	icon = "ward",
 	mp = 10,
 	power = 10,                 -- percent less damage taken
 	target = "self",

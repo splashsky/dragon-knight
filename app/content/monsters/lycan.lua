@@ -7,6 +7,7 @@ hunt the roads between Narcissa and Hambry on nights of the full moon, and a tra
 who sees one rarely lives to say whose face it had. Silver is said to hurt them, though
 the smiths who sell it are not always honest about its purity.
 ]],
+	icon = "lycan",
 	level = 25,
 	maxhp = 88, maxdam = 78, armor = 60,
 	maxexp = 185, maxgold = 62,

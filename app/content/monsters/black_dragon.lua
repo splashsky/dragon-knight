@@ -7,6 +7,7 @@ marshes beyond Narcissa since before the towns were walled. Its breath eats thro
 than fire melts it. Wardens say it leaves a traveller alone if he leaves it something shiny,
 though nobody has tested that lately.
 ]],
+	icon = "black_dragon",
 	level = 47,
 	maxhp = 275, maxdam = 250, armor = 205,
 	maxexp = 1580, maxgold = 527,

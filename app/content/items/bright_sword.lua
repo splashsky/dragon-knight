@@ -6,6 +6,7 @@ A long blade of pale steel that still catches the light in a cellar, made by smi
 will not say what they quench it in. Warriors who carry one swear it sings in the hand,
 and that they learn more from each hard fight with it at their side. Only a few shops in
 the far towns stock them, and they never stay on the rack long.]],
+	icon = "bright_sword",
 	category = "weapon",
 	price = 6000,
 	attack = 100,

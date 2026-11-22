@@ -10,6 +10,7 @@ your feet, and take three long breaths before the next swing. It works because a
 man who believes he can go on usually can, for a while. Recruits are told it is a gift
 from the gods; veterans know it is mostly stubbornness, and that it does not work twice
 in one fight.]],
+	icon = "second_wind",
 	mp = 14,
 	power = 25,                 -- percent of your maximum HP it restores
 	data = { cap = 60 },        -- the most HP it restores

@@ -12,6 +12,7 @@ return {
 A hag who keeps a hut on stilts in the bogs, stirring a pot of something green. She puts
 travellers to sleep with a wave of her hand and then, to be thorough, poisons them as well.
 Local people leave a loaf on the path for her and walk around her patch.]],
+	icon = "bog_witch",
 	description = "Puts you to sleep, poisons you and casts Pain, without ever running out of magic.",
 	level = 9,
 	maxhp = 60, maxdam = 10, armor = 6,

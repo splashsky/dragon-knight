@@ -6,6 +6,7 @@ Trolls sleep under bridges and along the old road between Midworld and Roma, and
 travellers pay the toll without argument. They are strong, stupid in the way of hungry
 things, and slow to forget a grudge. A troll caught in daylight is said to turn to stone,
 though the stone ones are usually the ones that were already dead.]],
+	icon = "troll",
 	level = 17,
 	maxhp = 56, maxdam = 48, armor = 36,
 	maxexp = 120, maxgold = 40,

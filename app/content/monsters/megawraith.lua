@@ -6,6 +6,7 @@ A megawraith is a wraith grown fat on the dead of a battlefield, a grey shape ta
 a door. Where lesser wraiths drift, the megawraith drives, pushing its cold into the bones
 of anyone who stands near it. The dead of Gilead are said to have stopped reaching the
 afterlife because of them. Priests recommend holy water and running, in that order.]],
+	icon = "megawraith",
 	level = 21,
 	maxhp = 70, maxdam = 60, armor = 46,
 	maxexp = 155, maxgold = 52,

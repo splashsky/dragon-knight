@@ -24,6 +24,7 @@ The earth under Midworld is soft, and the Mages of Hambry have made it harder to
 with. Rockfall calls up a slab of the road and drops it on whatever is standing there. The
 cost is paid in blood: a Mage who casts it loses a few Hit Points of their own, and
 the masters will not teach it to anyone who cannot afford the bruises.]],
+	icon = "rockfall",
 	mp = 22,
 	power = 100,                -- the most damage it deals
 	data = { cost = 10 },       -- percent of the maximum HP the caster pays

@@ -16,6 +16,7 @@ A grey wolf that answers the call from the edge of the road and runs at the cast
 until the fight is done. It is not tame, and it has no interest in being petted. It is
 quick, fragile for its size, and will take a blow meant for the caster if the monster
 happens to choose it. Hunters from Roma say it always leaves before the trouble does.]],
+	icon = "wolf",
 	hp = 30,
 	attack = 12,
 	defense = 5,

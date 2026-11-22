@@ -6,6 +6,7 @@ A knight of the old garrison of Gilead who was told, once too often, that he was
 strong enough to hold the gate. He still holds it, and he still takes the challenge
 personally. Sellers in Gilead's market have learned to sell his kind a shield, not a
 sword, since he breaks the swords.]],
+	icon = "strong_knight",
 	level = 35,
 	maxhp = 150, maxdam = 135, armor = 110,
 	maxexp = 365, maxgold = 122,

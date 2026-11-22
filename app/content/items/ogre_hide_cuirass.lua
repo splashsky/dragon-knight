@@ -7,6 +7,7 @@ the grain running down the spine. Hunters in the hills near Hambry trade them as
 trophies, and the tanners say the stuff keeps the wearer on his feet a little longer
 than he should be. It stinks for a month after the first wetting, and nobody has yet
 found a way to stop that.]],
+	icon = "ogre_hide_cuirass",
 	category = "armor",
 	price = 2800,
 	defense = 105,

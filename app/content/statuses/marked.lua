@@ -9,6 +9,7 @@ return {
 A hunter's mark, cut or painted onto a creature so that the next blows land harder. It is
 a cheap trick and it works. Blades find the marked spot easily, and the mark fades after a
 few turns whether or not anything has been hit. Spells and summoned allies ignore it.]],
+	icon = "marked",
 	kind = "harmful",
 	turns = 4,
 	data = { pct = 50 },

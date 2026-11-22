@@ -7,6 +7,7 @@ moves slowly but never stops, and it can pass through a barred door as if it wer
 Sages say it was once a man who made a bargain with the wrong ledger. They do not say which
 ledger, or which man.
 ]],
+	icon = "grey_daemon",
 	level = 46,
 	maxhp = 260, maxdam = 230, armor = 190,
 	maxexp = 1400, maxgold = 467,

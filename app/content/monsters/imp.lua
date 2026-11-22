@@ -5,6 +5,7 @@ return {
 A small winged devil that serves nobody for long. Imps play pranks on sleeping travellers, hide the
 keys to inn doors, and whisper bad prices to shopkeepers. They are quick and cruel in a bored
 way, and not worth the bother of killing, except that they will otherwise steal your boots.]],
+	icon = "imp",
 	level = 12,
 	maxhp = 42, maxdam = 34, armor = 22,
 	maxexp = 70, maxgold = 23,

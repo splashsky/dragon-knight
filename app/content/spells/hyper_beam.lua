@@ -19,6 +19,7 @@ return {
 A Mage in Roma once fired three in a row and fell over, which is why the spell now comes with
 a warning. The beam hits hard, but the caster's body needs a turn to recover from the strain.
 Use it when the monster is already weak and there is no time to waste.]],
+	icon = "hyper_beam",
 	mp = 15,
 	power = 60,                 -- the most damage it deals
 	uses = { statuses = { "recharging" } },

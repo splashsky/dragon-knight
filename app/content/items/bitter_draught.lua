@@ -9,6 +9,7 @@ wide clay jug in Narcissa's old infirmary. It is so bitter that most people only
 once, and then they carry it for the rest of their lives. The healers say it closes wounds
 slowly and steadily, which is better than closing them quickly and opening them again on
 the next hill.]],
+	icon = "bitter_draught",
 	category = "consumable",
 	price = 160,
 	max_stack = 10,

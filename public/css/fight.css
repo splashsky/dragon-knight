@@ -3,6 +3,22 @@
 .fight-command p { margin: 0 0 1em; }
 .fight-command input[type="submit"] { min-width: 4.5em; }
 .fight-stale { font-style: italic; }
+/* the monster faced (fight/fight.html): its portrait (images/monsters/, 3.1) beside the
+	"You are fighting" line and its HP/MP, in a thin frame; allies and statuses have a small
+	icon before their names (images/summons/, images/statuses/) */
+.fight-foe { display: flex; align-items: center; gap: 12px; margin: 0 0 1em; }
+.fight .box-body .fight-foe p { margin: 0 0 0.3em; }
+.fight .box-body .fight-foe p:last-child { margin-bottom: 0; }
+.fight-foe-portrait {
+	flex: none;
+	width: 72px;
+	height: 72px;
+	border-radius: 6px;
+	box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.45), 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+.fight-foe-text { min-width: 0; }
+.fight-ally-icon { width: 22px; height: 22px; border-radius: 4px; vertical-align: -6px; box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35); }
+.fight-status-icon { width: 16px; height: 16px; margin-right: 3px; border-radius: 3px; vertical-align: -3px; }
 /* a monster speaking (fight/speech.lua): its line set apart from the action's */
 .fight-speech { font-style: italic; }
 .fight-taunt { font-size: 16px; }

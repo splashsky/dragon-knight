@@ -7,6 +7,7 @@ A breastplate blessed by the priests of Gilead, with the vigil prayer cut into t
 of the collar where the wearer can read it with his chin down. Each charge is one night
 of watch, so the blows land softer and the cuts stop oozing. The priests sell it for a
 great deal of money and then ask the buyer to say the prayer every morning.]],
+	icon = "vigil_cuirass",
 	category = "armor",
 	price = 4500,
 	defense = 115,

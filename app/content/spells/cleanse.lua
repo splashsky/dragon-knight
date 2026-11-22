@@ -10,6 +10,7 @@ Poison, sleep and the rest of the harmful effects are why most young Paladins ca
 antidotes they can't afford. Cleanse does the same job from a short prayer. For three
 MP it costs less than the antidote the market in Roma charges, and it never runs out
 on the road.]],
+	icon = "cleanse",
 	mp = 3,
 	power = 0,                  -- unused: it cures every harmful status
 	usable_in = "both",

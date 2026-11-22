@@ -8,6 +8,7 @@ A grey, oily tonic that smells of tallow and boiled bark. The guards at the Narc
 drink it before a night watch, and the old ones say it thickens the skin enough to notice
 in a fight. The apothecary who sells it insists it is harmless, and the guards insist
 nobody has ever asked them to prove it.]],
+	icon = "guard_tonic",
 	category = "consumable",
 	price = 240,
 	max_stack = 10,

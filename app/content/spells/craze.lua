@@ -11,6 +11,7 @@ return {
 A cheap trick taught in the taverns of Roma, where fighters use it before a brawl. It makes
 the caster angrier and sloppier, and the blows land a little harder for it. Priests dislike
 it, but nobody has ever asked a Warrior to stop.]],
+	icon = "craze",
 	mp = 10,
 	power = 10,                 -- percent more damage
 	target = "self",

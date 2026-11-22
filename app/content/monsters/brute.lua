@@ -7,6 +7,7 @@ wide. Caravan guards out of Gilead say they are not stupid, only uninterested in
 anything that cannot be picked up and thrown. They are often found in the pass beyond
 Narcissa, where they wait for carts to come up the grade.
 ]],
+	icon = "brute",
 	level = 27,
 	maxhp = 94, maxdam = 84, armor = 65,
 	maxexp = 200, maxgold = 67,

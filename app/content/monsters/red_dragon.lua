@@ -6,6 +6,7 @@ The red dragon sleeps on a hoard beneath the mountains past Endworld, and it has
 once been known to share a gold piece. Its fire melts plate and runs down the stone walls
 of the cave in streams. Adventurers who come looking for its gold tend to leave it
 behind, and sometimes their bones with it.]],
+	icon = "red_dragon",
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 720, maxgold = 240,

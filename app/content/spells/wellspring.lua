@@ -10,6 +10,7 @@ A Mage's mana runs out in the middle of a fight more often than any of them will
 Wellspring is a small, cheap prayer of the kind Mages teach each other over a bad cup of
 tea, not one that comes from a book. It only works while there is room for it: with more
 than half of your Magic Points left it is refused, and that costs you nothing.]],
+	icon = "wellspring",
 	mp = 3,
 	power = 15,                 -- percent of the maximum MP it restores
 	usable_in = "both",

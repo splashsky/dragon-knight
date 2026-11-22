@@ -5,6 +5,7 @@ return {
 A fiery ember that falls from a seraph's wing when the creature is slain in the high passes
 beyond Gilead. It is warm to the touch and smells faintly of cinnamon. Mages say it quickens
 the thought and steadies the hand.]],
+	icon = "seraphs_joy",
 	category = "accessory",
 	drop_level = 25,
 	modifiers = {

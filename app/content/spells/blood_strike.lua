@@ -15,6 +15,7 @@ little already does not flinch at the rest. It is a bad trade for anyone with a 
 out of reach, and a Warrior who casts it with low HP is asking the undertaker to measure
 him. Used once at the right moment, it ends fights that would otherwise go on for three
 more rounds.]],
+	icon = "blood_strike",
 	mp = 10,
 	power = 60,                 -- the most damage it deals
 	data = { pct = 100, cost = 15 },   -- percent of your attack it deals before that limit;       -- percent of your maximum HP it takes from you

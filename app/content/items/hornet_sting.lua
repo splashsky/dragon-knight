@@ -6,6 +6,7 @@ The barb of a marsh hornet as long as a finger, kept whole in a tube of tallow. 
 east of Bris sell them for a penny each, having found that a sting pinned to a leather cord
 makes a fine warning to thieves. It also makes a good point for a short stabbing blow, which
 is how most of them get used.]],
+	icon = "hornet_sting",
 	category = "accessory",
 	drop_level = 20,
 	modifiers = { { kind = "stat", stat = "attack", amount = 35 } },

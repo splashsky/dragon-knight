@@ -5,6 +5,7 @@ return {
 A small white feather that drifts loose when a winged guardian falls near Roma. Pilgrims
 say it lifts the heart and steadies the arm. The priests keep the rest of the guardian's
 remains and sell the one feather that is left over to anyone who asks.]],
+	icon = "angels_joy",
 	category = "accessory",
 	drop_level = 25,
 	modifiers = {

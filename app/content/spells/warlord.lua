@@ -10,6 +10,7 @@ it. The voice has to carry across a muddy field in a gale, and it has to make a 
 frightened farmers take one more step. The cost is hoarse throats and a few swallowed
 bruises, but the men who hear it say they stopped feeling the wounds for the length of
 the charge.]],
+	icon = "warlord",
 	mp = 40,
 	power = 75,                 -- percent more damage dealt
 	data = { heal = 25 },       -- percent of your maximum HP it restores

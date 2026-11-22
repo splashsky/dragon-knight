@@ -6,6 +6,7 @@ A smaller, lighter cousin of the common buckler, with a dished face and a rim of
 that turns a point aside. Duellists in Roma favour it because it moves with the wrist
 and not the arm. It will not stop a hard blow, but it leaves the body free to step
 out of the way of one.]],
+	icon = "parry_buckler",
 	category = "shield",
 	price = 180,
 	defense = 6,

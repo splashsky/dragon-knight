@@ -9,6 +9,7 @@ only in trees that have stood for three hundred years. Bog priests in Gilead car
 charms and say the wood still beats slowly when the moon is full. A knot that size is heavy
 for its length, and a warrior who wears one for a week says the stone under his boots has
 begun to annoy him.]],
+	icon = "thornwood_heart",
 	category = "accessory",
 	drop_level = 32,
 	modifiers = {

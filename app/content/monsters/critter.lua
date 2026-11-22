@@ -6,6 +6,7 @@ A scruffy little beast that nests in the hedgerows along the road out of Midworl
 more nuisance than threat, though its claws leave scratches that take a week to heal.
 Farmers set traps for them, and a critter pelt sells for a few coins at the Midworld
 market.]],
+	icon = "critter",
 	level = 1,
 	maxhp = 6, maxdam = 5, armor = 2,
 	maxexp = 4, maxgold = 2,

@@ -7,6 +7,7 @@ the circle. Scholars in Gilead say it was bound once in the north and walked out
 seal cracked. It fights with its hands and its hunger together, and it has never learned to
 lose quietly.
 ]],
+	icon = "archfiend",
 	level = 42,
 	maxhp = 210, maxdam = 190, armor = 150,
 	maxexp = 810, maxgold = 270,

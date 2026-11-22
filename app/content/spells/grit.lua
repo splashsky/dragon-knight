@@ -9,6 +9,7 @@ Warriors who have sat out a few sieges all know the habit: stop for a moment, gr
 teeth and let the wounds close on their own. Grit is the spell that makes the habit
 possible. It does nothing for a warrior who is still standing well, so it is refused above
 half of the maximum Hit Points, and most Warriors learn it late and use it hard.]],
+	icon = "grit",
 	mp = 6,
 	power = 6,                  -- turns of regeneration
 	data = { amount = 5 },      -- hit points per turn

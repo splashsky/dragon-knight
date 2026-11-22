@@ -19,6 +19,7 @@ A spirit is what is left of a person who has not finished their business, or so 
 of Narcissa say. Mages call one for the length of a fight and send it off afterwards, and
 they are careful to say a proper thank you, since a spirit that feels ignored tends to
 wander. It is hard to hit and quick on its feet, though it does not hit very hard itself.]],
+	icon = "call_spirit",
 	mp = 20,
 	power = 6,                  -- rounds the spirit stays
 	target = "self",

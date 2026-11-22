@@ -8,6 +8,7 @@ return {
 Most Paladins learn Mend after their first bad fight in the hills, when a Heal alone was
 not enough. It closes a small wound and washes out whatever the monster left behind. The
 innkeepers in Roma say a Paladin who can cast it needs fewer rooms for the night.]],
+	icon = "mend",
 	mp = 7,
 	power = 12,                 -- the most HP it restores
 	usable_in = "both",

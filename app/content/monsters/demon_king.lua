@@ -7,6 +7,7 @@ founded at Midworld. He is said to wear a crown of cooled lava and to have never
 hurrying. Most who have fought him have failed. A few have spoken with him and lived to regret
 it.
 ]],
+	icon = "demon_king",
 	level = 49,
 	maxhp = 330, maxdam = 300, armor = 250,
 	maxexp = 2000, maxgold = 667,

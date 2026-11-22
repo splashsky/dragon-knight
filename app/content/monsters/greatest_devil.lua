@@ -7,6 +7,7 @@ roads, and it is the one the others obey. Its name is painted on the gates of En
 by people who did not want to be the next to hear it. Mages say it is bound to a single sigil,
 but nobody has been close enough to check.
 ]],
+	icon = "greatest_devil",
 	level = 43,
 	maxhp = 215, maxdam = 195, armor = 160,
 	maxexp = 890, maxgold = 297,

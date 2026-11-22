@@ -7,6 +7,7 @@ his rule would outlast his heart. His court of the dead still meets in the crypt
 where the floors are cold and every chair is full. He sends his servants out to collect the
 tithe of gold from the living, and he counts every coin himself.
 ]],
+	icon = "liche_king",
 	level = 44,
 	maxhp = 225, maxdam = 205, armor = 170,
 	maxexp = 1050, maxgold = 350,

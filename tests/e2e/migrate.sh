@@ -242,7 +242,8 @@ mig_layout "$MIG_DB" | grep -q '^forum|8|board|INTEGER|1|1|0$' && t_ok || t_fail
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys"
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's"
-mig_eq "SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> ''" "heal=heal,magic_bolt=magic_bolt" "spell icons (v0)"
+MIG_SPELL_ICONS="SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> '' ORDER BY id"
+mig_eq "$MIG_SPELL_ICONS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELL_ICONS")" "spell icons equal a fresh install's (v0)"
 mig_eq "$MIG_LORE_KEYS" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_KEYS")" "lore (v0)"
 mig_eq "$MIG_LORE_TEXT" "$(mig_sql "$MIG/fresh.db" "$MIG_LORE_TEXT")" "lore equals a fresh install's (v0)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's"
@@ -892,8 +893,8 @@ t_jar migv7
 t_login sleeper v7pass1; expect_redirect /
 t_get /;           expect_redirect /fight
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
-expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'
-expect_body '<b>You</b> <span class="fight-statuses">&mdash; Damage Up, Defense Up</span>'
+expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/sleep.png" width="16" height="16" alt="">Asleep</span>'
+expect_body '<b>You</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/uber_damage.png" width="16" height="16" alt="">Damage Up, <img class="fight-status-icon" src="/static/images/statuses/uber_defense.png" width="16" height="16" alt="">Defense Up</span>'
 mig_eq "SELECT $T_ROUND FROM users WHERE id = 1" "4" "the counter is kept"
 V7_CS=$(t_csrf)
 t_round "csrf=$V7_CS&spell=Spell&userspell=1"; expect_body 'Your Hit Points are already full.'
@@ -983,7 +984,7 @@ done
 t_jar migv8
 t_login fighter v8pass1; expect_redirect /
 t_get /fight;      expect_status 200; expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Shadow<template class="tip">'; expect_body "Monster's HP: 9"
-expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; Asleep</span>'; expect_no_body "Monster's MP"
+expect_body '<b>Shadow</b> <span class="fight-statuses">&mdash; <img class="fight-status-icon" src="/static/images/statuses/sleep.png" width="16" height="16" alt="">Asleep</span>'; expect_no_body "Monster's MP"
 mig_eq "SELECT round FROM fights WHERE user_id = 1" "4" "the counter is kept"
 t_round "csrf=$(t_csrf)&fight=Fight"; expect_status 200
 mig_eq "SELECT mp || '|' || maxmp FROM fight_combatants WHERE user_id = 1 AND id = 2" "5|5" "the Shadow's MP is full"
@@ -1073,7 +1074,8 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "v11 stamped"
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v11)"
 [ "$(mig_users "$V11_DB")" = "$V11_USERS" ] && t_ok || t_fail "users changed (v11)"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's (v11)"
-mig_eq "SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> ''" "heal=heal,magic_bolt=magic_bolt" "spell icons (v11)"
+MIG_SPELL_ICONS="SELECT group_concat(key || '=' || icon) FROM spells WHERE icon <> '' ORDER BY id"
+mig_eq "$MIG_SPELL_ICONS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELL_ICONS")" "spell icons equal a fresh install's (v11)"
 mig_eq "SELECT value FROM meta WHERE key = 'content_fingerprint'" \
 	"$(mig_sql "$MIG/fresh.db" "SELECT value FROM meta WHERE key = 'content_fingerprint'")" "content fingerprint (v11)"
 mig_serve "$MIG/v11.lua" "$MIG/v11server.log"
@@ -1083,7 +1085,7 @@ t_login caster v11pass1; expect_redirect /
 t_get /; expect_status 200
 expect_body 'action="/spell/1" data-tip data-tip-side="left"><input type="hidden" name="csrf" value="'
 expect_body 'title="Heal (5 MP)" aria-label="Heal (5 MP)"><img src="/static/images/skills/heal.png" width="34" height="34"'
-expect_body 'title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img src="/static/images/skills/default.png"'
+expect_body 'title="Revive (10 MP)" aria-label="Revive (10 MP)" disabled><img src="/static/images/skills/revive.png"'
 t_post /spell/1 "csrf=$(t_csrf)"; expect_body 'You have cast the Heal spell, and gained 10 Hit Points.'
 mig_eq "SELECT currenthp || '|' || currentmp FROM users WHERE id = 1" "15|2" "a Fast Spell after the migration"
 mig_unserve "$MIG/v11server.log"
@@ -1141,7 +1143,7 @@ mig_serve "$MIG/v12.lua" "$MIG/v12server.log"
 t_jar migv12; t_reset_jar
 t_login loreman v12pass1; expect_redirect /
 t_get /fight; expect_status 200
-expect_body '>Blue Slime<template class="tip"><div class="tip-title">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>The humblest monster of the land'
+expect_body '>Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>The humblest monster of the land'
 expect_body 'aria-label="Mend (5 MP)"><img src="/static/images/skills/heal.png"'
 expect_body '<template class="tip"><div class="tip-title">Mend</div><div class="tip-meta">5 MP · In fights and in town</div>'
 expect_body "Monster's HP: 3"
@@ -1206,7 +1208,7 @@ mig_eq "SELECT id || '|' || item_id || '|' || charges FROM user_items ORDER BY i
 mig_eq "$MIG_CLASSES" "$(mig_sql "$MIG/fresh.db" "$MIG_CLASSES")" "classes equal a fresh install's (v13)"
 mig_eq "$MIG_SPELLS" "$(mig_sql "$MIG/fresh.db" "$MIG_SPELLS")" "spells equal a fresh install's (v13)"
 mig_eq "$MIG_ITEMS" "$(mig_sql "$MIG/fresh.db" "$MIG_ITEMS")" "items and shops equal a fresh install's (v13)"
-mig_eq "SELECT group_concat(k) FROM (SELECT key || '=' || icon AS k FROM items WHERE icon <> '' ORDER BY id)" "stick=stick,branch=branch,club=club,skivvies=skivvies,clothes=clothes,leather_armor=leather_armor,reed_shield=reed_shield,buckler=buckler,herb=herb,potion=potion,ether=ether,wand=wand" "item icons (v13)"
+mig_eq "SELECT group_concat(k) FROM (SELECT key || '=' || icon AS k FROM items WHERE icon <> '' ORDER BY id)" "$(mig_sql "$MIG/fresh.db" "SELECT group_concat(k) FROM (SELECT key || '=' || icon AS k FROM items WHERE icon <> '' ORDER BY id)")" "item icons equal a fresh install's (v13)"
 mig_eq "SELECT key || '|' || casts || '|' || charges || '|' || price FROM items WHERE key = 'wand'" "wand|magic_bolt|5|75" "the Wand (v13)"
 mig_eq "SELECT town_id FROM town_items WHERE item_key = 'wand'" "1" "Midworld sells the Wand"
 mig_eq "$MIG_MONSTERS" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS")" "monsters equal a fresh install's (v13)"

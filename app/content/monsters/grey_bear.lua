@@ -6,6 +6,7 @@ The Grey Bear is the common bear of the northern forests past Hambry, grizzled a
 anger but terrible once roused. Hunters leave the grey-muzzled ones alone, having learned
 that they fight back. A Grey Bear will sit on a road for a day rather than leave its cub's
 stream, so travellers go round by the ford. Its pelt sells well in Gilead.]],
+	icon = "grey_bear",
 	level = 21,
 	maxhp = 70, maxdam = 62, armor = 48,
 	maxexp = 160, maxgold = 53,

@@ -8,6 +8,7 @@ crossroads near Endworld, where the gallows used to stand, and it has taken more
 one watch-guard off the road. A lamp does not frighten it, but a companion who stays
 awake usually does.
 ]],
+	icon = "terror",
 	level = 31,
 	maxhp = 115, maxdam = 108, armor = 84,
 	maxexp = 250, maxgold = 83,

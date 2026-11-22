@@ -7,6 +7,7 @@ for an island. Boatmen who pass over it at night leave a lantern in the bow and 
 down. It rises only when something disturbs the water. It has never once rushed a boat that
 kept still.
 ]],
+	icon = "leviathan",
 	level = 46,
 	maxhp = 255, maxdam = 225, armor = 190,
 	maxexp = 1350, maxgold = 450,

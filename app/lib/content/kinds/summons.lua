@@ -16,6 +16,8 @@ summons.fields = {
 	{ name = "description", type = "text", default = "", max = 1000, admin = true, label = "Description",
 		help = "Shown on the help page." },
 	schema.lore_field(),
+	{ name = "icon", type = "icon", dir = "images/summons", default = "", admin = true, label = "Icon",
+		help = "A PNG in public/images/summons/, without \".png\" (wolf: wolf.png); empty: none." },
 	{ name = "hp", type = "int", required = true, min = 1, max = 1000000, admin = true, label = "Hit points" },
 	{ name = "attack", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Attack" },
 	{ name = "defense", type = "int", default = 0, min = 0, max = 1000000, admin = true, label = "Defense",

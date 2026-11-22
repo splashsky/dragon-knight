@@ -11,6 +11,7 @@ return {
 Rage is the spell fighters learn when Craze stops being enough. It works the same way, only
 more so, and the caster feels the heat in the arms for the rest of the fight. Trainers warn
 students to keep a clear head, which is harder with a bellyful of anger.]],
+	icon = "rage",
 	mp = 20,
 	power = 25,                 -- percent more damage
 	target = "self",
