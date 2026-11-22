@@ -9,3 +9,4 @@ data/
 *:Zone.Identifier
 *:sec.endpointdlp
 /Icons/
+__pycache__/
