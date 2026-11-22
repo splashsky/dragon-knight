@@ -19,7 +19,7 @@ this spell is the proper way. The wolf is no pet: it stays a few rounds, bites w
 reach, and takes a blow meant for its master when a monster is in the mood.]],
 	icon = "call_wolf",
 	mp = 10,
-	power = 5,                  -- rounds the wolf stays
+	power = 5,                  -- ticks the wolf stays (the clock's, 10 s each)
 	target = "self",
 	uses = { summons = { "wolf" } },
 	messages = {

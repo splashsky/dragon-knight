@@ -21,7 +21,7 @@ it something it wants more than the fight. The bear is not grateful, but it hits
 and it stays only as long as the spell does.]],
 	icon = "call_bear",
 	mp = 12,
-	power = 4,                  -- rounds the bear stays
+	power = 4,                  -- ticks the bear stays (the clock's, 10 s each)
 	target = "self",
 	uses = { summons = { "bear" } },
 	messages = {

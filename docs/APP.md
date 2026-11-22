@@ -1466,6 +1466,27 @@ golem. `tests/lua/test_spells.lua` casts every spell, by the player and by a mon
 many seeded states (no errors, whole amounts, MP spent only when cast, monsters immune to
 every element and warding off every status untouched).
 
+3.2 added 25 spells for the elements and the battlefield (`tests/lua/test_new_spells.lua`).
+**Monster specials**, learned by no class, scale with the caster's own `attack` (`data.min` and
+`data.max` percent, armor ignored, so one spell serves a level 6 drake and a level 47
+dragon): the charged breaths (`fire_breath`, `frost_breath`, `venom_breath`,
+`shadow_breath`: 46-55%, 20 MP, gather for a tick with `s:charge(1, "release")`, then hit in
+their element with a rider: burning at level/5 (at least 3) a tick, weakened 25% for 2 ticks,
+venom, withering) and `heavy_blow` (50-60%, neutral, 15 MP, also the wyverns' dive), and the
+plain `thunderbolt`, `water_jet` (35-42%) and `deluge` (33-40% of water and a `downpour`).
+`doom` puts the status `doom` on the target (4 ticks; harmful, so every cure lifts it); only
+when the ticks run out (`on_expire`: not when cured) it takes shadow damage of half the
+caster's attack. **Field spells** (`rain_call`, `sunfire`, `storm_call`, `cold_snap`, `mire`,
+`nightfall`, `fog_bank`, `miasma`, `brimstone`, `consecrate`) are `target = "self"`, set the
+field of their group with `s:field(key, { ticks = n })`, and refuse (`can_cast`) while it is
+up (`s:has_field`); Consecrate (Paladin 30) takes an aura's place, so it undoes Miasma and
+Brimstone. **Player spells**: Gust (wind) and Torrent (water) are typed Hurts for the Mage,
+Scorch a stronger Ember (Mage 45), and `fire_ward`, `frost_ward` and `storm_ward` put on the
+statuses of the same keys (`resist` 50 of fire, frost or lightning, 6 ticks; the Ward
+Draughts, 240 gold, 8 ticks) for Paladins (21, 24, 26) and Mages (34, 37, 38). Rain Call 20,
+Gust 22, Torrent 24, Sunfire 26, Cold Snap 28 and Storm Call 41 are the Mage's, Mire the
+Warrior's (21).
+
 ```lua
 -- app/content/spells/heal.lua (scripted: see Scripting spells and items)
 return {

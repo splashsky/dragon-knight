@@ -22,7 +22,7 @@ party recovers, and then they thank it, because a golem that is not thanked seem
 longer to rise the next time.]],
 	icon = "call_golem",
 	mp = 40,
-	power = 4,                  -- rounds the golem stays
+	power = 4,                  -- ticks the golem stays (the clock's, 10 s each)
 	target = "self",
 	uses = { summons = { "golem" } },
 	messages = {

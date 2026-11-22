@@ -335,7 +335,10 @@ end
 local ORIGINAL_EXCEPTIONS = { ["warrior heal"] = true }
 
 -- Spells no class learns: they are left to monsters (or to gear).
-local NOBODY = { hyper_beam = true, solar_beam = true, regen = true, poison = true, call_wolf = true }
+local NOBODY = { hyper_beam = true, solar_beam = true, regen = true, poison = true, call_wolf = true,
+	fire_breath = true, frost_breath = true, venom_breath = true, shadow_breath = true, heavy_blow = true,
+	thunderbolt = true, water_jet = true, doom = true, deluge = true, nightfall = true, fog_bank = true,
+	miasma = true, brimstone = true }
 
 function T.class_spells_exist_and_are_affordable()
 	local seen = {}

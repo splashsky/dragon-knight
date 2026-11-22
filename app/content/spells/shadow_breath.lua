@@ -1,0 +1,39 @@
+-- app/content/spells/shadow_breath.lua :: a breath of darkness (Fire Breath's kin: gathers for
+-- a tick, then hits for a share of the caster's attack, armor ignored) that leaves the target
+-- withering (the withering status: the caster gains what the target loses). Learned by no
+-- class by default: monsters cast it.
+local function release(s)
+	if s.target:immune_to("shadow") then return s:say("immune", s.name) end
+	local attack = s.caster.attack
+	local damage = s:roll(attack * s.data.min // 100, attack * s.data.max // 100)
+	s:say("hit", s.name, s.target:hurt(damage, "shadow"))
+	local wither = { ticks = s.data.ticks, min = s.data.wither_min, max = s.data.wither_max }
+	if s.target:afflict("withering", wither) then s:say("wither", s:seconds(s.data.ticks)) end
+end
+
+return {
+	name = "Shadow Breath",
+	description = "Draws a deep breath for a tick, then breathes darkness for about half the caster's attack; the target withers for 30 seconds, and the caster gains what it loses. Some monsters are immune.",
+	icon = "shadow_breath",
+	mp = 20,
+	-- percent of the caster's attack; the withering's ticks and hit points drained a tick
+	data = { min = 46, max = 55, ticks = 3, wither_min = 10, wither_max = 16 },
+	uses = { statuses = { "charging", "withering" } },
+	messages = {
+		charge = "You have cast the %s spell, and draw a deep breath.",
+		hit = "Your %s engulfs the monster for %d damage.",
+		wither = "The monster withers for %d seconds.",
+		immune = "Your %s rolls over the monster, but it is immune to shadow.",
+		enemy = {
+			charge = "The monster draws a deep breath for its %s.",
+			hit = "The monster unleashes %s on you for %d damage.",
+			wither = "You wither for %d seconds.",
+			immune = "The monster unleashes %s, but you are immune to shadow.",
+		},
+	},
+	cast = function(s)
+		s:charge(1, "release")
+		s:say("charge", s.name)
+	end,
+	stages = { release = release },
+}

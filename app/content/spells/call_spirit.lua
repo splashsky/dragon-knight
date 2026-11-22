@@ -21,7 +21,7 @@ they are careful to say a proper thank you, since a spirit that feels ignored te
 wander. It is hard to hit and quick on its feet, though it does not hit very hard itself.]],
 	icon = "call_spirit",
 	mp = 20,
-	power = 6,                  -- rounds the spirit stays
+	power = 6,                  -- ticks the spirit stays (the clock's, 10 s each)
 	target = "self",
 	uses = { summons = { "spirit" } },
 	messages = {
