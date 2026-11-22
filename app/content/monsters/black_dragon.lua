@@ -11,7 +11,7 @@ though nobody has tested that lately.
 	level = 47,
 	maxhp = 275, maxdam = 250, armor = 205,
 	maxexp = 1580, maxgold = 527,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 176,
 	speech = {
 		start = { "The marsh is older than your kingdom, little knight.", "Leave your shine and go.", chance = 65 },

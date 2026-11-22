@@ -10,7 +10,6 @@ their spells carry farther than their manners.]],
 	level = 11,
 	maxhp = 41, maxdam = 33, armor = 22,
 	maxexp = 68, maxgold = 23,
-	immune = 0,
 	maxmp = 38,
 	speech = {
 		start = { "Ah, a student! Stand still while I test you.", chance = 50 },

@@ -11,7 +11,6 @@ are written down as missing.
 	level = 42,
 	maxhp = 210, maxdam = 190, armor = 155,
 	maxexp = 850, maxgold = 283,
-	immune = 0,
 	maxmp = 151,
 	speech = {
 		start = { "Name, business, and your receipt, please.", "You are late. Late is noted.", chance = 55 },

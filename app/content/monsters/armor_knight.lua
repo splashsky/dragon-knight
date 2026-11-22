@@ -9,7 +9,6 @@ enough to split a shield in one blow, and it never answers a hail.]],
 	level = 33,
 	maxhp = 130, maxdam = 115, armor = 95,
 	maxexp = 280, maxgold = 93,
-	immune = 0,
 	maxmp = 118,
 	speech = {
 		start = { "Halt.", "Papers.", chance = 25 },

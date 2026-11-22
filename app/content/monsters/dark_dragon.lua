@@ -11,7 +11,7 @@ Its claws are said to remember them.
 	level = 45,
 	maxhp = 245, maxdam = 215, armor = 180,
 	maxexp = 1250, maxgold = 417,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 167,
 	speech = {
 		start = { "I know your name, {player}. I have always known it.", "Your name is on my list.", chance = 65 },

@@ -10,7 +10,6 @@ the calm of people who have already decided the outcome.]],
 	level = 38,
 	maxhp = 168, maxdam = 155, armor = 125,
 	maxexp = 530, maxgold = 177,
-	immune = 0,
 	maxmp = 137,
 	speech = {
 		start = { "Peace, {player}. You are on the list.", "The Advocate sends his regards.", chance = 45 },

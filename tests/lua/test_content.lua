@@ -134,7 +134,7 @@ function T.fingerprint_stability()
 	local f2 = schema.validate(kind, d2)
 	local c1 = load.canonical(all_of({ { key = "x", flat = f1 } }))
 	eq(c1, load.canonical(all_of({ { key = "x", flat = f2 } })))
-	assert(c1:find("^dk%-content%-8\n"), "format line first")
+	assert(c1:find("^dk%-content%-9\n"), "format line first")
 	assert(c1:find('classes\tx\tname\ts"Same"', 1, true), "string field line")
 	assert(c1:find("classes\tx\tsort\ti4", 1, true), "integer field line")
 	-- any change changes it
@@ -247,7 +247,8 @@ function T.load_spells()
 	eq(k.by_key.hurt["messages.enemy.hit"], "The monster casts %s on you for %d damage.")
 	eq(dk.db:value("SELECT messages FROM spells WHERE key = 'sleep'"),
 		"asleep=You have cast the %s spell. The monster is asleep.\n" ..
-		"immune=You have cast the %s spell, but the monster is immune to it.")
+		"immune=You have cast the %s spell, but the monster is immune to it.\n" ..
+		"resisted=You have cast the %s spell, but the monster resists it.")
 	-- both forms of functions are shipped: inline (heal) and free-standing (hurt)
 	local function source(key)
 		local f = assert(io.open(load.path(spell_kind, key), "rb"))

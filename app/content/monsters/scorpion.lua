@@ -9,7 +9,6 @@ a day. Caravan drivers shake out their boots every morning and do not trust a da
 	level = 5,
 	maxhp = 18, maxdam = 14, armor = 6,
 	maxexp = 20, maxgold = 7,
-	immune = 0,
 	maxmp = 17,
 	speech = {
 		start = { "*clicks its claws*", chance = 20 },

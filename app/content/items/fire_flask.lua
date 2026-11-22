@@ -1,5 +1,6 @@
 -- app/content/items/fire_flask.lua :: a thrown flask of lamp oil that sets the monster
--- alight (the burning status). Fights only; some monsters are immune.
+-- alight (the burning status: fire). Fights only; monsters immune to fire or warding off
+-- burning for certain are refused it (it isn't used up).
 return {
 	name = "Fire Flask",
 	description = "Throws burning oil that sets the monster alight for a few turns. Some monsters are immune.",
@@ -19,13 +20,16 @@ on your feet.]],
 	messages = {
 		used = "You throw the %s. The monster catches fire and burns for %d turns.",
 		immune = "You throw the %s, but the monster is immune to it.",
+		resisted = "You throw the %s, but the monster resists it.",
 	},
 	uses = { statuses = { "burning" } },
 	can_use = function(u)
-		if u.target.immune ~= 0 then return u:refuse("immune", u.name) end
+		if u.target:immune_to("fire") or u.target:ward("burning") == 100 then return u:refuse("immune", u.name) end
 	end,
 	use = function(u)
-		u.target:afflict("burning", { turns = u.power, amount = u.data.amount })
+		if not u.target:afflict("burning", { turns = u.power, amount = u.data.amount }) then
+			return u:say("resisted", u.name)
+		end
 		u:say("used", u.name, u.power)
 	end,
 }

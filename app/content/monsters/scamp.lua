@@ -10,7 +10,6 @@ traveller's bag in a minute.]],
 	level = 4,
 	maxhp = 16, maxdam = 13, armor = 5,
 	maxexp = 15, maxgold = 5,
-	immune = 0,
 	maxmp = 12,
 	speech = {
 		start = { "Hee! A new one! Let's untie his boots!", chance = 35 },

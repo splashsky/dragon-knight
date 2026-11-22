@@ -12,7 +12,6 @@ crown.
 	level = 42,
 	maxhp = 205, maxdam = 185, armor = 150,
 	maxexp = 780, maxgold = 260,
-	immune = 0,
 	maxmp = 151,
 	speech = {
 		start = { "Toll or blade. Pick one.", "You are on my road now.", chance = 60 },

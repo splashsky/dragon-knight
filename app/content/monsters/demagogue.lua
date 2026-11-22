@@ -10,7 +10,6 @@ pay in coin and labour. His guards are paid in the bread they took from the gran
 	level = 48,
 	maxhp = 290, maxdam = 260, armor = 210,
 	maxexp = 1760, maxgold = 587,
-	immune = 0,
 	maxmp = 180,
 	speech = {
 		start = { "Look at this one, friends. A crown man in disguise.", "Stand with the people, {player}, or stand aside.", chance = 60 },

@@ -3,6 +3,7 @@
 -- standalone pages without the game frame, so they use the minimal layout (full width
 -- via body.help, see community.css).
 local classes = require("lib.classes")
+local elements = require("lib.elements")
 local game = require("lib.game")
 local items = require("lib.items")
 local leveling = require("lib.leveling")
@@ -81,29 +82,32 @@ function help.spells(req)
 end
 
 -- Every monster that isn't retired, with its stats and MP (with equipment counted: what
--- the fight uses), and for those that have them their spells, items and equipment.
+-- the fight uses), its resistances, weaknesses and wards, and for those that have them its
+-- spells (its own, then its class's), items and equipment.
 function help.monsters(req)
 	local list = {}
 	for _, row in ipairs(monsters.active()) do
 		local m = monsters.effective(row)
-		local immune
-		if m.immune == 1 then immune = "Hurt" elseif m.immune ~= 0 then immune = "Hurt & Sleep" end
 		local lo = monsters.loadout(m)
 		local loadout = {}
 		local function add(label, names)
 			if #names > 0 then loadout[#loadout + 1] = { label = label, text = table.concat(names, ", ") } end
 		end
-		local names = {}
-		for _, e in ipairs(lo.spells) do names[#names + 1] = e.spell.name end
+		local names, taught = {}, {}
+		for _, e in ipairs(lo.spells) do
+			if e.from_class then taught[#taught + 1] = e.spell.name else names[#names + 1] = e.spell.name end
+		end
 		add("Spells", names)
+		local class = (m.class or "") ~= "" and classes.find(m.class)
+		if class then add(class.name .. " spells", taught) end
 		names = {}
 		for _, e in ipairs(lo.items) do names[#names + 1] = e.item.name .. (e.stock and (" (" .. e.stock .. ")") or "") end
 		add("Items", names)
 		names = {}
 		for _, e in ipairs(lo.equipment) do names[#names + 1] = e.item.name end
 		add("Equipment", names)
-		list[#list + 1] = { monster = m, immune = immune, loadout = loadout, special = m.roams == 0,
-			free = m.uses_mp == 0 and #lo.spells > 0 }
+		list[#list + 1] = { monster = m, affinities = elements.lines(m.resist, m.ward), loadout = loadout,
+			special = m.roams == 0, free = m.uses_mp == 0 and #lo.spells > 0 }
 	end
 	return page(req, "Monsters", "community/help/monsters", { monsters = list })
 end

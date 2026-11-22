@@ -11,7 +11,6 @@ armour, so most who meet one go in with a plan to get out again.
 	level = 32,
 	maxhp = 120, maxdam = 110, armor = 90,
 	maxexp = 260, maxgold = 87,
-	immune = 0,
 	maxmp = 114,
 	speech = {
 		start = { "Your armour will make a fine puddle.", chance = 40 },

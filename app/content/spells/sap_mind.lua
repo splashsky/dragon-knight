@@ -3,11 +3,11 @@
 -- default.
 -- learned: mage 29
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("arcane") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
-	local back = s.caster:heal("mp", math.floor(damage / 4))
+	local dealt = s.target:hurt(damage, "arcane")
+	s:say("hit", s.name, dealt)
+	local back = s.caster:heal("mp", math.floor(dealt / 4))
 	if back > 0 then s:say("drain", back) end
 end
 

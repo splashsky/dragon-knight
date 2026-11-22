@@ -1,5 +1,5 @@
--- app/content/items/sleep_powder.lua :: puts a monster to sleep (a thrown pinch; immune 2
--- stops it). Fights only.
+-- app/content/items/sleep_powder.lua :: puts a monster to sleep (a thrown pinch; a ward
+-- against sleep may stop it, and one of 100% refuses it). Fights only.
 return {
 	name = "Sleep Powder",
 	description = "Throws a grey dust that puts the monster to sleep. Some monsters are immune.",
@@ -17,13 +17,14 @@ it with the air of men who have learned it the hard way.]],
 	messages = {
 		used = "You throw the %s. The monster falls asleep.",
 		immune = "You throw the %s, but the monster is immune to it.",
+		resisted = "You throw the %s, but the monster resists it.",
 	},
 	uses = { statuses = { "sleep" } },
 	can_use = function(u)
-		if u.target.immune == 2 then return u:refuse("immune", u.name) end
+		if u.target:ward("sleep") == 100 then return u:refuse("immune", u.name) end
 	end,
 	use = function(u)
-		u.target:sleep(u.power)
+		if not u.target:sleep(u.power) then return u:say("resisted", u.name) end
 		u:say("used", u.name)
 	end,
 }

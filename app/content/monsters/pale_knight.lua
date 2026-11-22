@@ -10,7 +10,6 @@ to see whether he moves first.]],
 	level = 39,
 	maxhp = 175, maxdam = 160, armor = 130,
 	maxexp = 580, maxgold = 193,
-	immune = 0,
 	maxmp = 141,
 	speech = {
 		start = { "Stand, {player}, if you can.", "The snow remembers you.", chance = 40 },

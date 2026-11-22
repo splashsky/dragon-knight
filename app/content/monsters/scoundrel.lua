@@ -9,7 +9,6 @@ Scoundrels are seldom brave, but they are rarely alone.]],
 	level = 12,
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 75, maxgold = 25,
-	immune = 0,
 	maxmp = 40,
 	speech = {
 		start = { "Friend! You look like a man with money.", chance = 50 },

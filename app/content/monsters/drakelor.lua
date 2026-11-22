@@ -10,7 +10,6 @@ a needle.]],
 	level = 3,
 	maxhp = 14, maxdam = 12, armor = 4,
 	maxexp = 10, maxgold = 3,
-	immune = 0,
 	maxmp = 9,
 	speech = {
 		start = { "Another one for the road, is it?", chance = 30 },

@@ -11,7 +11,6 @@ about him.]],
 	level = 40,
 	maxhp = 190, maxdam = 168, armor = 138,
 	maxexp = 660, maxgold = 220,
-	immune = 0,
 	maxmp = 144,
 	speech = {
 		start = { "The library is closed, {player}. Leave your books.", "Kneel to the crown.", chance = 50 },

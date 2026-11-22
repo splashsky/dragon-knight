@@ -14,6 +14,7 @@ local fm = require("tests.fight_model")
 local fo = require("tests.fight_original")
 local items = require("lib.items")
 local load = require("lib.content.load")
+local monsters_lib = require("lib.monsters")
 local olds = require("tests.spells_original")
 local php = require("lib.php")
 local round = require("fight.round")
@@ -95,7 +96,9 @@ table.sort(ORIGINAL_KEYS)
 function T.fights_play_as_in_2_1()
 	-- the original monsters (ids 1-151, attack only, no equipment); the example monsters with
 	-- loadouts that came later (2.2) act differently by design (test_monsters.lua)
-	local monsters = dk.db:query("SELECT * FROM monsters WHERE id <= 151 ORDER BY id")
+	-- (the frozen fight reads the original immunity, `immune`: from the resistances and wards)
+	local monsters = {}
+	for id = 1, 151 do monsters[id] = monsters_lib.get(id) end
 	local spell_rows = {}
 	for _, key in ipairs(ORIGINAL_KEYS) do spell_rows[#spell_rows + 1] = assert(spells.by_key(key)) end
 	local item_rows = { items.by_key("herb"), items.by_key("potion"), items.by_key("ether") }
@@ -113,7 +116,8 @@ function T.fights_play_as_in_2_1()
 		-- the encounter starts: monster HP, who swings first
 		local old = {}
 		for k, v in pairs(st) do old[k] = v end
-		local first_old = fo.start(old, monster, r_old.rand)
+		local legacy = setmetatable({ immune = fm.immune(monster) }, { __index = monster })
+		local first_old = fo.start(old, legacy, r_old.rand)
 		local f = state.new({ user_id = 1, round = 1, st = st })
 		f.rand = r_new.rand
 		state.add_monster(f, monster, 1)
@@ -134,7 +138,7 @@ function T.fights_play_as_in_2_1()
 					if old.currentmp >= s.mp then a = { kind = "spell", spell = s } else a = { kind = "attack" } end
 				else a = { kind = "item", item = item_rows[g(1, #item_rows)] } end
 			end
-			local o = fo.round(old, monster, a, r_old.rand, function(st_, x)
+			local o = fo.round(old, legacy, a, r_old.rand, function(st_, x)
 				return olds.run(x.kind, x.spell or x.item, st_, r_old.rand, true)
 			end)
 			-- every other fight traced (the JSON fight API): the same rolls, and the events say
@@ -214,8 +218,8 @@ local function with_content(fn)
 	if not ok then error(err, 0) end
 end
 
-local SLIME = { id = 1, name = "Blue Slime", maxhp = 4, maxdam = 3, armor = 1, level = 1, maxexp = 1, maxgold = 1, immune = 0 }
-local CREATURE = { id = 4, name = "Creature", maxhp = 10, maxdam = 8, armor = 2, level = 2, maxexp = 4, maxgold = 2, immune = 0 }
+local SLIME = { id = 1, name = "Blue Slime", maxhp = 4, maxdam = 3, armor = 1, level = 1, maxexp = 1, maxgold = 1 }
+local CREATURE = { id = 4, name = "Creature", maxhp = 10, maxdam = 8, armor = 2, level = 2, maxexp = 4, maxgold = 2 }
 
 local function player_row(over)
 	local p = { id = 1, charname = "Tester", level = 5, currenthp = 50, maxhp = 100, currentmp = 50, maxmp = 100,
@@ -245,7 +249,7 @@ local function keys(c)
 end
 
 -- A monster that never hits (dodge roll) and whose turns are predictable: maxdam 0.
-local PUNCHBAG = { id = 99, name = "Punchbag", maxhp = 1000, maxdam = 0, armor = 0, level = 1, maxexp = 1, maxgold = 1, immune = 0 }
+local PUNCHBAG = { id = 99, name = "Punchbag", maxhp = 1000, maxdam = 0, armor = 0, level = 1, maxexp = 1, maxgold = 1 }
 
 function T.round_order_and_tick_timing()
 	with_content(function(env)
@@ -396,9 +400,9 @@ function T.poison_and_regen_spells()
 	eq(enemy(r.f).hp, 900 - dmg)
 	for _ = 1, 2 do r = round.play(r.f, { kind = "continue" }) end
 	eq(keys(enemy(r.f)), "", "three ticks")
-	-- immune monsters aren't poisoned
+	-- monsters immune to poison aren't poisoned
 	f = fight(recorder(11).rand, nil, { PUNCHBAG }, 900)
-	enemy(f).data.immune = 1
+	enemy(f).row.resist = { poison = 100 }
 	r = round.play(f, { kind = "spell", spell = spells.by_key("poison") })
 	eq(lines(r.player), "You have cast the Poison spell, but the monster is immune to it.")
 	-- regen: from the next turn on

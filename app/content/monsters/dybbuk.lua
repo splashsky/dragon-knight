@@ -9,7 +9,6 @@ its family. Its blows land harder than they should, and it has no patience for t
 	level = 9,
 	maxhp = 34, maxdam = 28, armor = 14,
 	maxexp = 50, maxgold = 17,
-	immune = 0,
 	maxmp = 33,
 	speech = {
 		start = { "Give me back what is mine.", "Mine. Mine. Mine.", chance = 50 },

@@ -9,7 +9,6 @@ well, but they have never needed to.]],
 	level = 12,
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 70, maxgold = 23,
-	immune = 0,
 	maxmp = 40,
 	speech = {
 		start = { "Oh, you came. I knew you would.", chance = 50 },

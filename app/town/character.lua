@@ -1,7 +1,9 @@
 -- town/character.lua :: legacy index.php showchar() (own sheet, popup), onlinechar($id)
 -- (anyone's sheet, from Who's Online) and showmap().
+local affinities = require("lib.content.affinities")
 local classes = require("lib.classes")
 local common = require("town.common")
+local elements = require("lib.elements")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
@@ -19,7 +21,8 @@ end
 
 -- A character's sheet (the Extended Stats window, someone's sheet from Who's Online, and
 -- the inventory page's head): the users row, effective stats, equipment names, the numbers
--- as text, bonuses ("(+10%)"), the next level's experience, class name, spells, statuses.
+-- as text, bonuses ("(+10%)"), the next level's experience, class name, spells, statuses,
+-- and the resistances and wards its gear and statuses give (lines; none: empty).
 function character.sheet(user)
 	local class = classes.get(user.charclass)
 	local s = game.stats(user)
@@ -31,8 +34,12 @@ function character.sheet(user)
 	local names = {}
 	for _, s in ipairs(spells.known(user)) do names[#names + 1] = s.name end
 	-- world statuses (lib/world.lua): they tick on map moves
-	local statuses = dk.db:query("SELECT s.name, us.turns_left FROM user_statuses us JOIN statuses s ON s.id = us.status_id " ..
-		"WHERE us.user_id = ? ORDER BY us.position", user.id)
+	local statuses = dk.db:query("SELECT s.name, s.resist, s.ward, us.turns_left FROM user_statuses us " ..
+		"JOIN statuses s ON s.id = us.status_id WHERE us.user_id = ? ORDER BY us.position", user.id)
+	local resist, ward = s.resist, s.ward
+	for _, st in ipairs(statuses) do
+		resist, ward = elements.sum(resist, affinities.decode(st.resist)), elements.sum(ward, affinities.decode(st.ward))
+	end
 	return {
 		u = user,
 		s = s,
@@ -45,6 +52,7 @@ function character.sheet(user)
 		charclass = class and class.name,
 		spells = names,
 		statuses = statuses,
+		affinities = elements.lines(resist, ward),
 	}
 end
 

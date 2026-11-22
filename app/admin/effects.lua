@@ -4,6 +4,7 @@
 -- the spells page: admins override the names, descriptions, numbers and message strings per
 -- server (the kinds' admin_fields); "reset to file" deletes an override; what they do is
 -- the file's code, a monster's loadout the file's (shown read-only).
+local affinities = require("lib.content.affinities")
 local common = require("admin.common")
 local content = require("admin.content")
 local game = require("lib.game")
@@ -30,12 +31,15 @@ end
 local function loadout_lines(e)
 	local lo = monsters.loadout(e)
 	local out = {}
+	if (e.class or "") ~= "" then
+		out[#out + 1] = { label = "Class", value = ("%s: the fight spells it learns up to level %d"):format(e.class, e.level) }
+	end
 	for _, x in ipairs(lo.equipment) do
 		out[#out + 1] = { label = "Equipment", value = ("%s: %s (%s)"):format(x.slot, x.item.name, x.item.key) }
 	end
 	for _, x in ipairs(lo.spells) do
-		out[#out + 1] = { label = "Spell", value = ("%s (%s): weight %d%s"):format(x.spell.name, x.spell.key, x.weight,
-			x.has_when and ", when its condition holds" or "") }
+		out[#out + 1] = { label = "Spell", value = ("%s (%s): weight %d%s%s"):format(x.spell.name, x.spell.key, x.weight,
+			x.has_when and ", when its condition holds" or "", x.from_class and ", from its class" or "") }
 	end
 	for _, x in ipairs(lo.items) do
 		out[#out + 1] = { label = "Item", value = ("%s (%s): weight %d, %s%s"):format(x.item.name, x.item.key, x.weight,
@@ -72,8 +76,9 @@ local KINDS = {
 		code = "its loadout: equipment, items and spells with their weights, stock and when conditions",
 		intro = "Monsters are content files, <code>app/content/monsters/&lt;key&gt;.lua</code>; the game picks up " ..
 			"a new or edited file on the next page load. Click one to override its name, description and stats " ..
-			"(MP, whether spells cost it MP, the weight of its attack, whether it roams) on this server; its " ..
-			"equipment, items and spells are the file's (read-only here).",
+			"(MP, whether spells cost it MP, the weight of its attack, whether it roams, the element of its attack, " ..
+			"its resistances and wards) on this server; its equipment, items, spells and class are the file's " ..
+			"(read-only here).",
 		adding = "Copy one of the files in <code>app/content/monsters/</code> to a new name (the file name is its " ..
 			"key: lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it; " ..
 			"<code>goblin_shaman.lua</code> shows spells, items and equipment (see <code>docs/APP.md</code>, " ..
@@ -130,6 +135,7 @@ end
 local function detail(req, k, name, e, opts)
 	opts = opts or {}
 	local current = k.scripted and scripted.flatten(e, {}) or {}
+	affinities.flatten(e, current)
 	for _, f in ipairs(k.kind.fields) do current[f.name] = e[f.name] end
 	local facts = {}
 	if k.facts then

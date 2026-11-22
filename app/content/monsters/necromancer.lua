@@ -11,7 +11,6 @@ they are seen.
 	level = 26,
 	maxhp = 90, maxdam = 80, armor = 62,
 	maxexp = 190, maxgold = 63,
-	immune = 0,
 	maxmp = 94,
 	speech = {
 		start = { "Another soul wanders into my garden.", "Ah, {player}. The dead whispered you would come.", chance = 65 },

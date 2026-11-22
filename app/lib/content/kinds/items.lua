@@ -2,9 +2,11 @@
 -- lib/content/schema.lua for the kind interface and docs/APP.md "Items" for the file format.
 --
 -- Gear (category weapon, armor, shield or accessory) is equipped in its slot and adds its
--- attack, defense and `modifiers` (stat bonuses, lib/stats.lua) while equipped; it never
--- stacks. Modifiers are stored as text (stats.encode_modifiers) in items.modifiers; the
--- flat form has them as "modifiers.1.stat", "modifiers.1.amount". Consumables stack up to
+-- attack, defense and `modifiers` (stat bonuses, resistances and wards, lib/stats.lua) while
+-- equipped; it never stacks. A weapon's `element` is its attack's (lib/elements.lua;
+-- default neutral). Modifiers are stored as text (stats.encode_modifiers) in
+-- items.modifiers; the flat form has them as "modifiers.1.stat" (or ".element", ".status")
+-- and "modifiers.1.amount". Consumables stack up to
 -- max_stack in the bag and are scripted like spells (docs/APP.md "Scripting spells and
 -- items"): power, data and message strings are data, their use function (and the
 -- optional can_use) stays in the file (lib/content/scripted.lua). Quest items can't be
@@ -13,6 +15,7 @@
 -- user_items row has its own; rechargeable = false: single use, gone with its last charge
 -- instead of refilled at an inn). icon: a PNG in public/images/items/ (default: the spells'
 -- default icon).
+local elements = require("lib.elements")
 local scripted = require("lib.content.scripted")
 local schema = require("lib.content.schema")
 local stats = require("lib.stats")
@@ -58,6 +61,9 @@ items.fields = {
 	{ name = "icon", type = "icon", dir = "images/items", fallback = "images/skills/default.png", default = "",
 		admin = true, label = "Icon",
 		help = "A PNG in public/images/items/, without \".png\" (herb: herb.png); empty: the default icon." },
+	-- weapons
+	{ name = "element", type = "choice", values = elements.KEYS, default = "neutral", admin = true, label = "Element",
+		help = "The element of the attack made with it." },
 }
 
 items.FUNCTIONS = { { "use", true }, { "can_use", false } }
@@ -68,15 +74,21 @@ local CONSUMABLE = { usable_in = true, target = true, power = true }
 local by_name = {}
 for _, f in ipairs(items.fields) do by_name[f.name] = f end
 
--- Modifier stats and amounts, the consumables' messages and numbers are overridable
--- (lib/content/scripted.lua); a modifier's kind is not. An override of a modifier index
--- the file doesn't have adds that modifier (with both its stat and amount).
+-- Modifier stats, elements, statuses and amounts, the consumables' messages and numbers
+-- are overridable (lib/content/scripted.lua); a modifier's kind is not (it is the param it
+-- has). An override of a modifier index the file doesn't have adds that modifier (with both
+-- its stat and amount).
 function items.field(name)
 	if by_name[name] then return by_name[name] end
 	local i, param = tostring(name):match("^modifiers%.(%d+)%.([%a_]+)$")
 	if i then
 		if param == "stat" then
 			return { name = name, type = "choice", values = stats.STATS, admin = true, label = "Modifier " .. i .. " stat" }
+		elseif param == "element" then
+			return { name = name, type = "choice", values = elements.KEYS, admin = true,
+				label = "Modifier " .. i .. " resistance to" }
+		elseif param == "status" then
+			return { name = name, type = "key", refs = "statuses", admin = true, label = "Modifier " .. i .. " ward against" }
 		elseif param == "amount" then
 			return { name = name, type = "int", min = stats.AMOUNT.min, max = stats.AMOUNT.max, admin = true,
 							 label = "Modifier " .. i .. " amount" }
@@ -94,7 +106,8 @@ local function modifier_list(data, flat, err)
 		return nil
 	end
 	for i, m in ipairs(list) do
-		flat["modifiers." .. i .. ".stat"] = m.stat
+		local param = stats.MODIFIERS[m.kind].param
+		flat["modifiers." .. i .. "." .. param] = m[param]
 		flat["modifiers." .. i .. ".amount"] = m.amount
 	end
 	return list
@@ -108,6 +121,9 @@ function items.validate_extra(data, flat, err)
 	end
 	flat.slot = slot
 	local modifiers = modifier_list(data, flat, err)
+	if flat.element and flat.element ~= "neutral" and flat.category ~= "weapon" then
+		err("element is for weapons (the element of their attack), not " .. tostring(flat.category))
+	end
 	if data.sellable == nil then
 		flat.sellable = ((flat.price or 0) > 0 and flat.category ~= "quest") and 1 or 0
 	end
@@ -153,25 +169,36 @@ function items.validate_extra(data, flat, err)
 	if flat.sellable == 1 and flat.price == 0 then err("sellable = true needs a price") end
 end
 
--- Indices of the modifiers of a flat entity, in order: those with a stat (the file's, and
--- any an override added; see items.field).
+-- param -> the kind of modifier that has it
+local KIND_OF = {}
+for k, spec in pairs(stats.MODIFIERS) do KIND_OF[spec.param] = k end
+
+-- Indices of the modifiers of a flat entity, in order, with their kind: those with a stat,
+-- an element or a status (the file's, and any an override added; see items.field).
 local function modifier_indices(flat)
-	local out = {}
+	local out, kinds = {}, {}
 	for k in pairs(flat) do
-		local i = k:match("^modifiers%.(%d+)%.stat$")
-		if i then out[#out + 1] = math.tointeger(tonumber(i)) end
+		local i, param = k:match("^modifiers%.(%d+)%.(%a+)$")
+		if i and KIND_OF[param] then
+			i = math.tointeger(tonumber(i))
+			out[#out + 1] = i
+			kinds[i] = KIND_OF[param]
+		end
 	end
 	table.sort(out)
-	return out
+	return out, kinds
 end
 
--- The modifiers of a flat entity (an index needs both its stat and its amount).
+-- The modifiers of a flat entity (an index needs both its stat, element or status and its
+-- amount).
 function items.modifiers(flat)
 	local list = {}
-	for _, i in ipairs(modifier_indices(flat)) do
+	local indices, kinds = modifier_indices(flat)
+	for _, i in ipairs(indices) do
 		local amount = flat["modifiers." .. i .. ".amount"]
 		if amount ~= nil then
-			list[#list + 1] = { kind = "stat", stat = flat["modifiers." .. i .. ".stat"], amount = amount }
+			local param = stats.MODIFIERS[kinds[i]].param
+			list[#list + 1] = { kind = kinds[i], [param] = flat["modifiers." .. i .. "." .. param], amount = amount }
 		end
 	end
 	return list
@@ -202,10 +229,12 @@ function items.admin_fields(flat)
 		if f.name == "drop_level" or f.name == "droppable" then show = flat.drop_level ~= nil end
 		if f.name == "power" then show = consumable end
 		if f.name == "charges" or f.name == "rechargeable" then show = (flat.casts or "") ~= "" end
+		if f.name == "element" then show = flat.category == "weapon" end
 		if show then out[#out + 1] = f end
 	end
-	for _, i in ipairs(modifier_indices(flat)) do
-		out[#out + 1] = items.field("modifiers." .. i .. ".stat")
+	local indices, kinds = modifier_indices(flat)
+	for _, i in ipairs(indices) do
+		out[#out + 1] = items.field("modifiers." .. i .. "." .. stats.MODIFIERS[kinds[i]].param)
 		out[#out + 1] = items.field("modifiers." .. i .. ".amount")
 	end
 	for _, f in ipairs(scripted.admin_fields(flat)) do out[#out + 1] = f end

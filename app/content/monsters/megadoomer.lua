@@ -10,7 +10,6 @@ in their own heads.]],
 	level = 34,
 	maxhp = 140, maxdam = 128, armor = 105,
 	maxexp = 320, maxgold = 107,
-	immune = 0,
 	maxmp = 122,
 	speech = {
 		start = { "Nine.", "Eight.", chance = 40 },

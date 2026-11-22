@@ -10,7 +10,6 @@ bells no longer ring and nobody has asked why.]],
 	level = 38,
 	maxhp = 170, maxdam = 155, armor = 125,
 	maxexp = 555, maxgold = 185,
-	immune = 0,
 	maxmp = 137,
 	speech = {
 		start = { "Rest, child. The light is patient.", "Do not be afraid, {player}.", chance = 45 },

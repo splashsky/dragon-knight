@@ -9,7 +9,7 @@ them and Hurt spells do nothing, so you have to outlast the thing.]],
 	level = 14,
 	maxhp = 46, maxdam = 38, armor = 24,
 	maxexp = 85, maxgold = 28,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 47,
 	speech = {
 		start = { "Pay... pay me what I am owed.", chance = 50 },

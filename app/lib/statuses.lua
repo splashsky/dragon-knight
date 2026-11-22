@@ -1,7 +1,9 @@
 -- statuses.lua :: statuses as the game uses them (rows of the statuses table, synced from
 -- app/content/statuses/*.lua; see lib/content/), cached per request. Rows come back with
--- `messages` and `data` decoded into tables (lib/content/scripted.lua); what a status does
--- is its file's hooks (app/fight/engine.lua runs them).
+-- `messages` and `data` decoded into tables (lib/content/scripted.lua), and `resist` and
+-- `ward` (lib/content/affinities.lua); what a status does is its file's hooks
+-- (app/fight/engine.lua runs them).
+local affinities = require("lib.content.affinities")
 local scripted = require("lib.content.scripted")
 
 local statuses = {}
@@ -12,6 +14,7 @@ local function remember(row)
 	if row then
 		row.messages = scripted.decode_messages(row.messages)
 		row.data = scripted.decode_data(row.data)
+		affinities.decode_row(row)
 		by_id[row.id] = row
 		by_key[row.key] = row
 	end

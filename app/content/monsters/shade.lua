@@ -10,7 +10,7 @@ the shades away.]],
 	level = 3,
 	maxhp = 12, maxdam = 10, armor = 3,
 	maxexp = 10, maxgold = 3,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 9,
 	speech = {
 		start = { "Who walks in the old huts after dark?", chance = 30 },

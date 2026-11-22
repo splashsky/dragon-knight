@@ -11,7 +11,6 @@ enough to blind a man for a minute, and that is usually all it needs.
 	level = 28,
 	maxhp = 100, maxdam = 92, armor = 72,
 	maxexp = 220, maxgold = 73,
-	immune = 0,
 	maxmp = 98,
 	speech = {
 		start = { "Small one comes to the cave.", chance = 40 },

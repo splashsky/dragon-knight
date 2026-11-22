@@ -3,8 +3,10 @@
 -- class by default.
 -- learned: mage 54; paladin 53
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("withering", { turns = s.power, min = s.data.min, max = s.data.max })
+	if s.target:immune_to("shadow") then return s:say("immune", s.name) end
+	if not s.target:afflict("withering", { turns = s.power, min = s.data.min, max = s.data.max }) then
+		return s:say(s.target:ward("withering") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -24,9 +26,11 @@ by a caster who is patient enough to wait for it. Most Mages who learn it stop b
 	messages = {
 		cast = "You have cast the %s spell. The monster withers for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
 			cast = "The monster casts %s. You wither for %d turns.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = cast,

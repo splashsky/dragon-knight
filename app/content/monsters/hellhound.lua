@@ -11,7 +11,6 @@ Kalle keep a hellhound's tooth as a charm.]],
 	level = 20,
 	maxhp = 66, maxdam = 56, armor = 44,
 	maxexp = 140, maxgold = 47,
-	immune = 0,
 	maxmp = 70,
 	speech = {
 		start = { "*snarls*", "Hot meat... good.", chance = 35 },

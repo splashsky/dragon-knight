@@ -11,7 +11,6 @@ it.
 	level = 49,
 	maxhp = 330, maxdam = 300, armor = 250,
 	maxexp = 2000, maxgold = 667,
-	immune = 0,
 	maxmp = 183,
 	speech = {
 		start = { "Midworld's little champion. I have been expecting you.", "Kneel, {player}, and I will be brief.", chance = 65 },

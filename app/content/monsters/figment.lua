@@ -11,7 +11,7 @@ figment fades if you stop believing in it, which is easier said than done.]],
 	level = 19,
 	maxhp = 64, maxdam = 55, armor = 42,
 	maxexp = 140, maxgold = 47,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 64,
 	speech = {
 		start = { "Come closer. I have been waiting.", chance = 35 },

@@ -11,7 +11,6 @@ tithe of gold from the living, and he counts every coin himself.
 	level = 44,
 	maxhp = 225, maxdam = 205, armor = 170,
 	maxexp = 1050, maxgold = 350,
-	immune = 0,
 	maxmp = 159,
 	speech = {
 		start = { "Kneel, living one. The crypt was expecting you.", "Your tithe is overdue.", chance = 60 },

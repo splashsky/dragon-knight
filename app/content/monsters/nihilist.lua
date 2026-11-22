@@ -11,7 +11,6 @@ spared.
 	level = 47,
 	maxhp = 280, maxdam = 250, armor = 205,
 	maxexp = 1640, maxgold = 547,
-	immune = 0,
 	maxmp = 176,
 	speech = {
 		start = { "Why do you bother to stand there, {player}?", "Nothing you do will matter. Watch.", chance = 60 },

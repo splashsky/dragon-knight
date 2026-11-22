@@ -10,7 +10,6 @@ rest, which is more than most lords can claim.]],
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 425, maxgold = 142,
-	immune = 0,
 	maxmp = 128,
 	speech = {
 		start = { "The fog brought you, little knight. Good.", "Stay a while. The air is thick here.", chance = 60 },

@@ -9,7 +9,6 @@ Hunters say to keep torches low and wait for it to fly off.]],
 	level = 9,
 	maxhp = 34, maxdam = 28, armor = 14,
 	maxexp = 45, maxgold = 15,
-	immune = 0,
 	maxmp = 33,
 	speech = {
 		start = { "Kraa!", chance = 30 },

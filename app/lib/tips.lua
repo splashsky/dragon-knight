@@ -6,6 +6,7 @@
 -- Templates render them with the `tip(kind, row)` helper (lib/view.lua), which escapes
 -- everything. Plain data: no HTML here.
 local classes = require("lib.classes")
+local elements = require("lib.elements")
 local items = require("lib.items")
 local php = require("lib.php")
 local schema = require("lib.content.schema")
@@ -79,10 +80,10 @@ local function stat_rows(it, old)
 	return rows
 end
 
--- What it does besides its stats: a consumable's description (its effect), the spell gear
--- casts and its charges.
+-- What it does besides its stats: a weapon's element, the resistances and wards gear
+-- gives, a consumable's description (its effect), the spell gear casts and its charges.
 local function effects(it, charges)
-	local out = {}
+	local out = items.affinity_lines(it)
 	if it.category == "consumable" and (it.description or "") ~= "" then out[#out + 1] = it.description end
 	for _, l in ipairs(items.charge_lines(it, charges)) do out[#out + 1] = l end
 	return out
@@ -127,10 +128,11 @@ function tips.sell(entry, price)
 	return t
 end
 
--- A monster: its portrait (when it has one) and name; level; its description; its lore.
+-- A monster: its portrait (when it has one) and name; level; its resistances, weaknesses
+-- and wards; its description; its lore.
 function tips.monster(m)
 	return { title = m.name, icon = schema.entity_icon("monsters", m.icon), meta = { "Level " .. m.level },
-		body = m.description, lore = m.lore }
+		lines = elements.lines(m.resist, m.ward), body = m.description, lore = m.lore }
 end
 
 -- The fight menu's Attack button: the player's attack power (and the weapon's name, when

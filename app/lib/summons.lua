@@ -1,7 +1,8 @@
 -- summons.lua :: summons as the game uses them (rows of the summons table, synced from
 -- app/content/summons/*.lua; see lib/content/), cached per request. Rows come back with
--- `messages` and `data` decoded into tables; what a summon does is its file's act
--- (app/fight/engine.lua).
+-- `messages` and `data` decoded into tables, and `resist` and `ward`
+-- (lib/content/affinities.lua); what a summon does is its file's act (app/fight/engine.lua).
+local affinities = require("lib.content.affinities")
 local scripted = require("lib.content.scripted")
 
 local summons = {}
@@ -12,6 +13,7 @@ local function remember(row)
 	if row then
 		row.messages = scripted.decode_messages(row.messages)
 		row.data = scripted.decode_data(row.data)
+		affinities.decode_row(row)
 		by_id[row.id] = row
 		by_key[row.key] = row
 	end

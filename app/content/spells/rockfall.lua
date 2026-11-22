@@ -6,12 +6,11 @@ local function price(s)
 	return math.floor(s.caster.maxhp * s.data.cost / 100)
 end
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("earth") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
 	local cost = price(s)
 	s.caster:spend("hp", cost)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "earth"))
 	s:say("cost", cost)
 end
 

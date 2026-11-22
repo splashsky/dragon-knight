@@ -11,7 +11,6 @@ name.]],
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 132, maxgold = 44,
-	immune = 0,
 	maxmp = 59,
 	speech = {
 		start = { "You... owe me...", chance = 40 },

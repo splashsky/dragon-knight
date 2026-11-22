@@ -10,7 +10,6 @@ expects its visitors to know which spell they are facing.]],
 	level = 38,
 	maxhp = 168, maxdam = 155, armor = 125,
 	maxexp = 505, maxgold = 168,
-	immune = 0,
 	maxmp = 137,
 	speech = {
 		start = { "Ah, a new pupil. Let us see what you know.", "Name the spell, {player}.", chance = 45 },

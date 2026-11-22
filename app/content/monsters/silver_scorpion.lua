@@ -10,7 +10,7 @@ things about the creature that anyone has ever wanted.]],
 	level = 40,
 	maxhp = 30, maxdam = 160, armor = 350,
 	maxexp = 63, maxgold = 2000,
-	immune = 2,  -- 2: immune to hurt and sleep spells
+	resist = { arcane = 100 }, ward = { sleep = 100 },  -- immune to arcane (the hurt spells) and to sleep
 	maxmp = 144,
 	speech = {
 		start = { "*clicks*", chance = 12 },

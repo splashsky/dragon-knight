@@ -11,7 +11,6 @@ ledger, or which man.
 	level = 46,
 	maxhp = 260, maxdam = 230, armor = 190,
 	maxexp = 1400, maxgold = 467,
-	immune = 0,
 	maxmp = 172,
 	speech = {
 		start = { "Stone does not forget, and neither do I.", "You are the next line in the book.", chance = 60 },

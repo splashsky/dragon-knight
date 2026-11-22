@@ -2,14 +2,19 @@
 -- table. A summon is an ally that fights alongside the player for a while (a spell's
 -- s:summon("wolf", { turns = 5 })). Its numbers and message strings are data, synced and
 -- overridable; what it does on its turn is its act function (plus the optional
--- on_summon, on_death, on_expire), which stays in the file. See app/fight/engine.lua.
+-- on_summon, on_death, on_expire), which stays in the file. Its resistances and wards
+-- (resist, ward: lib/content/affinities.lua) and the element of its attacks (`element`, for
+-- its act: a.target:hurt(damage, a.self.attack_element)) are data too. See
+-- app/fight/engine.lua.
+local affinities = require("lib.content.affinities")
+local elements = require("lib.elements")
 local scripted = require("lib.content.scripted")
 local schema = require("lib.content.schema")
 
 local summons = { name = "summons", table = "summons", dir = "content.summons", label = "summon" }
 
 summons.FUNCTIONS = { { "act", true }, { "on_summon", false }, { "on_death", false }, { "on_expire", false } }
-summons.extra_keys = scripted.extra_keys(summons.FUNCTIONS)
+summons.extra_keys = scripted.extra_keys(summons.FUNCTIONS, { resist = true, ward = true })
 
 summons.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
@@ -26,24 +31,33 @@ summons.fields = {
 		help = "Its chance to dodge a monster's attack, like the player's dexterity." },
 	{ name = "turns", type = "int", default = 0, min = 0, max = 10000, admin = true, label = "Turns",
 		help = "How many rounds it stays when summoned without a duration; 0: until the end of the fight." },
+	{ name = "element", type = "choice", values = elements.KEYS, default = "neutral", admin = true, label = "Element",
+		help = "The element of its attacks." },
 }
 
 local by_name = {}
 for _, f in ipairs(summons.fields) do by_name[f.name] = f end
 
 function summons.field(name)
-	return by_name[name] or scripted.field(name)
+	return by_name[name] or affinities.field(name) or scripted.field(name)
 end
 
 function summons.validate_extra(data, flat, err)
 	scripted.validate(data, flat, err, summons.FUNCTIONS)
+	affinities.validate(data, flat, err)
 	if data.messages ~= nil and type(data.messages) == "table" and data.messages.enemy ~= nil then
 		err("field 'messages.enemy': summons fight for the player and have no monster wording")
 	end
 end
 
+-- Its wards must be of status files.
+function summons.validate_refs(flat, all, err)
+	affinities.check_refs(flat, all, err)
+end
+
 function summons.write_children(id, flat)
 	scripted.write("summons", id, flat)
+	affinities.write("summons", id, flat)
 end
 
 function summons.admin_fields(flat)

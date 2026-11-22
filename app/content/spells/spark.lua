@@ -3,10 +3,9 @@
 -- slot at level 60 when the Mage has long outgrown Magic Bolt.
 -- learned: mage 6
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("lightning") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power) + math.floor(s.caster.level / 10)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "lightning"))
 end
 
 return {

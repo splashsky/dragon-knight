@@ -176,6 +176,19 @@ function T.validate_items()
 		"modifiers[1]: unknown parameter 'pct' for stat")
 	has(errors({ drop_level = 0 }), "field 'drop_level' must be an integer from 1")
 	has(errors({ weight = 3 }), "unknown field 'weight'")
+	-- elements (schema version 21): a weapon's, and resistances and wards as modifiers
+	f = assert(schema.validate(kind, item({ element = "fire", modifiers = { { kind = "resist", element = "frost", amount = 25 },
+		{ kind = "ward", status = "sleep", amount = 30 } } })))
+	eq(f.element, "fire"); eq(f["modifiers.1.element"], "frost"); eq(f["modifiers.1.amount"], 25)
+	eq(f["modifiers.2.status"], "sleep"); eq(f["modifiers.2.amount"], 30); eq(f["modifiers.1.stat"], nil)
+	eq(stats.encode_modifiers(kind.modifiers(f)), "resist element=frost amount=25; ward status=sleep amount=30")
+	eq(assert(schema.validate(kind, item())).element, "neutral")
+	has(errors({ category = "armor", slot = "armor", attack = 0, element = "fire" }), "element is for weapons")
+	has(errors({ element = "plasma" }), "field 'element' must be one of neutral, fire")
+	has(errors({ modifiers = { { kind = "resist", element = "fire", amount = 300 } } }),
+		"modifiers[1].amount must be an integer from -100 to 200")
+	eq(kind.field("modifiers.2.status").refs, "statuses")
+	eq(kind.field("modifiers.2.element").type, "choice")
 end
 
 function T.item_fields_and_overrides()
@@ -199,7 +212,7 @@ function T.item_fields_and_overrides()
 	eq(table.concat(names, ","), "name,description,lore,price,sellable,power,icon,messages.full,messages.full_town,messages.used")
 	names = {}
 	for _, spec in ipairs(kind.admin_fields(load.kind("items").by_key.wand)) do names[#names + 1] = spec.name end
-	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,sellable,charges,rechargeable,icon")
+	eq(table.concat(names, ","), "name,description,lore,price,attack,defense,sellable,charges,rechargeable,icon,element")
 end
 
 function T.display()
@@ -218,6 +231,14 @@ function T.display()
 	assert(items.usable(bomb, "fight") and not items.usable(bomb, "town"), "fight-only consumable")
 	bomb.retired = 1
 	assert(not items.usable(bomb, "fight"), "a retired consumable has no code any more")
+	-- a weapon's element, resistances and wards (schema version 21)
+	local brand = { category = "weapon", attack = 30, defense = 0, element = "fire", modifiers = {
+		{ kind = "stat", stat = "strength", amount = 5 }, { kind = "resist", element = "frost", amount = -25 },
+		{ kind = "ward", status = "sleep", amount = 25 } } }
+	eq(table.concat(items.attributes(brand), ", "),
+		"Attack Power +30, Strength +5, Deals Fire damage, Frost Resistance -25%, Sleep Ward +25%")
+	eq(table.concat(items.special_lines(brand), ", "), "Strength +5, Deals Fire damage, Frost Resistance -25%, Sleep Ward +25%")
+	eq(#items.compare(brand), 2, "compared stat by stat: attack and strength")
 end
 
 return T

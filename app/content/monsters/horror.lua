@@ -11,7 +11,6 @@ without moving until a lantern was lit, and then it was already close.
 	level = 27,
 	maxhp = 96, maxdam = 88, armor = 68,
 	maxexp = 210, maxgold = 70,
-	immune = 0,
 	maxmp = 96,
 	speech = {
 		start = { "Do you know how long I have waited?", chance = 45 },

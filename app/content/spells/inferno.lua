@@ -3,8 +3,10 @@
 -- (app/content/statuses/burning.lua, as Ember does with smaller numbers).
 -- learned: mage 88
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("burning", { turns = s.power, amount = s.data.amount })
+	if s.target:immune_to("fire") then return s:say("immune", s.name) end
+	if not s.target:afflict("burning", { turns = s.power, amount = s.data.amount }) then
+		return s:say(s.target:ward("burning") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -24,9 +26,11 @@ roads are what it clears.]],
 	messages = {
 		cast = "You have cast the %s spell. The monster burns for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
 			cast = "The monster casts %s. You burn for %d turns.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = cast,

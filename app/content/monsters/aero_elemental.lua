@@ -11,7 +11,7 @@ rest. Hurt spells go straight through it, so it is a fight for steel and patienc
 	level = 29,
 	maxhp = 104, maxdam = 94, armor = 74,
 	maxexp = 220, maxgold = 73,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 101,
 	speech = {
 		start = { "*howls*", chance = 15 },

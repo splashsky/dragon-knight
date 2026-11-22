@@ -9,7 +9,7 @@ say it appears only in the hottest weeks, and that anyone who follows it is not 
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 14,
 	maxexp = 45, maxgold = 15,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 30,
 	speech = {
 		start = { "*a soft chime fills the air*", chance = 25 },

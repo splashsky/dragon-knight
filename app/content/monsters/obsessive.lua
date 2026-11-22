@@ -10,7 +10,6 @@ them useful, which is the only reason anyone has tried to reason with one.]],
 	level = 40,
 	maxhp = 180, maxdam = 160, armor = 135,
 	maxexp = 630, maxgold = 210,
-	immune = 0,
 	maxmp = 144,
 	speech = {
 		start = { "Guilty. Guilty. Guilty.", "{player}, {player}, {player}.", chance = 55 },

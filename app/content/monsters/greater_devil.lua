@@ -10,7 +10,6 @@ stairs, so anyone who meets one has either been summoned or has come a very long
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 750, maxgold = 250,
-	immune = 0,
 	maxmp = 147,
 	speech = {
 		start = { "You have been summoned, {player}. Pity.", "Your account is overdue.", chance = 55 },

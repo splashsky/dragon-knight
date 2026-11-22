@@ -3,8 +3,7 @@
 -- and soaks up blows meant for the player.
 local function act(a)
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
-	a.target:hurt(damage)
-	a:say("smash", a.self.name, damage)
+	a:say("smash", a.self.name, a.target:hurt(damage, a.self.attack_element))
 end
 
 return {

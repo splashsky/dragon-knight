@@ -10,7 +10,6 @@ if you must grapple with one.]],
 	level = 37,
 	maxhp = 160, maxdam = 145, armor = 120,
 	maxexp = 445, maxgold = 148,
-	immune = 0,
 	maxmp = 132,
 	speech = {
 		start = { "Fresh meat!", "Heh. Another one.", chance = 45 },

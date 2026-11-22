@@ -2,15 +2,13 @@
 -- monster is still unhurt (at full HP): the first blow is the one that counts.
 -- learned: mage 23
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("fire") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
 	if s.target.hp >= s.target.maxhp then
 		damage = damage + s:roll((s.power / 6) * 5, s.power)
-		s.target:hurt(damage)
-		return s:say("full", s.name, damage)
+		return s:say("full", s.name, s.target:hurt(damage, "fire"))
 	end
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "fire"))
 end
 
 return {

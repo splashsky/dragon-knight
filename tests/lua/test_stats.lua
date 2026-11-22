@@ -89,7 +89,7 @@ function T.modifiers()
 	has(errors("strength"), "must be a list of modifiers")
 	has(errors({ x = 1 }), "must be a list (unexpected key x)")
 	has(errors({ "maxhp" }), "[1] must be a table")
-	has(errors({ { kind = "heal_hp", amount = 5 } }), "[1].kind must be one of stat (got heal_hp)")
+	has(errors({ { kind = "heal_hp", amount = 5 } }), "[1].kind must be one of stat, resist, ward (got heal_hp)")
 	has(errors({ { kind = "stat", stat = "luck", amount = 1 } }), "[1].stat must be one of maxhp, maxmp")
 	has(errors({ { kind = "stat", stat = "maxhp" } }), "[1]: missing amount")
 	has(errors({ { kind = "stat", stat = "maxhp", amount = 2000000 } }), "[1].amount must be an integer from -1000000 to 1000000")
@@ -104,6 +104,36 @@ function T.modifiers()
 	local sum = stats.modifiers({ mod("maxhp", 10), mod("maxhp", -50), mod("strength", 5), { kind = "odd", stat = "maxhp", amount = 1 },
 		mod("luck", 3) })
 	eq(sum.maxhp, -40); eq(sum.strength, 5); eq(sum.luck, nil); eq(sum.dexterity, nil)
+end
+
+-- Resistances and wards (schema version 21): checked, stored and summed like stats, but
+-- apart from them.
+function T.resistance_and_ward_modifiers()
+	local list = assert(stats.validate_modifiers({ { kind = "resist", element = "fire", amount = 25 },
+		{ kind = "ward", status = "sleep", amount = 30 }, mod("strength", 5) }))
+	eq(list[1].element, "fire"); eq(list[2].status, "sleep"); eq(list[2].amount, 30)
+	local function errors(l)
+		local ok, errs = stats.validate_modifiers(l)
+		assert(not ok, "expected errors")
+		return table.concat(errs, " | ")
+	end
+	local function has(s, text) assert(s:find(text, 1, true), "no '" .. text .. "' in " .. s) end
+	has(errors({ { kind = "resist", element = "plasma", amount = 5 } }), "[1].element must be one of neutral, fire,")
+	has(errors({ { kind = "resist", element = "fire", amount = 201 } }), "[1].amount must be an integer from -100 to 200")
+	has(errors({ { kind = "ward", status = "Sleep!", amount = 5 } }), "[1].status must be the key of a status")
+	has(errors({ { kind = "ward", status = "sleep", amount = -1 } }), "[1].amount must be an integer from 0 to 100")
+	has(errors({ { kind = "ward", status = "sleep", stat = "maxhp", amount = 5 } }), "[1]: unknown parameter 'stat' for ward")
+	local text = stats.encode_modifiers(list)
+	eq(text, "resist element=fire amount=25; ward status=sleep amount=30; stat stat=strength amount=5")
+	local back = stats.decode_modifiers(text)
+	eq(back[1].kind, "resist"); eq(back[1].element, "fire"); eq(back[1].amount, 25); eq(back[2].status, "sleep")
+	-- they don't count as stats; stats.affinities sums them over the gear
+	eq(stats.modifiers(back).strength, 5); eq(stats.modifiers(back).fire, nil)
+	local ring = { modifiers = { { kind = "resist", element = "fire", amount = -10 }, { kind = "ward", status = "sleep", amount = 50 } } }
+	local a = stats.affinities({ { modifiers = back }, ring, BLADE })
+	eq(a.resist.fire, 15); eq(a.ward.sleep, 80); eq(a.resist.frost, nil)
+	local p = stats.player(base({}), { resist = a.resist, ward = a.ward, attack_element = "fire" })
+	eq(p.resist.fire, 15); eq(p.ward.sleep, 80); eq(p.attack_element, "fire")
 end
 
 return T

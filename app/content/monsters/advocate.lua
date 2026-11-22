@@ -10,7 +10,6 @@ and a bag of coin.]],
 	level = 35,
 	maxhp = 148, maxdam = 132, armor = 108,
 	maxexp = 350, maxgold = 117,
-	immune = 0,
 	maxmp = 125,
 	speech = {
 		start = { "You are charged, {player}.", "State your name for the record.", chance = 50 },

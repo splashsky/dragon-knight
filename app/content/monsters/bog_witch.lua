@@ -17,7 +17,7 @@ Local people leave a loaf on the path for her and walk around her patch.]],
 	level = 9,
 	maxhp = 60, maxdam = 10, armor = 6,
 	maxexp = 30, maxgold = 40,
-	immune = 1,                         -- 1: immune to hurt spells
+	resist = { arcane = 100 },          -- immune to arcane: the hurt spells
 	maxmp = 33,                         -- the Mage's MP at level 9
 	uses_mp = false,
 	roams = false,

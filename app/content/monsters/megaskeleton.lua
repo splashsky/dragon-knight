@@ -9,7 +9,6 @@ collected. It has no name, but the bones still remember how to fight.]],
 	level = 13,
 	maxhp = 44, maxdam = 36, armor = 24,
 	maxexp = 78, maxgold = 26,
-	immune = 0,
 	maxmp = 43,
 	speech = {
 		start = { "*rattles loudly*", "*clatters, many bones at once*", chance = 30 },

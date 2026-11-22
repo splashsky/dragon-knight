@@ -9,7 +9,6 @@ stairs to keep it off, which works until the salt runs out.]],
 	level = 10,
 	maxhp = 38, maxdam = 32, armor = 18,
 	maxexp = 62, maxgold = 21,
-	immune = 0,
 	maxmp = 36,
 	speech = {
 		start = { "*gurgles*", chance = 20 },

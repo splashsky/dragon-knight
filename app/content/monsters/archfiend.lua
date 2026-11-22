@@ -11,7 +11,6 @@ lose quietly.
 	level = 42,
 	maxhp = 210, maxdam = 190, armor = 150,
 	maxexp = 810, maxgold = 270,
-	immune = 0,
 	maxmp = 151,
 	speech = {
 		start = { "Another circle, another fool inside it.", "The seal is broken. You are not.", chance = 60 },

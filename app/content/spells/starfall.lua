@@ -3,10 +3,9 @@
 -- default.
 -- learned: mage 76
 local function release(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("arcane") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "arcane"))
 end
 
 return {

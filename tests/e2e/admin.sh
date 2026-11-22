@@ -113,29 +113,32 @@ expect_body 'name="maps" size="60" maxlength="2000" value="Kalle, Endworld"'
 
 t_section "admin: monsters"
 # monster files app/content/monsters/*.lua; admins override the stats, MP, uses_mp, the
-# attack's weight and roams; the loadout is the file's (read-only here)
+# attack's weight, roams, the attack's element, resistances and wards; the loadout is the
+# file's (read-only here)
 t_get /admin/monsters;     expect_status 200; expect_body '<a href="/admin/monsters/1">Blue Slime</a>'
 expect_body '<td>blue_slime</td><td>1</td><td>4</td><td>3</td><td>1</td><td>5</td><td>1</td>'
 expect_body 'monsters: 154 files, 154 in the database (0 retired), 0 overrides.'
 ADM_SHAMAN=$(t_sql "SELECT id FROM monsters WHERE key = 'goblin_shaman'")
 expect_body "<td>goblin_shaman</td><td>5</td><td>40</td><td>8</td><td>4</td><td>17</td><td>0</td>"
 t_get /admin/monsters/1;   expect_body 'Edit Monster: Blue Slime'; expect_body 'app/content/monsters/blue_slime.lua'
-expect_body 'Immunity:'; expect_body 'name="maxmp" size="6" value="5"'; expect_body 'name="attack_weight" size="6" value="1"'
+expect_body 'Arcane resistance:'; expect_body 'name="resist.arcane" size="6" value="0"'; expect_body 'Sleep ward:'
+expect_body 'name="maxmp" size="6" value="5"'; expect_body 'name="attack_weight" size="6" value="1"'
 expect_body 'Loadout:</td><td>none: it only attacks'
 t_form_submit /admin/monsters/1 maxhp= maxexp=lots attack_weight=-1
 expect_body 'Max Hit Points must be an integer from 1 to 1000000.'; expect_body 'Max Experience must be an integer from 0 to 1000000.'
 expect_body 'Attack weight must be an integer from 0 to 1000000.'
 admin_eq "SELECT count(*) FROM content_overrides" "0" "invalid monster form not saved"
 t_get /admin/monsters/1
-t_form_submit /admin/monsters/1 "lore=$(t_sql "SELECT lore FROM monsters WHERE id = 1")" name=Slimer maxhp=2 maxdam=9 immune=2 maxmp=12 uses_mp=0 attack_weight=3 roams=0
+t_form_submit /admin/monsters/1 "lore=$(t_sql "SELECT lore FROM monsters WHERE id = 1")" name=Slimer maxhp=2 maxdam=9 resist.arcane=100 ward.sleep=100 resist.frost=-50 maxmp=12 uses_mp=0 attack_weight=3 roams=0
 expect_redirect '/admin/monsters/1\?saved=1'
-admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || immune || '|' || maxmp || '|' || uses_mp || '|' || attack_weight || '|' || roams FROM monsters WHERE id = 1" \
-	"Slimer|2|9|2|12|0|3|0" "monster overrides applied"
+admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || resist || '|' || ward || '|' || maxmp || '|' || uses_mp || '|' || attack_weight || '|' || roams FROM monsters WHERE id = 1" \
+	"Slimer|2|9|arcane=100,frost=-50|sleep=100|12|0|3|0" "monster overrides applied"
 admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'monsters' ORDER BY field)" \
-	"attack_weight=3;immune=2;maxdam=9;maxhp=2;maxmp=12;name=Slimer;roams=0;uses_mp=0" "only the changed fields are overridden"
+	"attack_weight=3;maxdam=9;maxhp=2;maxmp=12;name=Slimer;resist.arcane=100;resist.frost=-50;roams=0;uses_mp=0;ward.sleep=100" "only the changed fields are overridden"
 t_get '/admin/monsters/1?saved=1'; expect_body 'Monster updated.'; expect_body 'File value: Blue Slime'
 expect_body '<option value="0" selected>No</option>'
 t_get /help/monsters;      expect_body 'Slimer <span class="light">(not met at random)</span>'
+expect_body '<td style="width: 12%">Weak to Frost (+50%)<br>Immune to Arcane<br>Wards off Sleep (100%)</td>'
 t_get /admin/monsters/1
 t_post /admin/monsters/1/reset "csrf=$(t_csrf)&field=*"
 expect_redirect '/admin/monsters/1\?saved=1'

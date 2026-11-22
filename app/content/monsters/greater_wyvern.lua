@@ -10,7 +10,6 @@ it dives.]],
 	level = 34,
 	maxhp = 145, maxdam = 130, armor = 105,
 	maxexp = 335, maxgold = 112,
-	immune = 0,
 	maxmp = 122,
 	speech = {
 		start = { "Kraa! Mine, the flock!", "*hisses*", chance = 30 },

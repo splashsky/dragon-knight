@@ -13,7 +13,8 @@
 # Magic Bolt, Midworld sells the Wand, and the rest equals a fresh install; version 14 -> 15
 # (schema_v14.sql, seed_v14.sql) that a fight in progress goes on, an encounter waiting for
 # GET /fight is cancelled and a won fight waiting for GET /victory is paid (and version 16's
-# items.rechargeable, version 17's user_hotbar). Since version
+# items.rechargeable, version 17's user_hotbar, version 21's resistances and wards in place
+# of monsters.immune, admins' overrides of it converted). Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -63,8 +64,8 @@ mig_fight() {
 		DELETE FROM fights WHERE user_id = $2; UPDATE users SET currentaction = 'Fighting' WHERE id = $2;
 		INSERT INTO fights (user_id, round) VALUES ($2, ${5:-2});
 		INSERT INTO fight_combatants (user_id, id, side, kind) VALUES ($2, 1, 'player', 'player');
-		INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data)
-			SELECT $2, 2, 'enemy', 'monster', id, 1, $4, maxhp, 'immune=i:' || immune FROM monsters WHERE id = $3"
+		INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp)
+			SELECT $2, 2, 'enemy', 'monster', id, 1, $4, maxhp FROM monsters WHERE id = $3"
 }
 # mig_serve CONFIG LOG: start a server on another database and point the t_* helpers at it;
 # mig_unserve LOG: stop it (failing on errors in its log) and point them back.
@@ -113,8 +114,8 @@ MIG_MONSTERS="SELECT * FROM monsters ORDER BY id; SELECT * FROM monster_equipmen
 	SELECT * FROM monster_items ORDER BY monster_id, position; SELECT * FROM monster_spells ORDER BY monster_id, position"
 # The same by key (ids of the monsters added after the original 151 depend on the
 # database), but for red_slime and monster_152 (the version 8 database's edits).
-MIG_MONSTERS_BY_KEY="SELECT key, name, description, maxhp, maxdam, armor, level, maxexp, maxgold, immune, maxmp, uses_mp,
-	attack_weight, roams, retired FROM monsters WHERE key NOT IN ('red_slime', 'monster_152') ORDER BY key;
+MIG_MONSTERS_BY_KEY="SELECT key, name, description, maxhp, maxdam, armor, level, maxexp, maxgold, resist, ward, maxmp, uses_mp,
+	attack_weight, roams, retired, attack_element, class FROM monsters WHERE key NOT IN ('red_slime', 'monster_152') ORDER BY key;
 	SELECT m.key, e.slot, e.item_id FROM monster_equipment e JOIN monsters m ON m.id = e.monster_id ORDER BY 1, 2;
 	SELECT m.key, i.position, i.item_id, i.weight, i.stock, i.has_when FROM monster_items i JOIN monsters m ON m.id = i.monster_id ORDER BY 1, 2;
 	SELECT m.key, x.position, x.spell_id, x.weight, x.has_when FROM monster_spells x JOIN monsters m ON m.id = x.monster_id ORDER BY 1, 2"
@@ -1231,9 +1232,10 @@ t_section "migrate: version 14 database"
 # version 14 schema + its game data, characters in every state GET /fight and GET /victory
 # used to move on: a fight in progress, an encounter waiting for GET /fight to pick its
 # monster, a won fight waiting for GET /victory to pay, and one exploring; only steps 15,
-# 16 (items.rechargeable), 17 (the hotbar: an empty table) and 18 (the maps towns sell)
-# run. The fight in progress goes on (its counter kept), the pending encounter is cancelled, the victory is paid and
-# kept for its page; nobody else changes.
+# 16 (items.rechargeable), 17 (the hotbar: an empty table), 18 (the maps towns sell) and
+# the later steps run. The fight in progress goes on (its counter kept), the pending encounter is cancelled, the victory is paid and
+# kept for its page; nobody else changes. Admins' overrides of monsters' immunity become
+# resistances and wards (21): where they differ from the file's only.
 V14_DB="$MIG/v14.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V14_DB\"#" "$CONFIG" > "$MIG/v14.lua"
 mig_script "$V14_DB" "$ROOT/tests/fixtures/schema_v14.sql"
@@ -1249,6 +1251,8 @@ INSERT INTO fights (user_id, round, wave, data) VALUES (1, 3, 1, ''), (2, 1, 1, 
 INSERT INTO fight_combatants (user_id, id, side, kind) VALUES (1, 1, 'player', 'player'), (3, 1, 'player', 'player');
 INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data) VALUES
 	(1, 2, 'enemy', 'monster', 1, 1, 2, 4, 'immune=i:0'), (3, 2, 'enemy', 'monster', 1, 1, 0, 4, 'immune=i:0');
+INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters', 'red_slime', 'immune', '2'),
+	('monsters', 'silver_slime', 'immune', '1'), ('monsters', 'shadow', 'immune', '1'), ('monsters', 'critter', 'maxhp', '9');
 PRAGMA user_version = 14;
 SQL
 mig_script "$V14_DB" "$MIG/v14_data.sql"
@@ -1272,6 +1276,14 @@ mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE 
 mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE item_key = 'antidote' ORDER BY town_id)" \
 	"1,2,3,4" "the Antidote sold at last (19)"
 mig_eq "SELECT count(*) FROM user_hotbar" "0" "no hotbar yet (17): the next fight fills it"
+grep -qF "Migrating to version 21: elements and wards" "$T/migrate.log" && t_ok || t_fail "step 21 not reported"
+mig_eq "SELECT count(*) FROM pragma_table_info('monsters') WHERE name = 'immune'" "0" "monsters.immune is gone (21)"
+mig_eq "SELECT group_concat(key || ':' || field || '=' || value, ' ') FROM (SELECT * FROM content_overrides ORDER BY key, field)" \
+	"critter:maxhp=9 red_slime:resist.arcane=100 red_slime:ward.sleep=100 silver_slime:ward.sleep=0" \
+	"overrides of immune become resistances and wards where they differ from the file (21)"
+mig_eq "SELECT group_concat(key || ':' || resist || ':' || ward, ' ') FROM (SELECT * FROM monsters WHERE key IN ('red_slime', 'shadow', 'silver_slime') ORDER BY key)" \
+	"red_slime:arcane=100:sleep=100 shadow:arcane=100: silver_slime:arcane=100:" "and apply (21)"
+mig_eq "SELECT count(*) FROM monsters WHERE resist = 'arcane=100'" "28" "the originals' immunity (21: 26, and the Bog Witch's and the Red Slime's override)"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
 [ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v14 schema differs from a fresh install:"

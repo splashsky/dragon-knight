@@ -12,7 +12,6 @@ die.
 	level = 32,
 	maxhp = 124, maxdam = 112, armor = 92,
 	maxexp = 270, maxgold = 90,
-	immune = 0,
 	maxmp = 114,
 	speech = {
 		start = { "The book is open, {player}. Your page is next.", chance = 50 },

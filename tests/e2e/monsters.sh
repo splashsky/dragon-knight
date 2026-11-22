@@ -1,8 +1,9 @@
 # tests/e2e/monsters.sh :: monsters as content through HTTP (2.2): the example monsters with
 # spells, items, equipment and MP (Goblin Shaman, Bog Witch, Bandit Captain), their stock
-# per encounter, uses_mp, the help page, and random encounters never picking monsters that
-# don't roam. The monsters' choices are random by weight; the tests make them certain with
-# an attack weight of 0 (an admin override) and the fight's state (HP, MP, statuses).
+# per encounter, uses_mp, elements, resistances, wards and classes, the help page, and
+# random encounters never picking monsters that don't roam. The monsters' choices are
+# random by weight; the tests make them certain with an attack weight of 0 (an admin
+# override) and the fight's state (HP, MP, statuses).
 # Sourced by tests/run.sh.
 if ! t_has_sql; then
 	t_section "monsters (skipped: needs sqlite3 or python3)"
@@ -52,12 +53,10 @@ t_get /fight; CS=$(t_csrf)
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Goblin Shaman<template class="tip">'; expect_body "Monster's MP: 0"
 t_round "csrf=$CS&fight=Fight"
 expect_body 'The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '   # (it may speak first)
-mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "immune=i:0
-stock_1=i:1"
+mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "stock_1=i:1"
 mo_enemy_set "hp = 10"
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
-mo_is "$(enemy data)" "immune=i:0
-stock_1=i:0"
+mo_is "$(enemy data)" "stock_1=i:0"
 mo_enemy_set "hp = 10"
 t_round "csrf=$CS&fight=Fight"; expect_no_body 'uses the Potion'
 expect_body 'You dodge the monster&#39;s attack.'
@@ -65,8 +64,7 @@ expect_body 'You dodge the monster&#39;s attack.'
 t_fight monsterer "$SHAMAN" 10
 mo_enemy_set "mp = 0, maxmp = 17"
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
-mo_is "$(enemy data)" "immune=i:0
-stock_1=i:1"
+mo_is "$(enemy data)" "stock_1=i:1"
 
 t_section "monsters: the Goblin Shaman casts Hurt (MP)"
 t_fight monsterer "$SHAMAN" 40   # full HP: no heal, no potion; 17 MP
@@ -158,13 +156,55 @@ cp "$T/blue_slime.lua.orig" "$MO_SLIME"
 t_fight_clear monsterer
 t_sql "UPDATE users SET currentaction = 'Exploring', base_maxhp = 500, currenthp = 500, dexterity = 22500, latitude = 20, longitude = 0 $MQ"
 
+t_section "monsters: elements, resistances and wards"
+# (overrides) the Red Slime weak to fire, its attack frost; the Dagger a fire weapon that
+# resists frost; the player can be hit (dexterity 0: no dodging)
+MO_RED=$(mon red_slime)
+t_sql "INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters', 'red_slime', 'resist.fire', '-50'),
+	('monsters', 'red_slime', 'attack_element', 'frost'), ('items', 'dagger', 'element', 'fire'),
+	('items', 'dagger', 'modifiers.1.element', 'frost'), ('items', 'dagger', 'modifiers.1.amount', '50')"
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+t_items_clear monsterer; t_give monsterer dagger 1 weapon
+t_sql "UPDATE users SET dexterity = 0 $MQ"
+t_get /character; expect_body '<span class="charsheet-affinities">Resists Frost (50%)</span>'
+t_get /inventory; expect_body 'Deals Fire damage'; expect_body 'Frost Resistance +50%'
+t_fight monsterer "$MO_RED" 100000
+t_get /fight; CS=$(t_csrf)
+expect_body '<div class="tip-meta">Level 1</div><ul class="tip-lines"><li>Weak to Fire (+50%)</li></ul>'
+MO_WEAK= MO_RESIST=
+for _ in $(seq 1 8); do
+	t_round "csrf=$CS&fight=Fight"
+	grep -qE 'You attack the monster for [0-9]+ damage\.<br>It is weak to fire!' "$BODY" && MO_WEAK=1
+	grep -qE 'The monster attacks you for [0-9]+ damage\.<br>You resist frost\.' "$BODY" && MO_RESIST=1
+	[ -n "$MO_WEAK" ] && [ -n "$MO_RESIST" ] && break
+done
+[ -n "$MO_WEAK" ] && t_ok || t_fail "the fire weapon's hit on a weakness has no line"
+[ -n "$MO_RESIST" ] && t_ok || t_fail "the frost attack on a resistance has no line"
+# a ward of 100 against sleep (the Silver Slime's, the original immunity 2): Sleep says immune
+t_spells monsterer "$(t_sql "SELECT id FROM spells WHERE key = 'sleep'")"
+t_sql "UPDATE users SET currentmp = 100 $MQ"
+t_fight monsterer "$(mon silver_slime)" 15
+t_get /fight; CS=$(t_csrf)
+t_round "csrf=$CS&spell=$(t_sql "SELECT id FROM spells WHERE key = 'sleep'")"
+expect_body 'You have cast the Sleep spell, but the monster is immune to it.'
+mo_is "(SELECT count(*) FROM fight_statuses WHERE user_id = users.id)" "0"
+t_fight_clear monsterer; t_items_clear monsterer
+t_sql "DELETE FROM content_overrides WHERE key IN ('red_slime', 'dagger'); UPDATE users SET dexterity = 22500, currentaction = 'Exploring' $MQ"
+# a class (an override here: no monster file has one yet): the Goblin Shaman (level 5) as a
+# Mage casts Magic Bolt too (its own Hurt and Heal stay as they are)
+t_sql "INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters', 'goblin_shaman', 'class', 'mage')"
+"$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
+t_get /character; expect_no_body 'charsheet-affinities'
+
 t_section "monsters: the help page"
 t_get /help/monsters; expect_status 200
-expect_body '<th>Max MP</th>'
+expect_body '<th>Max MP</th><th>Affinities</th>'
+expect_body '>Shadow</td><td style="width: 9%">10</td><td style="width: 9%">9</td><td style="width: 9%">3</td><td style="width: 9%">2</td><td style="width: 9%">6</td><td style="width: 9%">2</td><td style="width: 8%">5</td><td style="width: 12%">Immune to Arcane</td></tr>'
+expect_body '<td style="width: 12%">Immune to Arcane<br>Wards off Sleep (100%)</td>'
+expect_body 'Spells: Hurt, Heal; Mage spells: Magic Bolt; Items: Potion (2); Equipment: Dagger'
 expect_body '>Blue Slime</td><td style="width: 9%">4</td><td style="width: 9%">3</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 8%">5</td>'
 expect_body '>Bandit Captain <span class="light">(not met at random)</span></td><td style="width: 9%">145</td><td style="width: 9%">65</td><td style="width: 9%">52</td>'
 expect_body 'Spells: Craze; Items: Herb (1); Equipment: Broadsword, Chain Mail, Small Shield, Life Stone'
-expect_body 'Spells: Hurt, Heal; Items: Potion (2); Equipment: Dagger'
 expect_body 'Spells: Sleep, Poison, Pain <span class="light">(its spells cost no MP)</span>'
 
 t_section "monsters: cleanup"

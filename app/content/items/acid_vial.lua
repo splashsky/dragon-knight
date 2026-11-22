@@ -1,5 +1,5 @@
 -- app/content/items/acid_vial.lua :: a thrown vial of acid: hurts the monster outright
--- (armor does not stop it). Fights only; immune monsters are not hurt.
+-- (armor does not stop it) with poison. Fights only; monsters immune to poison are not hurt.
 return {
 	name = "Acid Vial",
 	description = "Throws acid that hurts the monster for a fixed amount, whatever its armor. Some monsters are immune.",
@@ -20,10 +20,9 @@ things.]],
 		immune = "You throw the %s, but the monster is immune to it.",
 	},
 	can_use = function(u)
-		if u.target.immune ~= 0 then return u:refuse("immune", u.name) end
+		if u.target:immune_to("poison") then return u:refuse("immune", u.name) end
 	end,
 	use = function(u)
-		u.target:hurt(u.power)
-		u:say("used", u.name, u.power)
+		u:say("used", u.name, u.target:hurt(u.power, "poison"))
 	end,
 }

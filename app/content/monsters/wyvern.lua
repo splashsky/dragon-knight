@@ -10,7 +10,6 @@ which does not always work.]],
 	level = 33,
 	maxhp = 134, maxdam = 120, armor = 95,
 	maxexp = 290, maxgold = 97,
-	immune = 0,
 	maxmp = 118,
 	speech = {
 		start = { "*hisses*", "Kraa!", chance = 20 },

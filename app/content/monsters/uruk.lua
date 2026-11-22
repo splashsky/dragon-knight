@@ -11,7 +11,6 @@ they close ranks; meet them in a narrow pass and they still close ranks.]],
 	level = 20,
 	maxhp = 68, maxdam = 58, armor = 44,
 	maxexp = 146, maxgold = 49,
-	immune = 0,
 	maxmp = 70,
 	speech = {
 		start = { "Halt! Name yourself, little man.", chance = 40 },

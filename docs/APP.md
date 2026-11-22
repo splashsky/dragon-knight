@@ -1247,8 +1247,8 @@ cures (Cleanse, Mend, Mercy, Renewal, Dawn), protection (Iron Vigil), holy strik
 `weakened` and `venom` (the monster deals less damage), `burning`, `withering` (drains HP
 to the caster), `marked` (weapon attacks deal more); new allies: the bear, the spirit, the
 golem. `tests/lua/test_spells.lua` casts every spell, by the player and by a monster, over
-many seeded states (no errors, whole amounts, MP spent only when cast, immune monsters
-untouched).
+many seeded states (no errors, whole amounts, MP spent only when cast, monsters immune to
+every element and warding off every status untouched).
 
 ```lua
 -- app/content/spells/heal.lua (scripted: see Scripting spells and items)
@@ -1309,11 +1309,11 @@ return {
 	a spell on a key carries `aria-keyshortcuts`, the others are under More. Items are icon
 	buttons too (2.4, see [Fight engine](#fight-engine)).
 - Magic Bolt (`magic_bolt`, 2.4, id 25): the Mage's starting spell, 1 MP, Hurt's formula
-	with power 4 (3-4 damage), none to monsters immune to hurt spells; the Wand casts it.
+	with power 4 (3-4 arcane damage), none to monsters immune to arcane; the Wand casts it.
 - The originals: heals (`heal` ... `gaia`: power = the HP restored), hurts (`hurt` ...
-	`chaos`: damage `rand(power * 5/6, power)`, none if the monster is immune), sleeps
-	(`sleep`, `dream`, `nightmare`: the monster stays asleep while `rand(1, 15) <= power`;
-	immunity 2 stops it), damage buffs (`craze`, `rage`, `fury`: +power% damage) and
+	`chaos`: arcane damage `rand(power * 5/6, power)`, none if the monster is immune to
+	arcane), sleeps (`sleep`, `dream`, `nightmare`: the monster stays asleep while `rand(1,
+	15) <= power`; a ward against sleep may stop it), damage buffs (`craze`, `rage`, `fury`: +power% damage) and
 	defense buffs (`ward`, `fend`, `barrier`: -power% damage taken). Heals use inline
 	functions, hurts and damage buffs free-standing ones.
 - A class learns a spell when its file lists the key in `levels[N].spells`; victory
@@ -1360,10 +1360,9 @@ or a local function defined anywhere in the file, the two work the same.
 ```lua
 -- app/content/spells/hurt.lua: a free-standing local function
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("arcane") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)   -- the original's rand(max * 5/6, max)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "arcane"))   -- what it really dealt
 end
 
 return {
@@ -1431,18 +1430,22 @@ optional. Only consumables have these fields; gear stays declarative (modifiers,
 **Combatants** (`s.caster`, `s.target`; the player, monsters and summons alike) have
 read-only fields `id` (the combatant's number in the fight), `side` (`"player"`, `"ally"`,
 `"enemy"`), `name`, `is_player`, `level`, `hp`, `maxhp`, `mp`, `maxmp`, `tp`, `maxtp`,
-`attack`, `defense`, `strength`, `dexterity`, `immune` (0, 1: hurt spells, 2: hurt and
-sleep), and, from its statuses, `asleep`, `sleep_chance`, `uber_damage`, `uber_defense`;
-and methods:
+`attack`, `defense`, `strength`, `dexterity`, `attack_element` (the element of its attack:
+the player's weapon's, a monster's `attack_element`, a summon's `element`; default
+`"neutral"`), and, from its statuses, `asleep`, `sleep_chance`, `uber_damage`,
+`uber_defense`; and methods (resistances and wards: see [Elements and
+wards](#elements-and-wards)):
 
 | | |
 |---|---|
 | `:heal(stat, n)` | restores up to `n` of `"hp"`, `"mp"` or `"tp"`, never above the maximum (and never lowering a value above it); returns what it restored |
-| `:hurt(n)` | takes `n` HP (may go below 0; the fight decides who died); returns `n` |
+| `:hurt(n [, element])` | `n` damage of `element` (default `"neutral"`) through the damage formula: returns what it really took (HP may go below 0; the fight decides who died); immune: 0; a combatant that absorbs the element heals instead (never above its maximum) and it returns 0 |
+| `:resist(element)`, `:immune_to(element)` | its resistance to the element (percent, -100..200, summed from its own, its gear's and its statuses'); whether it is 100 or more |
+| `:ward(key)` | its ward against status `key` (percent chance, 0..100, that it doesn't take hold) |
 | `:spend(stat, n)` | uses up `n` of a stat (a cost) |
 | `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the statuses `uber_damage` / `uber_defense`; 0 ends it) |
-| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance` at the start of each of its turns (0 wakes it) |
-| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`turns`: how long; the rest is the status's `t.data`); replaces an instance it has |
+| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance` at the start of each of its turns (0 wakes it); returns whether it fell asleep (false: its ward stopped it) |
+| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`turns`: how long; the rest is the status's `t.data`); replaces an instance it has; returns whether it took hold (false: its ward stopped it) |
 | `:cure(key or kind)` | removes a status, or all of a kind (`"harmful"`, `"helpful"`, `"neutral"`); returns how many |
 | `:has_status(key)`, `:status(key)`, `:statuses([kind])` | what it has: `{ key, name, kind, turns_left, data }` copies |
 
@@ -1549,7 +1552,7 @@ number key presses.
 | | |
 |---|---|
 | `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result }`. `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the last round's lines (`encounter.log_of`, `encounter.lines`); `result`: a victory's rewards |
-| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's `immune` and item stock (`stock_<position>`) |
+| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, turns_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `data`: a monster's item stock (`stock_<position>`) |
 | status instance | `{ status_id, key, row, turns_left, data, applied_round, source }`: `data` holds the params it was applied with, `source` the combatant who applied it |
 
 `state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (an escape, a new
@@ -1618,8 +1621,7 @@ a combatant: poison, a buff, sleep, "recharging".
 ```lua
 -- app/content/statuses/poison.lua
 local function tick(t)                       -- t: the status context
-	local damage = t:roll(t.data.min, t.data.max)
-	t.bearer:hurt(damage)
+	local damage = t.bearer:hurt(t:roll(t.data.min, t.data.max), "poison")   -- what it took
 	if t.bearer.is_player then t:say("hurt_you", damage) else t:say("hurt", t.bearer.name, damage) end
 end
 
@@ -1639,10 +1641,13 @@ return {
 	with the fight; `"world"`: outside fights only; `"both"`), `turns`, `blocks_action`
 	(`true`, or a `function(t)` returning true while it blocks), `data`, `messages`
 	(`blocked`: said when it blocks the player's turn; `blocked_other`: anyone else's, `%s`
-	the name). Hooks, all optional: `on_apply(t)`, `on_tick(t)`, `on_expire(t)` (ran out),
-	`on_remove(t)` (cured or replaced), `modify_damage_dealt(t, damage)` and
-	`modify_damage_taken(t, damage)` (return the new damage, a whole number >= 0; they only
-	decide, like `can_cast`).
+	the name), `resist` and `ward` (what it gives its bearer, like a monster's: `resist = {
+	fire = 50 }` for a fire ward; see [Elements and wards](#elements-and-wards)). Hooks, all
+	optional: `on_apply(t)`, `on_tick(t)`, `on_expire(t)` (ran out), `on_remove(t)` (cured or
+	replaced), `modify_damage_dealt(t, damage, element)` and `modify_damage_taken(t, damage,
+	element)` (an attack's; return the new damage, a whole number >= 0; they only decide,
+	like `can_cast`). A tick that hurts names its element (`t.bearer:hurt(n, "poison")`:
+	burning is fire, poison and venom poison, withering shadow).
 - The context `t`: `t.bearer` and `t.source` (handles; `source` may be nil),
 	`t.turns_left` (nil: no limit), `t.data` (the status's data under the params it was
 	applied with), `t.name`, `t.messages`, `t.round`, `t.in_fight`, `t:roll`, `t:say`,
@@ -1686,9 +1691,9 @@ return {
 ```lua
 -- app/content/spells/solar_beam.lua (excerpt)
 local function release(s)
+	if s.target:immune_to("fire") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "fire"))
 end
 
 return {
@@ -1713,8 +1718,7 @@ main settings).
 -- app/content/summons/wolf.lua
 local function act(a)                        -- a: the summon's context
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
-	a.target:hurt(damage)
-	a:say("bite", a.self.name, damage)
+	a:say("bite", a.self.name, a.target:hurt(damage, a.self.attack_element))   -- its `element`
 end
 
 return {
@@ -1729,7 +1733,9 @@ return {
 The context `a`: `a.self` (its handle), `a.target` (chosen by the AI), `a.data` (its
 params), `a.turns_left`, `a:roll`, `a:say`. Monsters may attack an ally instead of the
 player; the original formula then uses the ally's defense and dexterity. An ally leaves at
-0 HP, when its rounds run out or when the fight ends; an error in its code removes it.
+0 HP, when its rounds run out or when the fight ends; an error in its code removes it. Its
+file may give `element` (its attacks', handed to its `act` as `a.self.attack_element`),
+`resist` and `ward` (3.2, see [Elements and wards](#elements-and-wards)).
 
 ### Monster AI
 
@@ -1772,7 +1778,7 @@ on screen is what a page load shows. (2.3's JSON fight API, `Accept: application
 page's order, with what changed with it; a change in a step that hasn't said anything is
 an event without `text`. The texts are exactly the lines the page shows (unescaped:
 put them in with `textContent`). Nothing else of the model leaks (no status data, rolls,
-stock, immunity).
+stock, resistances).
 
 ```lua
 {
@@ -1847,6 +1853,74 @@ numbers only), apply it in fight.js's `show(e, log)` (look elements up by
 `data-fighter`; build DOM with `textContent`), add a CSS animation in `fight.css` (and its
 `prefers-reduced-motion` exception), and extend the shape check in `fight_api.sh`.
 
+## Elements and wards
+
+(3.2, `docs/plans/elements-and-weather.md` parts 1 and 2.) Every hit has an **element**, and
+every combatant a **resistance** to each element and a **ward** against each status.
+`app/lib/elements.lua` (pure) holds the elements, the damage formula and the lines.
+
+- **Elements** (`elements.LIST`, in this order): `neutral` (shown as "Physical"), `fire`,
+	`frost`, `lightning`, `water`, `wind`, `earth`, `holy`, `shadow`, `arcane`, `poison`.
+	Weapons, armor and attacks are neutral unless they say otherwise. The player's attack is
+	its weapon's `element`, a monster's its `attack_element`, a summon's its `element` (its
+	`act` passes it: `a.target:hurt(damage, a.self.attack_element)`). Spells and items name
+	theirs in `:hurt`: the original hurt spells, Magic Bolt, Sap Mind, Starfall and the Void
+	Flask are arcane; Ember, Inferno, Cinder Lash, Solar Beam and the Fire Flask fire;
+	Frostbite and Whiteout frost; Spark and Lightning Lance lightning; Rockfall earth;
+	Dawnstrike and Judgement holy; Withering and Curse shadow; Poison, Venom, Plague and the
+	Acid Vial poison. The Warrior's strikes (Cleave, Reaver, Blood Strike, Finishing Blow) are
+	neutral. Status ticks too: burning is fire, poison and venom poison, withering shadow.
+- **Resistance**: a percent per element, summed from every source (the monster's or
+	summon's file `resist = { fire = 50, frost = -50 }`, gear modifiers `{ kind = "resist",
+	element = "fire", amount = 25 }`, statuses' `resist`) and clamped to -100..200: below 0 a
+	weakness, 100 immunity, above 100 it absorbs. `h:resist(element)`, `h:immune_to(element)`
+	(`resist >= 100`).
+- **The damage formula**, the only one (`elements.damage(n, field_pct, resist)`: attacks in
+	`fight/combat.lua`, `:hurt` for spells, items and status ticks): `scaled = floor(n * (100
+	+ field_pct) / 100)` (never below 0; `field_pct` is the battlefield's percent for the
+	element: 0, as there are no fields yet), then `floor(scaled * (100 - resist) / 100)`; at
+	100 it deals 0, above 100 it deals 0 and heals `floor(scaled * (resist - 100) / 100)`
+	(never above the maximum). A hit that dealt at least 1 before resistance and isn't
+	resisted fully deals at least 1. With no field and no resistance it is `n`: fights
+	without affinities roll and say exactly what they did (`tests/lua/test_round.lua`).
+- **`target:hurt(n [, element])` returns what it really dealt**: spells print that ("for
+	%d damage"); an immune or absorbing target returns 0. Immune messages come from
+	`immune_to`: `if s.target:immune_to("arcane") then return s:say("immune", s.name) end`.
+- **Lines**: a hit against a weakness or a resistance adds a line after the next one said
+	(the spell's damage line; for an attack, its "You attack the monster for 9 damage."):
+	"It is weak to fire!", "It resists frost.", "It is immune to arcane force.", "It absorbs
+	the lightning!" ("You resist frost." when the player is hit; `elements.note`).
+- **A ward** is a percent chance, 0-100, that a status doesn't take hold, keyed by status
+	key and summed like resistances: a file's `ward = { sleep = 100 }`, gear `{ kind = "ward",
+	status = "sleep", amount = 25 }`, statuses' `ward`. `h:afflict(key, params)` and
+	`h:sleep(chance)` return true when the status took hold, false when the ward stopped it;
+	`h:ward(key)` reads it. A ward of 0 and one of 100 roll nothing; 1-99 rolls `rand(1,
+	100)` with the action's dice once (resisted at or below the ward). Status spells say
+	their "immune" message when the ward is 100 and "resisted" otherwise
+	(`s:say(s.target:ward("sleep") == 100 and "immune" or "resisted", s.name)`); thrown items
+	refuse (cost nothing) against a certain ward or immunity.
+- **Where they show**: the monsters help page (an Affinities column) and a monster's
+	tooltip (`elements.lines`: "Weak to Frost (+50%)", "Resists Fire (50%)", "Immune to
+	Arcane", "Absorbs Lightning (20%)", "Wards off Sleep (100%)"); the character sheet
+	(the player's, from gear and world statuses, when any); item lines ("Fire Resistance
+	+25%", "Sleep Ward +25%"); the monster admin editor (`resist.<element>`,
+	`ward.<status>`).
+- **Storage** (schema version 21, `lib/content/affinities.lua`): the flat form has
+	`resist.fire` and `ward.sleep`; the `monsters`, `summons` and `statuses` tables keep them
+	as text (`resist`, `ward`: `"fire=50,frost=-50"`), and `lib/monsters.lua`,
+	`lib/summons.lua` and `lib/statuses.lua` give them back as tables. A ward's status must
+	be a status file (`dk check`). The handles take a combatant's own (`resist`, `ward`: its
+	file's and its gear's) and each status's; a fight's saved data holds none of them.
+- **The end of `immune`**: monsters' `immune` (0, 1: hurt spells, 2: hurt and sleep) became
+	`resist = { arcane = 100 }` and, for 2, `ward = { sleep = 100 }`, in the files and on the
+	rows; step 21 turned admins' overrides of it into `resist.arcane` / `ward.sleep`
+	overrides where they differ from the file.
+
+Testing: `tests/lua/test_elements.lua` (the formula, clamps, immunity, absorbing, the lines,
+the handles' API and the wards' dice), `tests/lua/test_spells.lua` (a monster immune to
+everything is never hurt or afflicted), `tests/e2e/monsters.sh` (a typed attack and a
+resistance in a fight, the sheet, the help page, a class).
+
 ## Monsters
 
 Monsters are content (see [Content](#content)): `app/content/monsters/<key>.lua`, synced
@@ -1867,7 +1941,8 @@ return {
 	level = 5,                                -- where it is met and what it drops
 	maxhp = 40, maxdam = 8, armor = 4,        -- the original columns
 	maxexp = 12, maxgold = 15,
-	immune = 0,                               -- 1: hurt spells, 2: hurt and sleep spells
+	-- optional (not in this file): resist = { fire = 50, holy = -50 }, ward = { sleep = 30 },
+	-- attack_element = "fire", class = "mage" (see below)
 	maxmp = 17,                               -- MP at the start of every encounter (default 0)
 	uses_mp = true,                           -- spells cost it MP (default); false: free
 	attack_weight = 3,                        -- its attack's weight (default 1; 0: fallback only)
@@ -1883,8 +1958,9 @@ return {
 }
 ```
 
-- **Validation** (`dk check`): the stats as above (`maxhp` >= 1, `immune` 0-2, weights >=
-	1, `attack_weight` >= 0, `stock` >= 1 or absent); item and spell keys must be files;
+- **Validation** (`dk check`): the stats as above (`maxhp` >= 1, weights >= 1,
+	`attack_weight` >= 0, `stock` >= 1 or absent; `resist` of known elements, -100 to 200;
+	`ward` 0 to 100); item, spell, class and warded status keys must be files;
 	equipment must fit its slot (a weapon in `weapon`, an accessory in `accessory1`-`3`);
 	items must be consumables and spells usable in fights; `when` must be a function.
 - **MP**: every original monster has `maxmp` = the Mage's total MP at its level (the 2.2
@@ -1929,24 +2005,43 @@ return {
 	skipped with `uses_mp = false`), applied by `engine.apply`; lines are the files'
 	`messages.enemy` wordings, or the generic "The Goblin Shaman casts Heal." / "uses the
 	Potion." plus what changed. A monster can't summon (no room on its side).
+- **Elements and wards** (3.2, see [Elements and wards](#elements-and-wards)): `resist`
+	(percent by element: below 0 a weakness, 100 immunity, above 100 it absorbs), `ward`
+	(percent chance by status key that the status doesn't take hold) and `attack_element`
+	(its attack's element; default `"neutral"`). Its equipment's resistance and ward
+	modifiers add to them (`monsters.effective`). The original `immune` became these:
+	`immune = 1` is `resist = { arcane = 100 }` (the hurt spells are arcane), `immune = 2`
+	that and `ward = { sleep = 100 }`.
+- **Classes** (3.2): with `class = "mage"` its loadout gains every spell the class knows at
+	the monster's level (its starting spells and those its levels teach up to there) that is
+	castable in fights, weight 1 and no `when` (`monsters.loadout`, entries marked
+	`from_class`), after its own spells; its own entry for one of them wins (its weight and
+	`when`). It pays MP for them from `maxmp` like for its own (unless `uses_mp = false`).
+	No monster has a class yet.
 - **Random encounters** pick among the roaming, non-retired monsters of the level band
 	(`monsters.roaming`: the original rows and order). Monsters with `roams = false` (the
 	examples) are only met where content or a test puts them (`state.add_monster(f, row,
 	wave)` + `round.start(f)`); an admin can let one roam.
 - **Admin** (`/admin/monsters`, the shared content admin `admin/effects.lua`): name,
-	description, level, the stats, `maxmp`, `uses_mp`, `attack_weight` and `roams` are
-	overridable; the loadout is shown read-only (edit the file). The list keeps the
+	description, level, the stats, `maxmp`, `uses_mp`, `attack_weight`, `roams`,
+	`attack_element`, its resistance to every element (`resist.<element>`) and its wards
+	against the harmful statuses and those its file names (`ward.<status>`) are overridable;
+	the loadout and the class are shown read-only (edit the file). The list keeps the
 	original's check that the highest roaming level is the map size / 5.
 - **Help** (`/help/monsters`): every non-retired monster with its effective stats and MP,
-	and the spells, items (with stock) and equipment of those that have them.
+	its affinities ("Weak to Frost (+50%)", "Immune to Arcane", "Wards off Sleep (100%)";
+	`elements.lines`), and the spells (its own, then its class's: "Mage spells: ..."), items
+	(with stock) and equipment of those that have them. Its tooltip in a fight lists the
+	affinities too.
 - **Retired** monsters (file deleted) are no longer met; fights against them go on.
 
 `lib/monsters.lua`: `monsters.get(id)`, `monsters.by_key(key)`, `monsters.active()`,
 `monsters.all()`, `monsters.roaming(min, max)`, `monsters.loadout(row)` (`{ equipment,
 items, spells }` with item and spell rows, read once per request; a row may carry its own
-`loadout` table: tests), `monsters.condition(row, list, entry)` (the `when` function),
-`monsters.effective(row)` (a copy with the equipment counted, base values in `base`),
-`monsters.reload()`.
+`loadout` table: tests; with its class's spells), `monsters.condition(row, list, entry)`
+(the `when` function), `monsters.effective(row)` (a copy with the equipment counted, base
+values in `base`), `monsters.reload()`. Rows come back with `resist` and `ward` decoded into
+tables.
 
 ### Monster speech
 
@@ -2099,7 +2194,9 @@ return {
 
 - Other fields: `description`, `slot` (optional; it is the category for gear and absent
 	otherwise), `sellable` (default: it has a price and isn't a quest item), `droppable`
-	(default true; with a `drop_level`), `icon`, `casts` and `charges` (below).
+	(default true; with a `drop_level`), `icon`, `casts` and `charges` (below), and a
+	weapon's `element` (3.2: its attack's, default `"neutral"`; "Deals Fire damage" on its
+	lines; see [Elements and wards](#elements-and-wards)).
 - **Icons** (schema version 14): `icon = "herb"` names `public/images/items/herb.png`
 	(`[a-z0-9_]+`, square; every item has one since 3.1, see [Icons](#icons)).
 	Absent or `""`: the Inventory panel keeps the slot's icon, and icon buttons (the shop,
@@ -2139,11 +2236,15 @@ return {
 	`usable_in` and `target`, and a consumable needs `use`; quest items can't be sellable;
 	`sellable = true` needs a price.
 - Admins override name, description, price, attack, defense, icon, charges, rechargeable, drop level, sellable,
-	droppable, the modifiers' stats and amounts (an override can add a modifier: both its
-	`modifiers.N.stat` and `.amount`) and a consumable's power, numbers and message strings
-	at `/admin/items`.
+	droppable, a weapon's element, the modifiers' stats, elements, statuses and amounts (an
+	override can add a modifier: both its `modifiers.N.stat` (or `.element`, `.status`) and
+	`.amount`) and a consumable's power, numbers and message strings at `/admin/items`.
 - Modifier stats: `maxhp`, `maxmp`, `maxtp`, `strength`, `dexterity`, `attack`, `defense`,
-	`exp_bonus_pct`, `gold_bonus_pct` (see [Derived stats](#derived-stats)).
+	`exp_bonus_pct`, `gold_bonus_pct` (see [Derived stats](#derived-stats)); and (3.2)
+	resistances `{ kind = "resist", element = "fire", amount = 25 }` (-100 to 200: "Fire
+	Resistance +25%") and wards `{ kind = "ward", status = "sleep", amount = 25 }` (0 to 100,
+	a status file's key: "Sleep Ward +25%"), shown after the stats on its lines, in its
+	tooltips and in the shop's (`items.affinity_lines`).
 - Use: a consumable can be used in town (from `/inventory`) and in fights ("Use Item",
 	costs the turn like a spell; `fight/act.lua`) per its `usable_in`, with the player as
 	caster. Refusals (already full, ...) and errors cost nothing; the item is taken from
@@ -2206,7 +2307,7 @@ and `messages` and `data` into tables.
 | `items.active()`, `items.all()` | non-retired items (help) / every item (admin), by id |
 | `items.town(town_id)`, `items.sold_in(town_id, id)`, `items.set_town(town_id, ids)`, `items.town_keys(town_id)` | a town's shop |
 | `items.is_gear(item)`, `items.can_sell(item)`, `items.sell_price(item)`, `items.usable(item, place)` | rules |
-| `items.attributes(item)`, `items.special_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Power 30"`) |
+| `items.attributes(item)`, `items.special_lines(item)`, `items.affinity_lines(item)`, `items.use_lines(item)`, `items.stat_line(stat, n)` | display lines (`"Attack Power +250"`, `"Gold Bonus +10%"`, `"Deals Fire damage"`, `"Fire Resistance +25%"`, `"Power 30"`) |
 | `items.signed(stat, n)`, `items.compare(item, old)`, `items.compare_view(item, old)`, `items.category_label(item)` | `"+5"`, `"+10%"`; wearing `item` instead of `old` stat by stat (`{ stat, label, new, old, delta }`: the shop's tooltips) and as text (the purchase and the drop card); "Weapon", "Consumable" |
 | `items.icon(item)`, `items.icon_url(item)` | its picture's URL, or nil / the default icon |
 | `items.casts(item)`, `items.spell(item)`, `items.charge_lines(item [, charges])`, `items.rechargeable(item)` | it casts a spell; that spell's row; `{ "Casts Magic Bolt", "3/5 Charges" [, "Single use"] }`; an inn refills it |
@@ -2325,11 +2426,16 @@ change base stats or equipment. `stats.solve(expected, mods)` is the inverse (ba
 that give expected effective stats), used by the migration. `stats.monster(row, mods)`
 applies the same rules to a monster and its equipment (see [Monsters](#monsters)).
 
-Modifiers are gear's passive stat bonuses, plain data (not code: they are summed,
-displayed and overridden): `{ kind = "stat", stat = "strength", amount = 50 }` (amount may
-be negative), checked by `stats.validate_modifiers(list)`, stored as text by
-`stats.encode_modifiers` (`"stat stat=strength amount=50; stat stat=maxhp amount=-50"`,
-read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`.
+Modifiers are gear's passive bonuses, plain data (not code: they are summed, displayed and
+overridden): `{ kind = "stat", stat = "strength", amount = 50 }` (amount may be negative),
+`{ kind = "resist", element = "fire", amount = 25 }` and `{ kind = "ward", status = "sleep",
+amount = 25 }` (3.2, see [Elements and wards](#elements-and-wards); `stats.MODIFIERS`: what
+each names and its amount's range), checked by `stats.validate_modifiers(list)`, stored as
+text by `stats.encode_modifiers` (`"stat stat=strength amount=50; resist element=fire
+amount=25"`, read back by `stats.decode_modifiers`) and summed by `stats.modifiers(list)`
+(stats) and `stats.affinities(items)` (`{ resist = { fire = 25 }, ward = { sleep = 25 } }`).
+`inventory.stats` adds `resist`, `ward` and `attack_element` (the weapon's element) to the
+effective stats, and `stats.player` copies them for the fight.
 
 ## Forum and news
 

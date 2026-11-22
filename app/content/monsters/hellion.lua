@@ -9,7 +9,6 @@ when passing through.]],
 	level = 16,
 	maxhp = 50, maxdam = 45, armor = 30,
 	maxexp = 110, maxgold = 37,
-	immune = 0,
 	maxmp = 55,
 	speech = {
 		start = { "Hah! Fight me, mortal!", chance = 50 },

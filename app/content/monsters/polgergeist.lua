@@ -11,7 +11,6 @@ rooms with salt before they will let a bed go out for the night.
 	level = 25,
 	maxhp = 84, maxdam = 74, armor = 58,
 	maxexp = 180, maxgold = 60,
-	immune = 0,
 	maxmp = 91,
 	speech = {
 		start = { "Get OUT of my house!", chance = 45 },

@@ -9,7 +9,6 @@ hard to hit, and their cold touch leaves a chill that lasts for days.]],
 	level = 16,
 	maxhp = 50, maxdam = 45, armor = 30,
 	maxexp = 108, maxgold = 36,
-	immune = 0,
 	maxmp = 55,
 	speech = {
 		start = { "You should not be here.", chance = 40 },

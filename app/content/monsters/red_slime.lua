@@ -10,7 +10,6 @@ never works twice.]],
 	level = 1,
 	maxhp = 6, maxdam = 5, armor = 1,
 	maxexp = 2, maxgold = 1,
-	immune = 0,
 	maxmp = 5,
 	speech = {
 		start = { "*hisses wetly*", chance = 20 },

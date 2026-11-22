@@ -11,7 +11,6 @@ the smiths charge double for it.]],
 	level = 17,
 	maxhp = 56, maxdam = 48, armor = 38,
 	maxexp = 124, maxgold = 41,
-	immune = 0,
 	maxmp = 57,
 	speech = {
 		start = { "Run, little hunter. Run.", chance = 40 },

@@ -59,9 +59,9 @@ local function spell(key, over)
 end
 
 -- seed rows
-local BLUE_SLIME = { id = 1, name = "Blue Slime", maxhp = 4, maxdam = 3, armor = 1, level = 1, maxexp = 1, maxgold = 1, immune = 0 }
-local CREATURE = { id = 4, name = "Creature", maxhp = 10, maxdam = 8, armor = 2, level = 2, maxexp = 4, maxgold = 2, immune = 0 }
-local SHADOW = { id = 5, name = "Shadow", maxhp = 10, maxdam = 9, armor = 3, level = 2, maxexp = 6, maxgold = 2, immune = 1 }
+local BLUE_SLIME = { id = 1, name = "Blue Slime", maxhp = 4, maxdam = 3, armor = 1, level = 1, maxexp = 1, maxgold = 1 }
+local CREATURE = { id = 4, name = "Creature", maxhp = 10, maxdam = 8, armor = 2, level = 2, maxexp = 4, maxgold = 2 }
+local SHADOW = { id = 5, name = "Shadow", maxhp = 10, maxdam = 9, armor = 3, level = 2, maxexp = 6, maxgold = 2, resist = { arcane = 100 } }
 
 function T.monster_level_band()
 	local function band(lat, lon) local a, b = combat.monster_levels(lat, lon); return a .. "-" .. b end

@@ -11,7 +11,6 @@ which the wizards take poorly.]],
 	level = 20,
 	maxhp = 66, maxdam = 56, armor = 44,
 	maxexp = 144, maxgold = 48,
-	immune = 0,
 	maxmp = 70,
 	speech = {
 		start = { "Another fool on my road. How quaint.", chance = 50 },

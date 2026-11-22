@@ -9,7 +9,7 @@ Miners give them a wide berth, and most of them learn that only once.]],
 	level = 15,
 	maxhp = 48, maxdam = 40, armor = 26,
 	maxexp = 95, maxgold = 32,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 52,
 	speech = {
 		start = { "*clicks*", chance = 15 },

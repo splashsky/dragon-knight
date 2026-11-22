@@ -7,7 +7,10 @@
 -- column names (game.player: maxhp, strength, attackpower, expbonus, ...; the legacy
 -- in-memory $userrow); messages are returned as lists of plain-text lines (escaped by the
 -- templates). The round (fight/round.lua) applies the damage; spells and items are
--- scripted content run by fight/act.lua.
+-- scripted content run by fight/act.lua. An attack's damage is typed last (its element
+-- against the target's resistance, lib/elements.lua): neutral damage on a target without
+-- resistances is the original number.
+local elements = require("lib.elements")
 local leveling = require("lib.leveling")
 local php = require("lib.php")
 
@@ -54,36 +57,47 @@ function combat.run_chance(st, monster, rand)
 	return chance > (rand(1, 5) + php.ceil(sqrt(monster.maxdam)))
 end
 
+-- An attack's damage typed by `typed` ({ element, resist, field_pct }: fight/engine.lua
+-- engine.typed; nil: untyped): what it deals and heals, and the line on a weakness or a
+-- resistance.
+local function typed_damage(damage, typed, you)
+	if not typed then return damage, 0, nil end
+	local dealt, healed = elements.damage(damage, typed.field_pct, typed.resist)
+	return dealt, healed, elements.note(typed.element, typed.resist, you)
+end
+
 -- A monster's attack (`maxdam`: its maximum damage) on `target` (a combatant handle: the
 -- player, or an ally in the player's place: defense, dexterity, is_player, name).
 -- `modify(damage)` applies the statuses' damage modifiers (fight/engine.lua; the original
--- uber defense buff is one). Returns lines, damage (the caller takes it off the target).
+-- uber defense buff is one), then `typed` its element (above). Returns lines, damage (the
+-- caller takes it off the target), healed (a target that absorbs the element).
 -- legacy: after a spell the original raised tohit to toblock + 1 instead of clamping the
 -- damage to 1; the outcome is the same, so there is one formula.
-function combat.monster_attack(maxdam, target, rand, modify)
+function combat.monster_attack(maxdam, target, rand, modify, typed)
 	local lines = {}
 	local tohit = php.ceil(rand(maxdam * .5, maxdam))
 	local toblock = php.ceil(rand(target.defense * .75, target.defense) / 4)
-	local damage
+	local damage, healed, note = 0, 0, nil
 	if rand(1, 150) <= sqrt(target.dexterity) then
 		lines[#lines + 1] = target.is_player and "You dodge the monster's attack. No damage has been scored." or
 			("Your " .. tostring(target.name) .. " dodges the monster's attack. No damage has been scored.")
-		damage = 0
 	else
 		damage = tohit - toblock
 		if damage < 1 then damage = 1 end
 		if modify then damage = modify(damage) end
 		if damage < 1 then damage = 1 end
+		damage, healed, note = typed_damage(damage, typed, target.is_player)
 	end
 	lines[#lines + 1] = target.is_player and ("The monster attacks you for " .. damage .. " damage.") or
 		("The monster attacks your " .. tostring(target.name) .. " for " .. damage .. " damage.")
-	return lines, damage
+	lines[#lines + 1] = note
+	return lines, damage, healed
 end
 
 -- The player's melee attack: `attacker` (attack, strength) on `target` (defense: a
 -- monster's armor). `modify(damage)` applies the statuses' damage modifiers (the uber
--- damage buff is one). Returns lines, damage.
-function combat.attack(attacker, target, rand, modify)
+-- damage buff is one), then `typed` its element (above). Returns lines, damage, healed.
+function combat.attack(attacker, target, rand, modify, typed)
 	local lines = {}
 	local tohit = php.ceil(rand(attacker.attack * .75, attacker.attack) / 3)
 	if rand(1, 150) <= sqrt(attacker.strength) then
@@ -91,18 +105,19 @@ function combat.attack(attacker, target, rand, modify)
 		lines[#lines + 1] = "Excellent hit!"
 	end
 	local toblock = php.ceil(rand(target.defense * .75, target.defense) / 3)
-	local damage
+	local damage, healed, note = 0, 0, nil
 	if rand(1, 200) <= sqrt(target.defense) then
 		lines[#lines + 1] = "The monster is dodging. No damage has been scored."
-		damage = 0
 	else
 		damage = tohit - toblock
 		if damage < 1 then damage = 1 end
 		if modify then damage = modify(damage) end
 		if damage < 1 then damage = 1 end
+		damage, healed, note = typed_damage(damage, typed, false)
 	end
 	lines[#lines + 1] = "You attack the monster for " .. damage .. " damage."
-	return lines, damage
+	lines[#lines + 1] = note
+	return lines, damage, healed
 end
 
 -- Death penalty: half the gold (rounded up) and a quarter of max HP (rounded up).

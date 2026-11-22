@@ -9,7 +9,6 @@ and bargain again, and seldom keeps to any of it.]],
 	level = 10,
 	maxhp = 36, maxdam = 30, armor = 15,
 	maxexp = 54, maxgold = 18,
-	immune = 0,
 	maxmp = 36,
 	speech = {
 		start = { "Shiny! Mine now!", "Hey you! Give it here!", chance = 50 },

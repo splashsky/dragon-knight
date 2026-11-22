@@ -133,14 +133,20 @@ function inventory.find(user_id, item_id)
 	return r and entry_of(r)
 end
 
--- Effective stats of a users row (lib/stats.lua) with what it has equipped.
+-- Effective stats of a users row (lib/stats.lua) with what it has equipped, and what the
+-- gear adds besides: resist and ward (tables, stats.affinities) and attack_element (the
+-- weapon's element).
 function inventory.stats(user)
 	local list = {}
+	local eq = inventory.equipped(user.id)
 	for _, slot in ipairs(inventory.SLOTS) do
-		local e = inventory.equipped(user.id)[slot]
-		if e then list[#list + 1] = e.item end
+		if eq[slot] then list[#list + 1] = eq[slot].item end
 	end
-	return stats.derive(user, stats.item_mods(list))
+	local s = stats.derive(user, stats.item_mods(list))
+	local worn = stats.affinities(list)
+	s.resist, s.ward = worn.resist, worn.ward
+	s.attack_element = eq.weapon and eq.weapon.item.element or "neutral"
+	return s
 end
 
 -- The equipped item's name per slot ("None" when empty): { weapon = "Stick", ... }.

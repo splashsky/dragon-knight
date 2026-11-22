@@ -146,7 +146,8 @@ CREATE INDEX forum_board ON forum (board, parent, newpostdate);
 -- version 14: casts (a spell key: gear that casts it in fights; '' = none) and charges
 -- (when full; user_items.charges holds each one's), icon (a PNG in public/images/items/,
 -- '' = the default icon). Schema version 16: rechargeable (0: single use, gone with its
--- last charge; 1: an inn refills it).
+-- last charge; 1: an inn refills it). Schema version 21: element (a weapon's attack's,
+-- app/lib/elements.lua; modifiers may give resistances and wards too).
 CREATE TABLE items (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -172,7 +173,8 @@ CREATE TABLE items (
 	casts        TEXT    NOT NULL DEFAULT '',
 	charges      INTEGER NOT NULL DEFAULT 0,
 	icon         TEXT    NOT NULL DEFAULT '',
-	rechargeable INTEGER NOT NULL DEFAULT 1
+	rechargeable INTEGER NOT NULL DEFAULT 1,
+	element      TEXT    NOT NULL DEFAULT 'neutral'
 );
 
 -- Monsters: content files app/content/monsters/<key>.lua (like items; never deleted, a
@@ -181,7 +183,9 @@ CREATE TABLE items (
 -- spells cost it MP (0: free); attack_weight: the weight of its basic attack among its
 -- actions; roams: met in random encounters of its level band. The loadout (equipment,
 -- items, spells) is in the monster_* tables; `when` conditions stay in the file
--- (has_when says the entry has one).
+-- (has_when says the entry has one). Schema version 21 (in place of immune): resist and
+-- ward ("fire=50,frost=-50", "sleep=100": app/lib/content/affinities.lua), attack_element
+-- and class (a class key whose fight spells it casts too; '' = none).
 CREATE TABLE monsters (
 	id             INTEGER PRIMARY KEY,
 	key            TEXT    NOT NULL UNIQUE,
@@ -193,14 +197,17 @@ CREATE TABLE monsters (
 	level          INTEGER NOT NULL DEFAULT 1,
 	maxexp         INTEGER NOT NULL DEFAULT 0,
 	maxgold        INTEGER NOT NULL DEFAULT 0,
-	immune         INTEGER NOT NULL DEFAULT 0,
 	maxmp          INTEGER NOT NULL DEFAULT 0,
 	uses_mp        INTEGER NOT NULL DEFAULT 1,
 	attack_weight  INTEGER NOT NULL DEFAULT 1,
 	roams          INTEGER NOT NULL DEFAULT 1,
 	retired        INTEGER NOT NULL DEFAULT 0,
 	lore           TEXT    NOT NULL DEFAULT '',
-	icon           TEXT    NOT NULL DEFAULT ''
+	icon           TEXT    NOT NULL DEFAULT '',
+	resist         TEXT    NOT NULL DEFAULT '',
+	ward           TEXT    NOT NULL DEFAULT '',
+	attack_element TEXT    NOT NULL DEFAULT 'neutral',
+	class          TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX monsters_level ON monsters (level);
 
@@ -270,7 +277,8 @@ CREATE TABLE spells (
 -- (app/fight/engine.lua): the hooks are the file's code; kind ('harmful', 'helpful',
 -- 'neutral'), tick_on ('turn_start', 'turn_end'), scope ('fight', 'world', 'both'), turns
 -- (default duration; 0: no limit), blocks_action, messages and data are data. Ids 1-3 are
--- the original game's mechanics (sleep, uber_damage, uber_defense; seed.sql).
+-- the original game's mechanics (sleep, uber_damage, uber_defense; seed.sql). Schema
+-- version 21: resist and ward, what it gives its bearer (like a monster's).
 CREATE TABLE statuses (
 	id             INTEGER PRIMARY KEY,
 	key            TEXT    NOT NULL UNIQUE,
@@ -285,11 +293,14 @@ CREATE TABLE statuses (
 	messages       TEXT    NOT NULL DEFAULT '',
 	data           TEXT    NOT NULL DEFAULT '',
 	lore           TEXT    NOT NULL DEFAULT '',
-	icon           TEXT    NOT NULL DEFAULT ''
+	icon           TEXT    NOT NULL DEFAULT '',
+	resist         TEXT    NOT NULL DEFAULT '',
+	ward           TEXT    NOT NULL DEFAULT ''
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
--- player (app/fight/engine.lua); act is the file's code, the numbers are data.
+-- player (app/fight/engine.lua); act is the file's code, the numbers are data. Schema
+-- version 21: resist and ward (like a monster's), element (its attacks').
 CREATE TABLE summons (
 	id           INTEGER PRIMARY KEY,
 	key          TEXT    NOT NULL UNIQUE,
@@ -304,7 +315,10 @@ CREATE TABLE summons (
 	messages     TEXT    NOT NULL DEFAULT '',
 	data         TEXT    NOT NULL DEFAULT '',
 	lore         TEXT    NOT NULL DEFAULT '',
-	icon         TEXT    NOT NULL DEFAULT ''
+	icon         TEXT    NOT NULL DEFAULT '',
+	resist       TEXT    NOT NULL DEFAULT '',
+	ward         TEXT    NOT NULL DEFAULT '',
+	element      TEXT    NOT NULL DEFAULT 'neutral'
 );
 
 CREATE TABLE towns (

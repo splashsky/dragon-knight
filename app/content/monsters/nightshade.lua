@@ -9,7 +9,6 @@ burn the plant on purpose to keep it from spreading, and they wear gloves when t
 	level = 6,
 	maxhp = 22, maxdam = 16, armor = 6,
 	maxexp = 24, maxgold = 8,
-	immune = 0,
 	maxmp = 22,
 	speech = {
 		start = { "*leaves rustle*", chance = 25 },

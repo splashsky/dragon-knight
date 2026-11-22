@@ -10,7 +10,6 @@ gloves, and do not expect the dragon to be impressed by either.]],
 	level = 39,
 	maxhp = 180, maxdam = 160, armor = 130,
 	maxexp = 605, maxgold = 202,
-	immune = 0,
 	maxmp = 141,
 	speech = {
 		start = { "Cold climbs a long way to reach you, little knight.", "Climb back down. Or stay.", chance = 60 },

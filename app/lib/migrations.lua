@@ -1281,6 +1281,47 @@ local function v20_more_icons()
 	end
 end
 
+-- 21: elements and wards (3.2, lib/elements.lua): monsters, statuses and summons resist
+-- elements and ward off statuses (resist, ward), weapons and summons have an element,
+-- monsters an attack element and a class. monsters.immune goes: 1 becomes a resistance of
+-- 100 to arcane (the hurt spells' element), 2 that and a ward of 100 against sleep, on the
+-- rows (a retired monster keeps its immunity) and in admins' overrides of it (an override
+-- where the result differs from the file's) and pending adoptions.
+local function v21_elements_and_wards()
+	local db = dk.db
+	db:exec_script([[
+ALTER TABLE items ADD COLUMN element TEXT NOT NULL DEFAULT 'neutral';
+ALTER TABLE monsters ADD COLUMN resist TEXT NOT NULL DEFAULT '';
+ALTER TABLE monsters ADD COLUMN ward TEXT NOT NULL DEFAULT '';
+ALTER TABLE monsters ADD COLUMN attack_element TEXT NOT NULL DEFAULT 'neutral';
+ALTER TABLE monsters ADD COLUMN class TEXT NOT NULL DEFAULT '';
+UPDATE monsters SET resist = CASE WHEN immune <> 0 THEN 'arcane=100' ELSE '' END,
+	ward = CASE WHEN immune = 2 THEN 'sleep=100' ELSE '' END;
+ALTER TABLE monsters DROP COLUMN immune;
+ALTER TABLE statuses ADD COLUMN resist TEXT NOT NULL DEFAULT '';
+ALTER TABLE statuses ADD COLUMN ward TEXT NOT NULL DEFAULT '';
+ALTER TABLE summons ADD COLUMN resist TEXT NOT NULL DEFAULT '';
+ALTER TABLE summons ADD COLUMN ward TEXT NOT NULL DEFAULT '';
+ALTER TABLE summons ADD COLUMN element TEXT NOT NULL DEFAULT 'neutral';
+]])
+	-- the monster files (read, not the database): an override equal to the file's is none
+	local files = require("lib.content.load").kind("monsters").by_key
+	for _, tbl in ipairs({ "content_overrides", "content_adopt" }) do
+		for _, r in ipairs(db:query("SELECT key, value FROM " .. tbl .. " WHERE kind = 'monsters' AND field = 'immune' " ..
+			"ORDER BY key")) do
+			local immune = math.tointeger(tonumber(r.value)) or 0
+			local file = files[r.key]
+			for _, x in ipairs({ { "resist.arcane", immune >= 1 and 100 or 0 }, { "ward.sleep", immune == 2 and 100 or 0 } }) do
+				if tbl == "content_adopt" or not file or (file[x[1]] or 0) ~= x[2] then
+					db:exec("INSERT OR REPLACE INTO " .. tbl .. " (kind, key, field, value) VALUES ('monsters', ?, ?, ?)", r.key,
+						x[1], tostring(x[2]))
+				end
+			end
+		end
+		db:exec("DELETE FROM " .. tbl .. " WHERE kind = 'monsters' AND field = 'immune'")
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1315,6 +1356,9 @@ migrations.STEPS = {
 	{ name = "shop lists name items by key; the towns sell the 3.1 wares (and the Antidote and the Regen Potion)",
 		up = v19_shop_keys },
 	{ name = "monsters, statuses and allies have icons", up = v20_more_icons },
+	{ name = "elements and wards: resistances and status wards in place of monsters' immunity (immune 1: arcane, " ..
+		"2: arcane and sleep; admins' overrides kept), weapons' and attacks' elements, monster classes",
+		up = v21_elements_and_wards },
 }
 
 migrations.VERSION = #migrations.STEPS

@@ -10,7 +10,6 @@ behind, and sometimes their bones with it.]],
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 720, maxgold = 240,
-	immune = 0,
 	maxmp = 147,
 	speech = {
 		start = {

@@ -11,7 +11,6 @@ to say why they stopped.]],
 	level = 23,
 	maxhp = 76, maxdam = 66, armor = 52,
 	maxexp = 165, maxgold = 55,
-	immune = 0,
 	maxmp = 82,
 	speech = {
 		start = { "You know what I am.", chance = 40 },

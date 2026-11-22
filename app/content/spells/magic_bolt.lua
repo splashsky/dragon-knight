@@ -1,12 +1,11 @@
 -- app/content/spells/magic_bolt.lua :: Magic Bolt (new in 2.4), the Mage's first spell,
 -- known from character creation (classes/mage.lua start_spells) and cast by the Wand
--- (items/wand.lua). Hurt's formula with a small power: 3-4 damage, none to monsters immune
--- to hurt spells.
+-- (items/wand.lua). Hurt's formula with a small power: 3-4 arcane damage, none to monsters
+-- immune to arcane (like the hurt spells).
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("arcane") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)   -- like Hurt: rand(max * 5/6, max)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "arcane"))
 end
 
 return {

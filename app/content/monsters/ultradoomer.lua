@@ -10,7 +10,6 @@ it reaches its end the road will be quieter for a while.]],
 	level = 36,
 	maxhp = 155, maxdam = 140, armor = 115,
 	maxexp = 395, maxgold = 132,
-	immune = 0,
 	maxmp = 128,
 	speech = {
 		start = { "Four.", "Three. You are already counted.", chance = 40 },

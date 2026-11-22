@@ -10,7 +10,6 @@ to stop, so close the distance before the first spell is finished.]],
 	level = 35,
 	maxhp = 150, maxdam = 135, armor = 110,
 	maxexp = 380, maxgold = 127,
-	immune = 0,
 	maxmp = 125,
 	speech = {
 		start = { "You are late, {player}. The ink is dry.", "Another reader. Sit.", chance = 40 },

@@ -9,7 +9,7 @@ ask nicely. Most of them are polite until they are not.]],
 	level = 15,
 	maxhp = 48, maxdam = 40, armor = 26,
 	maxexp = 100, maxgold = 33,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 52,
 	speech = {
 		start = { "Pleasant of you to come. Shall we make a deal?", chance = 50 },

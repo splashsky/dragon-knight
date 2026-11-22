@@ -3,8 +3,10 @@
 -- smaller numbers).
 -- learned: mage 73; warrior 94; paladin 80
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("weakened", { turns = s.power, pct = s.data.pct })
+	if s.target:immune_to("shadow") then return s:say("immune", s.name) end
+	if not s.target:afflict("weakened", { turns = s.power, pct = s.data.pct }) then
+		return s:say(s.target:ward("weakened") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -24,9 +26,11 @@ hits for three hundred a turn, nobody is shy about using it.]],
 	messages = {
 		cast = "You have cast the %s spell. The monster is cursed for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
 			cast = "The monster casts %s. You are cursed for %d turns.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = cast,

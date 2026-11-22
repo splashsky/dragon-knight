@@ -11,7 +11,6 @@ He will sell the next gate too.
 	level = 45,
 	maxhp = 230, maxdam = 205, armor = 175,
 	maxexp = 1150, maxgold = 383,
-	immune = 0,
 	maxmp = 167,
 	speech = {
 		start = { "Ah, {player}. I was told you would come.", "Who is paying you to stand there?", chance = 60 },

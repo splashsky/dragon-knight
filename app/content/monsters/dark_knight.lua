@@ -12,7 +12,6 @@ king's.
 	level = 43,
 	maxhp = 220, maxdam = 200, armor = 160,
 	maxexp = 930, maxgold = 310,
-	immune = 0,
 	maxmp = 156,
 	speech = {
 		start = { "The pass is closed to you.", "Name your oath, if you have one.", chance = 60 },

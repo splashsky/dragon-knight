@@ -9,7 +9,6 @@ it. Mages keep a charm of salt by the bed, and the wise ones say it helps.]],
 	level = 33,
 	maxhp = 138, maxdam = 125, armor = 100,
 	maxexp = 300, maxgold = 100,
-	immune = 0,
 	maxmp = 118,
 	speech = {
 		start = { "Sleep, {player}.", "Hsssss...", chance = 40 },

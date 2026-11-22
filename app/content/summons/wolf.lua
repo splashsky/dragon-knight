@@ -2,10 +2,11 @@
 -- spell: s:summon("wolf", { turns = 5 })). act runs once per round after the player's
 -- turn, at a target the fight picks (a.target); monsters may attack it instead of the
 -- player (50/50 with one ally), with its defense and dexterity in place of the player's.
+-- Its bite is of its element (`element`, neutral unless the file says otherwise), which its
+-- handle shows as a.self.attack_element.
 local function act(a)
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
-	a.target:hurt(damage)
-	a:say("bite", a.self.name, damage)
+	a:say("bite", a.self.name, a.target:hurt(damage, a.self.attack_element))
 end
 
 return {

@@ -4,7 +4,9 @@
 -- like a spell (docs/APP.md "Fight engine"): its numbers (turns, data) and message strings
 -- are data, synced and overridable; what it does is its hooks (on_apply, on_tick,
 -- on_expire, on_remove, modify_damage_dealt, modify_damage_taken, blocks_action), which
--- stay in the file. The runtime is app/fight/engine.lua.
+-- stay in the file. The resistances and wards it gives its bearer (resist, ward:
+-- lib/content/affinities.lua) are data too. The runtime is app/fight/engine.lua.
+local affinities = require("lib.content.affinities")
 local scripted = require("lib.content.scripted")
 local schema = require("lib.content.schema")
 
@@ -17,7 +19,7 @@ statuses.FUNCTIONS = {
 	{ "on_apply", false }, { "on_tick", false }, { "on_expire", false }, { "on_remove", false },
 	{ "modify_damage_dealt", false }, { "modify_damage_taken", false },
 }
-statuses.extra_keys = scripted.extra_keys(statuses.FUNCTIONS, { blocks_action = true })
+statuses.extra_keys = scripted.extra_keys(statuses.FUNCTIONS, { blocks_action = true, resist = true, ward = true })
 
 statuses.fields = {
 	{ name = "name", type = "string", required = true, max = 50, admin = true, label = "Name" },
@@ -43,12 +45,13 @@ local BLOCKS = { name = "blocks_action", type = "bool", label = "Blocks the bear
 
 function statuses.field(name)
 	if name == "blocks_action" then return BLOCKS end
-	return by_name[name] or scripted.field(name)
+	return by_name[name] or affinities.field(name) or scripted.field(name)
 end
 
 -- blocks_action is data (true / false, stored) or a function deciding per turn (code).
 function statuses.validate_extra(data, flat, err)
 	scripted.validate(data, flat, err, statuses.FUNCTIONS)
+	affinities.validate(data, flat, err)
 	local b = data.blocks_action
 	if b == nil or type(b) == "function" then
 		flat.blocks_action = 0
@@ -62,9 +65,15 @@ function statuses.validate_extra(data, flat, err)
 	end
 end
 
+-- Its wards must be of status files.
+function statuses.validate_refs(flat, all, err)
+	affinities.check_refs(flat, all, err)
+end
+
 function statuses.write_children(id, flat)
 	dk.db:exec("UPDATE statuses SET blocks_action = ? WHERE id = ?", flat.blocks_action or 0, id)
 	scripted.write("statuses", id, flat)
+	affinities.write("statuses", id, flat)
 end
 
 -- Admin page fields: name, description, turns, the named numbers and the messages.

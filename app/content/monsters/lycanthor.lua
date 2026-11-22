@@ -11,7 +11,6 @@ voice sounds like their own.
 	level = 28,
 	maxhp = 100, maxdam = 90, armor = 70,
 	maxexp = 210, maxgold = 70,
-	immune = 0,
 	maxmp = 98,
 	speech = {
 		start = { "We have been watching your fire, {player}.", chance = 40 },

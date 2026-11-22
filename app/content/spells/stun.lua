@@ -16,14 +16,17 @@ fighting and an excellent one to swing again.]],
 	messages = {
 		asleep = "You have cast the %s spell. The monster is stunned.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {                    -- when a monster casts it
 			asleep = "The monster casts %s on you. You are stunned.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = function(s)
-		if s.target.immune == 2 then return s:say("immune", s.name) end
-		s.target:sleep(s.power)
+		if not s.target:sleep(s.power) then
+			return s:say(s.target:ward("sleep") == 100 and "immune" or "resisted", s.name)
+		end
 		s:say("asleep", s.name)
 	end,
 }

@@ -9,7 +9,6 @@ value them for the lightning they carry, and sylphs value nothing except being l
 	level = 15,
 	maxhp = 49, maxdam = 42, armor = 28,
 	maxexp = 106, maxgold = 35,
-	immune = 0,
 	maxmp = 52,
 	speech = {
 		start = { "Oh, a visitor! Do stay for a gust or two.", chance = 40 },

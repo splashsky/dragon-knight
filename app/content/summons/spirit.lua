@@ -3,8 +3,7 @@
 -- monsters often miss it, and it hits for a fair amount.
 local function act(a)
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
-	a.target:hurt(damage)
-	a:say("touch", a.self.name, damage)
+	a:say("touch", a.self.name, a.target:hurt(damage, a.self.attack_element))
 end
 
 return {

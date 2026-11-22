@@ -9,7 +9,6 @@ dead is in for a nasty surprise.]],
 	level = 14,
 	maxhp = 46, maxdam = 38, armor = 24,
 	maxexp = 90, maxgold = 30,
-	immune = 0,
 	maxmp = 47,
 	speech = {
 		start = { "Your debt is due. All of it. Now.", chance = 50 },

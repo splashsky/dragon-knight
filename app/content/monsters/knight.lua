@@ -11,7 +11,6 @@ road between Gilead and Endworld, where he challenges anyone who passes.
 	level = 30,
 	maxhp = 110, maxdam = 102, armor = 80,
 	maxexp = 240, maxgold = 80,
-	immune = 0,
 	maxmp = 105,
 	speech = {
 		start = { "Halt! Name yourself, traveller.", "State your business on this road.", chance = 50 },

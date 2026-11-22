@@ -9,7 +9,6 @@ near Hambry say a drakefin will take a line if it is hungry, and rarely lets go.
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 12,
 	maxexp = 40, maxgold = 13,
-	immune = 0,
 	maxmp = 30,
 	speech = {
 		start = { "Hsss! Into the water with you!", chance = 30 },

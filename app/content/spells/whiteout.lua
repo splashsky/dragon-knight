@@ -1,16 +1,12 @@
 -- app/content/spells/whiteout.lua :: a frost storm that hits hard and puts the monster to
--- sleep if the blow leaves it at half its Hit Points or less. Learned by no class by
--- default.
+-- sleep if the blow leaves it at half its Hit Points or less (unless its ward stops it).
+-- Frost damage. Learned by no class by default.
 -- learned: mage 100
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("frost") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
-	if s.target.hp * 2 <= s.target.maxhp then
-		s.target:sleep(s.data.chance)
-		s:say("asleep", s.name)
-	end
+	s:say("hit", s.name, s.target:hurt(damage, "frost"))
+	if s.target.hp * 2 <= s.target.maxhp and s.target:sleep(s.data.chance) then s:say("asleep", s.name) end
 end
 
 return {

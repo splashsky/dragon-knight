@@ -10,7 +10,6 @@ quiet and some of them away.]],
 	level = 6,
 	maxhp = 24, maxdam = 20, armor = 8,
 	maxexp = 28, maxgold = 9,
-	immune = 0,
 	maxmp = 22,
 	speech = {
 		start = { "Wh... who are you?", chance = 30 },

@@ -2,8 +2,9 @@
 -- few turns (app/content/statuses/weakened.lua). Learned by no class by default.
 -- learned: mage 10; warrior 48; paladin 12
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("weakened", { turns = s.power, pct = s.data.pct })
+	if not s.target:afflict("weakened", { turns = s.power, pct = s.data.pct }) then
+		return s:say(s.target:ward("weakened") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -23,9 +24,11 @@ stop a monster hitting, only hitting hard.]],
 	messages = {
 		cast = "You have cast the %s spell. The monster is weakened for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
 			cast = "The monster casts %s. You are weakened for %d turns.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = cast,

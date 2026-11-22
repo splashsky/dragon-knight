@@ -10,7 +10,6 @@ when the chanting starts, because the chant is usually followed by a rush.]],
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 410, maxgold = 137,
-	immune = 0,
 	maxmp = 128,
 	speech = {
 		start = { "The Advocate is right! Say it!", "Heretic, {player}!", chance = 60 },

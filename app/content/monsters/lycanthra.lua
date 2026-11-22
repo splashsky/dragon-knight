@@ -11,7 +11,6 @@ in both forms say her eyes stay the same colour either way.
 	level = 30,
 	maxhp = 112, maxdam = 104, armor = 82,
 	maxexp = 240, maxgold = 80,
-	immune = 0,
 	maxmp = 105,
 	speech = {
 		start = { "Good evening, {player}. Do sit down.", chance = 40 },

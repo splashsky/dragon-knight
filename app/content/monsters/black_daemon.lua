@@ -11,7 +11,7 @@ tried to bind it. None came back to say how it went.
 	level = 50,
 	maxhp = 400, maxdam = 400, armor = 280,
 	maxexp = 3000, maxgold = 1000,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 186,
 	speech = {
 		start = { "Mothers tell their children about me.", "Your knights tried this. Watch what happened.", chance = 65 },

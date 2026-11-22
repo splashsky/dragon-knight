@@ -66,7 +66,7 @@ end
 -- slot = item key }, spells / items = { { spell|item = key, weight, stock, when } }.
 local function test_monster(over, lo)
 	local m = { key = "t_monster", name = "Testling", level = 5, maxhp = 1000, maxdam = 10, armor = 5, maxexp = 1,
-		maxgold = 1, immune = 0, maxmp = 50, uses_mp = 1, attack_weight = 1, roams = 0 }
+		maxgold = 1, maxmp = 50, uses_mp = 1, attack_weight = 1, roams = 0 }
 	for k, v in pairs(over or {}) do m[k] = v end
 	lo = lo or {}
 	local out = { equipment = {}, items = {}, spells = {} }
@@ -111,7 +111,8 @@ function T.original_monsters_are_the_seed()
 	eq(#k.entities, 154, "151 originals and 3 examples")
 	local slime = k.by_key.blue_slime
 	eq(slime.name, "Blue Slime"); eq(slime.maxhp, 4); eq(slime.maxdam, 3); eq(slime.armor, 1); eq(slime.level, 1)
-	eq(slime.maxexp, 1); eq(slime.maxgold, 1); eq(slime.immune, 0); eq(slime.maxmp, 5, "at least 5")
+	eq(slime.maxexp, 1); eq(slime.maxgold, 1); eq(slime.maxmp, 5, "at least 5")
+	eq(slime["resist.arcane"], nil); eq(slime.attack_element, "neutral"); eq(slime.class, "")
 	eq(slime.uses_mp, 1); eq(slime.attack_weight, 1); eq(slime.roams, 1)
 	-- the Mage's MP at the monster's level (start + gains, at least 5), for every original;
 	-- the start is the Mage's of 2.2 (0; 5 since 2.4): monsters kept their MP
@@ -133,7 +134,24 @@ function T.original_monsters_are_the_seed()
 		eq(monsters.acts(row), false, row.key .. " acts")
 		eq(#monsters.loadout(row).equipment, 0, row.key .. " equipment")
 	end
-	eq(monsters.get(151).key, "lucifuge"); eq(monsters.get(9).key, "silver_slime"); eq(monsters.get(9).immune, 2)
+	eq(monsters.get(151).key, "lucifuge"); eq(monsters.get(9).key, "silver_slime")
+	-- the original immunity, converted exactly (schema version 21): 1 is arcane 100 (the hurt
+	-- spells), 2 that and a ward of 100 against sleep; nothing else
+	local slime9 = monsters.get(9)
+	eq(slime9.resist.arcane, 100); eq(slime9.ward.sleep, 100)
+	local arcane, sleep = {}, {}
+	for id = 1, 151 do
+		local row = monsters.get(id)
+		for e, n in pairs(row.resist) do
+			eq(e .. "=" .. n, "arcane=100", row.key .. " resist")
+			arcane[#arcane + 1] = row.key
+		end
+		for s, n in pairs(row.ward) do
+			eq(s .. "=" .. n, "sleep=100", row.key .. " ward")
+			sleep[#sleep + 1] = row.key
+		end
+	end
+	eq(#arcane, 26, "immune 1 or 2"); eq(#sleep, 4, "immune 2")
 	eq(k.by_key.titan.maxmp, mage_mp(50))
 end
 
@@ -149,7 +167,8 @@ function T.loadout_validation()
 		spells = { { spell = "hurt", weight = 2 }, { spell = "heal", when = function() return true end } },
 		items = { { item = "potion", weight = 3, stock = 2, when = function() return true end }, { item = "herb" } },
 	})))
-	eq(flat.maxmp, 0); eq(flat.uses_mp, 1); eq(flat.attack_weight, 1); eq(flat.roams, 1); eq(flat.immune, 0)
+	eq(flat.maxmp, 0); eq(flat.uses_mp, 1); eq(flat.attack_weight, 1); eq(flat.roams, 1)
+	eq(flat.attack_element, "neutral"); eq(flat.class, "")
 	eq(flat["equipment.weapon"], "dagger"); eq(flat["equipment.accessory2"], "life_pebble")
 	eq(flat["spells.1.spell"], "hurt"); eq(flat["spells.1.weight"], 2); eq(flat["spells.1.when"], nil)
 	eq(flat["spells.2.weight"], 1, "default weight"); eq(flat["spells.2.when"], 1)
@@ -170,7 +189,19 @@ function T.loadout_validation()
 	has_error(errors({ equipment = { hat = "dagger" } }), "equipment: unknown slot 'hat'")
 	has_error(errors({ equipment = { weapon = 5 } }), "equipment.weapon must be the key of an item")
 	has_error(errors({ attack_weight = -1 }), "field 'attack_weight' must be an integer from 0")
-	has_error(errors({ immune = 3 }), "field 'immune' must be an integer from 0 to 2")
+	has_error(errors({ immune = 1 }), "unknown field 'immune'")
+	-- resistances, wards, the attack's element, a class
+	flat = assert(schema.validate(kind, base_data({ resist = { fire = 50, frost = -50 }, ward = { sleep = 100 },
+		attack_element = "fire", class = "mage" })))
+	eq(flat["resist.fire"], 50); eq(flat["resist.frost"], -50); eq(flat["ward.sleep"], 100)
+	eq(flat.attack_element, "fire"); eq(flat.class, "mage")
+	has_error(errors({ resist = { plasma = 10 } }), "resist.plasma: unknown element")
+	has_error(errors({ resist = { fire = 201 } }), "field 'resist.fire' must be an integer from -100 to 200")
+	has_error(errors({ resist = { fire = -101 } }), "field 'resist.fire' must be an integer from -100 to 200")
+	has_error(errors({ ward = { sleep = 101 } }), "field 'ward.sleep' must be an integer from 0 to 100")
+	has_error(errors({ ward = { [1] = 5 } }), "ward.1: must be the key of a status")
+	has_error(errors({ resist = 50 }), "field 'resist' must be a table like { fire = 50, frost = -50 }")
+	has_error(errors({ attack_element = "plasma" }), "field 'attack_element' must be one of neutral, fire")
 	has_error(errors({ uses_mp = "no" }), "field 'uses_mp' must be true or false")
 	has_error(errors({ maxhp = 0 }), "field 'maxhp' must be an integer from 1")
 	local d = base_data()
@@ -205,6 +236,12 @@ function T.loadout_references_are_checked()
 	eq(#errs, 5, table.concat(errs, " | "))
 	eq(#check_with("zz_test_monster2", [[return { name = "Z", level = 1, maxhp = 1, maxdam = 1, armor = 1, maxexp = 1, maxgold = 1,
 		equipment = { weapon = "dagger" }, spells = { { spell = "hurt" } }, items = { { item = "potion" } } }]]), 0)
+	-- a ward's status and the class must be files
+	errs = check_with("zz_test_monster3", [[return { name = "Z", level = 1, maxhp = 1, maxdam = 1, armor = 1, maxexp = 1,
+		maxgold = 1, ward = { sleep = 50, dizzy = 20 }, class = "bard" }]])
+	has_error(errs, "zz_test_monster3.lua: ward.dizzy: no status 'dizzy'")
+	has_error(errs, "zz_test_monster3.lua: class: no class 'bard'")
+	eq(#errs, 2, table.concat(errs, " | "))
 	eq(#load.all().errors, 0, "the file is gone")
 end
 
@@ -474,6 +511,50 @@ function T.refused_after_all_attacks_instead()
 	if not ok then error(err, 0) end
 end
 
+-- A monster with a class casts the fight spells the class learns up to its level (weight 1,
+-- no condition), besides its own; its own entry for one of them wins.
+function T.class_spells_join_the_loadout()
+	dk.db:exec("SAVEPOINT test_monsters")
+	local ok, err = pcall(function()
+		local hurt = assert(spells.by_key("hurt"))
+		dk.db:exec("INSERT INTO monster_spells (monster_id, position, spell_id, weight, has_when) VALUES (1, 1, ?, 5, 0)", hurt.id)
+		monsters.reload()
+		local row = {}
+		for k, v in pairs(monsters.get(1)) do row[k] = v end
+		row.class, row.level = "mage", 20
+		local mage = assert(require("lib.classes").find("mage"))
+		local expected = {}
+		for _, s in ipairs(require("lib.classes").spells_up_to(mage, 20)) do
+			if spells.usable(s, "fight") and s.key ~= "hurt" then expected[#expected + 1] = s.key end
+		end
+		assert(#expected >= 3, "the Mage knows a few fight spells by level 20")
+		local lo = monsters.loadout(row)
+		eq(lo.spells[1].spell.key, "hurt"); eq(lo.spells[1].weight, 5, "its own entry wins"); eq(lo.spells[1].from_class, nil)
+		local got = {}
+		for i = 2, #lo.spells do
+			local e = lo.spells[i]
+			eq(e.from_class, true); eq(e.weight, 1); eq(e.has_when, false)
+			got[#got + 1] = e.spell.key
+		end
+		eq(table.concat(got, ","), table.concat(expected, ","), "the class's fight spells up to its level, once each")
+		for _, key in ipairs(got) do
+			assert(spells.by_key(key).usable_in ~= "town", key .. ": castable in fights")
+		end
+		-- in a fight: candidates like its own spells (with the MP for them)
+		local f, c = fight(no_rolls, row)
+		c.mp = 1000
+		local names = kinds(monster.candidates(f, c))
+		has(names, "spell:hurt"); has(names, "spell:" .. expected[1])
+		-- without a class: its own spells only
+		row.class = ""
+		eq(#monsters.loadout(row).spells, 1)
+	end)
+	dk.db:exec("ROLLBACK TO test_monsters")
+	dk.db:exec("RELEASE test_monsters")
+	monsters.reload()
+	if not ok then error(err, 0) end
+end
+
 function T.mp_is_saved_with_the_fight()
 	dk.db:exec("SAVEPOINT test_monsters")
 	local ok, err = pcall(function()
@@ -484,7 +565,7 @@ function T.mp_is_saved_with_the_fight()
 		c.mp, c.data.stock_1 = 12, 1
 		state.save(f)
 		eq(dk.db:value("SELECT mp || '|' || maxmp || '|' || data FROM fight_combatants WHERE user_id = ? AND id = 2", user.id),
-			"12|17|immune=i:0\nstock_1=i:1")
+			"12|17|stock_1=i:1")
 		local g = state.load(user, player_row())
 		local e = state.side(g, "enemy", true)[1]
 		eq(e.mp, 12); eq(e.maxmp, 17); eq(e.data.stock_1, 1); eq(e.row.maxdam, 16, "with its dagger")

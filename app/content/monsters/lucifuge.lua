@@ -11,7 +11,7 @@ court say he is courteous, which is worse.
 	level = 50,
 	maxhp = 600, maxdam = 600, armor = 400,
 	maxexp = 10000, maxgold = 10000,
-	immune = 2,  -- 2: immune to hurt and sleep spells
+	resist = { arcane = 100 }, ward = { sleep = 100 },  -- immune to arcane (the hurt spells) and to sleep
 	maxmp = 186,
 	speech = {
 		start = { "You answered. How courteous of you, {player}.", "Do sit down. The pit is cold.", chance = 65 },

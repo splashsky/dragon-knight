@@ -10,7 +10,7 @@ Hunters say the pack leader is always the one that stays silent until it bites.]
 	level = 17,
 	maxhp = 54, maxdam = 47, armor = 36,
 	maxexp = 120, maxgold = 40,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 57,
 	speech = {
 		start = { "Grrrr...", chance = 30 },

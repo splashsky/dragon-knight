@@ -2,12 +2,11 @@
 -- act on its next turn (the status recharging; the fight page offers only "Continue").
 -- Learned by no class by default.
 local function cast(s)
-	if s.target.immune ~= 0 then
+	if s.target:immune_to("arcane") then
 		s:say("immune", s.name)
 	else
 		local damage = s:roll((s.power / 6) * 5, s.power)
-		s.target:hurt(damage)
-		s:say("hit", s.name, damage)
+		s:say("hit", s.name, s.target:hurt(damage, "arcane"))
 	end
 	s:recharge(1)
 end

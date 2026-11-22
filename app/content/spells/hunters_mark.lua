@@ -3,8 +3,9 @@
 -- and allies do not pass the damage hooks, so only the blows of a weapon count). Learned by no class by default.
 -- learned: warrior 40
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("marked", { turns = s.power, pct = s.data.pct })
+	if not s.target:afflict("marked", { turns = s.power, pct = s.data.pct }) then
+		return s:say(s.target:ward("marked") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -24,6 +25,7 @@ which is why warriors cast it just before they swing.]],
 	messages = {
 		cast = "You have cast the %s spell. The monster is marked for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 	},
 	cast = cast,
 }

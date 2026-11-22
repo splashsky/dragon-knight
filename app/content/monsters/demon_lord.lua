@@ -10,7 +10,6 @@ his captains by lamplight. Those who reach him rarely leave the hall unchanged.
 	level = 48,
 	maxhp = 300, maxdam = 270, armor = 220,
 	maxexp = 1820, maxgold = 607,
-	immune = 0,
 	maxmp = 180,
 	speech = {
 		start = { "A petitioner. How rare, and how brief.", "Kneel on the black glass, {player}.", chance = 60 },

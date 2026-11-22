@@ -3,16 +3,14 @@
 -- The damage is a share of the caster's strength (up to power), rolled between five sixths of
 -- that and the full amount. Armor is ignored, as with the other damage spells.
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
 	local top = math.min(s.power, math.floor(s.caster.strength * s.data.pct / 100))
 	local damage = s:roll(math.floor(top * 5 / 6), top)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage))
 end
 
 return {
 	name = "Cleave",
-	description = "Hurts the monster by a share of your strength, whatever its armor. Some monsters are immune.",
+	description = "Hurts the monster by a share of your strength, whatever its armor.",
 	lore = [[
 Taught in the training yards at Midworld with a wooden sword and a bucket of sand, so
 the sergeants could see where the blow landed. The trick is to swing from the hips and
@@ -25,10 +23,8 @@ breath for the next one.]],
 	data = { pct = 100 },       -- percent of your strength it deals before that limit
 	messages = {
 		hit = "You have cast the %s spell for %d damage.",
-		immune = "You have cast the %s spell, but the monster is immune to it.",
 		enemy = {                    -- when a monster casts it
 			hit = "The monster casts %s on you for %d damage.",
-			immune = "The monster casts %s, but you are immune to it.",
 		},
 	},
 	cast = cast,

@@ -4,10 +4,9 @@
 -- progress is saved with names only, so the stage is referenced by name. Learned by no
 -- class by default.
 local function release(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("fire") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "fire"))
 end
 
 return {

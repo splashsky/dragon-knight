@@ -11,7 +11,7 @@ that would finish a lesser demon, so bring steel.
 	level = 44,
 	maxhp = 230, maxdam = 205, armor = 175,
 	maxexp = 1100, maxgold = 367,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 159,
 	speech = {
 		start = { "Stay a while, {player}. The night is long.", "You look like you need company.", chance = 60 },

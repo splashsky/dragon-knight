@@ -10,7 +10,6 @@ though the stone ones are usually the ones that were already dead.]],
 	level = 17,
 	maxhp = 56, maxdam = 48, armor = 36,
 	maxexp = 120, maxgold = 40,
-	immune = 0,
 	maxmp = 57,
 	speech = {
 		start = { "Who walks on Troll road?", "Troll smash little one.", chance = 50 },

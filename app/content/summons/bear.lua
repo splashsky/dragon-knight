@@ -3,8 +3,7 @@
 -- share of the monster's attention.
 local function act(a)
 	local damage = a:roll(a.self.attack // 2, a.self.attack)
-	a.target:hurt(damage)
-	a:say("maul", a.self.name, damage)
+	a:say("maul", a.self.name, a.target:hurt(damage, a.self.attack_element))
 end
 
 return {

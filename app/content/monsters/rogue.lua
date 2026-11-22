@@ -9,7 +9,6 @@ Hambry guard posts a reward for each one brought in, which is usually the price 
 	level = 8,
 	maxhp = 30, maxdam = 25, armor = 12,
 	maxexp = 40, maxgold = 13,
-	immune = 0,
 	maxmp = 30,
 	speech = {
 		start = { "Hand over the purse, {player}.", chance = 30 },

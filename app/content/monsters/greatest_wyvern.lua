@@ -10,7 +10,6 @@ ridge road has already made it halfway through the fight.]],
 	level = 37,
 	maxhp = 162, maxdam = 150, armor = 120,
 	maxexp = 465, maxgold = 155,
-	immune = 0,
 	maxmp = 132,
 	speech = {
 		start = { "Kraaaa. So small.", "I have eaten braver than you.", chance = 40 },

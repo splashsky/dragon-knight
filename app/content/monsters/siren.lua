@@ -11,7 +11,7 @@ was about them.
 	level = 50,
 	maxhp = 68, maxdam = 400, armor = 800,
 	maxexp = 10000, maxgold = 50,
-	immune = 2,  -- 2: immune to hurt and sleep spells
+	resist = { arcane = 100 }, ward = { sleep = 100 },  -- immune to arcane (the hurt spells) and to sleep
 	maxmp = 186,
 	speech = {
 		start = { "Come closer, {player}. The rocks are very sharp.", "Listen. I know what you want to hear.", chance = 65 },

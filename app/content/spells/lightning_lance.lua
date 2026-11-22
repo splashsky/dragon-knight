@@ -3,13 +3,12 @@
 -- blow: a kill leaves the Mage free to act. Learned by no class by default.
 -- learned: mage 62
 local function cast(s)
-	if s.target.immune ~= 0 then
+	if s.target:immune_to("lightning") then
 		s:say("immune", s.name)
 		return s:recharge(1)
 	end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "lightning"))
 	if s.target.hp > 0 then
 		s:say("recharge")
 		s:recharge(1)

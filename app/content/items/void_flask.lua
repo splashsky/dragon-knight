@@ -1,5 +1,5 @@
 -- app/content/items/void_flask.lua :: a thrown flask of void-glass shards: heavy damage
--- to the monster outright. Fights only; immune monsters are not hurt.
+-- to the monster outright (arcane). Fights only; monsters immune to arcane are not hurt.
 return {
 	name = "Void Flask",
 	description = "Throws a flask of black glass that tears the monster for a heavy amount, whatever its armor. Some monsters are immune.",
@@ -20,10 +20,9 @@ up in a shop.]],
 		immune = "You throw the %s, but the monster is immune to it.",
 	},
 	can_use = function(u)
-		if u.target.immune ~= 0 then return u:refuse("immune", u.name) end
+		if u.target:immune_to("arcane") then return u:refuse("immune", u.name) end
 	end,
 	use = function(u)
-		u.target:hurt(u.power)
-		u:say("used", u.name, u.power)
+		u:say("used", u.name, u.target:hurt(u.power, "arcane"))
 	end,
 }

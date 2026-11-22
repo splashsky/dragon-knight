@@ -63,7 +63,7 @@ local function monster_row(n)
 	local r = seeded(n * 31 + 7)
 	local level = r(1, 50)
 	return { id = 5, name = "Shadow", level = level, maxhp = level * 8 + r(1, 20), maxdam = level * 6 + r(1, 10),
-		armor = level * 4, immune = (n - 1) % 3, maxmp = r(0, 200) }
+		armor = level * 4, maxmp = r(0, 200) }
 end
 
 -- A fight model from seed n: the monster's HP full, low or in between, an ally already
@@ -269,21 +269,26 @@ function T.summons_need_room()
 	end
 end
 
+-- A monster immune to every element and warding off every status for certain takes no
+-- damage and no status from any spell.
 function T.immune_monsters_are_not_hurt_or_afflicted()
 	local checked = 0
+	local resist, ward = {}, {}
+	for _, e in ipairs(require("lib.elements").KEYS) do resist[e] = 100 end
+	for _, r in ipairs(dk.db:query("SELECT key FROM statuses")) do ward[r.key] = 100 end
 	for _, entity in ipairs(all_spells()) do
 		if entity.target ~= "self" then
 			for n = 1, SEEDS do
 				local f = model(n, false)
 				local c = enemy_of(f)
-				c.data.immune = 2
+				c.row.resist, c.row.ward = resist, ward
 				local player = engine.handle(f, state.player(f))
 				local r = action.perform({ kind = "spell", entity = entity, caster = player, target = engine.handle(f, c),
 					in_fight = true, rand = f.rand, summon_room = 1 })
 				if r.ok then
 					for _, e in ipairs(r.events) do
 						if e.id == c.id then
-							assert(e.type ~= "hurt" and e.type ~= "sleep" and e.type ~= "afflict",
+							assert((e.type ~= "hurt" or e.amount == 0) and e.type ~= "sleep" and e.type ~= "afflict",
 								entity.key .. ": affected an immune monster (" .. e.type .. ")")
 						end
 					end

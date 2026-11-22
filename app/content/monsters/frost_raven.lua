@@ -9,7 +9,6 @@ Hunters wear fur hats when they go out, and say the frost raven is the one bird 
 	level = 7,
 	maxhp = 26, maxdam = 20, armor = 8,
 	maxexp = 30, maxgold = 10,
-	immune = 0,
 	maxmp = 26,
 	speech = {
 		start = { "Kraa! Cold wind comes!", chance = 25 },

@@ -1,8 +1,12 @@
 -- monsters.lua :: monsters as the game uses them (rows of the monsters table, synced from
--- app/content/monsters/*.lua; see lib/content/), their loadouts (equipment, items and
--- spells from the monster_* tables; an entry's `when` condition from the file) and their
--- effective numbers with their equipment (lib/stats.lua stats.monster). Cached per
+-- app/content/monsters/*.lua; see lib/content/; `resist` and `ward` decoded into tables,
+-- lib/content/affinities.lua), their loadouts (equipment, items and spells from the
+-- monster_* tables, an entry's `when` condition from the file, and its class's spells) and
+-- their effective numbers with their equipment (lib/stats.lua stats.monster). Cached per
 -- request. What a monster does with its loadout in a fight is app/fight/monster.lua.
+local affinities = require("lib.content.affinities")
+local classes = require("lib.classes")
+local elements = require("lib.elements")
 local items = require("lib.items")
 local kind = require("lib.content.kinds.monsters")
 local load = require("lib.content.load")
@@ -13,10 +17,11 @@ local monsters = {}
 
 monsters.SLOTS = kind.SLOTS
 
-local by_id, by_key, loadouts = {}, {}, nil
+local by_id, by_key, loadouts, classed = {}, {}, nil, {}
 
 local function remember(row)
 	if row then
+		affinities.decode_row(row)
 		by_id[row.id] = row
 		by_key[row.key] = row
 	end
@@ -36,28 +41,29 @@ function monsters.by_key(key)
 end
 
 -- Monsters that aren't retired (help) / every monster (admin), by id.
+local function remember_all(rows)
+	for _, r in ipairs(rows) do remember(r) end
+	return rows
+end
+
 function monsters.active()
-	local out = dk.db:query("SELECT * FROM monsters WHERE retired = 0 ORDER BY id")
-	for _, r in ipairs(out) do remember(r) end
-	return out
+	return remember_all(dk.db:query("SELECT * FROM monsters WHERE retired = 0 ORDER BY id"))
 end
 
 function monsters.all()
-	local out = dk.db:query("SELECT * FROM monsters ORDER BY id")
-	for _, r in ipairs(out) do remember(r) end
-	return out
+	return remember_all(dk.db:query("SELECT * FROM monsters ORDER BY id"))
 end
 
 -- The monsters met in random encounters of levels minlevel..maxlevel, by id (the original
 -- pick's rows: roaming, not retired).
 function monsters.roaming(minlevel, maxlevel)
-	return dk.db:query("SELECT * FROM monsters WHERE level >= ? AND level <= ? AND roams <> 0 AND retired = 0 " ..
-		"ORDER BY id", minlevel, maxlevel)
+	return remember_all(dk.db:query("SELECT * FROM monsters WHERE level >= ? AND level <= ? AND roams <> 0 " ..
+		"AND retired = 0 ORDER BY id", minlevel, maxlevel))
 end
 
 -- Forget the cache (after a sync in the same request).
 function monsters.reload()
-	by_id, by_key, loadouts = {}, {}, nil
+	by_id, by_key, loadouts, classed = {}, {}, nil, {}
 end
 
 local SLOT_ORDER = {}
@@ -98,16 +104,40 @@ local function load_all()
 	return all
 end
 
+-- A loadout with the spells of monster m's class: those the class learns up to m's level
+-- that are castable in fights and that m's own spells don't list (weight 1, no condition),
+-- after its own.
+local function with_class(m, lo)
+	local c = classes.find(m.class)
+	if not c then return lo end
+	local out = { equipment = lo.equipment, items = lo.items, spells = {} }
+	local own = {}
+	for _, e in ipairs(lo.spells) do
+		out.spells[#out.spells + 1] = e
+		own[e.spell.id] = true
+	end
+	for _, s in ipairs(classes.spells_up_to(c, m.level)) do
+		if not own[s.id] and spells.usable(s, "fight") then
+			out.spells[#out.spells + 1] = { spell = s, weight = 1, has_when = false, from_class = true }
+		end
+	end
+	return out
+end
+
 -- The loadout of monster row `m`: { equipment = { { slot, item }, ... } (in slot order),
 -- items = { { position, item, weight, stock (nil: no limit), has_when }, ... },
--- spells = { { position, spell, weight, has_when }, ... } } (item and spell rows; entries
--- whose row is gone are left out). A row may carry its own `loadout` table instead (tests;
--- entries may then hold their `when` function).
+-- spells = { { position, spell, weight, has_when }, ... , then its class's: { spell,
+-- weight = 1, from_class = true } } } (item and spell rows; entries whose row is gone are
+-- left out). A row may carry its own `loadout` table instead (tests; entries may then hold
+-- their `when` function).
 function monsters.loadout(m)
 	if m.loadout then return m.loadout end
 	if m.id == nil then return empty() end
 	loadouts = loadouts or load_all()
-	return loadouts[m.id] or empty()
+	local lo = loadouts[m.id] or empty()
+	if (m.class or "") == "" then return lo end
+	classed[m.id] = classed[m.id] or with_class(m, lo)
+	return classed[m.id]
 end
 
 -- Whether monster row `m` has spells or items to choose from.
@@ -130,8 +160,9 @@ function monsters.condition(m, list, e)
 end
 
 -- A copy of monster row `m` with its effective numbers (maxhp, maxmp, maxdam, armor,
--- strength, dexterity: the base values plus its equipment, stats.monster) and the base
--- values in `base`. A copy already made is returned as it is.
+-- strength, dexterity: the base values plus its equipment, stats.monster; resist and ward:
+-- its own plus its equipment's) and the base values in `base`. A copy already made is
+-- returned as it is.
 function monsters.effective(m)
 	if m.base then return m end
 	local gear = {}
@@ -140,6 +171,8 @@ function monsters.effective(m)
 	for k, v in pairs(m) do out[k] = v end
 	out.base = { maxhp = m.maxhp, maxmp = m.maxmp or 0, maxdam = m.maxdam, armor = m.armor }
 	for k, v in pairs(stats.monster(m, stats.item_mods(gear))) do out[k] = v end
+	local worn = stats.affinities(gear)
+	out.resist, out.ward = elements.sum(m.resist, worn.resist), elements.sum(m.ward, worn.ward)
 	return out
 end
 

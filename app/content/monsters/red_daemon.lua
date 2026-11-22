@@ -11,7 +11,6 @@ drink and a wet cloak.
 	level = 48,
 	maxhp = 310, maxdam = 280, armor = 230,
 	maxexp = 1880, maxgold = 627,
-	immune = 0,
 	maxmp = 180,
 	speech = {
 		start = { "Stand still and burn, little thing.", "You smell of wet wool.", chance = 60 },

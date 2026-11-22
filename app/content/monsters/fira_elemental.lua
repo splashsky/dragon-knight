@@ -10,7 +10,7 @@ long stick.]],
 	level = 34,
 	maxhp = 140, maxdam = 125, armor = 100,
 	maxexp = 310, maxgold = 103,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 122,
 	speech = {
 		start = { "Fssh.", chance = 15 },

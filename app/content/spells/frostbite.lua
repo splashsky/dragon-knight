@@ -1,16 +1,12 @@
 -- app/content/spells/frostbite.lua :: a frost bolt that sometimes numbs the monster into a
 -- sleep. One hit in three the cold takes hold and the monster sleeps (the sleep status,
--- as Sleep does). Learned by no class by default.
+-- as Sleep does, unless its ward stops it). Frost damage. Learned by no class by default.
 -- learned: mage 16
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("frost") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
-	if s:roll(1, 3) == 1 then
-		s.target:sleep(s.data.chance)
-		s:say("asleep", s.name)
-	end
+	s:say("hit", s.name, s.target:hurt(damage, "frost"))
+	if s:roll(1, 3) == 1 and s.target:sleep(s.data.chance) then s:say("asleep", s.name) end
 end
 
 return {

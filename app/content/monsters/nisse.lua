@@ -11,7 +11,6 @@ a long way on a still night.]],
 	level = 19,
 	maxhp = 60, maxdam = 52, armor = 40,
 	maxexp = 132, maxgold = 44,
-	immune = 0,
 	maxmp = 64,
 	speech = {
 		start = { "Hee hee! Mind the hay, {player}!", chance = 45 },

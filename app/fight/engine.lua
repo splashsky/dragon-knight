@@ -112,7 +112,8 @@ end
 local function status_view(c)
 	local out = {}
 	for _, s in ipairs(c.statuses) do
-		out[#out + 1] = { key = s.key, name = s.row.name, kind = s.row.kind, turns_left = s.turns_left, data = s.data }
+		out[#out + 1] = { key = s.key, name = s.row.name, kind = s.row.kind, turns_left = s.turns_left, data = s.data,
+			resist = s.row.resist, ward = s.row.ward }
 	end
 	return out
 end
@@ -126,16 +127,18 @@ function engine.handle(f, c)
 		t.name, t.level = st.charname, st.level
 		t.hp, t.maxhp, t.mp, t.maxmp, t.tp, t.maxtp = st.currenthp, st.maxhp, st.currentmp, st.maxmp, st.currenttp, st.maxtp
 		t.attack, t.defense, t.strength, t.dexterity = st.attackpower, st.defensepower, st.strength, st.dexterity
+		t.attack_element, t.resist, t.ward = st.attack_element, st.resist, st.ward
 	elseif c.kind == "monster" then
 		-- c.row has the effective numbers (its equipment counted: lib/monsters.lua)
 		local m = c.row
 		t.name, t.level, t.hp, t.maxhp, t.mp, t.maxmp = m.name, m.level, c.hp, c.maxhp, c.mp, c.maxmp
-		t.attack, t.defense, t.immune = m.maxdam, m.armor, c.data.immune or 0
-		t.strength, t.dexterity = m.strength, m.dexterity
+		t.attack, t.defense, t.strength, t.dexterity = m.maxdam, m.armor, m.strength, m.dexterity
+		t.attack_element, t.resist, t.ward = m.attack_element, m.resist, m.ward
 	else
 		local r = c.row
 		t.name, t.hp, t.maxhp = r.name, c.hp, c.maxhp
 		t.attack, t.defense, t.dexterity = r.attack, r.defense, r.dexterity
+		t.attack_element, t.resist, t.ward = r.element, r.resist, r.ward
 	end
 	return action.combatant(t)
 end
@@ -391,13 +394,14 @@ function engine.blocked_line(f, c, inst)
 	end
 end
 
--- The damage of an attack after the attacker's modify_damage_dealt and the target's
--- modify_damage_taken hooks (each returns the new damage, a whole number >= 0).
-function engine.modify_damage(f, attacker, target, damage)
+-- The damage of an attack of `element` after the attacker's modify_damage_dealt and the
+-- target's modify_damage_taken hooks (each gets the damage and the element and returns the
+-- new damage, a whole number >= 0).
+function engine.modify_damage(f, attacker, target, damage, element)
 	local function run(c, fname)
 		for _, inst in ipairs(copy(c.statuses)) do
 			if present(c, inst) then
-				local ok, v = engine.status_hook(f, c, inst, fname, true, damage)
+				local ok, v = engine.status_hook(f, c, inst, fname, true, damage, element)
 				if ok and v ~= nil then
 					if math.type(v) == "integer" and v >= 0 then
 						damage = v
@@ -413,6 +417,13 @@ function engine.modify_damage(f, attacker, target, damage)
 	run(attacker, "modify_damage_dealt")
 	run(target, "modify_damage_taken")
 	return damage
+end
+
+-- What an attack of `element` meets in target `h` (a handle), for combat.lua to type its
+-- damage with (lib/elements.lua): { element, resist (h's), field_pct (the battlefield's
+-- percent for the element: 0, there are no fields yet) }.
+function engine.typed(f, h, element)
+	return { element = element, resist = h:resist(element), field_pct = 0 }
 end
 
 ---------------------------------------------------------------------------------------
@@ -504,8 +515,15 @@ local function add_stat(f, c, stat, n)
 	end
 end
 
--- Damage dealt by an attack (combat.lua): HP may go below 0, the round decides who died.
-function engine.damage(f, c, n)
+-- Damage dealt by an attack (combat.lua): HP may go below 0, the round decides who died;
+-- or, when c absorbs the attack's element, `healed` HP restored (never above its maximum).
+function engine.damage(f, c, n, healed)
+	if (healed or 0) > 0 then
+		local hp, max = stat_of(f, c, "hp")
+		local gained = math.min(healed, math.max(0, max - hp))
+		if gained > 0 then add_stat(f, c, "hp", gained) end
+		return
+	end
 	add_stat(f, c, "hp", -n)
 end
 

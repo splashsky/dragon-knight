@@ -9,7 +9,6 @@ carries a long way on a still night, which is how the watch usually knows it is 
 	level = 10,
 	maxhp = 38, maxdam = 30, armor = 18,
 	maxexp = 58, maxgold = 19,
-	immune = 0,
 	maxmp = 36,
 	speech = {
 		start = { "*rattles*", chance = 15 },

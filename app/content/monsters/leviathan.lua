@@ -11,7 +11,6 @@ kept still.
 	level = 46,
 	maxhp = 255, maxdam = 225, armor = 190,
 	maxexp = 1350, maxgold = 450,
-	immune = 0,
 	maxmp = 172,
 	speech = {
 		start = { "The water carried your oar to me.", "Still your boat, {player}. Stillness is kind.", chance = 60 },

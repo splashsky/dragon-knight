@@ -11,7 +11,7 @@ furriers pay well for the hides.]],
 	level = 24,
 	maxhp = 80, maxdam = 70, armor = 56,
 	maxexp = 175, maxgold = 58,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 87,
 	speech = {
 		start = { "*low growl*", chance = 25 },

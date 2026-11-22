@@ -11,7 +11,6 @@ but nobody has been close enough to check.
 	level = 43,
 	maxhp = 215, maxdam = 195, armor = 160,
 	maxexp = 890, maxgold = 297,
-	immune = 0,
 	maxmp = 156,
 	speech = {
 		start = { "The gate was never meant to open for you.", "Bow, little one. Or fall.", chance = 60 },

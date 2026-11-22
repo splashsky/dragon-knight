@@ -10,7 +10,6 @@ a warning. Nobody has yet found a way to make one purr.]],
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 128, maxgold = 43,
-	immune = 0,
 	maxmp = 59,
 	speech = {
 		start = { "*hisses*", chance = 40 },

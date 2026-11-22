@@ -72,7 +72,7 @@ local function new_run(kind, entity, st, monster, rand, in_fight)
 	return { lines = f.out, killed = st.currentmonsterhp <= 0 }
 end
 
-local MONSTER = { id = 5, name = "Shadow", maxhp = 300, maxdam = 9, armor = 3, level = 2, immune = 0 }
+local MONSTER = { id = 5, name = "Shadow", maxhp = 300, maxdam = 9, armor = 3, level = 2 }
 
 -- A fight state from seed n: HP/MP/TP below, at and above their maxima, monster HP and
 -- immunity, buffs.
@@ -398,7 +398,7 @@ function T.monster_casters()
 		s:say("Slept.")
 	end
 	local caster = engine.handle(fm.model(fight_state(), MONSTER), enemy_of(fm.model(fight_state(), MONSTER)))
-	local wolf_f = fm.model(fight_state(), { id = 9, name = "Wolf", maxhp = 50, maxdam = 1, armor = 1, level = 1, immune = 0 })
+	local wolf_f = fm.model(fight_state(), { id = 9, name = "Wolf", maxhp = 50, maxdam = 1, armor = 1, level = 1 })
 	local target = engine.handle(wolf_f, enemy_of(wolf_f))
 	r = action.perform({ kind = "spell", entity = row(), module = module, caster = caster, target = target,
 		in_fight = true, rand = recorder(2).rand })

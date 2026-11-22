@@ -71,7 +71,8 @@ function sync.reset_override(kind_name, key, field)
 	dk.db:exec("DELETE FROM content_overrides WHERE kind = ? AND key = ? AND field = ?", kind_name, key, field)
 end
 
--- Turns pending adoptions of an entity into overrides where they differ from the file.
+-- Turns pending adoptions of an entity into overrides where they differ from the file (a
+-- nested field the file doesn't have: from its spec's default).
 local function adopt(kind, key, flat)
 	local rows = dk.db:query("SELECT field, value FROM content_adopt WHERE kind = ? AND key = ?", kind.name, key)
 	if #rows == 0 then return 0 end
@@ -79,7 +80,9 @@ local function adopt(kind, key, flat)
 	local n = 0
 	for _, r in ipairs(rows) do
 		local spec = kind.field(r.field)
-		if spec and existing[r.field] == nil and schema.text(flat[r.field]) ~= r.value and schema.parse(spec, r.value) ~= nil then
+		local file = flat[r.field]
+		if file == nil and spec then file = spec.default end
+		if spec and existing[r.field] == nil and schema.text(file) ~= r.value and schema.parse(spec, r.value) ~= nil then
 			sync.set_override(kind.name, key, r.field, r.value)
 			n = n + 1
 		end

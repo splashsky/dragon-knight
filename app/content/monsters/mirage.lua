@@ -9,7 +9,7 @@ they last saw one, then take a different road.]],
 	level = 11,
 	maxhp = 40, maxdam = 32, armor = 20,
 	maxexp = 64, maxgold = 21,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 38,
 	speech = {
 		start = { "Water? Are you sure you want water?", chance = 40 },

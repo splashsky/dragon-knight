@@ -11,7 +11,6 @@ keep a whole book on them, most of it grim.]],
 	level = 22,
 	maxhp = 72, maxdam = 62, armor = 48,
 	maxexp = 160, maxgold = 53,
-	immune = 0,
 	maxmp = 79,
 	speech = {
 		start = { "Stay the night... stay forever.", chance = 40 },

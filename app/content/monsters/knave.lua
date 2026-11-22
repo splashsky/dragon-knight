@@ -9,7 +9,6 @@ knows his face but seldom his name, since he changes it every few weeks.]],
 	level = 9,
 	maxhp = 36, maxdam = 30, armor = 15,
 	maxexp = 52, maxgold = 17,
-	immune = 0,
 	maxmp = 33,
 	speech = {
 		start = { "Your purse or your life, friend. Purse first, please.", chance = 50 },

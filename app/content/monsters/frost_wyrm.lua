@@ -11,7 +11,6 @@ spring say the snow around its lair never fully melts.
 	level = 30,
 	maxhp = 110, maxdam = 100, armor = 80,
 	maxexp = 230, maxgold = 77,
-	immune = 0,
 	maxmp = 105,
 	speech = {
 		start = { "The cold has brought you to me, {player}.", chance = 40 },

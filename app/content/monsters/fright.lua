@@ -10,7 +10,6 @@ the dark. Its touch is cold enough to stop a heart, and it seems to take its tim
 	level = 25,
 	maxhp = 86, maxdam = 76, armor = 58,
 	maxexp = 180, maxgold = 60,
-	immune = 0,
 	maxmp = 91,
 	speech = {
 		start = { "You should not have come down here.", chance = 40 },

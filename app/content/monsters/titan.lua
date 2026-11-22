@@ -11,7 +11,6 @@ they stand on his foot.
 	level = 50,
 	maxhp = 360, maxdam = 340, armor = 270,
 	maxexp = 2400, maxgold = 800,
-	immune = 0,
 	maxmp = 186,
 	speech = {
 		start = { "*the mountain stirs*", "Something small is on my foot.", chance = 60 },

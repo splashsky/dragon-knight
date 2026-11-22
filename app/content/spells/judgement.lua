@@ -4,11 +4,11 @@
 -- Learned by no class by default.
 -- learned: paladin 64
 local function release(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("holy") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
-	local healed = s.caster:heal("hp", math.floor(damage / 4))
+	local dealt = s.target:hurt(damage, "holy")
+	s:say("hit", s.name, dealt)
+	local healed = s.caster:heal("hp", math.floor(dealt / 4))
 	if healed > 0 then s:say("heal", healed) end
 end
 

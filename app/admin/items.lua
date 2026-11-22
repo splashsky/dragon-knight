@@ -45,7 +45,8 @@ local function detail(req, it, opts)
 	-- the effective values, as flat fields
 	local current = scripted.flatten(it, {})
 	for i, m in ipairs(it.modifiers) do
-		current["modifiers." .. i .. ".stat"] = m.stat
+		local param = stats.MODIFIERS[m.kind].param
+		current["modifiers." .. i .. "." .. param] = m[param]
 		current["modifiers." .. i .. ".amount"] = m.amount
 	end
 	for _, f in ipairs(kind.fields) do current[f.name] = it[f.name] end

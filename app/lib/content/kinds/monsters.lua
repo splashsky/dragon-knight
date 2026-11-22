@@ -3,9 +3,11 @@
 -- lib/content/schema.lua for the kind interface and docs/APP.md "Monsters" for the file
 -- format.
 --
--- The stats (name, level, HP, damage, armor, rewards, immunity, MP, uses_mp,
--- attack_weight, roams) are data, synced and overridable by admins. The loadout is data
--- too (item and spell keys, weights, stock) but read-only in the admin panel; an entry's
+-- The stats (name, level, HP, damage, armor, rewards, MP, uses_mp, attack_weight, roams),
+-- the element of its attack and its resistances and wards (resist.<element>,
+-- ward.<status>: lib/content/affinities.lua) are data, synced and overridable by admins.
+-- The loadout is data too (item and spell keys, weights, stock, a class whose spells it
+-- casts) but read-only in the admin panel; an entry's
 -- `when` condition is a function: it stays in the file (fight/monster.lua runs it) and
 -- the flat form only notes that there is one ("items.1.when" = 1). Flat fields:
 -- "equipment.weapon" = "broadsword", "items.1.item" = "potion", "items.1.weight",
@@ -13,11 +15,13 @@
 -- `speech` (what it says in a fight: fight/speech.lua) stays in the file too, read when the
 -- fight runs; it is checked here, and the statuses it answers or its conditions name are
 -- noted in the flat form ("speech.statuses" = "poison,sleep": they must exist).
+local affinities = require("lib.content.affinities")
+local elements = require("lib.elements")
 local schema = require("lib.content.schema")
 
 local monsters = {
 	name = "monsters", table = "monsters", dir = "content.monsters", label = "monster",
-	extra_keys = { equipment = true, items = true, spells = true, speech = true },
+	extra_keys = { equipment = true, items = true, spells = true, speech = true, resist = true, ward = true },
 }
 
 -- Equipment slots (a character's) -> the item category that fits.
@@ -45,8 +49,6 @@ monsters.fields = {
 		help = "Compares to the player's attack power (its armor's defense adds to it)." },
 	{ name = "maxexp", type = "int", required = true, min = 0, max = STAT, admin = true, label = "Max Experience" },
 	{ name = "maxgold", type = "int", required = true, min = 0, max = STAT, admin = true, label = "Max Gold" },
-	{ name = "immune", type = "int", default = 0, min = 0, max = 2, admin = true, label = "Immunity",
-		help = "0: none, 1: hurt spells, 2: hurt and sleep spells." },
 	{ name = "maxmp", type = "int", default = 0, min = 0, max = STAT, admin = true, label = "Max Magic Points",
 		help = "Its MP at the start of every encounter (spells cost it MP, see Uses MP)." },
 	{ name = "uses_mp", type = "bool", default = true, admin = true, label = "Uses MP",
@@ -55,6 +57,10 @@ monsters.fields = {
 		help = "How likely its basic attack is next to its spells and items (by weight; 0: only when nothing else is possible)." },
 	{ name = "roams", type = "bool", default = true, admin = true, label = "Roams",
 		help = "Met in random encounters of its level; off: only where content puts it." },
+	{ name = "attack_element", type = "choice", values = elements.KEYS, default = "neutral", admin = true,
+		label = "Attack element", help = "The element of its attack (its resistances are below)." },
+	{ name = "class", type = "key", refs = "classes", default = "", label = "Class",
+		help = "It casts the fight spells this class learns up to its level (besides its own spells)." },
 }
 
 local by_name = {}
@@ -82,6 +88,8 @@ function monsters.field(name)
 	name = tostring(name)
 	if by_name[name] then return by_name[name] end
 	if name == "speech.statuses" then return key_spec(name, "statuses", "Speech: statuses") end
+	local affinity = affinities.field(name, true)
+	if affinity then return affinity end
 	local slot = name:match("^equipment%.([%w_]+)$")
 	if slot and monsters.SLOT_CATEGORY[slot] then return key_spec(name, "items", "Equipment " .. slot) end
 	local list, i, param = name:match("^(%a+)%.(%d+)%.(%a+)$")
@@ -275,6 +283,7 @@ end
 
 function monsters.validate_extra(data, flat, err)
 	validate_speech(data.speech, flat, err)
+	affinities.validate(data, flat, err)
 	local eq = data.equipment
 	if eq ~= nil then
 		if type(eq) ~= "table" then
@@ -297,8 +306,9 @@ end
 
 -- The loadout's references against the other kinds' files (load.all, after the keys were
 -- found to exist): equipment of the slot's category, consumables usable in fights, spells
--- usable in fights.
+-- usable in fights; wards of status files.
 function monsters.validate_refs(flat, all, err)
+	affinities.check_refs(flat, all, err)
 	local items = all.kinds.items and all.kinds.items.by_key or {}
 	local spells = all.kinds.spells and all.kinds.spells.by_key or {}
 	for _, f in ipairs(sorted_keys(flat)) do
@@ -337,6 +347,7 @@ function monsters.write_children(id, flat)
 	local item_ids, spell_ids = {}, {}
 	for _, r in ipairs(db:query("SELECT id, key FROM items")) do item_ids[r.key] = r.id end
 	for _, r in ipairs(db:query("SELECT id, key FROM spells")) do spell_ids[r.key] = r.id end
+	affinities.write("monsters", id, flat)
 	db:exec("DELETE FROM monster_equipment WHERE monster_id = ?", id)
 	db:exec("DELETE FROM monster_items WHERE monster_id = ?", id)
 	db:exec("DELETE FROM monster_spells WHERE monster_id = ?", id)
@@ -364,12 +375,21 @@ function monsters.write_children(id, flat)
 	end
 end
 
--- Admin page fields: the stats (the loadout is read-only there).
-function monsters.admin_fields()
+-- Admin page fields: the stats, its resistance to every element and its wards against
+-- the harmful statuses and those its file names (the loadout is read-only there).
+function monsters.admin_fields(flat)
 	local out = {}
 	for _, f in ipairs(monsters.fields) do
 		if f.admin then out[#out + 1] = f end
 	end
+	for _, e in ipairs(elements.KEYS) do out[#out + 1] = affinities.field("resist." .. e, true) end
+	local wards = {}
+	for f in pairs(flat) do
+		local key = f:match("^ward%.([a-z0-9_]+)$")
+		if key then wards[key] = true end
+	end
+	for _, r in ipairs(dk.db:query("SELECT key FROM statuses WHERE kind = 'harmful' AND retired = 0")) do wards[r.key] = true end
+	for _, key in ipairs(sorted_keys(wards)) do out[#out + 1] = affinities.field("ward." .. key, true) end
 	return out
 end
 

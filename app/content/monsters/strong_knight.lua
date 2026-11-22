@@ -10,7 +10,6 @@ sword, since he breaks the swords.]],
 	level = 35,
 	maxhp = 150, maxdam = 135, armor = 110,
 	maxexp = 365, maxgold = 122,
-	immune = 0,
 	maxmp = 125,
 	speech = {
 		start = { "Name yourself, {player}, and stand where I can see you.", chance = 40 },

@@ -1,8 +1,7 @@
 -- app/content/statuses/poison.lua :: loses HP at the end of each of its turns: rand(min,
--- max) (t.data: the file's numbers, or what the spell applied it with).
+-- max) of poison damage (t.data: the file's numbers, or what the spell applied it with).
 local function tick(t)
-	local damage = t:roll(t.data.min, t.data.max)
-	t.bearer:hurt(damage)
+	local damage = t.bearer:hurt(t:roll(t.data.min, t.data.max), "poison")
 	if t.bearer.is_player then
 		t:say("hurt_you", damage)
 	else

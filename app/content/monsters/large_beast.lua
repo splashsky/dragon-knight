@@ -11,7 +11,6 @@ hunters cut a notch in their bows for each one they have seen and not met.
 	level = 27,
 	maxhp = 96, maxdam = 88, armor = 66,
 	maxexp = 200, maxgold = 67,
-	immune = 0,
 	maxmp = 96,
 	speech = {
 		start = { "*roars*", chance = 30 },

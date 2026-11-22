@@ -10,7 +10,6 @@ way out, though rarely a cheap one.]],
 	level = 37,
 	maxhp = 164, maxdam = 150, armor = 120,
 	maxexp = 485, maxgold = 162,
-	immune = 0,
 	maxmp = 132,
 	speech = {
 		start = { "A bargain, {player}? I have a good one.", "Your debt is noted.", chance = 50 },

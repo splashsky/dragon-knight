@@ -11,7 +11,6 @@ known to tear a loaded wagon apart for the sake of the sacks inside it.
 	level = 29,
 	maxhp = 108, maxdam = 98, armor = 78,
 	maxexp = 230, maxgold = 77,
-	immune = 0,
 	maxmp = 101,
 	speech = {
 		start = { "BRUTE CRUSH!", chance = 40 },

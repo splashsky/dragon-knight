@@ -11,7 +11,6 @@ hills better than the soldiers who chase them.
 	level = 46,
 	maxhp = 250, maxdam = 220, armor = 190,
 	maxexp = 1300, maxgold = 433,
-	immune = 0,
 	maxmp = 172,
 	speech = {
 		start = { "Put down the crown's coin and walk on.", "We do not need your sort up here.", chance = 60 },

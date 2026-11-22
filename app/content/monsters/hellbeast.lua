@@ -10,7 +10,6 @@ them loose on the roads to make a point. Do not count on one being frightened of
 	level = 22,
 	maxhp = 74, maxdam = 64, armor = 50,
 	maxexp = 165, maxgold = 55,
-	immune = 0,
 	maxmp = 79,
 	speech = {
 		start = { "*roars*", "You smell of fear.", chance = 40 },

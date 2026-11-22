@@ -10,7 +10,7 @@ very helpful.]],
 	level = 2,
 	maxhp = 10, maxdam = 9, armor = 3,
 	maxexp = 6, maxgold = 2,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 5,
 	speech = {
 		start = { "*whispers*", "Come closer...", chance = 25 },

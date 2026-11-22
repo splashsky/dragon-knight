@@ -15,8 +15,12 @@
 -- (game.stats(user)).
 --
 -- Gear's passive modifiers are data: a list of { kind = "stat", stat = "strength",
--- amount = 50 } in the item files (checked by stats.validate_modifiers), stored as text
--- ("stat stat=strength amount=50; stat stat=maxhp amount=-50") and summed while equipped.
+-- amount = 50 }, { kind = "resist", element = "fire", amount = 25 } (percent, lib/elements.lua)
+-- and { kind = "ward", status = "sleep", amount = 25 } (percent) in the item files (checked by
+-- stats.validate_modifiers), stored as text ("stat stat=strength amount=50; resist
+-- element=fire amount=25") and summed while equipped.
+local elements = require("lib.elements")
+
 local stats = {}
 
 stats.STATS = {
@@ -55,6 +59,19 @@ end
 local function max0(n)
 	if n < 0 then return 0 end
 	return n
+end
+
+-- The resistances and wards `items` give: { resist = { fire = 25 }, ward = { sleep = 25 } }
+-- (summed, not clamped: lib/action.lua clamps the total).
+function stats.affinities(items)
+	local out = { resist = {}, ward = {} }
+	for _, it in ipairs(items) do
+		for _, m in ipairs(it.modifiers or {}) do
+			if m.kind == "resist" then out.resist[m.element] = (out.resist[m.element] or 0) + m.amount
+			elseif m.kind == "ward" then out.ward[m.status] = (out.ward[m.status] or 0) + m.amount end
+		end
+	end
+	return out
 end
 
 -- Effective stats from a users row's base columns and the summed item modifiers.
@@ -104,7 +121,8 @@ end
 
 -- A copy of the users row with the effective stats under the names the fight code and
 -- the spell and item actions use (the original game's users columns): maxhp, maxmp, maxtp,
--- strength, dexterity, attackpower, defensepower, expbonus, goldbonus.
+-- strength, dexterity, attackpower, defensepower, expbonus, goldbonus; and, from the gear,
+-- resist and ward (tables) and attack_element (the weapon's element).
 function stats.player(user, s)
 	local p = {}
 	for k, v in pairs(user) do p[k] = v end
@@ -112,6 +130,7 @@ function stats.player(user, s)
 	p.strength, p.dexterity = s.strength, s.dexterity
 	p.attackpower, p.defensepower = s.attack, s.defense
 	p.expbonus, p.goldbonus = s.exp_bonus_pct, s.gold_bonus_pct
+	p.resist, p.ward, p.attack_element = s.resist, s.ward, s.attack_element
 	return p
 end
 
@@ -143,6 +162,28 @@ end
 ---------------------------------------------------------------------------------------
 -- Modifiers (gear's stat bonuses while equipped).
 
+-- What each kind of modifier names, and the range of its amount.
+stats.MODIFIERS = {
+	stat = { param = "stat", amount = stats.AMOUNT, example = '{ kind = "stat", stat = "strength", amount = 5 }' },
+	resist = { param = "element", amount = elements.RESIST,
+		example = '{ kind = "resist", element = "fire", amount = 25 }' },
+	ward = { param = "status", amount = elements.WARD, example = '{ kind = "ward", status = "sleep", amount = 25 }' },
+}
+
+-- Whether `v` is a valid value of a modifier's param (a stat, an element, a status key: the
+-- status must exist, which lib/content/load.lua checks).
+local function valid_param(kind, v)
+	if kind == "stat" then return STAT_SET[v] == true end
+	if kind == "resist" then return elements.valid(v) end
+	return type(v) == "string" and v:find("^[a-z0-9_]+$") ~= nil and #v <= 64
+end
+
+local PARAM_HINT = {
+	stat = function() return "one of " .. table.concat(stats.STATS, ", ") end,
+	resist = function() return "one of " .. table.concat(elements.KEYS, ", ") end,
+	ward = function() return "the key of a status (like sleep)" end,
+}
+
 -- Checks a list of modifiers from an item file. Returns a normalized copy, or nil and a
 -- list of messages ("[2].amount must be ...": the caller prefixes the field name).
 function stats.validate_modifiers(list)
@@ -158,35 +199,39 @@ function stats.validate_modifiers(list)
 	end
 	for i, m in ipairs(list) do
 		local at = "[" .. i .. "]"
+		local spec = type(m) == "table" and stats.MODIFIERS[m.kind]
 		if type(m) ~= "table" then
-			err(at .. " must be a table like { kind = \"stat\", stat = \"strength\", amount = 5 }")
-		elseif m.kind ~= "stat" then
-			err(at .. ".kind must be one of stat (got " .. tostring(m.kind) .. ")")
+			err(at .. " must be a table like " .. stats.MODIFIERS.stat.example)
+		elseif not spec then
+			err(at .. ".kind must be one of stat, resist, ward (got " .. tostring(m.kind) .. ")")
 		else
-			if not STAT_SET[m.stat] then err(at .. ".stat must be one of " .. table.concat(stats.STATS, ", ")) end
+			local param = spec.param
+			if not valid_param(m.kind, m[param]) then err(at .. "." .. param .. " must be " .. PARAM_HINT[m.kind]()) end
 			local n = math.type(m.amount) == "float" and math.tointeger(m.amount) or m.amount
-			if math.type(n) ~= "integer" or n < stats.AMOUNT.min or n > stats.AMOUNT.max then
+			if math.type(n) ~= "integer" or n < spec.amount.min or n > spec.amount.max then
 				err(at .. (m.amount == nil and ": missing amount" or
-					(".amount must be an integer from %d to %d"):format(stats.AMOUNT.min, stats.AMOUNT.max)))
+					(".amount must be an integer from %d to %d"):format(spec.amount.min, spec.amount.max)))
 			end
 			local extra = {}
 			for k in pairs(m) do
-				if k ~= "kind" and k ~= "stat" and k ~= "amount" then extra[#extra + 1] = tostring(k) end
+				if k ~= "kind" and k ~= param and k ~= "amount" then extra[#extra + 1] = tostring(k) end
 			end
 			table.sort(extra)
-			for _, k in ipairs(extra) do err(at .. ": unknown parameter '" .. k .. "' for stat") end
-			out[i] = { kind = "stat", stat = m.stat, amount = n }
+			for _, k in ipairs(extra) do err(at .. ": unknown parameter '" .. k .. "' for " .. m.kind) end
+			out[i] = { kind = m.kind, [param] = m[param], amount = n }
 		end
 	end
 	if #errors > 0 then return nil, errors end
 	return out
 end
 
--- Stored text of a list of modifiers: "stat stat=strength amount=50; stat stat=maxhp amount=-50".
+-- Stored text of a list of modifiers: "stat stat=strength amount=50; resist element=fire
+-- amount=25; ward status=sleep amount=25".
 function stats.encode_modifiers(list)
 	local parts = {}
 	for _, m in ipairs(list) do
-		parts[#parts + 1] = "stat stat=" .. tostring(m.stat) .. " amount=" .. tostring(m.amount)
+		local param = stats.MODIFIERS[m.kind].param
+		parts[#parts + 1] = m.kind .. " " .. param .. "=" .. tostring(m[param]) .. " amount=" .. tostring(m.amount)
 	end
 	return table.concat(parts, "; ")
 end

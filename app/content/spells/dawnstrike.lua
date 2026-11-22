@@ -2,13 +2,12 @@
 -- the caster is wounded (below half HP): the faith of a man with his back to the wall.
 -- learned: paladin 16
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("holy") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)
 	if s.caster.hp * 2 < s.caster.maxhp then
 		damage = damage + s:roll(0, math.floor(s.power / 3))
 	end
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "holy"))
 end
 
 return {

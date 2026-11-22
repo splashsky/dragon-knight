@@ -11,7 +11,6 @@ Water helps, but a Blaze is rarely near enough to a well when it arrives.
 	level = 31,
 	maxhp = 118, maxdam = 108, armor = 84,
 	maxexp = 250, maxgold = 83,
-	immune = 0,
 	maxmp = 110,
 	speech = {
 		start = { "*roars like a chimney*", chance = 30 },

@@ -87,6 +87,24 @@ function classes.start_spells(c)
 	return out
 end
 
+-- The spells class `c` knows at level `level`: its starting spells and those its levels
+-- teach up to `level` (spells rows that aren't retired, in the order learned).
+function classes.spells_up_to(c, level)
+	local out, seen = {}, {}
+	local function add(s)
+		if s and s.retired == 0 and not seen[s.id] then
+			seen[s.id] = true
+			out[#out + 1] = s
+		end
+	end
+	for _, s in ipairs(classes.start_spells(c)) do add(s) end
+	for _, r in ipairs(dk.db:query("SELECT spell_id FROM class_spells WHERE class_id = ? AND level <= ? ORDER BY level, spell_id",
+		c.id, level)) do
+		add(spells.get(r.spell_id))
+	end
+	return out
+end
+
 -- Teaches a new character (user `user_id`, class `c`) its class's starting spells, as
 -- learned at level 1 (registration, dk install).
 function classes.teach_start_spells(user_id, c)

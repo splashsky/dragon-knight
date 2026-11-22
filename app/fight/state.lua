@@ -13,9 +13,9 @@
 -- last round's lines, encounter.log_of), result = {} (a victory's rewards) }
 -- c = { id, side ("player" | "ally" | "enemy"), kind ("player" | "monster" | "summon"),
 -- entity_id, wave, hp, maxhp (nil for the player: st has them), mp, maxmp (monsters),
--- turns_left (summons), data = {} (a monster's immune and the stock of its items,
--- stock_<position>), row (the summons row; a monster's with its equipment counted:
--- lib/monsters.lua monsters.effective), statuses = { inst, ... } (in the order applied) }
+-- turns_left (summons), data = {} (the stock of a monster's items, stock_<position>), row
+-- (the summons row; a monster's with its equipment counted: lib/monsters.lua
+-- monsters.effective), statuses = { inst, ... } (in the order applied) }
 -- inst = { status_id, key, row (statuses row), turns_left (nil: no limit), data (the params
 -- it was applied with), applied_round, source (a combatant id), position }
 -- Persisted values are names and plain data only (lib/action.lua action.params), never
@@ -157,7 +157,7 @@ end
 -- stock of its items are full).
 function state.add_monster(f, monster, wave)
 	local row = monsters.effective(monster)
-	local data = { immune = monster.immune }
+	local data = {}
 	for _, e in ipairs(monsters.loadout(row).items) do
 		if e.stock then data[state.stock_key(e.position)] = e.stock end
 	end

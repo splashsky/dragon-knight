@@ -11,7 +11,7 @@ clear, and steel does better against it than any spell that might be cast at it.
 	level = 31,
 	maxhp = 120, maxdam = 110, armor = 90,
 	maxexp = 260, maxgold = 87,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 110,
 	speech = {
 		start = { "*splashes*", chance = 15 },

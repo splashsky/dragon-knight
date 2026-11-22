@@ -11,7 +11,6 @@ the life from a body faster than a blade does.
 	level = 26,
 	maxhp = 90, maxdam = 82, armor = 64,
 	maxexp = 190, maxgold = 63,
-	immune = 0,
 	maxmp = 94,
 	speech = {
 		start = { "Warm... you are warm...", chance = 40 },

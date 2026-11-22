@@ -13,7 +13,10 @@
 -- returns no events at all, so nothing changes and nothing (MP, the item, the turn) is
 -- spent. Messages are worded for the player; a file may give `messages.enemy` variants for
 -- a monster acting, and without one a generic line ("The Dragon casts Hurt.") plus the
--- numbers is shown.
+-- numbers is shown. Damage has an element and meets the target's resistance, and a status
+-- its ward (lib/elements.lua): a hit against a weakness or a resistance adds a line after
+-- the next one said ("It resists fire.").
+local elements = require("lib.elements")
 local load = require("lib.content.load")
 local sandbox = require("lib.content.sandbox")
 
@@ -37,14 +40,14 @@ action.STATUS_KINDS = { harmful = true, helpful = true, neutral = true }
 action.MAX_TEXT = 200
 
 -- What a handle shows (read-only; asleep, sleep_chance and the uber values are derived from
--- its statuses).
+-- its statuses; its resistances and wards are read with :resist and :ward).
 local FIELDS = {
 	"id", "side", "name", "is_player", "level", "hp", "maxhp", "mp", "maxmp", "tp", "maxtp", "attack", "defense",
-	"strength", "dexterity", "immune",
+	"strength", "dexterity", "attack_element",
 }
-local NUMBER_DEFAULTS = {
+local DEFAULTS = {
 	level = 0, hp = 0, maxhp = 0, mp = 0, maxmp = 0, tp = 0, maxtp = 0, attack = 0, defense = 0, strength = 0,
-	dexterity = 0, immune = 0,
+	dexterity = 0, attack_element = "neutral",
 }
 
 local COMBATANT_MT = {
@@ -73,7 +76,8 @@ local function find_status(v, key)
 	return nil
 end
 
--- The fields that follow from the statuses (as the original game's columns did).
+-- The fields that follow from the statuses (as the original game's columns did), and the
+-- resistances and wards they add to the combatant's own.
 local function derive(v)
 	local sleep = find_status(v, "sleep")
 	v.asleep = sleep ~= nil
@@ -82,24 +86,32 @@ local function derive(v)
 		local s = find_status(v, key)
 		v[key] = s and (math.tointeger(s.data.pct) or 0) or 0
 	end
+	v.resist_sum, v.ward_sum = elements.sum(v.own_resist), elements.sum(v.own_ward)
+	for _, s in ipairs(v.statuses) do
+		v.resist_sum = elements.sum(v.resist_sum, s.resist)
+		v.ward_sum = elements.sum(v.ward_sum, s.ward)
+	end
 end
 
 -- A combatant handle. `t`: { id (the combatant's number in the fight), side ("player",
 -- "ally", "enemy"), name, is_player, level, hp, maxhp, mp, maxmp, tp, maxtp, attack,
--- defense, strength, dexterity, immune (0, 1: hurt spells, 2: hurt and sleep), statuses =
--- { { key, name, kind, turns_left, data }, ... } (in the order applied) }.
+-- defense, strength, dexterity, attack_element (default "neutral"), resist, ward (its own
+-- resistances and wards: { fire = 50 }, { sleep = 100 }; its file's and its gear's),
+-- statuses = { { key, name, kind, turns_left, data, resist, ward }, ... } (in the order
+-- applied) }.
 function action.combatant(t)
 	local v = {}
 	for _, f in ipairs(FIELDS) do
 		local x = t[f]
-		if x == nil then x = NUMBER_DEFAULTS[f] end
+		if x == nil then x = DEFAULTS[f] end
 		v[f] = x
 	end
 	v.is_player = v.is_player == true
+	v.own_resist, v.own_ward = copy(t.resist), copy(t.ward)
 	v.statuses = {}
 	for _, s in ipairs(t.statuses or {}) do
 		v.statuses[#v.statuses + 1] = { key = s.key, name = s.name, kind = s.kind, turns_left = s.turns_left,
-			data = copy(s.data) }
+			data = copy(s.data), resist = s.resist, ward = s.ward }
 	end
 	derive(v)
 	local h = setmetatable({}, COMBATANT_MT)
@@ -165,10 +177,14 @@ function action.params(p, what)
 end
 
 -- A status file's name, kind and default duration (for a handle's view of its statuses).
-local function status_info(key)
-	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then error("a status key expected (got " .. tostring(key) .. ")", 4) end
+-- level: the error's (default 4: content code calling a method calling this one's caller).
+local function status_info(key, level)
+	level = level or 4
+	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then
+		error("a status key expected (got " .. tostring(key) .. ")", level)
+	end
 	local m, err = load.module("statuses", key)
-	if not m then error("no status '" .. key .. "' (" .. tostring(err) .. ")", 4) end
+	if not m then error("no status '" .. key .. "' (" .. tostring(err) .. ")", level) end
 	return m
 end
 
@@ -181,7 +197,7 @@ local function set_status(h, ctx, key, params, e)
 	local data = copy(params)
 	data.turns = nil
 	local s = { key = key, name = m.name, kind = m.kind or "neutral", turns_left = turns ~= 0 and turns or nil,
-		data = data }
+		data = data, resist = m.resist, ward = m.ward }
 	local _, i = find_status(v, key)
 	if i then table.remove(v.statuses, i) end
 	v.statuses[#v.statuses + 1] = s
@@ -216,13 +232,51 @@ function Combatant:heal(stat, n)
 	return gained
 end
 
--- Takes n HP (HP may go below 0: the caller decides who died). Returns n.
-function Combatant:hurt(n)
+local function element_key(element)
+	if element == nil then return "neutral" end
+	if not elements.valid(element) then
+		error("unknown element " .. tostring(element) .. " (elements: " .. table.concat(elements.KEYS, ", ") .. ")", 3)
+	end
+	return element
+end
+
+-- Its resistance to `element` (default "neutral"): a percent, -100..200 (below 0 a weakness,
+-- 100 immunity, above 100 it absorbs), summed from its own, its gear's and its statuses'.
+function Combatant:resist(element)
+	return elements.clamp_resist(INNER[self].v.resist_sum[element_key(element)] or 0)
+end
+
+function Combatant:immune_to(element)
+	return self:resist(element) >= 100
+end
+
+-- Its ward against status `key`: the percent chance (0..100) that the status doesn't take
+-- hold, summed like its resistances.
+function Combatant:ward(key)
+	if type(key) ~= "string" then error("ward takes a status key (got " .. type(key) .. ")", 2) end
+	return elements.clamp_ward(INNER[self].v.ward_sum[key] or 0)
+end
+
+-- Takes n damage of `element` (default "neutral") through the damage formula
+-- (lib/elements.lua: the battlefield's percent for it, then its resistance). Returns what it
+-- really took (HP may go below 0: the caller decides who died). A combatant that absorbs the
+-- element heals instead (never above its maximum), and it returns 0.
+function Combatant:hurt(n, element)
 	n = whole(n, "the damage")
+	element = element_key(element)
 	local v, ctx = changing(self)
-	v.hp = v.hp - n
-	record(ctx, self, { type = "hurt", amount = n })
-	return n
+	local resist = self:resist(element)
+	local dealt, healed = elements.damage(n, ctx.field_pct and ctx.field_pct(element) or 0, resist)
+	local note = elements.note(element, resist, v.is_player)
+	if healed > 0 then
+		local gained = math.max(0, math.min(healed, v.maxhp - v.hp))
+		v.hp = v.hp + gained
+		record(ctx, self, { type = "heal", stat = "hp", amount = gained, note = note })
+		return 0
+	end
+	v.hp = v.hp - dealt
+	record(ctx, self, { type = "hurt", amount = dealt, note = note })
+	return dealt
 end
 
 -- Uses up n of hp, mp or tp (a cost). Returns n.
@@ -251,8 +305,18 @@ function Combatant:buff(kind, pct)
 	end
 end
 
+-- Whether status `key` takes hold of h, against its ward: 0 always and 100 never, both
+-- without a roll; 1-99 rolls rand(1, 100) with the action's dice (resisted at or below it).
+local function takes_hold(h, ctx, key)
+	local ward = h:ward(key)
+	if ward == 0 then return true end
+	if ward == 100 then return false end
+	return ctx.rand(1, 100) > ward
+end
+
 -- Puts it to sleep (the status sleep): it stays asleep while rand(1, 15) <= chance,
--- checked at the start of each of its turns (0 wakes it).
+-- checked at the start of each of its turns (0 wakes it). Returns whether it fell asleep
+-- (false: its ward against sleep stopped it; waking always works).
 function Combatant:sleep(chance)
 	chance = whole(chance, "the chance to stay asleep")
 	local _, ctx = changing(self)
@@ -260,19 +324,24 @@ function Combatant:sleep(chance)
 	if chance == 0 then
 		drop_status(self, "sleep")
 		record(ctx, self, e)
-	else
-		set_status(self, ctx, "sleep", { chance = chance }, e)
+		return true
 	end
+	if not takes_hold(self, ctx, "sleep") then return false end
+	set_status(self, ctx, "sleep", { chance = chance }, e)
+	return true
 end
 
 -- Applies the status `key` (app/content/statuses/<key>.lua) with `params` (names and
 -- values: turns = how long, 0 or absent: the file's turns, and anything its code reads as
 -- t.data). Applying it again replaces the one it has (the new duration and params win,
--- even when shorter).
+-- even when shorter). Returns whether it took hold (false: its ward stopped it).
 function Combatant:afflict(key, params)
 	local p = action.params(params, "the status params")
 	local _, ctx = changing(self)
+	status_info(key, 3)
+	if not takes_hold(self, ctx, key) then return false end
 	set_status(self, ctx, key, p, { type = "afflict", status = key, params = p })
+	return true
 end
 
 -- Removes a status by key, or every status of a kind ("harmful", "helpful", "neutral").
@@ -357,7 +426,8 @@ end
 -- caster, target (combatant handles; target may be nil), in_fight, rand (php.rand-like),
 -- data (overrides of the data: a status's params), fields (more read-only fields: bearer,
 -- source, self, turns_left, round), summon_room (allies that may still join), plain (its
--- lines are never worded for a monster: statuses and summons) }.
+-- lines are never worded for a monster: statuses and summons), field_pct (a
+-- function(element) giving the battlefield's damage percent for it; absent: 0) }.
 function action.new(o)
 	local entity, module = o.entity, o.module or {}
 	local data = {}
@@ -374,7 +444,7 @@ function action.new(o)
 	for k, v in pairs(o.fields or {}) do s[k] = v end
 	setmetatable(s, ACTION_MT)
 	INNER[s] = { rand = o.rand, events = {}, running = false, checking = false, module = module,
-		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room }
+		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room, field_pct = o.field_pct }
 	INNER[o.caster].ctx = s
 	if o.target then INNER[o.target].ctx = s end
 	for _, h in pairs(o.fields or {}) do
@@ -515,10 +585,16 @@ local function describe(e)
 	return nil
 end
 
--- The message lines of a finished action.
+-- The message lines of a finished action. A hit's note (a weakness, a resistance) follows
+-- the next line said (the content's damage line), or its generic description.
 local function lines_of(s)
 	local i = INNER[s]
 	local lines, pending, intro = {}, {}, false
+	local function notes()
+		for _, p in ipairs(pending) do
+			if p.note then lines[#lines + 1] = p.note end
+		end
+	end
 	for _, e in ipairs(i.events) do
 		if e.type == "say" then
 			if e.generic then
@@ -526,15 +602,20 @@ local function lines_of(s)
 					lines[#lines + 1] = action.KINDS[s.kind].generic:format(tostring(s.caster.name), tostring(s.name))
 					intro = true
 				end
-				for _, p in ipairs(pending) do lines[#lines + 1] = describe(p) end
+				for _, p in ipairs(pending) do
+					lines[#lines + 1] = describe(p)
+					if p.note then lines[#lines + 1] = p.note end
+				end
 			else
 				lines[#lines + 1] = e.text
+				notes()
 			end
 			pending = {}
-		elseif e.who and describe(e) then
+		elseif e.who and (describe(e) or e.note) then
 			pending[#pending + 1] = e
 		end
 	end
+	notes()
 	return lines
 end
 

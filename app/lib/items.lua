@@ -3,6 +3,7 @@
 -- are described. Rows come back with `modifiers` decoded into a list (lib/stats.lua) and
 -- `messages` and `data` into tables (lib/content/scripted.lua); what a consumable does is
 -- its file's use (lib/action.lua).
+local elements = require("lib.elements")
 local kind = require("lib.content.kinds.items")
 local php = require("lib.php")
 local schema = require("lib.content.schema")
@@ -226,23 +227,39 @@ function items.stat_line(stat, amount)
 	return (items.STAT_LABELS[stat] or stat) .. " " .. items.signed(stat, amount)
 end
 
--- What equipping it does: attack and defense, then the modifiers, as stat lines.
-function items.attributes(item)
+-- A weapon's element and the resistances and wards it gives: "Deals Fire damage", "Fire
+-- Resistance +25%", "Sleep Ward +25%".
+function items.affinity_lines(item)
 	local out = {}
-	if item.attack ~= 0 then out[#out + 1] = items.stat_line("attack", item.attack) end
-	if item.defense ~= 0 then out[#out + 1] = items.stat_line("defense", item.defense) end
-	for _, m in ipairs(item.modifiers) do
-		if m.kind == "stat" then out[#out + 1] = items.stat_line(m.stat, m.amount) end
+	if (item.element or "neutral") ~= "neutral" then out[#out + 1] = "Deals " .. elements.name(item.element) .. " damage" end
+	for _, m in ipairs(type(item.modifiers) == "table" and item.modifiers or {}) do
+		if m.kind == "resist" then
+			out[#out + 1] = elements.name(m.element) .. " Resistance " .. items.signed("resist", m.amount) .. "%"
+		elseif m.kind == "ward" then
+			out[#out + 1] = elements.ward_name(m.status) .. " Ward " .. items.signed("ward", m.amount) .. "%"
+		end
 	end
 	return out
 end
 
--- The modifiers alone ("Strength +50"), for the shop's and help pages' Special column.
+-- What equipping it does: attack and defense, then the modifiers, as stat lines, then its
+-- element, resistances and wards.
+function items.attributes(item)
+	local out = {}
+	if item.attack ~= 0 then out[#out + 1] = items.stat_line("attack", item.attack) end
+	if item.defense ~= 0 then out[#out + 1] = items.stat_line("defense", item.defense) end
+	for _, l in ipairs(items.special_lines(item)) do out[#out + 1] = l end
+	return out
+end
+
+-- The modifiers alone ("Strength +50", "Fire Resistance +25%") and a weapon's element, for
+-- the shop's and help pages' Special column.
 function items.special_lines(item)
 	local out = {}
 	for _, m in ipairs(item.modifiers) do
 		if m.kind == "stat" then out[#out + 1] = items.stat_line(m.stat, m.amount) end
 	end
+	for _, l in ipairs(items.affinity_lines(item)) do out[#out + 1] = l end
 	return out
 end
 

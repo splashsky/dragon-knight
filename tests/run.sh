@@ -249,7 +249,7 @@ expect_stats() {  # expect_stats "maxhp maxmp maxtp strength dexterity attack de
 T_KNOWN="(SELECT group_concat(spell_id) FROM (SELECT spell_id FROM user_spells WHERE user_id = users.id ORDER BY spell_id))"
 
 # Fights (app/fight/state.lua). t_fight USER MONSTER_ID HP [ROUND]: USER is fighting the
-# monster (with HP; immunity from the monster) since round ROUND (default 2), no statuses.
+# monster (with HP) since round ROUND (default 2), no statuses.
 # t_fight_new USER: an encounter begins where USER stands, as on a map move (the monster
 # picked, its first strike played when quicker: POST /__test/encounter, with the current
 # jar, which must be USER's; $BODY is then the fight page). t_fight_clear USER: no fight
@@ -273,8 +273,8 @@ t_fight() {
 	t_sql "UPDATE users SET currentaction = 'Fighting' WHERE username = '$1';
 		INSERT INTO fights (user_id, round) SELECT id, ${4:-2} FROM users WHERE username = '$1';
 		INSERT INTO fight_combatants (user_id, id, side, kind) SELECT id, 1, 'player', 'player' FROM users WHERE username = '$1';
-		INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, data)
-			SELECT u.id, 2, 'enemy', 'monster', m.id, 1, $3, m.maxhp, 'immune=i:' || m.immune FROM users u, monsters m
+		INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp)
+			SELECT u.id, 2, 'enemy', 'monster', m.id, 1, $3, m.maxhp FROM users u, monsters m
 			WHERE u.username = '$1' AND m.id = $2"
 }
 # t_round 'fields' [curl args]: POST /fight like a form, following its redirect back to the

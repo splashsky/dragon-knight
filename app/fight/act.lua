@@ -47,12 +47,14 @@ function act.run(f, a)
 	local p = state.player(f)
 	local target = engine.target(f, p)
 	if a.kind == "attack" then
-		local lines, damage = combat.attack(engine.handle(f, p), engine.handle(f, target), f.rand, function(d)
-			return engine.modify_damage(f, p, target, d)
-		end)
+		local me, them = engine.handle(f, p), engine.handle(f, target)
+		local element = me.attack_element
+		local lines, damage, healed = combat.attack(me, them, f.rand, function(d)
+			return engine.modify_damage(f, p, target, d, element)
+		end, engine.typed(f, them, element))
 		local prev = engine.doing(f, p, "attack")
 		emit(f, lines)
-		engine.damage(f, target, damage)
+		engine.damage(f, target, damage, healed)
 		engine.done(f, prev)
 		return {}
 	end
@@ -91,15 +93,18 @@ function act.can_use(f, item)
 	return r.ok == true
 end
 
--- A monster's attack (the original formula) on `target` (the player or an ally).
+-- A monster's attack (the original formula, of its attack_element) on `target` (the player
+-- or an ally).
 function act.enemy_attack(f, c, target)
 	if not target then return end
-	local lines, damage = combat.monster_attack(c.row.maxdam, engine.handle(f, target), f.rand, function(d)
-		return engine.modify_damage(f, c, target, d)
-	end)
+	local element = engine.handle(f, c).attack_element
+	local them = engine.handle(f, target)
+	local lines, damage, healed = combat.monster_attack(c.row.maxdam, them, f.rand, function(d)
+		return engine.modify_damage(f, c, target, d, element)
+	end, engine.typed(f, them, element))
 	local prev = engine.doing(f, c, "attack")
 	emit(f, lines)
-	engine.damage(f, target, damage)
+	engine.damage(f, target, damage, healed)
 	engine.done(f, prev)
 end
 

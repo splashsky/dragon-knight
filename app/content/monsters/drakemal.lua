@@ -9,7 +9,6 @@ back. Its fire is smoky and short, but close enough to singe a cloak, so keep yo
 	level = 6,
 	maxhp = 22, maxdam = 18, armor = 7,
 	maxexp = 24, maxgold = 8,
-	immune = 0,
 	maxmp = 22,
 	speech = {
 		start = { "Turn back, little {player}. This cave is mine.", chance = 30 },

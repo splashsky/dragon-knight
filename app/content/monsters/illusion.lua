@@ -10,7 +10,7 @@ sounds.]],
 	level = 5,
 	maxhp = 20, maxdam = 15, armor = 6,
 	maxexp = 20, maxgold = 7,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 17,
 	speech = {
 		start = { "...Come closer. The road is this way.", chance = 25 },

@@ -9,7 +9,6 @@ every step. Adventurers who have fought one say the second blow is always harder
 	level = 16,
 	maxhp = 52, maxdam = 46, armor = 32,
 	maxexp = 116, maxgold = 39,
-	immune = 0,
 	maxmp = 55,
 	speech = {
 		start = { "*rattles, iron on bone*", chance = 25 },

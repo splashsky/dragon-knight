@@ -9,7 +9,6 @@ say it is slow to anger, but it hits hard once roused, so give it room to run.]]
 	level = 2,
 	maxhp = 10, maxdam = 8, armor = 2,
 	maxexp = 4, maxgold = 2,
-	immune = 0,
 	maxmp = 5,
 	speech = {
 		start = { "Grrr...", chance = 25 },

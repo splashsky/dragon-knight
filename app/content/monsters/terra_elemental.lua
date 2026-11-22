@@ -11,7 +11,7 @@ bring a blade or a strong arm.
 	level = 25,
 	maxhp = 88, maxdam = 80, armor = 62,
 	maxexp = 185, maxgold = 62,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 91,
 	speech = {
 		start = { "*grinds*", chance = 15 },

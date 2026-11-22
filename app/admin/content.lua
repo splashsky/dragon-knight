@@ -18,6 +18,14 @@ function content.file_values(kind, key)
 	return load.kind(kind.name).by_key[key]
 end
 
+-- A field's value in flat values: a nested field the entity doesn't have (a monster's
+-- resist.fire) has its spec's default.
+local function value_of(flat, spec)
+	local v = flat[spec.name]
+	if v == nil then v = spec.default end
+	return v
+end
+
 -- The form of entity `key`. `current`: its effective flat values (from the database);
 -- `values`: what the admin typed, to show again after an error. Returns { fields = {
 -- spec, file, override, value, preview (icon fields: the effective icon's URL) }, others = { field, value, file } (overrides of fields the
@@ -30,9 +38,9 @@ function content.form(kind, key, current, values)
 		shown[spec.name] = true
 		fields[#fields + 1] = {
 			spec = spec,
-			file = file and schema.text(file[spec.name]),
+			file = file and schema.text(value_of(file, spec)),
 			override = overrides[spec.name],
-			value = values and values[spec.name] or schema.text(current[spec.name]),
+			value = values and values[spec.name] or schema.text(value_of(current, spec)),
 			-- an icon field shows the effective icon (default.png when none or missing)
 			preview = spec.type == "icon" and schema.icon_url(spec, current[spec.name]) or nil,
 		}
@@ -73,7 +81,7 @@ function content.save(req, kind, key)
 	end
 	if #errors > 0 then return { errors = errors, values = values } end
 	for _, f in ipairs(specs) do
-		if parsed[f.name] == file[f.name] then
+		if parsed[f.name] == value_of(file, f) then
 			sync.reset_override(kind.name, key, f.name)
 		else
 			sync.set_override(kind.name, key, f.name, schema.text(parsed[f.name]))

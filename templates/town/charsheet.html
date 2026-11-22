@@ -1,5 +1,6 @@
 {#- Character sheet boxes (legacy templates/showchar.php, onlinechar.php). full = own sheet
-		(bonuses, next level, spells). -#}
+		(bonuses, next level, spells); affinities: the resistances and wards from gear and
+		statuses (lines). -#}
 <section class="box">
 <h2 class="title">{{{ art("character", "Character") }}}</h2>
 <div class="box-body">
@@ -28,6 +29,9 @@ Strength: {{ s.strength }}<br>
 Dexterity: {{ s.dexterity }}<br>
 Attack Power: {{ s.attack }}<br>
 Defense Power: {{ s.defense }}<br>
+{%- if #affinities > 0 then %}
+<br><span class="charsheet-affinities">{% for i, l in ipairs(affinities) do %}{% if i > 1 then %}<br>{% end %}{{ l }}{% end %}</span><br>
+{%- end %}
 </div>
 </section>
 

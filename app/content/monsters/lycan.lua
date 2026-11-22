@@ -11,7 +11,6 @@ the smiths who sell it are not always honest about its purity.
 	level = 25,
 	maxhp = 88, maxdam = 78, armor = 60,
 	maxexp = 185, maxgold = 62,
-	immune = 0,
 	maxmp = 91,
 	speech = {
 		start = { "Full moon, {player}. Bad luck for you.", chance = 50 },

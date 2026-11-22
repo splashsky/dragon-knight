@@ -9,7 +9,6 @@ of the wagon. The reason caravans now travel with guards is mostly them.]],
 	level = 16,
 	maxhp = 52, maxdam = 45, armor = 30,
 	maxexp = 114, maxgold = 38,
-	immune = 0,
 	maxmp = 55,
 	speech = {
 		start = { "Stand and deliver! Hand it over!", chance = 50 },

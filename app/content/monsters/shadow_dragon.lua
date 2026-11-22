@@ -10,7 +10,6 @@ who fight it see it clearly. Most remember only the cold wind that came before t
 	level = 44,
 	maxhp = 225, maxdam = 200, armor = 170,
 	maxexp = 1010, maxgold = 337,
-	immune = 0,
 	maxmp = 159,
 	speech = {
 		start = { "Your lamp shows me nothing but you.", "The dark is mine, little knight.", chance = 60 },

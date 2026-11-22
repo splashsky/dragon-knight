@@ -10,7 +10,6 @@ is hard to put out. Endworld scouts carry wet sacks as a matter of habit.]],
 	level = 24,
 	maxhp = 80, maxdam = 72, armor = 56,
 	maxexp = 175, maxgold = 58,
-	immune = 0,
 	maxmp = 87,
 	speech = {
 		start = { "Crackle...", chance = 30 },

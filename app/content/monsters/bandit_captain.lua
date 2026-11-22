@@ -13,7 +13,6 @@ he is hurt. Roadside notices offer gold for his head, and most of them are old.]
 	level = 12,
 	maxhp = 120, maxdam = 20, armor = 12,
 	maxexp = 60, maxgold = 120,
-	immune = 0,
 	maxmp = 40,                         -- the Mage's MP at level 12
 	roams = false,
 	attack_weight = 4,

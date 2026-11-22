@@ -10,7 +10,6 @@ found the nerve to try.]],
 	level = 8,
 	maxhp = 30, maxdam = 24, armor = 10,
 	maxexp = 36, maxgold = 12,
-	immune = 0,
 	maxmp = 30,
 	speech = {
 		start = { "A student, is it? Pay attention.", chance = 35 },

@@ -10,7 +10,6 @@ defeated. Some say slimes are what is left when a spell goes wrong.]],
 	level = 1,
 	maxhp = 4, maxdam = 3, armor = 1,
 	maxexp = 1, maxgold = 1,
-	immune = 0,
 	maxmp = 5,
 	speech = {
 		start = { "*squelch*", chance = 15 },

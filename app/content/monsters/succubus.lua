@@ -11,7 +11,7 @@ fight is best done with blades.
 	level = 47,
 	maxhp = 265, maxdam = 240, armor = 200,
 	maxexp = 1460, maxgold = 487,
-	immune = 1,  -- 1: immune to hurt spells
+	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
 	maxmp = 176,
 	speech = {
 		start = { "Sit with me, {player}. You have been walking far.", "Your sword is heavy. Let me help.", chance = 60 },

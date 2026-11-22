@@ -23,7 +23,6 @@ advice from any goblin you can find.]],
 	level = 5,
 	maxhp = 40, maxdam = 8, armor = 4,
 	maxexp = 12, maxgold = 15,
-	immune = 0,
 	maxmp = 17,                         -- the Mage's MP at level 5
 	roams = false,
 	attack_weight = 3,

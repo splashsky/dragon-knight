@@ -1,9 +1,8 @@
 -- app/content/spells/maim.lua :: the Maim spell (the original game's spell 8).
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
+	if s.target:immune_to("arcane") then return s:say("immune", s.name) end
 	local damage = s:roll((s.power / 6) * 5, s.power)   -- the original's rand(max * 5/6, max)
-	s.target:hurt(damage)
-	s:say("hit", s.name, damage)
+	s:say("hit", s.name, s.target:hurt(damage, "arcane"))
 end
 
 return {

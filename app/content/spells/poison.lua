@@ -1,8 +1,10 @@
 -- app/content/spells/poison.lua :: poisons the monster for a few turns (new in 2.2: a
 -- status, app/content/statuses/poison.lua). Learned by no class by default.
 local function cast(s)
-	if s.target.immune ~= 0 then return s:say("immune", s.name) end
-	s.target:afflict("poison", { turns = s.power, min = s.data.min, max = s.data.max })
+	if s.target:immune_to("poison") then return s:say("immune", s.name) end
+	if not s.target:afflict("poison", { turns = s.power, min = s.data.min, max = s.data.max }) then
+		return s:say(s.target:ward("poison") == 100 and "immune" or "resisted", s.name)
+	end
 	s:say("cast", s.name, s.power)
 end
 
@@ -22,9 +24,11 @@ spoil, and they shrug it off.]],
 	messages = {
 		cast = "You have cast the %s spell. The monster is poisoned for %d turns.",
 		immune = "You have cast the %s spell, but the monster is immune to it.",
+		resisted = "You have cast the %s spell, but the monster resists it.",
 		enemy = {
 			cast = "The monster casts %s. You are poisoned for %d turns.",
 			immune = "The monster casts %s, but you are immune to it.",
+			resisted = "The monster casts %s, but you resist it.",
 		},
 	},
 	cast = cast,
