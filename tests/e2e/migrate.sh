@@ -117,9 +117,9 @@ MIG_ITEMS="SELECT * FROM items ORDER BY id; SELECT * FROM town_items ORDER BY to
 MIG_MONSTERS="SELECT * FROM monsters ORDER BY id; SELECT * FROM monster_equipment ORDER BY monster_id, slot;
 	SELECT * FROM monster_items ORDER BY monster_id, position; SELECT * FROM monster_spells ORDER BY monster_id, position"
 # The same by key (ids of the monsters added after the original 151 depend on the
-# database), but for red_slime and monster_152 (the version 8 database's edits).
+# database), but for red_slime, ghost and monster_152 (the version 8 database's edits).
 MIG_MONSTERS_BY_KEY="SELECT key, name, description, maxhp, maxdam, armor, level, maxexp, maxgold, resist, ward, maxmp, uses_mp,
-	attack_weight, roams, retired, attack_element, class FROM monsters WHERE key NOT IN ('red_slime', 'monster_152') ORDER BY key;
+	attack_weight, roams, retired, attack_element, class FROM monsters WHERE key NOT IN ('red_slime', 'ghost', 'monster_152') ORDER BY key;
 	SELECT m.key, e.slot, e.item_id FROM monster_equipment e JOIN monsters m ON m.id = e.monster_id ORDER BY 1, 2;
 	SELECT m.key, i.position, i.item_id, i.weight, i.stock, i.has_when FROM monster_items i JOIN monsters m ON m.id = i.monster_id ORDER BY 1, 2;
 	SELECT m.key, x.position, x.spell_id, x.weight, x.has_when FROM monster_spells x JOIN monsters m ON m.id = x.monster_id ORDER BY 1, 2"
@@ -922,16 +922,19 @@ mig_unserve "$MIG/v7server.log"
 "$BIN" migrate --config "$MIG/v7.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v7)"
 
 t_section "migrate: version 8 database"
-# version 8 schema + its game data: an admin edit of an original monster, a monster added
-# by hand (no content file), a fight in progress against an original monster (asleep) and
-# one against the added monster; only step 9 runs. Monsters become content: the edit is an
-# override, the added monster is retired (its fight goes on), monster MP starts full.
+# version 8 schema + its game data: admin edits of original monsters (the Red Slime's stats,
+# the Ghost's immunity), a monster added by hand (no content file), a fight in progress
+# against an original monster (asleep) and one against the added monster; steps 9 on run.
+# Monsters become content: the edits are overrides (of the immunity, only what the admin
+# changed: step 21), the added monster is retired (its fight goes on), monster MP starts
+# full, and the unedited originals have their files' affinities.
 V8_DB="$MIG/v8.db"
 sed "s#db_path = \"$T/dk.db\"#db_path = \"$V8_DB\"#" "$CONFIG" > "$MIG/v8.lua"
 mig_script "$V8_DB" "$ROOT/tests/fixtures/schema_v8.sql"
 mig_script "$V8_DB" "$ROOT/tests/fixtures/seed_v8.sql"
 cat > "$MIG/v8_data.sql" <<'SQL'
 UPDATE monsters SET name = 'Big Slime', maxhp = 7 WHERE id = 2;
+UPDATE monsters SET immune = 1 WHERE id = 17;
 INSERT INTO monsters (id, name, maxhp, maxdam, armor, level, maxexp, maxgold, immune) VALUES (152, 'Homebrew', 30, 5, 2, 3, 9, 9, 0);
 INSERT INTO users (id, username, email, charname, verify, authlevel, charclass, level, currentaction,
 	currenthp, base_maxhp, currentmp, base_maxmp, strength, dexterity) VALUES
@@ -953,7 +956,7 @@ V8_USERS=$(mig_users "$V8_DB")
 grep -qE 'Migrating to version [1-8]:' "$T/migrate.log" && t_fail "steps 1-8 ran on a version 8 database" || t_ok
 for line in 'Migrating to version 9: monsters are content files with MP, equipment, items and spells' \
 	'warning: monster 152 Homebrew (monster_152) has no content file and is retired (fights against it go on; it is no longer met). Write app/content/monsters/monster_152.lua to bring it back.' \
-	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; fields: $M_FI, $M_FI new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: $M_IT, $((M_IT - 71)) new, 0 retired; monsters: 154, 3 new, 1 retired, 2 earlier admin edits kept as overrides)."; do
+	"Content synced (statuses: $M_ST, $((M_ST - 3)) new, 0 retired; fields: $M_FI, $M_FI new, 0 retired; summons: $M_SU, $M_SU new, 0 retired; spells: $M_SP, $((M_SP - 25)) new, 0 retired; classes: 3, 0 new, 0 retired; items: $M_IT, $((M_IT - 71)) new, 0 retired; monsters: 154, 3 new, 1 retired, 3 earlier admin edits kept as overrides)."; do
 	grep -qF "$line" "$T/migrate.log" && t_ok || t_fail "migrate (v8) output lacks: $line
 $(cat "$T/migrate.log")"
 done
@@ -965,15 +968,24 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "v8 stamped"
 mig_eq "PRAGMA foreign_key_check" "" "foreign keys (v8)"
 [ "$(mig_users "$V8_DB")" = "$V8_USERS" ] && t_ok || t_fail "users changed (v8)"
 mig_eq "SELECT kind || '|' || key || '|' || field || '|' || value FROM content_overrides ORDER BY key, field" \
-	"monsters|red_slime|maxhp|7
-monsters|red_slime|name|Big Slime" "the edit kept as overrides"
+	"monsters|ghost|resist.arcane|100
+monsters|red_slime|maxhp|7
+monsters|red_slime|name|Big Slime" "the edits kept as overrides (the Ghost's immunity 1: arcane, its sleep ward untouched)"
 mig_eq "SELECT id || '|' || key || '|' || name || '|' || maxhp || '|' || level || '|' || maxmp || '|' || retired FROM monsters WHERE id IN (2, 152) ORDER BY id" \
 	"2|red_slime|Big Slime|7|1|5|0
 152|monster_152|Homebrew|30|3|9|1" "an edited and a hand-made monster"
 mig_eq "SELECT group_concat(key || '=' || id, ',') FROM (SELECT key, id FROM monsters WHERE id > 152 ORDER BY id)" \
 	"bandit_captain=153,bog_witch=154,goblin_shaman=155" "the example monsters after the existing ids"
-mig_eq "SELECT * FROM monsters WHERE id <= 151 AND id <> 2 ORDER BY id" \
-	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM monsters WHERE id <= 151 AND id <> 2 ORDER BY id")" "the original monsters equal a fresh install's"
+mig_eq "SELECT * FROM monsters WHERE id <= 151 AND id NOT IN (2, 17) ORDER BY id" \
+	"$(mig_sql "$MIG/fresh.db" "SELECT * FROM monsters WHERE id <= 151 AND id NOT IN (2, 17) ORDER BY id")" "the original monsters equal a fresh install's"
+# their immunity unedited, the originals have their files' affinities (21): the Red Slime's
+# (immune 0), the Silver Slime's (2: its file has more) and the Titan's (0: its file wards
+# off sleep at 50); the Ghost's file's but for arcane
+V8_AFF="SELECT key || '|' || resist || '|' || ward FROM monsters WHERE key IN ('red_slime', 'silver_slime', 'titan') ORDER BY key"
+mig_eq "$V8_AFF" "$(mig_sql "$MIG/fresh.db" "$V8_AFF")" "unedited immunity: the files' affinities, no override (21)"
+mig_eq "SELECT ward FROM monsters WHERE key = 'ghost'" "$(mig_sql "$MIG/fresh.db" "SELECT ward FROM monsters WHERE key = 'ghost'")" \
+	"the Ghost's sleep ward is its file's (21)"
+mig_eq "SELECT ',' || resist || ',' LIKE '%,arcane=100,%' FROM monsters WHERE key = 'ghost'" "1" "the Ghost's edit: immune to arcane (21)"
 mig_eq "$MIG_MONSTERS_BY_KEY" "$(mig_sql "$MIG/fresh.db" "$MIG_MONSTERS_BY_KEY")" \
 	"the other monsters and the loadouts equal a fresh install's (by key)"
 mig_eq "SELECT user_id || '|' || id || '|' || coalesce(entity_id, '-') || '|' || coalesce(hp, '-') || '|' || coalesce(mp, '-') || '|' || coalesce(maxmp, '-') FROM fight_combatants ORDER BY user_id, id" \
@@ -1148,7 +1160,8 @@ mig_serve "$MIG/v12.lua" "$MIG/v12server.log"
 t_jar migv12; t_reset_jar
 t_login loreman v12pass1; expect_redirect /
 t_get /fight; expect_status 200
-expect_body '>Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>The humblest monster of the land'
+expect_body '>Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div>'
+expect_body '</ul><div class="tip-lore"><p>The humblest monster of the land'
 expect_body 'aria-label="Mend (5 MP)"><img src="/static/images/skills/heal.png"'
 expect_body '<template class="tip"><div class="tip-title">Mend</div><div class="tip-meta">5 MP · In fights and in town</div>'
 expect_body "Monster's HP: 3"
@@ -1285,9 +1298,10 @@ mig_eq "SELECT count(*) FROM pragma_table_info('monsters') WHERE name = 'immune'
 mig_eq "SELECT group_concat(key || ':' || field || '=' || value, ' ') FROM (SELECT * FROM content_overrides ORDER BY key, field)" \
 	"critter:maxhp=9 red_slime:resist.arcane=100 red_slime:ward.sleep=100 silver_slime:ward.sleep=0" \
 	"overrides of immune become resistances and wards where they differ from the file (21)"
-mig_eq "SELECT group_concat(key || ':' || resist || ':' || ward, ' ') FROM (SELECT * FROM monsters WHERE key IN ('red_slime', 'shadow', 'silver_slime') ORDER BY key)" \
-	"red_slime:arcane=100:sleep=100 shadow:arcane=100: silver_slime:arcane=100:" "and apply (21)"
-mig_eq "SELECT count(*) FROM monsters WHERE resist = 'arcane=100'" "28" "the originals' immunity (21: 26, and the Bog Witch's and the Red Slime's override)"
+mig_eq "SELECT group_concat(key || ':' || (',' || resist || ',' LIKE '%,arcane=100,%') || ':' || (',' || ward || ',' LIKE '%,sleep=100,%'), ' ') FROM (SELECT * FROM monsters WHERE key IN ('red_slime', 'shadow', 'silver_slime') ORDER BY key)" \
+	"red_slime:1:1 shadow:1:0 silver_slime:1:0" "and apply: immune to arcane, warding off sleep as the overrides say (21)"
+V14_AFF="SELECT key || '|' || resist || '|' || ward FROM monsters WHERE key NOT IN ('red_slime', 'silver_slime') ORDER BY key"
+mig_eq "$V14_AFF" "$(mig_sql "$MIG/fresh.db" "$V14_AFF")" "the other monsters' affinities are their files' (21)"
 mig_eq "PRAGMA user_version" "$CUR_VERSION" "v14 stamped"
 [ "$(mig_layout "$V14_DB")" = "$(mig_layout "$MIG/fresh.db")" ] && t_ok || {
 	t_fail "migrated v14 schema differs from a fresh install:"

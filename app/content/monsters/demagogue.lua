@@ -1,4 +1,9 @@
 -- app/content/monsters/demagogue.lua :: the Demagogue (the original game's monster 143).
+
+local function unraged(m)
+	return not m:has_status("uber_damage")
+end
+
 return {
 	name = "Demagogue",
 	lore = [[
@@ -10,7 +15,19 @@ pay in coin and labour. His guards are paid in the bread they took from the gran
 	level = 48,
 	maxhp = 290, maxdam = 260, armor = 210,
 	maxexp = 1760, maxgold = 587,
+	ward = { weakened = 50, sleep = 25 },
 	maxmp = 180,
+	attack_weight = 8,
+	items = {
+		-- a potion under a third of his life
+		{ item = "potion", weight = 8, stock = 2, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
+	spells = {
+		-- "Do you hear the crowd?": he rouses it in his first turns...
+		{ spell = "rage", weight = 14, when = function(m) return m.turn <= 2 and unraged(m) end },
+		-- ...and turns it on you when he is hurt
+		{ spell = "curse", weight = 8, when = function(m) return m.hp < m.maxhp // 2 and not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "Look at this one, friends. A crown man in disguise.", "Stand with the people, {player}, or stand aside.", chance = 60 },
 		turn = { "Do you hear the granary doors, {player}? They are shut.", "The crowd is watching you.", chance = 15 },

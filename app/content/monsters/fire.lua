@@ -1,4 +1,12 @@
 -- app/content/monsters/fire.lua :: the Fire (the original game's monster 70).
+local function hot(m)
+	return m:has_field("heat") or m:has_field("sun")
+end
+
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
 return {
 	name = "Fire",
 	lore = [[
@@ -10,7 +18,17 @@ is hard to put out. Endworld scouts carry wet sacks as a matter of habit.]],
 	level = 24,
 	maxhp = 80, maxdam = 72, armor = 56,
 	maxexp = 175, maxgold = 58,
+	resist = { fire = 100, water = -50, frost = -25 },
+	ward = { burning = 100 },
+	attack_element = "fire",
 	maxmp = 87,
+	spells = {
+		-- lights you with Ember (not in the rain)
+		{ spell = "ember", weight = 2,
+			when = function(m) return not m.target:has_status("burning") and not wet(m) end },
+		-- grows when fed: regenerates in the heat
+		{ spell = "regen", weight = 3, when = function(m) return hot(m) and not m:has_status("regen") end },
+	},
 	speech = {
 		start = { "Crackle...", chance = 30 },
 		turn = { "*hisses*", chance = 15 },

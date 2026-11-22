@@ -1,4 +1,8 @@
 -- app/content/monsters/ghoul.lua :: the Ghoul (the original game's monster 20).
+local function unmended(m)
+	return not m:has_status("regen")
+end
+
 return {
 	name = "Ghoul",
 	lore = [[
@@ -10,7 +14,13 @@ down but does not stop them.]],
 	level = 7,
 	maxhp = 29, maxdam = 24, armor = 9,
 	maxexp = 34, maxgold = 11,
+	resist = { shadow = 50, poison = 50, fire = -25, holy = -50 },
+	ward = { sleep = 50, poison = 100 },        -- sleep takes hold only half of the time
 	maxmp = 26,
+	spells = {
+		-- knits itself under half HP (Grit refuses above it)
+		{ spell = "grit", weight = 3, when = unmended },
+	},
 	speech = {
 		start = { "Hungry... so hungry...", chance = 30 },
 		turn = { "*sniffs the air*", "Warm... you are warm...", chance = 15 },

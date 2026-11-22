@@ -1,4 +1,12 @@
 -- app/content/monsters/wyvern.lua :: the Wyvern (the original game's monster 98).
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
+local function snowy(m)
+	return m:has_field("snow") or m:has_field("blizzard")
+end
+
 return {
 	name = "Wyvern",
 	lore = [[
@@ -10,7 +18,18 @@ which does not always work.]],
 	level = 33,
 	maxhp = 134, maxdam = 120, armor = 95,
 	maxexp = 290, maxgold = 97,
+	resist = { wind = 50, lightning = -25, poison = 75 },
+	ward = { poison = 75, venom = 75 },
 	maxmp = 118,
+	attack_weight = 3,
+	spells = {
+		-- climbs out of reach on its 3rd, 7th, 11th... turn and plunges the next (not in rain, storm or snow)
+		{ spell = "heavy_blow", weight = 60, when = function(m)
+			return m.turn % 4 == 3 and not wet(m) and not snowy(m)
+		end },
+		-- stings with Venom
+		{ spell = "venom", weight = 3, when = function(m) return not m.target:has_status("venom") end },
+	},
 	speech = {
 		start = { "*hisses*", "Kraa!", chance = 20 },
 		turn = { "Grrr...", chance = 8 },

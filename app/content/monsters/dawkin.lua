@@ -11,7 +11,12 @@ you.]],
 	level = 21,
 	maxhp = 70, maxdam = 60, armor = 46,
 	maxexp = 155, maxgold = 52,
+	resist = { earth = 25, fire = -25 },
 	maxmp = 74,
+	items = {
+		-- retreats and comes back: drinks one Potion when badly hurt
+		{ item = "potion", weight = 5, stock = 1, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
 	speech = {
 		start = { "You lost, {player}. Dawkin know the way out.", chance = 40 },
 		turn = { "Dawk not stupid.", chance = 15 },

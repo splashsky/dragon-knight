@@ -115,7 +115,7 @@ expect_body '<b>Bandit Captain</b> <span class="fight-statuses">&mdash; <img cla
 mo_is "$(enemy mp)" 30
 # buffed already, not hurt enough for its herb: the attack
 t_round "csrf=$CS&fight=Fight"; expect_body 'You dodge the monster&#39;s attack.'; expect_no_body 'casts Craze'
-mo_enemy_set "hp = 40"
+mo_enemy_set "hp = 40, mp = 0"   # badly hurt, no MP for Fend or Grit: the herb is all it may use
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Bandit Captain uses the Herb.<br>The Bandit Captain recovers 30 Hit Points.'
 t_fight_clear monsterer
 t_sql "UPDATE users SET currentaction = 'Exploring' $MQ"
@@ -176,7 +176,7 @@ t_get /character; expect_body '<span class="charsheet-affinities">Resists Frost 
 t_get /inventory; expect_body 'Deals Fire damage'; expect_body 'Frost Resistance +50%'
 t_fight monsterer "$MO_RED" 100000
 t_get /fight; CS=$(t_csrf)
-expect_body '<div class="tip-meta">Level 1</div><ul class="tip-lines"><li>Weak to Fire (+50%)</li></ul>'
+expect_body '<div class="tip-meta">Level 1</div><ul class="tip-lines"><li>Weak to Fire (+50%)</li>'
 MO_WEAK= MO_RESIST=
 for _ in $(seq 1 8); do
 	t_round "csrf=$CS&fight=Fight"
@@ -196,7 +196,7 @@ expect_body 'You have cast the Sleep spell, but the monster is immune to it.'
 mo_is "(SELECT count(*) FROM fight_statuses WHERE user_id = users.id)" "0"
 t_fight_clear monsterer; t_items_clear monsterer
 t_sql "DELETE FROM content_overrides WHERE key IN ('red_slime', 'dagger'); UPDATE users SET dexterity = 22500, currentaction = 'Exploring' $MQ"
-# a class (an override here: no monster file has one yet): the Goblin Shaman (level 5) as a
+# a class (an override here: its file has none): the Goblin Shaman (level 5) as a
 # Mage casts Magic Bolt too (its own Hurt and Heal stay as they are)
 t_sql "INSERT INTO content_overrides (kind, key, field, value) VALUES ('monsters', 'goblin_shaman', 'class', 'mage')"
 "$BIN" content sync --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content sync: $(cat "$T/content.log")"
@@ -233,13 +233,13 @@ t_sql "DELETE FROM content_overrides WHERE key = 'red_slime'; UPDATE users SET d
 t_section "monsters: the help page"
 t_get /help/monsters; expect_status 200
 expect_body '<th>Max MP</th><th>Affinities</th>'
-expect_body '>Shadow</td><td style="width: 9%">10</td><td style="width: 9%">9</td><td style="width: 9%">3</td><td style="width: 9%">2</td><td style="width: 9%">6</td><td style="width: 9%">2</td><td style="width: 8%">5</td><td style="width: 12%">Immune to Arcane</td></tr>'
-expect_body '<td style="width: 12%">Immune to Arcane<br>Wards off Sleep (100%)</td>'
+expect_body '>Shadow</td><td style="width: 9%">10</td><td style="width: 9%">9</td><td style="width: 9%">3</td><td style="width: 9%">2</td><td style="width: 9%">6</td><td style="width: 9%">2</td><td style="width: 8%">5</td><td style="width: 12%">Resists Physical (20%)<br>Weak to Fire (+50%)<br>Immune to Shadow<br>Immune to Arcane</td></tr>'
+expect_body '<td style="width: 12%">Resists Physical (50%)<br>Weak to Lightning (+50%)<br>Immune to Arcane<br>Wards off Sleep (100%)</td>'   # the Silver Slime
 expect_body 'Spells: Hurt, Heal; Mage spells: Magic Bolt; Items: Potion (2); Equipment: Dagger'
 expect_body '>Blue Slime</td><td style="width: 9%">4</td><td style="width: 9%">3</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 9%">1</td><td style="width: 8%">5</td>'
 expect_body '>Bandit Captain <span class="light">(not met at random)</span></td><td style="width: 9%">145</td><td style="width: 9%">65</td><td style="width: 9%">52</td>'
-expect_body 'Spells: Craze; Items: Herb (1); Equipment: Broadsword, Chain Mail, Small Shield, Life Stone'
-expect_body 'Spells: Sleep, Poison, Pain <span class="light">(its spells cost no MP)</span>'
+expect_body 'Spells: Craze, Fend, Grit; Items: Herb (1); Equipment: Broadsword, Chain Mail, Small Shield, Life Stone'
+expect_body 'Spells: Sleep, Poison, Pain; Items: Herb (2) <span class="light">(its spells cost no MP)</span>'
 
 t_section "monsters: cleanup"
 t_sql "DELETE FROM content_overrides WHERE kind = 'monsters'"

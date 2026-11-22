@@ -10,7 +10,12 @@ traveller's bag in a minute.]],
 	level = 4,
 	maxhp = 16, maxdam = 13, armor = 5,
 	maxexp = 15, maxgold = 5,
+	resist = { fire = 25, holy = -25 },
 	maxmp = 12,
+	spells = {
+		-- hurls a Hurt at you (12 MP buys two, then it only swings)
+		{ spell = "hurt", weight = 1 },
+	},
 	speech = {
 		start = { "Hee! A new one! Let's untie his boots!", chance = 35 },
 		turn = { "Your laces are mine, {player}!", "Hee hee hee!", chance = 20 },

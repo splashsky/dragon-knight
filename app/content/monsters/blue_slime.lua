@@ -10,6 +10,7 @@ defeated. Some say slimes are what is left when a spell goes wrong.]],
 	level = 1,
 	maxhp = 4, maxdam = 3, armor = 1,
 	maxexp = 1, maxgold = 1,
+	resist = { water = 50, lightning = -50 },   -- wet jelly: water slides off, lightning shorts it out
 	maxmp = 5,
 	speech = {
 		start = { "*squelch*", chance = 15 },

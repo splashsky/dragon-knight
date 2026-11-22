@@ -1,4 +1,10 @@
 -- app/content/monsters/green_dragon.lua :: the Green Dragon (the original game's monster 108).
+
+local function breath_due(m)
+	local n = m:has_field("fog") and 3 or 4        -- it hides in the fog
+	return m.turn % n == 0
+end
+
 return {
 	name = "Green Dragon",
 	lore = [[
@@ -10,7 +16,13 @@ rest, which is more than most lords can claim.]],
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 425, maxgold = 142,
+	resist = { poison = 100, earth = 25, fire = -25 },
+	ward = { poison = 100, venom = 100 },
 	maxmp = 128,
+	spells = {
+		-- gathers a poison cloud every 4th turn, every 3rd in fog: a "Charging" tell, then it lands
+		{ spell = "venom_breath", weight = 30, when = breath_due },
+	},
 	speech = {
 		start = { "The fog brought you, little knight. Good.", "Stay a while. The air is thick here.", chance = 60 },
 		turn = { "Breathe deep.", "Your lungs will remember this.", chance = 15 },

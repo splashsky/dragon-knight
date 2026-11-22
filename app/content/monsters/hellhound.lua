@@ -1,4 +1,8 @@
 -- app/content/monsters/hellhound.lua :: the Hellhound (the original game's monster 57).
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
 return {
 	name = "Hellhound",
 	lore = [[
@@ -11,7 +15,14 @@ Kalle keep a hellhound's tooth as a charm.]],
 	level = 20,
 	maxhp = 66, maxdam = 56, armor = 44,
 	maxexp = 140, maxgold = 47,
+	resist = { fire = 75, frost = -25, water = -25, holy = -25 },
+	attack_element = "fire",
 	maxmp = 70,
+	spells = {
+		-- lights you with Ember once (not in the rain), then bites
+		{ spell = "ember", weight = 2,
+			when = function(m) return not m.target:has_status("burning") and not wet(m) end },
+	},
 	speech = {
 		start = { "*snarls*", "Hot meat... good.", chance = 35 },
 		turn = { "Grrrrah!", chance = 15 },

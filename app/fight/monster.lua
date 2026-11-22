@@ -2,7 +2,7 @@
 -- spells and items it may use this turn, as AI candidates (fight/ai.lua), and using them.
 -- Pure but for reading content (lib/monsters.lua: the loadout, the `when` conditions from
 -- the file). Weighing the options rolls no dice, so a monster without spells and items
--- (every original monster) has its attack alone and the fight rolls the original dice.
+-- (as in the original game) has its attack alone and the fight rolls the original dice.
 --
 -- A spell is eligible when its row is usable in fights (not retired, with code), the
 -- monster has the MP (with uses_mp; otherwise it's free), its `when` passes and its
@@ -33,12 +33,16 @@ end
 -- m:statuses(kind), m:has_field(key) (the battlefield: fight/fields.lua), plus m.round (the
 -- fight's round), m.turn (its own turn: 1 on its first action of the fight, counting only
 -- the turns it acted), m.target (the handle of the opponent it faces by default: the
--- player) and m.stock (the uses left of this item, nil: no limit).
+-- player) and m.stock (the uses left of this item, nil: no limit). A status or field key no
+-- file has is an error (the entry isn't used, and the warning names it).
 function monster.context(f, c, extra)
 	local h = engine.handle(f, c)
 	local tc = engine.target(f, c)
 	local seen = { round = f.round, turn = c.data.turn or 0, target = tc and engine.handle(f, tc) or nil,
-		has_field = function(_, key) return fields.has(f, key) end }
+		has_field = function(_, key)
+			action.field_info(key, 3)
+			return fields.has(f, key)
+		end }
 	for k, v in pairs(extra or {}) do seen[k] = v end
 	return setmetatable({}, {
 		__index = function(_, k)

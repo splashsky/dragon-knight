@@ -1,4 +1,9 @@
 -- app/content/monsters/zealot.lua :: the Zealot (the original game's monster 113).
+
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
 return {
 	name = "Zealot",
 	lore = [[
@@ -10,7 +15,17 @@ the calm of people who have already decided the outcome.]],
 	level = 38,
 	maxhp = 168, maxdam = 155, armor = 125,
 	maxexp = 530, maxgold = 177,
+	ward = { sleep = 50 },
 	maxmp = 137,
+	attack_weight = 3,
+	spells = {
+		-- "Breathe. It is almost over.": a sleep song every 4th turn from its second
+		{ spell = "sleep", weight = 6, when = function(m) return m.turn % 4 == 2 and awake(m) end },
+		-- a smiting prayer now and then
+		{ spell = "dawnstrike", weight = 3 },
+		-- it tends itself under two fifths of its life
+		{ spell = "mercy", weight = 5, when = function(m) return m.hp < m.maxhp * 2 // 5 end },
+	},
 	speech = {
 		start = { "Peace, {player}. You are on the list.", "The Advocate sends his regards.", chance = 45 },
 		turn = { "Breathe. It is almost over.", "You were warned.", chance = 15 },

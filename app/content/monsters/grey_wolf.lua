@@ -9,6 +9,7 @@ them, and the dogs are usually the first to go.]],
 	level = 13,
 	maxhp = 44, maxdam = 36, armor = 24,
 	maxexp = 82, maxgold = 27,
+	resist = { frost = 25, fire = -25 },
 	maxmp = 43,
 	speech = {
 		start = { "*growls low*", chance = 20 },

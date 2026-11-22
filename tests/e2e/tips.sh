@@ -46,8 +46,8 @@ t_sql "UPDATE users SET currenthp = 5, base_maxhp = 30, currentmp = 7, base_maxm
 t_spells tipper 1,2,6    # Heal (5 MP), Revive (10 MP: more than the 7 MP left), Hurt (5 MP)
 t_fight tipper 1 4
 t_get /fight; expect_status 200
-# the monster's name: its level and lore (Blue Slime has no description)
-expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
+# the monster's name: its level, affinities and lore (Blue Slime has no description)
+expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Blue Slime<template class="tip"><div class="tip-title"><img class="tip-icon" src="/static/images/monsters/blue_slime.png" width="20" height="20" alt="">Blue Slime</div><div class="tip-meta">Level 1</div><ul class="tip-lines"><li>Weak to Lightning (+50%)</li><li>Resists Water (50%)</li></ul><div class="tip-lore"><p>'"$TP_SLIME_LORE"'</p></div></template></b></p>'
 # each button in a span that carries its tooltip: name, MP, where, description, lore
 expect_body '<span class="spell-tip" data-tip><button class="spell-btn" type="submit" name="spell" value="1" title="Heal (5 MP)" aria-label="Heal (5 MP)" aria-keyshortcuts="2"><img src="/static/images/skills/heal.png" width="44" height="44" alt=""><span class="spell-mp" aria-hidden="true">5</span></button><template class="tip"><div class="tip-title">Heal</div><div class="tip-meta">5 MP · In fights and in town</div><div class="tip-body"><p>Restores hit points, in a fight or out of it.</p></div><div class="tip-lore"><p>'"$TP_HEAL_LORE"'</p></div></template></span>'
 # every spell has lore: Hurt's follows its description

@@ -11,7 +11,17 @@ keep a whole book on them, most of it grim.]],
 	level = 22,
 	maxhp = 72, maxdam = 62, armor = 48,
 	maxexp = 160, maxgold = 53,
+	resist = { neutral = 25, shadow = 50, poison = 100, holy = -50 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
 	maxmp = 79,
+	spells = {
+		-- fills the house with fog (weapons are dulled)
+		{ spell = "fog_bank", weight = 5, when = function(m) return not m:has_field("fog") end },
+		-- throws Pain from within the fog
+		{ spell = "pain", weight = 3, when = function(m) return m:has_field("fog") end },
+		-- throws Hurt until the fog is up
+		{ spell = "hurt", weight = 1, when = function(m) return not m:has_field("fog") end },
+	},
 	speech = {
 		start = { "Stay the night... stay forever.", chance = 40 },
 		turn = { "*rattles chains*", chance = 20 },

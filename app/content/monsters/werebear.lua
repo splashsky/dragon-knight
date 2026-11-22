@@ -11,6 +11,7 @@ meet one tend to leave their bows on the ground and run.
 	level = 26,
 	maxhp = 92, maxdam = 84, armor = 65,
 	maxexp = 195, maxgold = 65,
+	resist = { frost = 25, holy = -25 },
 	maxmp = 94,
 	speech = {
 		start = { "*roars*", chance = 35 },

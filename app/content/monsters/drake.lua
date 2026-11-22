@@ -10,6 +10,7 @@ much else.]],
 	level = 2,
 	maxhp = 11, maxdam = 10, armor = 3,
 	maxexp = 8, maxgold = 3,
+	resist = { frost = -25 },                   -- cold-blooded
 	maxmp = 5,
 	speech = {
 		start = { "Hsss! Mine!", chance = 30 },

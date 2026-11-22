@@ -1,4 +1,12 @@
 -- app/content/monsters/nisse.lua :: the Nisse (the original game's monster 54).
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
 return {
 	name = "Nisse",
 	lore = [[
@@ -11,7 +19,15 @@ a long way on a still night.]],
 	level = 19,
 	maxhp = 60, maxdam = 52, armor = 40,
 	maxexp = 132, maxgold = 44,
+	resist = { neutral = -25, shadow = -25, fire = 25 },
 	maxmp = 64,
+	spells = {
+		-- puts you to sleep
+		{ spell = "sleep", weight = 2, when = awake },
+		-- sets the hay alight (Ember), but not in the rain
+		{ spell = "ember", weight = 2,
+			when = function(m) return not m.target:has_status("burning") and not wet(m) end },
+	},
 	speech = {
 		start = { "Hee hee! Mind the hay, {player}!", chance = 45 },
 		turn = { "Tee-hee.", chance = 20 },

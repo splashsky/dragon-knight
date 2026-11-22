@@ -193,6 +193,19 @@ local function status_info(key, level)
 	return m
 end
 
+-- The loaded module of field file `key`, or an error naming the key (level: the error's; 3
+-- is the content calling the method that calls this). The conditions on the battlefield
+-- (s:has_field, t:has_field, m:has_field in a monster's `when`) refuse a key no field file
+-- has, which would otherwise read as "not up".
+function action.field_info(key, level)
+	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then
+		error("a field key expected (got " .. tostring(key) .. ")", level)
+	end
+	local m, err = load.module("fields", key)
+	if not m then error("no field '" .. key .. "' (" .. tostring(err) .. ")", level) end
+	return m
+end
+
 -- Puts a status on the handle's view (replacing one of the same key) and records `e`.
 local function set_status(h, ctx, key, params, e)
 	local v = INNER[h].v
@@ -381,7 +394,10 @@ function Combatant:cure(which)
 	return #keys
 end
 
+-- Whether it has status `key`. A key no status file has is an error (a typo would
+-- otherwise read as "doesn't have it"), and so in :status.
 function Combatant:has_status(key)
+	status_info(key, 3)
 	return find_status(INNER[self].v, key) ~= nil
 end
 
@@ -391,6 +407,7 @@ end
 
 -- { key, name, kind, ticks_left (nil: no limit), data } of a status it has, or nil.
 function Combatant:status(key)
+	status_info(key, 3)
 	local s = find_status(INNER[self].v, key)
 	return s and status_copy(s) or nil
 end
@@ -576,7 +593,7 @@ end
 -- (app/content/fields/<key>.lua) up for params.ticks clock ticks (at least 1), in place of
 -- the field of its group (the weather's comes back after it). Returns true when it was set,
 -- false when that field is already up or there is no fight. has_field: whether field `key`
--- is up.
+-- is up (a key no field file has is an error: action.field_info).
 function Action:field(key, params)
 	local i = running(self, "field")
 	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then error("a field key expected (got " .. tostring(key) .. ")", 2) end
@@ -591,6 +608,7 @@ function Action:field(key, params)
 end
 
 function Action:has_field(key)
+	action.field_info(key, 3)
 	local bf = INNER[self].battlefield
 	return bf ~= nil and bf.has(key)
 end

@@ -11,6 +11,8 @@ anyone who crosses the line painted at its feet.
 	level = 49,
 	maxhp = 320, maxdam = 300, armor = 240,
 	maxexp = 1940, maxgold = 647,
+	resist = { earth = 75, neutral = 25, fire = 25, poison = 100, lightning = -50 },
+	ward = { sleep = 100, poison = 100, venom = 100, burning = 100, weakened = 50 },
 	maxmp = 183,
 	speech = {
 		start = { "LINE. CROSSED.", "PASS. CLOSED.", chance = 55 },

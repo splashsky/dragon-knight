@@ -1,4 +1,8 @@
 -- app/content/monsters/ultrawraith.lua :: the Ultrawraith (the original game's monster 76).
+local function night(m)
+	return m:has_field("night")
+end
+
 return {
 	name = "Ultrawraith",
 	lore = [[
@@ -11,7 +15,20 @@ the life from a body faster than a blade does.
 	level = 26,
 	maxhp = 90, maxdam = 82, armor = 64,
 	maxexp = 190, maxgold = 63,
+	resist = { neutral = 50, shadow = 75, frost = 50, poison = 100, holy = -75 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
+	attack_element = "shadow",
 	maxmp = 94,
+	spells = {
+		-- calls the night
+		{ spell = "nightfall", weight = 6, when = function(m) return not night(m) end },
+		-- drains you in the dark (Withering)
+		{ spell = "withering", weight = 4,
+			when = function(m) return night(m) and not m.target:has_status("withering") end },
+		-- weakens you (Enfeeble)
+		{ spell = "enfeeble", weight = 2,
+			when = function(m) return not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "Warm... you are warm...", chance = 40 },
 		turn = { "*moans*", "Let me share your fire.", chance = 20 },

@@ -1426,7 +1426,9 @@ High hit points]],                       -- one line per point on the help page
 	`power`, and version 9 kept edited monster stats). Only values that may have been
 	edited belong there: version 4 records a level's spell only where it differs from the
 	original game's (`V4_STOCK_SPELLS`), since the class files teach spells at more levels
-	now and a stock database's empty level is no edit.
+	now and a stock database's empty level is no edit; likewise version 21 adopts a
+	monster's immunity as `resist.arcane` / `ward.sleep` only where it differs from the
+	original game's (`V21_STOCK_IMMUNE`).
 
 Adding a class: copy `app/content/classes/mage.lua` to `app/content/classes/<key>.lua`,
 edit it, run `./dk check`; the class shows up on the registration page on the next page
@@ -2208,7 +2210,10 @@ keep a status from taking hold before its ward is rolled.
 - **The end of `immune`**: monsters' `immune` (0, 1: hurt spells, 2: hurt and sleep) became
 	`resist = { arcane = 100 }` and, for 2, `ward = { sleep = 100 }`, in the files and on the
 	rows; step 21 turned admins' overrides of it into `resist.arcane` / `ward.sleep`
-	overrides where they differ from the file.
+	overrides where they differ from the file, and pending adoptions of it (a database from
+	before version 9) into adoptions of only what differs from the original game's
+	immunity (`V21_STOCK_IMMUNE`): the files' affinities have changed since, and a stock
+	immunity is no edit, so an unedited monster gets its file's affinities.
 
 Testing: `tests/lua/test_elements.lua` (the formula, clamps, immunity, absorbing, the lines,
 the handles' API and the wards' dice), `tests/lua/test_spells.lua` (a monster immune to
@@ -2284,7 +2289,9 @@ return {
 - **The API**: `s:field(key, { ticks = n })` (spells and items; true when set, false when
 	that field is already up or outside a fight; a key that isn't a field is an error),
 	`s:has_field(key)` and `t:has_field(key)` (status hooks), `m:has_field(key)` in monsters'
-	`when` conditions ([Monsters](#monsters)). A field's `on_tick(e)` runs on every tick it is
+	`when` conditions ([Monsters](#monsters)); a key that no field file has is an error there
+	too (`action.field_info`), and so for status keys in the handles' `:has_status(key)` and
+	`:status(key)`, so that a typo doesn't read as "not up". A field's `on_tick(e)` runs on every tick it is
 	up, after the fields followed the weather: `e` is a context like a status's (`e:roll`,
 	`e:say`, `e.data`, `e.messages`, `e.round`, `e.ticks_left`: a spell's field's) with
 	`e.combatants` (every combatant standing: the player, the allies, the enemies of the
@@ -2326,8 +2333,13 @@ fight on the clock, a live round's `field` event, the admin page), `tests/e2e/mi
 Monsters are content (see [Content](#content)): `app/content/monsters/<key>.lua`, synced
 into `monsters` (`lib/content/kinds/monsters.lua`) and the loadout tables
 `monster_equipment`, `monster_items` and `monster_spells`. The original 151 keep ids 1-151
-(keys from the names: `blue_slime` ... `lucifuge`) and only attack, exactly as before.
-`goblin_shaman.lua`, `bog_witch.lua` and `bandit_captain.lua` are examples of the rest.
+(keys from the names: `blue_slime` ... `lucifuge`), the original game's stats and their
+converted immunity (`tests/lua/test_monsters.lua` checks them against
+`tests/lua/monsters_original.lua`); since 3.2 they have affinities, and many a fight pattern
+(spells, items, a class), so only those still without a loadout attack exactly as before
+(`tests/lua/test_round.lua` fights the original stats, attack only, against the frozen 2.1
+fight). `goblin_shaman.lua`, `bog_witch.lua` and `bandit_captain.lua` are the commented
+examples.
 
 ```lua
 -- app/content/monsters/goblin_shaman.lua
@@ -2366,7 +2378,8 @@ return {
 	items must be consumables and spells usable in fights; `when` must be a function.
 - **MP**: every original monster has `maxmp` = the Mage's total MP at its level (the 2.2
 	start of 0 + the gains in `classes/mage.lua`, at least 5), written into its file (the
-	Mage's start of 5 since 2.4 left them as they were). A monster's MP is full
+	Mage's start of 5 since 2.4 left them as they were), or more where its fight pattern's
+	spells need it (3.2). A monster's MP is full
 	at the start of each encounter (`fight_combatants.mp`/`maxmp`; a fight from before
 	version 9 loads it full) and its spells cost `mp` like the player's (none affordable:
 	not eligible). With `uses_mp = false` spells are free (MP is still shown and readable
@@ -2402,7 +2415,12 @@ return {
 	combatant's data, so openers are `m.turn == 1` and rotations `m.turn % 4 == 0`),
 	`m.target` (the default opponent's handle: the player; `m.target:has_status("sleep")`)
 	and `m.stock` (items: uses left). They only decide: no
-	dice, no changes (an error, logged, makes the entry ineligible this turn). They stay in
+	dice, no changes (an error, logged, makes the entry ineligible this turn). A key that no
+	file has is an error, not "no": `m:has_field("nightx")`, `m:has_status("sleeep")` and
+	`:status` name it in the warning (else a typo in a negated condition would always pass;
+	`tests/lua/test_patterns.lua` reports it). A retired status or field, its file deleted,
+	counts as unknown too: nothing can carry it, and content that declares it in `uses`
+	keeps `dk check` from letting its file go. They stay in
 	the file (`has_when` in the loadout tables marks them; the runtime takes them from the
 	loaded file by position).
 - **Stock** is per encounter: `stock_<position>` in the combatant's data counts down on
@@ -2423,7 +2441,6 @@ return {
 	castable in fights, weight 1 and no `when` (`monsters.loadout`, entries marked
 	`from_class`), after its own spells; its own entry for one of them wins (its weight and
 	`when`). It pays MP for them from `maxmp` like for its own (unless `uses_mp = false`).
-	No monster has a class yet.
 - **Weight 0**: a `spells` or `items` entry with `weight = 0` is never chosen: the loadout
 	leaves it out (`monsters.loadout`), and with it its class's spell of that key. That is how
 	a class's unwanted spells are switched off: `{ spell = "dream", weight = 0 }`. The help

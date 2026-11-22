@@ -1,4 +1,12 @@
 -- app/content/monsters/shimmer.lua :: the Shimmer (the original game's monster 24).
+local function hot(m)
+	return m:has_field("heat") or m:has_field("sun")
+end
+
+local function unweakened(m)
+	return not m.target:has_status("weakened")
+end
+
 return {
 	name = "Shimmer",
 	lore = [[
@@ -9,8 +17,13 @@ say it appears only in the hottest weeks, and that anyone who follows it is not 
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 14,
 	maxexp = 45, maxgold = 15,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, fire = 50, frost = -50, holy = 25 },   -- no hurt spells
+	attack_element = "fire",
 	maxmp = 30,
+	spells = {
+		-- in the heat or the sun it dazzles you: Enfeeble, once
+		{ spell = "enfeeble", weight = 3, when = function(m) return hot(m) and unweakened(m) end },
+	},
 	speech = {
 		start = { "*a soft chime fills the air*", chance = 25 },
 		turn = { "*light ripples*", chance = 15 },

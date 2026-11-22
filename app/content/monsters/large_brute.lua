@@ -1,4 +1,8 @@
 -- app/content/monsters/large_brute.lua :: the Large Brute (the original game's monster 87).
+local function buffed(m)
+	return m:has_status("uber_damage")
+end
+
 return {
 	name = "Large Brute",
 	lore = [[
@@ -11,7 +15,13 @@ known to tear a loaded wagon apart for the sake of the sacks inside it.
 	level = 29,
 	maxhp = 108, maxdam = 98, armor = 78,
 	maxexp = 230, maxgold = 77,
+	resist = { neutral = 25 },
+	ward = { sleep = 50 },
 	maxmp = 101,
+	spells = {
+		-- slow to start: nothing for two turns, then Rage
+		{ spell = "rage", weight = 6, when = function(m) return m.turn >= 3 and not buffed(m) end },
+	},
 	speech = {
 		start = { "BRUTE CRUSH!", chance = 40 },
 		turn = { "Grrrah.", "Brute big now.", chance = 20 },

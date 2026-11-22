@@ -11,7 +11,14 @@ meat on a rock for the giant's goodwill.
 	level = 43,
 	maxhp = 220, maxdam = 200, armor = 165,
 	maxexp = 970, maxgold = 323,
+	resist = { earth = 50, frost = 25, lightning = -25 },
+	ward = { sleep = 50 },
 	maxmp = 156,
+	attack_weight = 3,
+	spells = {
+		-- hurls boulders every 3rd turn (they cost the Giant a tenth of its life)
+		{ spell = "rockfall", weight = 8, when = function(m) return m.turn % 3 == 0 end },
+	},
 	speech = {
 		start = { "Hm? A small thing on my path.", "Stay. Is this a game?", chance = 55 },
 		turn = { "Ooh. Hit me again.", "Your little stick tickles.", chance = 15 },

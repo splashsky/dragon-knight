@@ -9,7 +9,13 @@ near Hambry say a drakefin will take a line if it is hungry, and rarely lets go.
 	level = 8,
 	maxhp = 32, maxdam = 26, armor = 12,
 	maxexp = 40, maxgold = 13,
+	resist = { water = 50, lightning = -50 },
 	maxmp = 30,
+	attack_weight = 0,                  -- it only bites on the turns it isn't jetting
+	spells = {
+		-- a jet of water every other turn
+		{ spell = "water_jet", weight = 1, when = function(m) return m.turn % 2 == 0 end },
+	},
 	speech = {
 		start = { "Hsss! Into the water with you!", chance = 30 },
 		turn = { "*fins flare*", "Hsss.", chance = 15 },

@@ -10,7 +10,16 @@ stairs, so anyone who meets one has either been summoned or has come a very long
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 750, maxgold = 250,
+	resist = { fire = 75, shadow = 25, holy = -50 },
+	ward = { burning = 50 },
 	maxmp = 147,
+	attack_weight = 3,
+	spells = {
+		-- "Interest accrues": a Curse on you from its second turn, renewed when it lapses
+		{ spell = "curse", weight = 4, when = function(m) return m.turn >= 2 and not m.target:has_status("weakened") end },
+		-- a lash of cinders now and then
+		{ spell = "cinder_lash", weight = 3 },
+	},
 	speech = {
 		start = { "You have been summoned, {player}. Pity.", "Your account is overdue.", chance = 55 },
 		turn = { "Interest accrues, you know.", "Hold still while I read the terms.", chance = 18 },

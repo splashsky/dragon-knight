@@ -1,4 +1,9 @@
 -- app/content/monsters/titan.lua :: the Titan (the original game's monster 149).
+
+local function unguarded(m)
+	return not m:has_status("uber_defense")
+end
+
 return {
 	name = "Titan",
 	lore = [[
@@ -11,7 +16,20 @@ they stand on his foot.
 	level = 50,
 	maxhp = 360, maxdam = 340, armor = 270,
 	maxexp = 2400, maxgold = 800,
+	resist = { earth = 75, neutral = 25, frost = 25, poison = 100, lightning = -25, wind = -50 },
+	ward = { sleep = 50, poison = 100 },
 	maxmp = 186,
+	attack_weight = 6,
+	spells = {
+		-- the mountain turns over: a stomp every 4th turn, every 3rd under half (a "draws back" tell, then it lands)
+		{ spell = "heavy_blow", weight = 40, when = function(m)
+			return m.turn % (m.hp < m.maxhp // 2 and 3 or 4) == 0
+		end },
+		-- boulders in between (each costs the Titan a tenth of its life)
+		{ spell = "rockfall", weight = 12, when = function(m) return m.turn % 4 == 2 end },
+		-- under a third it digs in
+		{ spell = "fend", weight = 20, when = function(m) return m.hp < m.maxhp // 3 and unguarded(m) end },
+	},
 	speech = {
 		start = { "*the mountain stirs*", "Something small is on my foot.", chance = 60 },
 		turn = { "I built the first wall. You are standing on its stones.", "Slow, little one.", chance = 15 },

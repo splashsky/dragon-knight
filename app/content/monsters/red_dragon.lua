@@ -1,4 +1,16 @@
 -- app/content/monsters/red_dragon.lua :: the Red Dragon (the original game's monster 121).
+
+local function unraged(m)
+	return not m:has_status("uber_damage")
+end
+
+local function breath_due(m)
+	local n = 4
+	if m.hp < m.maxhp // 2 or m:has_field("heat") or m:has_field("sun") then n = 3 end   -- heat feeds it
+	if m:has_field("rain") or m:has_field("downpour") then n = n + 1 end                 -- rain douses it
+	return m.turn % n == 0
+end
+
 return {
 	name = "Red Dragon",
 	lore = [[
@@ -10,7 +22,15 @@ behind, and sometimes their bones with it.]],
 	level = 41,
 	maxhp = 200, maxdam = 180, armor = 145,
 	maxexp = 720, maxgold = 240,
+	resist = { fire = 75, frost = -50, water = -25 },
+	ward = { burning = 50 },
 	maxmp = 147,
+	spells = {
+		-- gathers a fire breath every 4th turn (3rd under half or in the heat, 5th in the rain), then it lands and burns
+		{ spell = "fire_breath", weight = 30, when = breath_due },
+		-- "I will not die to a creature like YOU!": it enrages under a quarter of its life
+		{ spell = "fury", weight = 20, when = function(m) return m.hp < m.maxhp // 4 and unraged(m) end },
+	},
 	speech = {
 		start = {
 			"You smell of ash already, little knight.", "Kneel, and I may yet make it quick.",

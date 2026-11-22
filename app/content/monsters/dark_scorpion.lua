@@ -1,4 +1,8 @@
 -- app/content/monsters/dark_scorpion.lua :: the Dark Scorpion (the original game's monster 41).
+local function unvenomed(m)
+	return not m.target:has_status("venom")
+end
+
 return {
 	name = "Dark Scorpion",
 	lore = [[
@@ -9,8 +13,16 @@ Miners give them a wide berth, and most of them learn that only once.]],
 	level = 15,
 	maxhp = 48, maxdam = 40, armor = 26,
 	maxexp = 95, maxgold = 32,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, shadow = 50, poison = 75, fire = -25 },   -- no hurt spells
+	ward = { poison = 100, venom = 100 },
+	attack_element = "poison",
 	maxmp = 52,
+	spells = {
+		-- opens with venom, and again every 3rd turn once it has worn off
+		{ spell = "venom", weight = 6, when = function(m)
+			return unvenomed(m) and (m.turn == 1 or m.turn % 3 == 0)
+		end },
+	},
 	speech = {
 		start = { "*clicks*", chance = 15 },
 		turn = { "*hisses*", chance = 15 },

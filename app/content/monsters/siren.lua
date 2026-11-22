@@ -1,4 +1,9 @@
 -- app/content/monsters/siren.lua :: the Siren (the original game's monster 60).
+
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
 return {
 	name = "Siren",
 	lore = [[
@@ -11,8 +16,14 @@ was about them.
 	level = 50,
 	maxhp = 68, maxdam = 400, armor = 800,
 	maxexp = 10000, maxgold = 50,
-	resist = { arcane = 100 }, ward = { sleep = 100 },  -- immune to arcane (the hurt spells) and to sleep
+	resist = { arcane = 100, water = 100, wind = 50, lightning = -50, shadow = -50 },  -- immune to arcane (the hurt spells)
+	ward = { sleep = 100 },
 	maxmp = 186,
+	attack_weight = 2,
+	spells = {
+		-- the verse: a Sleep on every even turn, a blow on every odd one
+		{ spell = "sleep", weight = 30, when = function(m) return m.turn % 2 == 0 and awake(m) end },
+	},
 	speech = {
 		start = { "Come closer, {player}. The rocks are very sharp.", "Listen. I know what you want to hear.", chance = 65 },
 		turn = { "Your oars have stopped, sailor.", "Hush now. The verse is nearly done.", chance = 15 },

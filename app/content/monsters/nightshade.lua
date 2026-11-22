@@ -1,4 +1,8 @@
 -- app/content/monsters/nightshade.lua :: the Nightshade (the original game's monster 14).
+local function unpoisoned(m)
+	return not m.target:has_status("poison")
+end
+
 return {
 	name = "Nightshade",
 	lore = [[
@@ -9,7 +13,13 @@ burn the plant on purpose to keep it from spreading, and they wear gloves when t
 	level = 6,
 	maxhp = 22, maxdam = 16, armor = 6,
 	maxexp = 24, maxgold = 8,
+	resist = { poison = 150, fire = -50 },      -- it drinks poison; herbalists burn it
+	attack_element = "poison",
 	maxmp = 22,
+	spells = {
+		-- poisons you unless you are already poisoned
+		{ spell = "poison", weight = 1, when = unpoisoned },
+	},
 	speech = {
 		start = { "*leaves rustle*", chance = 25 },
 		turn = { "*sap drips*", chance = 10 },

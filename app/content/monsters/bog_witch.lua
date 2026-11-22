@@ -6,6 +6,10 @@ local function awake(m)
 	return not m.target:has_status("sleep")
 end
 
+local function wounded(m)
+	return m.hp < m.maxhp // 2
+end
+
 return {
 	name = "Bog Witch",
 	lore = [[
@@ -17,15 +21,23 @@ Local people leave a loaf on the path for her and walk around her patch.]],
 	level = 9,
 	maxhp = 60, maxdam = 10, armor = 6,
 	maxexp = 30, maxgold = 40,
-	resist = { arcane = 100 },          -- immune to arcane: the hurt spells
+	resist = { arcane = 100, poison = 50, fire = -25 },   -- immune to arcane: the hurt spells; fire stings her
+	ward = { poison = 100, sleep = 50 },
 	maxmp = 33,                         -- the Mage's MP at level 9
 	uses_mp = false,
 	roams = false,
 	attack_weight = 1,
 	spells = {
+		-- puts you to sleep unless you already are
 		{ spell = "sleep", weight = 1, when = awake },
+		-- poisons you unless you are already poisoned
 		{ spell = "poison", weight = 2, when = function(m) return not m.target:has_status("poison") end },
+		-- casts Pain
 		{ spell = "pain", weight = 1 },
+	},
+	items = {
+		-- drinks from the pot (a herb) when she is under half HP
+		{ item = "herb", weight = 3, stock = 2, when = wounded },
 	},
 	speech = {
 		start = { "Oh, a visitor. Sit, sit. The tea is nearly ready.", chance = 50 },

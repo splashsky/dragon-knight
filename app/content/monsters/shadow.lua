@@ -10,7 +10,7 @@ very helpful.]],
 	level = 2,
 	maxhp = 10, maxdam = 9, armor = 3,
 	maxexp = 6, maxgold = 2,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, shadow = 100, neutral = 20, fire = -50 },   -- no hurt spells, steel blunted, torchlight burns it
 	maxmp = 5,
 	speech = {
 		start = { "*whispers*", "Come closer...", chance = 25 },

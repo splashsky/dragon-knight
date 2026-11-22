@@ -11,6 +11,7 @@ days. Carry more bandages than seems sensible.]],
 	level = 23,
 	maxhp = 76, maxdam = 66, armor = 52,
 	maxexp = 170, maxgold = 57,
+	resist = { frost = 25 },
 	maxmp = 82,
 	speech = {
 		start = { "*snorts*", chance = 30 },

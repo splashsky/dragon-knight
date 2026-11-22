@@ -11,8 +11,20 @@ Its claws are said to remember them.
 	level = 45,
 	maxhp = 245, maxdam = 215, armor = 180,
 	maxexp = 1250, maxgold = 417,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { shadow = 100, arcane = 100, holy = -75 },  -- immune to arcane (the hurt spells)
+	ward = { sleep = 50, withering = 100 },
 	maxmp = 167,
+	attack_weight = 3,
+	spells = {
+		-- gathers a shadow breath every 4th turn, every 3rd under half, then it lands and drains
+		{ spell = "shadow_breath", weight = 30, when = function(m)
+			return m.turn % (m.hp < m.maxhp // 2 and 3 or 4) == 0
+		end },
+		-- "Your name grows fainter": it saps you at the start...
+		{ spell = "enfeeble", weight = 10, when = function(m) return m.turn <= 2 and not m.target:has_status("weakened") end },
+		-- ...then drains you under half
+		{ spell = "withering", weight = 10, when = function(m) return m.hp < m.maxhp // 2 and not m.target:has_status("withering") end },
+	},
 	speech = {
 		start = { "I know your name, {player}. I have always known it.", "Your name is on my list.", chance = 65 },
 		turn = { "Names are heavy things to carry.", "Your name grows fainter, little one.", chance = 15 },

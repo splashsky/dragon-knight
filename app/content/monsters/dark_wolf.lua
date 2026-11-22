@@ -10,8 +10,12 @@ Hunters say the pack leader is always the one that stays silent until it bites.]
 	level = 17,
 	maxhp = 54, maxdam = 47, armor = 36,
 	maxexp = 120, maxgold = 40,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, shadow = 50, frost = 25, holy = -25 },   -- no hurt spells
 	maxmp = 57,
+	spells = {
+		-- marks you on its first turn: its bites hit harder for a while
+		{ spell = "hunters_mark", weight = 6, when = function(m) return m.turn == 1 end },
+	},
 	speech = {
 		start = { "Grrrr...", chance = 30 },
 		turn = { "*snarls*", chance = 10 },

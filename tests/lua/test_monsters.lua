@@ -11,6 +11,7 @@ local kind = require("lib.content.kinds.monsters")
 local load = require("lib.content.load")
 local monster = require("fight.monster")
 local monsters = require("lib.monsters")
+local originals = require("tests.monsters_original")
 local php = require("lib.php")
 local round = require("fight.round")
 local schema = require("lib.content.schema")
@@ -110,49 +111,44 @@ function T.original_monsters_are_the_seed()
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
 	eq(#k.entities, 154, "151 originals and 3 examples")
 	local slime = k.by_key.blue_slime
-	eq(slime.name, "Blue Slime"); eq(slime.maxhp, 4); eq(slime.maxdam, 3); eq(slime.armor, 1); eq(slime.level, 1)
-	eq(slime.maxexp, 1); eq(slime.maxgold, 1); eq(slime.maxmp, 5, "at least 5")
-	eq(slime["resist.arcane"], nil); eq(slime.attack_element, "neutral"); eq(slime.class, "")
-	eq(slime.uses_mp, 1); eq(slime.attack_weight, 1); eq(slime.roams, 1)
+	eq(slime.maxmp, 5, "at least 5"); eq(slime["resist.arcane"], nil); eq(slime.attack_element, "neutral")
+	eq(slime.class, ""); eq(slime.uses_mp, 1); eq(slime.attack_weight, 1); eq(slime.roams, 1)
 	-- the Mage's MP at the monster's level (start + gains, at least 5), for every original;
-	-- the start is the Mage's of 2.2 (0; 5 since 2.4): monsters kept their MP
+	-- the start is the Mage's of 2.2 (0; 5 since 2.4): monsters kept their MP, and those
+	-- with a fight pattern (3.2) may have more for it
 	local mage = load.kind("classes").by_key.mage
 	local function mage_mp(level)
 		local n = 0
 		for l = 2, level do n = n + mage["levels." .. l .. ".mp"] end
 		return math.max(5, n)
 	end
-	for id = 1, 151 do
+	-- ids 1-151, keys and the original game's stats (tests/lua/monsters_original.lua); the
+	-- original immunity, converted exactly (schema version 21), is kept: 1 is arcane 100 (the
+	-- hurt spells), 2 that and a ward of 100 against sleep. Their other affinities and their
+	-- fight patterns are 3.2's (tests/lua/test_patterns.lua)
+	local arcane, sleep = 0, 0
+	for id, o in ipairs(originals) do
 		local row = monsters.get(id)
+		eq(row.key, o.key, "id " .. id)
 		local flat = k.by_key[row.key]
-		eq(flat.maxmp, mage_mp(flat.level), row.key .. " maxmp")
-		eq(row.maxmp, flat.maxmp, row.key .. " synced")
+		for _, f in ipairs({ "name", "maxhp", "maxdam", "armor", "level", "maxexp", "maxgold" }) do
+			eq(flat[f], o[f], row.key .. " " .. f)
+			eq(row[f], o[f], row.key .. " " .. f .. " synced")
+		end
+		if monsters.acts(row) then
+			assert(flat.maxmp >= mage_mp(o.level), row.key .. " maxmp: at least the Mage's")
+		else
+			eq(flat.maxmp, mage_mp(o.level), row.key .. " maxmp")
+		end
+		eq(row.maxmp, flat.maxmp, row.key .. " maxmp synced")
 		eq(flat.roams, 1, row.key .. " roams")
-		for f in pairs(flat) do
-			assert(not f:find("^equipment") and not f:find("^items") and not f:find("^spells"), row.key .. ": no loadout")
-		end
-		eq(monsters.acts(row), false, row.key .. " acts")
-		eq(#monsters.loadout(row).equipment, 0, row.key .. " equipment")
+		eq(row.resist.arcane == 100, o.immune >= 1, row.key .. " immune to arcane")
+		if o.immune == 2 then eq(row.ward.sleep, 100, row.key .. " wards off sleep") end
+		if o.immune >= 1 then arcane = arcane + 1 end
+		if o.immune == 2 then sleep = sleep + 1 end
 	end
+	eq(#originals, 151); eq(arcane, 26, "immune 1 or 2"); eq(sleep, 4, "immune 2")
 	eq(monsters.get(151).key, "lucifuge"); eq(monsters.get(9).key, "silver_slime")
-	-- the original immunity, converted exactly (schema version 21): 1 is arcane 100 (the hurt
-	-- spells), 2 that and a ward of 100 against sleep; nothing else
-	local slime9 = monsters.get(9)
-	eq(slime9.resist.arcane, 100); eq(slime9.ward.sleep, 100)
-	local arcane, sleep = {}, {}
-	for id = 1, 151 do
-		local row = monsters.get(id)
-		for e, n in pairs(row.resist) do
-			eq(e .. "=" .. n, "arcane=100", row.key .. " resist")
-			arcane[#arcane + 1] = row.key
-		end
-		for s, n in pairs(row.ward) do
-			eq(s .. "=" .. n, "sleep=100", row.key .. " ward")
-			sleep[#sleep + 1] = row.key
-		end
-	end
-	eq(#arcane, 26, "immune 1 or 2"); eq(#sleep, 4, "immune 2")
-	eq(k.by_key.titan.maxmp, mage_mp(50))
 end
 
 local function base_data(over)
@@ -289,13 +285,19 @@ end
 -- Choosing an action
 
 function T.attack_only_monsters_roll_nothing_to_choose()
-	for _, id in ipairs({ 1, 9, 77, 151 }) do
-		local f, c = fight(no_rolls, monsters.get(id))
-		local list = ai.actions(f, c)
-		eq(kinds(list), "attack:", "one action")
-		local cand, target = ai.choose(f, c)
-		eq(cand.kind, "attack"); eq(target.side, "player")
+	local n = 0
+	for id = 1, 151 do
+		local row = monsters.get(id)
+		if not monsters.acts(row) then
+			local f, c = fight(no_rolls, row)
+			local list = ai.actions(f, c)
+			eq(kinds(list), "attack:", row.key .. ": one action")
+			local cand, target = ai.choose(f, c)
+			eq(cand.kind, "attack"); eq(target.side, "player")
+			n = n + 1
+		end
 	end
+	assert(n >= 10, "attack-only originals: " .. n)
 end
 
 function T.weighted_choice_over_many_trials()
@@ -355,6 +357,36 @@ function T.when_conditions()
 	f, c = fight(no_rolls, m)
 	eq(kinds(ai.actions(f, c)), "attack:")
 	eq(f.st.currenthp, 500)
+	-- a status or field key no file has is an error, not "doesn't have it" (a typo in a
+	-- negated condition would always pass): not eligible, and the warning names the key
+	local logged, log = {}, dk.log
+	dk.log = function(_, msg) logged[#logged + 1] = msg end
+	local ok, err = pcall(function()
+		for _, when in ipairs({
+			function(x) return not x:has_field("nightx") end,
+			function(x) return not x:has_status("sleeep") end,
+			function(x) return not x.target:has_status("sleeep") end,
+			function(x) return x:status("sleeep") == nil end,
+		}) do
+			logged = {}
+			f, c = fight(no_rolls, test_monster(nil, { spells = { { spell = "hurt", when = when } } }))
+			eq(kinds(ai.actions(f, c)), "attack:")
+			eq(#logged, 1, "one warning")
+			has(logged[1], "the when condition of spells[1] failed")
+		end
+		has(logged[1], "no status 'sleeep'")
+		f, c = fight(no_rolls, test_monster(nil, { spells = { { spell = "hurt", when = function(x) return not x:has_field("nightx") end } } }))
+		logged = {}
+		ai.actions(f, c)
+		has(logged[1], "no field 'nightx'")
+		-- the keys of files pass (a field that isn't up, a status it doesn't have)
+		f, c = fight(no_rolls, test_monster(nil, { spells = { { spell = "hurt",
+			when = function(x) return not x:has_field("night") and not x:has_status("sleep") and x:status("regen") == nil end } } }))
+		logged = {}
+		eq(kinds(ai.actions(f, c)), "attack:,spell:hurt"); eq(#logged, 0)
+	end)
+	dk.log = log
+	if not ok then error(err, 0) end
 	-- can_cast / can_use refusing: not eligible (Heal and the Potion at full HP), without dice
 	m = test_monster(nil, { spells = { { spell = "heal" } }, items = { { item = "potion" } } })
 	f, c = fight(no_rolls, m)

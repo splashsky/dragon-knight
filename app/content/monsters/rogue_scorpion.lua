@@ -1,4 +1,8 @@
 -- app/content/monsters/rogue_scorpion.lua :: the Rogue Scorpion (the original game's monster 19).
+local function unpoisoned(m)
+	return not m.target:has_status("poison")
+end
+
 return {
 	name = "Rogue Scorpion",
 	lore = [[
@@ -10,7 +14,16 @@ the stables.]],
 	level = 7,
 	maxhp = 28, maxdam = 22, armor = 9,
 	maxexp = 32, maxgold = 11,
+	resist = { poison = 50, fire = -25 },
+	ward = { poison = 100 },
+	attack_element = "poison",
 	maxmp = 26,
+	spells = {
+		-- opens by poisoning you, within its first two turns
+		{ spell = "poison", weight = 5, when = function(m)
+			return m.turn <= 2 and unpoisoned(m)
+		end },
+	},
 	speech = {
 		start = { "Your purse, friend, or your tail.", chance = 30 },
 		turn = { "Quick now. Quick.", "*claws pick at your pack*", chance = 15 },

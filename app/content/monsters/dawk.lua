@@ -11,6 +11,7 @@ the entrance for that reason.]],
 	level = 19,
 	maxhp = 60, maxdam = 54, armor = 40,
 	maxexp = 136, maxgold = 45,
+	resist = { earth = 25, fire = -25 },
 	maxmp = 64,
 	speech = {
 		start = { "Dawk smash!", chance = 40 },

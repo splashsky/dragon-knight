@@ -10,6 +10,13 @@ of the wagon. The reason caravans now travel with guards is mostly them.]],
 	maxhp = 52, maxdam = 45, armor = 30,
 	maxexp = 114, maxgold = 38,
 	maxmp = 55,
+	attack_weight = 4,
+	items = {
+		-- throws an Acid Vial from its second turn on
+		{ item = "acid_vial", weight = 2, stock = 1, when = function(m) return m.turn >= 2 end },
+		-- eats a herb under a third of its HP
+		{ item = "herb", weight = 3, stock = 1, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
 	speech = {
 		start = { "Stand and deliver! Hand it over!", chance = 50 },
 		turn = { "Don't make us do this the hard way.", "Keep your hands where I can see them.", chance = 25 },

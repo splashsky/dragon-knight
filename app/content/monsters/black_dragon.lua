@@ -11,8 +11,17 @@ though nobody has tested that lately.
 	level = 47,
 	maxhp = 275, maxdam = 250, armor = 205,
 	maxexp = 1580, maxgold = 527,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { poison = 100, shadow = 75, arcane = 100, holy = -50 },  -- immune to arcane (the hurt spells)
+	ward = { poison = 100, venom = 100, sleep = 50 },
 	maxmp = 176,
+	spells = {
+		-- the marsh gloom first (poison and shadow +25%), again whenever it lapses
+		{ spell = "miasma", weight = 20, when = function(m) return not m:has_field("miasma") end },
+		-- gathers an acid breath every 4th turn, every 3rd under half, then it lands and venoms
+		{ spell = "venom_breath", weight = 30, when = function(m)
+			return m.turn % (m.hp < m.maxhp // 2 and 3 or 4) == 0
+		end },
+	},
 	speech = {
 		start = { "The marsh is older than your kingdom, little knight.", "Leave your shine and go.", chance = 65 },
 		turn = { "Your armour rusts in my breath.", "Patience. I have plenty.", chance = 15 },

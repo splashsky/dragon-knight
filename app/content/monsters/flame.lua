@@ -1,4 +1,12 @@
 -- app/content/monsters/flame.lua :: the Flame (the original game's monster 82).
+local function hot(m)
+	return m:has_field("heat") or m:has_field("sun")
+end
+
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
 return {
 	name = "Flame",
 	lore = [[
@@ -11,7 +19,17 @@ just as quickly, if you can hit them before they get started.
 	level = 28,
 	maxhp = 100, maxdam = 90, armor = 70,
 	maxexp = 210, maxgold = 70,
+	resist = { fire = 100, water = -50, frost = -50 },
+	ward = { burning = 100 },
+	attack_element = "fire",
 	maxmp = 98,
+	spells = {
+		-- warms the field (Sunfire)
+		{ spell = "sunfire", weight = 2, when = function(m) return not hot(m) end },
+		-- lights you with Ember (not in the rain)
+		{ spell = "ember", weight = 2,
+			when = function(m) return not m.target:has_status("burning") and not wet(m) end },
+	},
 	speech = {
 		start = { "*crackles*", chance = 20 },
 		turn = { "*hisses*", "*pops*", chance = 15 },

@@ -10,6 +10,8 @@ a needle.]],
 	level = 3,
 	maxhp = 14, maxdam = 12, armor = 4,
 	maxexp = 10, maxgold = 3,
+	resist = { frost = -25 },
+	ward = { poison = 25 },                     -- poison sometimes doesn't take hold
 	maxmp = 9,
 	speech = {
 		start = { "Another one for the road, is it?", chance = 30 },

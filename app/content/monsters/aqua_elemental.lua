@@ -1,4 +1,8 @@
 -- app/content/monsters/aqua_elemental.lua :: the Aqua Elemental (the original game's monster 93).
+local function wet(m)
+	return m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm")
+end
+
 return {
 	name = "Aqua Elemental",
 	lore = [[
@@ -11,8 +15,19 @@ clear, and steel does better against it than any spell that might be cast at it.
 	level = 31,
 	maxhp = 120, maxdam = 110, armor = 90,
 	maxexp = 260, maxgold = 87,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, water = 150, frost = 50, lightning = -50 },  -- arcane: immune (the hurt spells)
+	ward = { sleep = 100, poison = 50 },
+	attack_element = "water",
 	maxmp = 110,
+	spells = {
+		-- calls the rain
+		{ spell = "rain_call", weight = 6, when = function(m) return not wet(m) end },
+		-- regenerates while it rains
+		{ spell = "regen", weight = 4, when = function(m) return wet(m) and not m:has_status("regen") end },
+		-- weakens you (Enfeeble)
+		{ spell = "enfeeble", weight = 2,
+			when = function(m) return not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "*splashes*", chance = 15 },
 		turn = { "*gurgles*", chance = 10 },

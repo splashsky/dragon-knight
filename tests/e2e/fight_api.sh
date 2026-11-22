@@ -266,7 +266,7 @@ fa_is experience "$EXP"
 t_section "fight api: running away"
 fa_run() { fa_player; t_fight fapi 2 50; }
 for seed in 1 2 3; do fa_both run "$seed" fa_run "run=Run&round=2"; done
-fa_blocked() { fa_player; t_fight fapi 151 30000; fa_sql "UPDATE users SET dexterity = 0"; }
+fa_blocked() { fa_player; t_fight fapi 146 30000; fa_sql "UPDATE users SET dexterity = 0"; }
 fa_both "blocked run" 4 fa_blocked "run=Run&round=2"
 fa_expect 'd["events"][0]["type"] == "run" and d["events"][0]["text"] == "You tried to run away, but were blocked in front!"'
 fa_escape() { fa_player; t_fight fapi 2 50; fa_sql "UPDATE users SET dexterity = 10000"; }
@@ -369,28 +369,28 @@ expect_body "name=\"use_gear\" value=\"$FA_WAND\" title=\"Wand (0/5 charges)\" a
 expect_body '<span class="item-badge item-badge-charges item-badge-empty" aria-hidden="true">0/5</span>'
 
 t_section "fight api: statuses, summons, locked turns"
-fa_titan() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 149 30000; fa_on_clock; }
-fa_both poison 1 fa_titan "spell=Spell&userspell=$(sp poison)&round=2"
+fa_goblin() { fa_player; fa_sql "UPDATE users SET dexterity = 22500"; t_fight fapi 28 30000; fa_on_clock; }   # it only attacks, and misses
+fa_both poison 1 fa_goblin "spell=Spell&userspell=$(sp poison)&round=2"
 fa_expect 'any(e["type"] == "spell" and e["status"][0]["key"] == "poison" and e["status"][0]["who"] == "enemy" and e["status"][0]["ticks"] == 3 and e["status"][0]["statuses"][0]["left"] == "30s" and e["status"][0]["status"] == "Poisoned" for e in d["events"] if "status" in e)' "Poison: the status"
 fa_expect 'not any(e["type"] == "status" and "text" in e for e in d["events"])' "Poison: no tick in the round"
 # a command a clock tick later: the fight catches up first (the poison's tick, its events
 # first), then the round
-fa_poisoned() { fa_titan; t_fight_status fapi 2 poison 'max=i:5
+fa_poisoned() { fa_goblin; t_fight_status fapi 2 poison 'max=i:5
 min=i:2' 2; }
 T_NOW=$((T_START + 10)) fa_both "poison ticks, caught up" 2 fa_poisoned "fight=Fight&round=2"
-fa_expect 'd["events"][0]["type"] == "status" and d["events"][0]["part"] == "ending" and d["events"][0]["actor"] == "enemy" and d["events"][0]["text"].startswith("The Titan takes ") and d["events"][0]["hp"][0]["who"] == "enemy"' "Poison: the tick, caught up first"
+fa_expect 'd["events"][0]["type"] == "status" and d["events"][0]["part"] == "ending" and d["events"][0]["actor"] == "enemy" and d["events"][0]["text"].startswith("The Goblin takes ") and d["events"][0]["hp"][0]["who"] == "enemy"' "Poison: the tick, caught up first"
 fa_expect 'any(e["type"] == "attack" and e["actor"] == "player" for e in d["events"])' "then the round"
-fa_poisoned_out() { fa_titan; t_fight_status fapi 2 poison 'max=i:5
+fa_poisoned_out() { fa_goblin; t_fight_status fapi 2 poison 'max=i:5
 min=i:2' 1; }
 T_NOW=$((T_START + 10)) fa_both "poison runs out" 2 fa_poisoned_out "fight=Fight&round=2"
 fa_expect 'any(e["actor"] == "enemy" and e["type"] == "status" and s["change"] == "expire" and s["key"] == "poison" and s["statuses"] == [] for e in d["events"] for s in e.get("status", []))' "Poison: expiry"
-fa_both regen 3 fa_titan "spell=Spell&userspell=$(sp regen)&round=2"
-fa_both wolf 4 fa_titan "spell=Spell&userspell=$(sp call_wolf)&round=2"
+fa_both regen 3 fa_goblin "spell=Spell&userspell=$(sp regen)&round=2"
+fa_both wolf 4 fa_goblin "spell=Spell&userspell=$(sp call_wolf)&round=2"
 fa_expect 'any(e["type"] == "spell" and e["summon"][0]["change"] == "join" and e["summon"][0]["name"] == "Wolf" and e["summon"][0]["hp"] == 30 for e in d["events"] if "summon" in e)' "Call Wolf: joins"
 fa_expect 'any(e["actor"] == "ally" and e["type"] == "summon" and e["part"] == "allies" and e["text"].startswith("Your Wolf bites the monster for") for e in d["events"] if "text" in e)' "the wolf bites"
-fa_both "hyper beam" 5 fa_titan "spell=Spell&userspell=$(sp hyper_beam)&round=2"
+fa_both "hyper beam" 5 fa_goblin "spell=Spell&userspell=$(sp hyper_beam)&round=2"
 fa_expect '"name=\"continue\"" in d["fragments"]["main"] and any(s["key"] == "recharging" and s["who"] == "player" for e in d["events"] for s in e.get("status", []))'
-fa_recharging() { fa_titan; t_fight_status fapi 1 recharging '' 1; }
+fa_recharging() { fa_goblin; t_fight_status fapi 1 recharging '' 1; }
 # a blocked turn ends at the next tick: before it any command plays nothing; after it the
 # catch-up played it (the blocked turn, the monster), so the page's form is stale
 for cmd in "continue=Continue" "fight=Fight" "spell=Spell&userspell=$(sp heal)"; do
@@ -399,7 +399,7 @@ for cmd in "continue=Continue" "fight=Fight" "spell=Spell&userspell=$(sp heal)";
 	T_NOW=$((T_START + 10)) fa_both "recharge, a tick later" 6 fa_recharging "$cmd&round=2"
 	fa_expect 'any(e["type"] == "blocked" and e["actor"] == "player" and e["text"] == "You must recharge this turn." for e in d["events"]) and d["stale"] and d["round"] == 3'
 done
-fa_both "continue, not locked" 7 fa_titan "continue=Continue&round=2"
+fa_both "continue, not locked" 7 fa_goblin "continue=Continue&round=2"
 fa_expect 'd["events"] == [] and d["round"] == 2'
 
 t_section "fight api: Guard, and a turn that ran out"
@@ -482,7 +482,7 @@ fa_slime; fa_live POST /fight "csrf=$FA_CS&fight=Fight&round=2"; fa_check
 fa_expect '"fight-monstermp" not in d["fragments"]["main"] and "fight-monsterhp" in d["fragments"]["main"]'
 
 t_section "fight api: death"
-fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 151 30000; }
+fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 146 30000; }
 fa_both death 1 fa_doomed "fight=Fight&round=2"
 fa_expect 'd["events"][-1]["type"] == "death" and "<b>You have died.</b>" in d["fragments"]["main"] and "round" not in d'
 fa_expect 'd["scene"]["kind"] == "death" and d["scene"]["title"] == "You have died" and d["scene"]["detail"].endswith("defeated you. Half your gold is lost.")'

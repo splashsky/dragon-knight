@@ -9,7 +9,17 @@ value them for the lightning they carry, and sylphs value nothing except being l
 	level = 15,
 	maxhp = 49, maxdam = 42, armor = 28,
 	maxexp = 106, maxgold = 35,
+	resist = { wind = 75, lightning = 25, neutral = -25 },   -- fey: iron hurts them
+	ward = { sleep = 25 },
 	maxmp = 52,
+	spells = {
+		-- calls the rain, unless it is already raining
+		{ spell = "rain_call", weight = 8, when = function(m)
+			return not (m:has_field("rain") or m:has_field("downpour") or m:has_field("thunderstorm"))
+		end },
+		-- arcs lightning through the rain
+		{ spell = "spark", weight = 3 },
+	},
 	speech = {
 		start = { "Oh, a visitor! Do stay for a gust or two.", chance = 40 },
 		turn = { "Whoosh! There goes your hat!", "Too slow, too slow.", chance = 25 },

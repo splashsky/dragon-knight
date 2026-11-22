@@ -1,4 +1,8 @@
 -- app/content/monsters/knave.lua :: the Knave (the original game's monster 27).
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
 return {
 	name = "Knave",
 	lore = [[
@@ -10,6 +14,11 @@ knows his face but seldom his name, since he changes it every few weeks.]],
 	maxhp = 36, maxdam = 30, armor = 15,
 	maxexp = 52, maxgold = 17,
 	maxmp = 33,
+	attack_weight = 3,
+	items = {
+		-- throws Sleep Powder in your face while you are awake
+		{ item = "sleep_powder", weight = 3, stock = 1, when = awake },
+	},
 	speech = {
 		start = { "Your purse or your life, friend. Purse first, please.", chance = 50 },
 		turn = { "Keep still and nobody gets hurt.", "Don't be tiresome.", chance = 25 },

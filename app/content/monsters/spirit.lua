@@ -11,7 +11,14 @@ name.]],
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 132, maxgold = 44,
+	resist = { neutral = 25, shadow = 50, poison = 100, holy = -50 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
 	maxmp = 59,
+	spells = {
+		-- drains you with Withering, once (it can only afford one)
+		{ spell = "withering", weight = 3,
+			when = function(m) return not m.target:has_status("withering") end },
+	},
 	speech = {
 		start = { "You... owe me...", chance = 40 },
 		turn = { "Cold... so cold.", chance = 15 },

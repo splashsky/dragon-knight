@@ -10,7 +10,15 @@ it reaches its end the road will be quieter for a while.]],
 	level = 36,
 	maxhp = 155, maxdam = 140, armor = 115,
 	maxexp = 395, maxgold = 132,
+	resist = { shadow = 75, poison = 100, frost = 25, holy = -75 },
+	ward = { poison = 100, sleep = 100 },
 	maxmp = 128,
+	spells = {
+		-- "Four. Three. Two. One. Zero.": a four-turn countdown, then shadow damage; it hurries a new one under a third of its life
+		{ spell = "doom", weight = 30, when = function(m)
+			return not m.target:has_status("doom") and (m.turn % 5 == 1 or m.hp < m.maxhp // 3)
+		end },
+	},
 	speech = {
 		start = { "Four.", "Three. You are already counted.", chance = 40 },
 		turn = { "Two.", "One is close.", chance = 15 },

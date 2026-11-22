@@ -10,7 +10,13 @@ and a bag of coin.]],
 	level = 35,
 	maxhp = 148, maxdam = 132, armor = 108,
 	maxexp = 350, maxgold = 117,
+	ward = { weakened = 50 },                        -- hard to talk down
 	maxmp = 125,
+	attack_weight = 3,
+	spells = {
+		-- "argues your case into the ground": saps your strength for a few turns
+		{ spell = "enfeeble", weight = 3, when = function(m) return not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "You are charged, {player}.", "State your name for the record.", chance = 50 },
 		turn = { "Objection.", "The record shows you struck first.", chance = 20 },

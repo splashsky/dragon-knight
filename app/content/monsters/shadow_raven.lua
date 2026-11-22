@@ -9,7 +9,8 @@ Scholars say it feeds on lost light, which explains why it is always about when 
 	level = 6,
 	maxhp = 24, maxdam = 18, armor = 7,
 	maxexp = 26, maxgold = 9,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, shadow = 75, wind = 25, holy = -50, lightning = -25 },   -- no hurt spells
+	attack_element = "shadow",
 	maxmp = 22,
 	speech = {
 		start = { "Kraa... dark... Kraa...", chance = 30 },

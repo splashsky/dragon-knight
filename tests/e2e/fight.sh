@@ -59,18 +59,18 @@ t_get /fight; expect_body 'Cheat attempt detected.'
 t_get /victory; expect_redirect /
 
 t_section "fight: run away blocked"
-# Lucifuge (maxdam 600): ceil(sqrt(600)) = 25 beats any run roll with dexterity 0 (max 10);
-# no dodge with dexterity 0, and the hit is rand(300,600) - 0 (at the calm place: no field
-# changes the monster's attack)
+# a Colossus (it only attacks; maxdam 300): ceil(sqrt(300)) = 18 beats any run roll with
+# dexterity 0 (max 10); no dodge with dexterity 0, and the hit is rand(150,300) - 0 (at the
+# calm place: no field changes the monster's attack)
 t_calm fighter
-t_fight fighter 151 30000
+t_fight fighter 146 30000
 f_sql "UPDATE users SET dexterity = 0, base_defense = 0, currenthp = 5000, base_maxhp = 5000"
 t_round "csrf=$CS&run=Run"; expect_status 200
 expect_body 'You tried to run away, but were blocked in front!'; expect_body "Monster's HP: 30000"
 expect_body 'The monster attacks you for'; expect_body 'name="run"'; expect_no_body 'You have died.'
-f_is currentaction Fighting; f_is "$T_ROUND" 3; f_is "$T_MONSTER" 151; f_is "$T_MONSTER_HP" 30000
+f_is currentaction Fighting; f_is "$T_ROUND" 3; f_is "$T_MONSTER" 146; f_is "$T_MONSTER_HP" 30000
 hp=$(f_col currenthp)
-[ "$hp" -ge 4400 ] && [ "$hp" -le 4700 ] && t_ok || t_fail "blocked run: currenthp $hp not in 4400..4700"
+[ "$hp" -ge 4700 ] && [ "$hp" -le 4850 ] && t_ok || t_fail "blocked run: currenthp $hp not in 4700..4850"
 t_fight_clear fighter
 f_sql "UPDATE users SET currentaction = 'Exploring', dexterity = $DEX"
 
@@ -240,7 +240,7 @@ t_spells fighter 1,6,11
 t_fight_clear fighter
 
 t_section "fight: death"
-t_fight fighter 151 30000
+t_fight fighter 146 30000
 f_sql "UPDATE users SET base_attack = 1 - strength, currenthp = 1, base_maxhp = 30,
 	dexterity = 0, base_defense = 0, gold = 101, latitude = 40, longitude = -40"
 t_get /fight; CS=$(t_csrf)
@@ -257,7 +257,7 @@ t_get /victory; expect_redirect /
 
 t_section "fight: death on a spell turn keeps the MP spent, clears buffs"
 t_spells fighter 1,6,11,14
-t_fight fighter 151 30000
+t_fight fighter 146 30000
 t_fight_status fighter 1 uber_defense 'pct=i:25'
 f_sql "UPDATE users SET currenthp = 1, currentmp = 30, base_maxmp = 50, gold = 100"
 t_round "csrf=$CS&spell=Spell&userspell=14"
@@ -266,7 +266,7 @@ f_is currentaction 'In Town'; f_is currentmp 20; f_is "$T_UBER_DAMAGE" 0; f_is "
 f_is gold 50; f_is currenthp 8
 
 t_section "fight: run away blocked, fatal"
-t_fight fighter 151 30000
+t_fight fighter 146 30000
 t_fight_status fighter 1 uber_damage 'pct=i:10'; t_fight_status fighter 1 uber_defense 'pct=i:10'
 f_sql "UPDATE users SET currenthp = 1, currentmp = 7, gold = 101, latitude = 40, longitude = -40"
 t_round "csrf=$CS&run=Run"

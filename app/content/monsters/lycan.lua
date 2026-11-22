@@ -1,4 +1,12 @@
 -- app/content/monsters/lycan.lua :: the Lycan (the original game's monster 73).
+local function buffed(m)
+	return m:has_status("uber_damage")
+end
+
+local function night(m)
+	return m:has_field("night")
+end
+
 return {
 	name = "Lycan",
 	lore = [[
@@ -11,7 +19,12 @@ the smiths who sell it are not always honest about its purity.
 	level = 25,
 	maxhp = 88, maxdam = 78, armor = 60,
 	maxexp = 185, maxgold = 62,
+	resist = { holy = -25 },
 	maxmp = 91,
+	spells = {
+		-- rages at night
+		{ spell = "rage", weight = 4, when = function(m) return night(m) and not buffed(m) end },
+	},
 	speech = {
 		start = { "Full moon, {player}. Bad luck for you.", chance = 50 },
 		turn = { "*snarls*", "I can smell your fear.", chance = 20 },

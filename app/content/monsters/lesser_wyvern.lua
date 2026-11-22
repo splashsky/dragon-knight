@@ -11,6 +11,8 @@ to keep their horses under a roof when one is about, and to keep their heads dow
 	level = 32,
 	maxhp = 122, maxdam = 110, armor = 92,
 	maxexp = 270, maxgold = 90,
+	resist = { wind = 25, lightning = -25, poison = 50 },
+	ward = { poison = 50, venom = 50 },
 	maxmp = 114,
 	speech = {
 		start = { "*shrieks from above*", chance = 30 },

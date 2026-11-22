@@ -9,6 +9,8 @@ stairs to keep it off, which works until the salt runs out.]],
 	level = 10,
 	maxhp = 38, maxdam = 32, armor = 18,
 	maxexp = 62, maxgold = 21,
+	resist = { shadow = 75, holy = -50, fire = -25 },
+	attack_element = "shadow",
 	maxmp = 36,
 	speech = {
 		start = { "*gurgles*", chance = 20 },

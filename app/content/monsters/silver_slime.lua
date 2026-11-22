@@ -11,7 +11,8 @@ yet found a spell that will hold it still, which is why it is so seldom caught.
 	level = 30,
 	maxhp = 15, maxdam = 100, armor = 200,
 	maxexp = 15, maxgold = 1000,
-	resist = { arcane = 100 }, ward = { sleep = 100 },  -- immune to arcane (the hurt spells) and to sleep
+	resist = { arcane = 100, neutral = 50, lightning = -50 },  -- arcane: immune (the hurt spells)
+	ward = { sleep = 100 },  -- and to sleep
 	maxmp = 105,
 	speech = {
 		start = { "*gloop*", chance = 15 },

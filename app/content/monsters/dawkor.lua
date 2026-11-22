@@ -11,6 +11,7 @@ and a lone one is rarely so bold.
 	level = 26,
 	maxhp = 92, maxdam = 82, armor = 64,
 	maxexp = 195, maxgold = 65,
+	resist = { earth = 40 },
 	maxmp = 94,
 	speech = {
 		start = { "Dawkor sees you. Dawkor hits you.", chance = 40 },

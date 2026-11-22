@@ -9,6 +9,7 @@ traveller's pack. Hunters say a raven that circles overhead is waiting for someo
 	level = 4,
 	maxhp = 16, maxdam = 13, armor = 5,
 	maxexp = 18, maxgold = 6,
+	resist = { wind = 25, lightning = -25 },
 	maxmp = 12,
 	speech = {
 		start = { "Kraa!", chance = 30 },

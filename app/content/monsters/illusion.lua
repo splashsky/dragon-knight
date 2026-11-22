@@ -10,7 +10,7 @@ sounds.]],
 	level = 5,
 	maxhp = 20, maxdam = 15, armor = 6,
 	maxexp = 20, maxgold = 7,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, lightning = -50, holy = 25 },   -- no hurt spells, but a spark disperses it
 	maxmp = 17,
 	speech = {
 		start = { "...Come closer. The road is this way.", chance = 25 },

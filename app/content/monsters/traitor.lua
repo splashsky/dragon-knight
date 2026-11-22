@@ -11,7 +11,17 @@ He will sell the next gate too.
 	level = 45,
 	maxhp = 230, maxdam = 205, armor = 175,
 	maxexp = 1150, maxgold = 383,
+	ward = { weakened = 25 },
 	maxmp = 167,
+	attack_weight = 6,
+	items = {
+		-- "I was told you would come": he comes prepared, and throws weakening dust...
+		{ item = "weakening_dust", weight = 5, stock = 2, when = function(m) return not m.target:has_status("weakened") end },
+		-- ...and acid
+		{ item = "acid_vial", weight = 4, stock = 2 },
+		-- and he can be bought off a potion under a third of his life
+		{ item = "potion", weight = 8, stock = 2, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
 	speech = {
 		start = { "Ah, {player}. I was told you would come.", "Who is paying you to stand there?", chance = 60 },
 		turn = { "I could be persuaded to switch sides, you know.", "Every gate has a price.", chance = 15 },

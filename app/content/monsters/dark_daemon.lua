@@ -11,7 +11,8 @@ his leave. Nobody has yet asked it.
 	level = 49,
 	maxhp = 340, maxdam = 320, armor = 260,
 	maxexp = 2200, maxgold = 733,
-	resist = { arcane = 100 },  -- immune to arcane: the hurt spells
+	resist = { arcane = 100, shadow = 150, fire = 50, poison = 50, holy = -75 },  -- immune to arcane (the hurt spells)
+	ward = { sleep = 50, withering = 100 },
 	maxmp = 183,
 	speech = {
 		start = { "Your light is a small thing, {player}.", "The ruins keep no guests.", chance = 60 },

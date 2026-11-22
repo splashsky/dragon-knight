@@ -1,4 +1,8 @@
 -- app/content/monsters/fire_raven.lua :: the Fire Raven (the original game's monster 25).
+local function unburnt(m)
+	return not m.target:has_status("burning")
+end
+
 return {
 	name = "Fire Raven",
 	lore = [[
@@ -9,7 +13,14 @@ Hunters say to keep torches low and wait for it to fly off.]],
 	level = 9,
 	maxhp = 34, maxdam = 28, armor = 14,
 	maxexp = 45, maxgold = 15,
+	resist = { fire = 75, wind = 25, frost = -50, water = -25 },
+	ward = { burning = 100 },
+	attack_element = "fire",
 	maxmp = 33,
+	spells = {
+		-- sets you alight, once the last fire is out
+		{ spell = "ember", weight = 4, when = unburnt },
+	},
 	speech = {
 		start = { "Kraa!", chance = 30 },
 		turn = { "Kraa!", "*flaps its smoking wings*", chance = 15 },

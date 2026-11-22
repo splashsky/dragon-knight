@@ -11,7 +11,16 @@ rooms with salt before they will let a bed go out for the night.
 	level = 25,
 	maxhp = 84, maxdam = 74, armor = 58,
 	maxexp = 180, maxgold = 60,
+	resist = { neutral = 25, shadow = 50, poison = 100, holy = -50 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
 	maxmp = 91,
+	attack_weight = 2,
+	spells = {
+		-- throws things: Hurt, Pain or a plain blow, no telling which
+		{ spell = "hurt", weight = 2 },
+		-- throws Pain
+		{ spell = "pain", weight = 2 },
+	},
 	speech = {
 		start = { "Get OUT of my house!", chance = 45 },
 		turn = { "*crash*", "Who put that there?", chance = 25 },

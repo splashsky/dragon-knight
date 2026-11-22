@@ -1,4 +1,9 @@
 -- app/content/monsters/demon_prince.lua :: the Demon Prince (the original game's monster 139).
+
+local function unraged(m)
+	return not m:has_status("uber_damage")
+end
+
 return {
 	name = "Demon Prince",
 	lore = [[
@@ -10,7 +15,18 @@ against him. He rarely fights himself. He prefers to watch from a height and cou
 	level = 47,
 	maxhp = 270, maxdam = 240, armor = 200,
 	maxexp = 1520, maxgold = 507,
+	resist = { fire = 75, shadow = 25, holy = -50 },
+	ward = { burning = 50, sleep = 50 },
 	maxmp = 176,
+	attack_weight = 3,
+	spells = {
+		-- "He rarely fights himself": he sets the sulphur aura...
+		{ spell = "brimstone", weight = 20, when = function(m) return not m:has_field("brimstone") end },
+		-- ...and lashes from a height...
+		{ spell = "cinder_lash", weight = 6 },
+		-- ...until he is hurt, then he joins and hits harder
+		{ spell = "fury", weight = 20, when = function(m) return m.hp < m.maxhp // 2 and unraged(m) end },
+	},
 	speech = {
 		start = { "I have your name, {player}. Your knights wrote it on the walls.", "Send another wave, then.", chance = 60 },
 		turn = { "My soldiers are cheap. You are not.", "Count the dead, {player}. Then count yours.", chance = 15 },

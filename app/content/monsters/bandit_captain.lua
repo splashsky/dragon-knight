@@ -2,6 +2,14 @@
 -- its equipment's attack, defense and modifiers count like a character's (maxdam 20 +
 -- 45, armor 12 + 30 + 10, maxhp 120 + 25). It works itself into a frenzy once per fight
 -- and eats its one herb when badly hurt. It doesn't roam (see goblin_shaman.lua).
+local function unraged(m)
+	return not m:has_status("uber_damage")
+end
+
+local function unmended(m)
+	return not m:has_status("regen")
+end
+
 return {
 	name = "Bandit Captain",
 	lore = [[
@@ -13,6 +21,7 @@ he is hurt. Roadside notices offer gold for his head, and most of them are old.]
 	level = 12,
 	maxhp = 120, maxdam = 20, armor = 12,
 	maxexp = 60, maxgold = 120,
+	ward = { sleep = 50 },
 	maxmp = 40,                         -- the Mage's MP at level 12
 	roams = false,
 	attack_weight = 4,
@@ -23,9 +32,17 @@ he is hurt. Roadside notices offer gold for his head, and most of them are old.]
 		accessory1 = "life_stone",
 	},
 	spells = {
-		{ spell = "craze", weight = 1, when = function(m) return not m:has_status("uber_damage") end },
+		-- works himself into a frenzy
+		{ spell = "craze", weight = 1, when = unraged },
+		-- raises a shield of Fend under 60% HP
+		{ spell = "fend", weight = 3, when = function(m)
+			return m.hp < m.maxhp * 6 // 10 and not m:has_status("uber_defense")
+		end },
+		-- knits itself under half HP (Grit refuses above it)
+		{ spell = "grit", weight = 3, when = unmended },
 	},
 	items = {
+		-- eats his herb under a third of his HP
 		{ item = "herb", weight = 2, stock = 1, when = function(m) return m.hp < m.maxhp // 3 end },
 	},
 	speech = {

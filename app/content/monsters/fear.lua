@@ -1,4 +1,8 @@
 -- app/content/monsters/fear.lua :: the Fear (the original game's monster 66).
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
 return {
 	name = "Fear",
 	lore = [[
@@ -11,7 +15,17 @@ to say why they stopped.]],
 	level = 23,
 	maxhp = 76, maxdam = 66, armor = 52,
 	maxexp = 165, maxgold = 55,
+	resist = { neutral = 25, shadow = 50, poison = 100, holy = -25 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
 	maxmp = 82,
+	spells = {
+		-- weakens you (Enfeeble)
+		{ spell = "enfeeble", weight = 3,
+			when = function(m) return not m.target:has_status("weakened") end },
+		-- puts the weak to sleep: only once you are under half HP
+		{ spell = "dream", weight = 2,
+			when = function(m) return awake(m) and m.target.hp < m.target.maxhp // 2 end },
+	},
 	speech = {
 		start = { "You know what I am.", chance = 40 },
 		turn = { "Look behind you.", chance = 20 },

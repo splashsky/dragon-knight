@@ -10,6 +10,8 @@ the pit are more binding than the rules of the road.]],
 	level = 40,
 	maxhp = 184, maxdam = 164, armor = 135,
 	maxexp = 666, maxgold = 222,
+	resist = { fire = 50, shadow = 25, holy = -50 },
+	ward = { burning = 50 },
 	maxmp = 144,
 	speech = {
 		start = { "Good evening, {player}. Shall we talk terms?", "Your signature, please.", chance = 55 },

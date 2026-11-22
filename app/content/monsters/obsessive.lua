@@ -10,7 +10,13 @@ them useful, which is the only reason anyone has tried to reason with one.]],
 	level = 40,
 	maxhp = 180, maxdam = 160, armor = 135,
 	maxexp = 630, maxgold = 210,
+	ward = { sleep = 50, weakened = 50 },
 	maxmp = 144,
+	attack_weight = 4,
+	spells = {
+		-- one word, over and over, until the magic runs dry (144 MP = five casts), then it swings
+		{ spell = "maim", weight = 30 },
+	},
 	speech = {
 		start = { "Guilty. Guilty. Guilty.", "{player}, {player}, {player}.", chance = 55 },
 		turn = { "Again. Again.", "Always. Always.", chance = 25 },

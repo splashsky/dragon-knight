@@ -1,4 +1,9 @@
 -- app/content/monsters/fanatic.lua :: the Fanatic (the original game's monster 107).
+
+local function unraged(m)
+	return not m:has_status("uber_damage")
+end
+
 return {
 	name = "Fanatic",
 	lore = [[
@@ -10,7 +15,13 @@ when the chanting starts, because the chant is usually followed by a rush.]],
 	level = 36,
 	maxhp = 160, maxdam = 140, armor = 115,
 	maxexp = 410, maxgold = 137,
+	ward = { sleep = 100 },                         -- has given up sleep
 	maxmp = 128,
+	attack_weight = 4,
+	spells = {
+		-- the chant, then the rush: its second turn is a rage instead of a blow
+		{ spell = "rage", weight = 12, when = function(m) return m.turn >= 2 and unraged(m) end },
+	},
 	speech = {
 		start = { "The Advocate is right! Say it!", "Heretic, {player}!", chance = 60 },
 		turn = { "Doubt is a sin!", "Louder! LOUDER!", chance = 25 },

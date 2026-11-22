@@ -1,4 +1,12 @@
 -- app/content/monsters/lycanthor.lua :: the Lycanthor (the original game's monster 83).
+local function buffed(m)
+	return m:has_status("uber_damage")
+end
+
+local function night(m)
+	return m:has_field("night")
+end
+
 return {
 	name = "Lycanthor",
 	lore = [[
@@ -11,7 +19,16 @@ voice sounds like their own.
 	level = 28,
 	maxhp = 100, maxdam = 90, armor = 70,
 	maxexp = 210, maxgold = 70,
+	resist = { holy = -50 },
 	maxmp = 98,
+	attack_weight = 3,
+	spells = {
+		-- marks you: its blows hit harder until it fades or is cleansed
+		{ spell = "hunters_mark", weight = 5,
+			when = function(m) return not m.target:has_status("marked") end },
+		-- rages at night
+		{ spell = "rage", weight = 3, when = function(m) return night(m) and not buffed(m) end },
+	},
 	speech = {
 		start = { "We have been watching your fire, {player}.", chance = 40 },
 		turn = { "*low growl*", "Circle left. Now.", chance = 20 },

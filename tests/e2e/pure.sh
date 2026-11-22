@@ -105,7 +105,7 @@ t_get /victory; expect_status 200
 pu_all "after a victory"
 
 t_section "pure GETs: after a death"
-t_fight pureuser 151 30000
+t_fight pureuser 146 30000
 t_sql "UPDATE users SET currenthp = 1, dexterity = 0, base_defense = 0, dropcode = 0 $PQ"
 t_get /fight; t_round "csrf=$(t_csrf)&fight=Fight"; expect_body '<b>You have died.</b>'
 pu_all "after a death"

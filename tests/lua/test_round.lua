@@ -21,6 +21,7 @@ local items = require("lib.items")
 local load = require("lib.content.load")
 local monsters_lib = require("lib.monsters")
 local olds = require("tests.spells_original")
+local originals = require("tests.monsters_original")
 local php = require("lib.php")
 local round = require("fight.round")
 local spells = require("lib.spells")
@@ -102,11 +103,21 @@ end
 table.sort(ORIGINAL_KEYS)
 
 function T.fights_play_as_in_2_1()
-	-- the original monsters (ids 1-151, attack only, no equipment); the example monsters with
-	-- loadouts that came later (2.2) act differently by design (test_monsters.lua)
-	-- (the frozen fight reads the original immunity, `immune`: from the resistances and wards)
+	-- the original monsters as the original game had them (ids 1-151: their stats and immunity,
+	-- tests/lua/monsters_original.lua; attack only, no equipment, no other affinities): the
+	-- fight patterns and affinities of 3.2 act differently by design (test_monsters.lua,
+	-- test_patterns.lua). The frozen fight reads the immunity, `immune`, from the resistances
+	-- and wards
 	local monsters = {}
-	for id = 1, 151 do monsters[id] = monsters_lib.get(id) end
+	for id, o in ipairs(originals) do
+		local m = {}
+		for k, v in pairs(monsters_lib.get(id)) do m[k] = v end
+		for _, f in ipairs({ "name", "maxhp", "maxdam", "armor", "level", "maxexp", "maxgold" }) do m[f] = o[f] end
+		m.resist, m.ward = fm.affinities(o.immune)
+		m.attack_element, m.class, m.attack_weight = "neutral", "", 1
+		m.loadout = { equipment = {}, items = {}, spells = {} }
+		monsters[id] = m
+	end
 	local spell_rows = {}
 	for _, key in ipairs(ORIGINAL_KEYS) do spell_rows[#spell_rows + 1] = assert(spells.by_key(key)) end
 	local item_rows = { items.by_key("herb"), items.by_key("potion"), items.by_key("ether") }

@@ -10,6 +10,7 @@ stream, so travellers go round by the ford. Its pelt sells well in Gilead.]],
 	level = 21,
 	maxhp = 70, maxdam = 62, armor = 48,
 	maxexp = 160, maxgold = 53,
+	resist = { frost = 25 },
 	maxmp = 74,
 	speech = {
 		start = { "*grumbles*", chance = 20 },

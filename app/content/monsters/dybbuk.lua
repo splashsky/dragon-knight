@@ -1,4 +1,8 @@
 -- app/content/monsters/dybbuk.lua :: the Dybbuk (the original game's monster 26).
+local function unweakened(m)
+	return not m.target:has_status("weakened")
+end
+
 return {
 	name = "Dybbuk",
 	lore = [[
@@ -9,7 +13,13 @@ its family. Its blows land harder than they should, and it has no patience for t
 	level = 9,
 	maxhp = 34, maxdam = 28, armor = 14,
 	maxexp = 50, maxgold = 17,
+	resist = { shadow = 50, holy = -50 },
+	ward = { sleep = 50 },                      -- the body sleeps, the spirit doesn't
 	maxmp = 33,
+	spells = {
+		-- saps your strength before it hits
+		{ spell = "enfeeble", weight = 3, when = unweakened },
+	},
 	speech = {
 		start = { "Give me back what is mine.", "Mine. Mine. Mine.", chance = 50 },
 		turn = { "Let me in. Let me in.", "Your voice is not yours.", chance = 20 },

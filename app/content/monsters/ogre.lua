@@ -11,6 +11,8 @@ round.]],
 	level = 23,
 	maxhp = 78, maxdam = 68, armor = 54,
 	maxexp = 170, maxgold = 57,
+	resist = { neutral = 10, poison = 25 },
+	ward = { sleep = 30 },
 	maxmp = 82,
 	speech = {
 		start = { "Ogre want toll!", chance = 45 },

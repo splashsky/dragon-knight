@@ -1,4 +1,8 @@
 -- app/content/monsters/necromancer.lua :: the Necromancer (the original game's monster 75).
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
 return {
 	name = "Necromancer",
 	lore = [[
@@ -11,7 +15,24 @@ they are seen.
 	level = 26,
 	maxhp = 90, maxdam = 80, armor = 62,
 	maxexp = 190, maxgold = 63,
-	maxmp = 94,
+	resist = { shadow = 50, poison = 50, holy = -25 },
+	ward = { sleep = 50, poison = 50 },
+	maxmp = 125,                        -- from 94: the chain is 100 MP (miasma 30, poison 6, dream 30, withering 34), then the heal 25
+	attack_weight = 2,
+	spells = {
+		-- makes the air foul (poison ticks harder)
+		{ spell = "miasma", weight = 6, when = function(m) return not m:has_field("miasma") end },
+		-- poisons you
+		{ spell = "poison", weight = 4, when = function(m) return not m.target:has_status("poison") end },
+		-- puts you to sleep once you are poisoned
+		{ spell = "dream", weight = 4,
+			when = function(m) return m.target:has_status("poison") and awake(m) end },
+		-- drains the sleeper (Withering)
+		{ spell = "withering", weight = 6,
+			when = function(m) return m.target:has_status("sleep") and not m.target:has_status("withering") end },
+		-- heals itself below a third HP
+		{ spell = "life", weight = 5, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
 	speech = {
 		start = { "Another soul wanders into my garden.", "Ah, {player}. The dead whispered you would come.", chance = 65 },
 		turn = {

@@ -11,6 +11,8 @@ Narcissa, where they wait for carts to come up the grade.
 	level = 27,
 	maxhp = 94, maxdam = 84, armor = 65,
 	maxexp = 200, maxgold = 67,
+	resist = { neutral = 15 },
+	ward = { sleep = 25 },
 	maxmp = 96,
 	speech = {
 		start = { "Brute smash!", chance = 40 },

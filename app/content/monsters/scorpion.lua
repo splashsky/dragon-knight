@@ -1,4 +1,8 @@
 -- app/content/monsters/scorpion.lua :: the Scorpion (the original game's monster 12).
+local function unpoisoned(m)
+	return not m.target:has_status("poison")
+end
+
 return {
 	name = "Scorpion",
 	lore = [[
@@ -9,7 +13,14 @@ a day. Caravan drivers shake out their boots every morning and do not trust a da
 	level = 5,
 	maxhp = 18, maxdam = 14, armor = 6,
 	maxexp = 20, maxgold = 7,
+	resist = { poison = 50, fire = -25 },
+	ward = { poison = 100 },
+	attack_element = "poison",
 	maxmp = 17,
+	spells = {
+		-- poisons you unless you are already poisoned
+		{ spell = "poison", weight = 1, when = unpoisoned },
+	},
 	speech = {
 		start = { "*clicks its claws*", chance = 20 },
 		turn = { "*tail twitches*", chance = 10 },

@@ -1,4 +1,12 @@
 -- app/content/monsters/nymph.lua :: the Nymph (the original game's monster 35).
+local function awake(m)
+	return not m.target:has_status("sleep")
+end
+
+local function wounded(m)
+	return m.hp < m.maxhp // 2
+end
+
 return {
 	name = "Nymph",
 	lore = [[
@@ -9,7 +17,17 @@ well, but they have never needed to.]],
 	level = 12,
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 70, maxgold = 23,
+	resist = { water = 75, frost = 25, neutral = -25 },   -- fey: iron hurts them
+	ward = { sleep = 50 },
 	maxmp = 40,
+	spells = {
+		-- sings you to sleep unless you already are
+		{ spell = "sleep", weight = 3, when = awake },
+		-- a jet of water
+		{ spell = "water_jet", weight = 1 },
+		-- heals itself under half HP
+		{ spell = "heal", weight = 3, when = wounded },
+	},
 	speech = {
 		start = { "Oh, you came. I knew you would.", chance = 50 },
 		turn = { "Sit with me a while.", "Your feet must be so tired.", chance = 25 },

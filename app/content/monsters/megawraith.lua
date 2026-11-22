@@ -10,6 +10,9 @@ afterlife because of them. Priests recommend holy water and running, in that ord
 	level = 21,
 	maxhp = 70, maxdam = 60, armor = 46,
 	maxexp = 155, maxgold = 52,
+	resist = { neutral = 35, shadow = 75, frost = 50, poison = 100, holy = -75 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
+	attack_element = "shadow",
 	maxmp = 74,
 	speech = {
 		start = { "Your bones will do.", chance = 40 },

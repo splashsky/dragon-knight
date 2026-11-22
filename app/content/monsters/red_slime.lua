@@ -10,6 +10,9 @@ never works twice.]],
 	level = 1,
 	maxhp = 6, maxdam = 5, armor = 1,
 	maxexp = 2, maxgold = 1,
+	resist = { fire = 50, frost = -50 },
+	ward = { burning = 100 },                   -- a Fire Flask can't set it alight
+	attack_element = "fire",
 	maxmp = 5,
 	speech = {
 		start = { "*hisses wetly*", chance = 20 },

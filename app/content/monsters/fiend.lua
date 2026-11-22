@@ -10,6 +10,9 @@ if you must grapple with one.]],
 	level = 37,
 	maxhp = 160, maxdam = 145, armor = 120,
 	maxexp = 445, maxgold = 148,
+	resist = { fire = 50, holy = -50 },
+	ward = { burning = 50 },
+	attack_element = "fire",                        -- hot skin
 	maxmp = 132,
 	speech = {
 		start = { "Fresh meat!", "Heh. Another one.", chance = 45 },

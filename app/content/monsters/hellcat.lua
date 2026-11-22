@@ -10,6 +10,8 @@ a warning. Nobody has yet found a way to make one purr.]],
 	level = 18,
 	maxhp = 58, maxdam = 50, armor = 38,
 	maxexp = 128, maxgold = 43,
+	resist = { fire = 50, frost = -25, water = -25, holy = -25 },
+	attack_element = "fire",
 	maxmp = 59,
 	speech = {
 		start = { "*hisses*", chance = 40 },

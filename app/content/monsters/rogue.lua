@@ -1,4 +1,8 @@
 -- app/content/monsters/rogue.lua :: the Rogue (the original game's monster 22).
+local function unburnt(m)
+	return not m.target:has_status("burning")
+end
+
 return {
 	name = "Rogue",
 	lore = [[
@@ -10,6 +14,11 @@ Hambry guard posts a reward for each one brought in, which is usually the price 
 	maxhp = 30, maxdam = 25, armor = 12,
 	maxexp = 40, maxgold = 13,
 	maxmp = 30,
+	attack_weight = 3,
+	items = {
+		-- throws a Fire Flask while you aren't burning
+		{ item = "fire_flask", weight = 2, stock = 1, when = unburnt },
+	},
 	speech = {
 		start = { "Hand over the purse, {player}.", chance = 30 },
 		turn = { "Keep still and nobody gets hurt.", "Quiet, now.", chance = 20 },

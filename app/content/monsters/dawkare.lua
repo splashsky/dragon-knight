@@ -1,4 +1,8 @@
 -- app/content/monsters/dawkare.lua :: the Dawkare (the original game's monster 86).
+local function buffed(m)
+	return m:has_status("uber_damage")
+end
+
 return {
 	name = "Dawkare",
 	lore = [[
@@ -12,7 +16,18 @@ them.
 	level = 29,
 	maxhp = 106, maxdam = 96, armor = 76,
 	maxexp = 220, maxgold = 73,
+	resist = { earth = 50 },
 	maxmp = 101,
+	attack_weight = 3,
+	spells = {
+		-- picks its ground: the pass turns to mud
+		{ spell = "mire", weight = 6, when = function(m) return not m:has_field("mud") end },
+		-- gives a war cry
+		{ spell = "war_cry", weight = 4, when = function(m) return not buffed(m) end },
+		-- steels itself (Grit, regeneration) under half HP
+		{ spell = "grit", weight = 4,
+			when = function(m) return m.hp < m.maxhp // 2 and not m:has_status("regen") end },
+	},
 	speech = {
 		start = { "Dawkare has been waiting for you.", chance = 40 },
 		turn = { "My dawkor said you were weak.", "Stand still. It is easier.", chance = 25 },

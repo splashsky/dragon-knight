@@ -10,7 +10,15 @@ though the stone ones are usually the ones that were already dead.]],
 	level = 17,
 	maxhp = 56, maxdam = 48, armor = 36,
 	maxexp = 120, maxgold = 40,
+	resist = { fire = -50, earth = 25 },
 	maxmp = 57,
+	spells = {
+		-- regenerates under 60% HP, but not while burning or in the sun or the heat
+		{ spell = "regen", weight = 4, when = function(m)
+			return m.hp < m.maxhp * 6 // 10 and not m:has_status("regen") and not m:has_status("burning")
+				and not (m:has_field("sun") or m:has_field("heat"))
+		end },
+	},
 	speech = {
 		start = { "Who walks on Troll road?", "Troll smash little one.", chance = 50 },
 		turn = { "Hrrrrm.", "Troll hungry.", chance = 10 },

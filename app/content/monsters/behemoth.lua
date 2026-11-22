@@ -11,6 +11,8 @@ for whatever is nearest.
 	level = 48,
 	maxhp = 285, maxdam = 260, armor = 210,
 	maxexp = 1700, maxgold = 567,
+	resist = { neutral = 25, earth = 25, poison = 25 },
+	ward = { sleep = 25, poison = 50 },
 	maxmp = 180,
 	speech = {
 		start = { "*rumbles*", "Nearest thing. Mine.", chance = 50 },

@@ -10,6 +10,8 @@ Most adventurers prefer to fight their way through, which is what the Cherufiend
 	level = 41,
 	maxhp = 195, maxdam = 170, armor = 140,
 	maxexp = 690, maxgold = 230,
+	resist = { fire = 50, neutral = 25, holy = -50 },     -- the shield
+	ward = { sleep = 50 },
 	maxmp = 147,
 	speech = {
 		start = { "Papers, {player}. Now.", "Nobody passes the stairs.", chance = 50 },

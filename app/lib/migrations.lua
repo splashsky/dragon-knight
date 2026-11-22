@@ -1286,7 +1286,22 @@ end
 -- monsters an attack element and a class. monsters.immune goes: 1 becomes a resistance of
 -- 100 to arcane (the hurt spells' element), 2 that and a ward of 100 against sleep, on the
 -- rows (a retired monster keeps its immunity) and in admins' overrides of it (an override
--- where the result differs from the file's) and pending adoptions.
+-- where the result differs from the file's) and pending adoptions (only what differs from
+-- the original game's immunity, V21_STOCK_IMMUNE: the files' affinities have since changed,
+-- and a stock database's immunity is no edit).
+
+-- the original monsters' immune where it isn't 0 (the monsters table as installed)
+local V21_STOCK_IMMUNE = {
+	shadow = 1, shade = 1, silver_slime = 2, illusion = 1, shadow_raven = 1, shimmer = 1, silver_scorpion = 2,
+	mirage = 1, phantom = 1, dark_scorpion = 1, warlock = 1, dark_wolf = 1, figment = 1, siren = 2, dark_bear = 1,
+	terra_elemental = 1, aero_elemental = 1, aqua_elemental = 1, fira_elemental = 1, incubus = 1, dark_dragon = 1,
+	succubus = 1, black_dragon = 1, dark_daemon = 1, black_daemon = 1, lucifuge = 2,
+}
+
+local function v21_affinities(immune)
+	return { { "resist.arcane", immune >= 1 and 100 or 0 }, { "ward.sleep", immune == 2 and 100 or 0 } }
+end
+
 local function v21_elements_and_wards()
 	local db = dk.db
 	db:exec_script([[
@@ -1311,8 +1326,11 @@ ALTER TABLE summons ADD COLUMN element TEXT NOT NULL DEFAULT 'neutral';
 			"ORDER BY key")) do
 			local immune = math.tointeger(tonumber(r.value)) or 0
 			local file = files[r.key]
-			for _, x in ipairs({ { "resist.arcane", immune >= 1 and 100 or 0 }, { "ward.sleep", immune == 2 and 100 or 0 } }) do
-				if tbl == "content_adopt" or not file or (file[x[1]] or 0) ~= x[2] then
+			local stock = v21_affinities(V21_STOCK_IMMUNE[r.key] or 0)
+			for i, x in ipairs(v21_affinities(immune)) do
+				local edited
+				if tbl == "content_adopt" then edited = x[2] ~= stock[i][2] else edited = not file or (file[x[1]] or 0) ~= x[2] end
+				if edited then
 					db:exec("INSERT OR REPLACE INTO " .. tbl .. " (kind, key, field, value) VALUES ('monsters', ?, ?, ?)", r.key,
 						x[1], tostring(x[2]))
 				end

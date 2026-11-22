@@ -1,4 +1,8 @@
 -- app/content/monsters/scoundrel.lua :: the Scoundrel (the original game's monster 36).
+local function unweakened(m)
+	return not m.target:has_status("weakened")
+end
+
 return {
 	name = "Scoundrel",
 	lore = [[
@@ -10,6 +14,13 @@ Scoundrels are seldom brave, but they are rarely alone.]],
 	maxhp = 43, maxdam = 35, armor = 22,
 	maxexp = 75, maxgold = 25,
 	maxmp = 40,
+	attack_weight = 3,
+	items = {
+		-- throws Weakening Dust at you, once
+		{ item = "weakening_dust", weight = 3, stock = 1, when = unweakened },
+		-- eats a herb under a third of its HP
+		{ item = "herb", weight = 3, stock = 1, when = function(m) return m.hp < m.maxhp // 3 end },
+	},
 	speech = {
 		start = { "Friend! You look like a man with money.", chance = 50 },
 		turn = { "Fine words, fine words. Now the gold.", "Don't make me ask twice.", chance = 25 },

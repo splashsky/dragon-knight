@@ -12,7 +12,20 @@ die.
 	level = 32,
 	maxhp = 124, maxdam = 112, armor = 92,
 	maxexp = 270, maxgold = 90,
+	resist = { neutral = 25, shadow = 75, frost = 25, poison = 100, holy = -75 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
+	attack_element = "shadow",
 	maxmp = 114,
+	attack_weight = 2,
+	spells = {
+		-- names the day you die: Doom, until cured
+		{ spell = "doom", weight = 7, when = function(m) return not m.target:has_status("doom") end },
+		-- throws Pain
+		{ spell = "pain", weight = 2 },
+		-- weakens you (Enfeeble)
+		{ spell = "enfeeble", weight = 1,
+			when = function(m) return not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "The book is open, {player}. Your page is next.", chance = 50 },
 		turn = { "You have been counted.", { text = "Your sins are long, {player}. Shall I read them?", once = true }, chance = 25 },

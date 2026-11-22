@@ -11,7 +11,18 @@ without moving until a lantern was lit, and then it was already close.
 	level = 27,
 	maxhp = 96, maxdam = 88, armor = 68,
 	maxexp = 210, maxgold = 70,
+	resist = { neutral = 25, shadow = 50, frost = 25, poison = 100, holy = -50 },
+	ward = { sleep = 100, poison = 100, venom = 100 },
+	attack_element = "shadow",
 	maxmp = 96,
+	spells = {
+		-- feeds on you (Withering)
+		{ spell = "withering", weight = 2,
+			when = function(m) return not m.target:has_status("withering") end },
+		-- weakens you (Enfeeble)
+		{ spell = "enfeeble", weight = 2,
+			when = function(m) return not m.target:has_status("weakened") end },
+	},
 	speech = {
 		start = { "Do you know how long I have waited?", chance = 45 },
 		turn = { "*gnashes*", "Your coat will fit me nicely.", chance = 25 },

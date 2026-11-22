@@ -11,7 +11,18 @@ enough to blind a man for a minute, and that is usually all it needs.
 	level = 28,
 	maxhp = 100, maxdam = 92, armor = 72,
 	maxexp = 220, maxgold = 73,
+	resist = { fire = 25, frost = 25 },
 	maxmp = 98,
+	attack_weight = 2,
+	spells = {
+		-- breathes smoke: the fog
+		{ spell = "fog_bank", weight = 6, when = function(m) return not m:has_field("fog") end },
+		-- blinds you (Enfeeble) inside the fog
+		{ spell = "enfeeble", weight = 4,
+			when = function(m) return m:has_field("fog") and not m.target:has_status("weakened") end },
+		-- throws Pain through the fog
+		{ spell = "pain", weight = 2, when = function(m) return m:has_field("fog") end },
+	},
 	speech = {
 		start = { "Small one comes to the cave.", chance = 40 },
 		turn = { "*hisses*", "Smell of you is sour.", chance = 20 },

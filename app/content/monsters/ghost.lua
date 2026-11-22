@@ -10,6 +10,9 @@ quiet and some of them away.]],
 	level = 6,
 	maxhp = 24, maxdam = 20, armor = 8,
 	maxexp = 28, maxgold = 9,
+	resist = { shadow = 75, poison = 100, neutral = 25, holy = -50 },
+	ward = { sleep = 100, poison = 100 },       -- Sleep Powder and poison fail here
+	attack_element = "shadow",
 	maxmp = 22,
 	speech = {
 		start = { "Wh... who are you?", chance = 30 },

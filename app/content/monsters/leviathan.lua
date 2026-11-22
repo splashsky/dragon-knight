@@ -11,7 +11,19 @@ kept still.
 	level = 46,
 	maxhp = 255, maxdam = 225, armor = 190,
 	maxexp = 1350, maxgold = 450,
+	resist = { water = 150, fire = 25, lightning = -50 },
+	ward = { burning = 100, sleep = 50 },
+	attack_element = "water",
 	maxmp = 172,
+	attack_weight = 4,
+	spells = {
+		-- the lake rises: a downpour on its 1st, 5th, 9th turn, unless one is already falling
+		{ spell = "deluge", weight = 30, when = function(m)
+			return m.turn % 4 == 1 and not m:has_field("downpour") and not m:has_field("thunderstorm")
+		end },
+		-- under half it mends in the deep
+		{ spell = "regen", weight = 8, when = function(m) return m.hp < m.maxhp // 2 and not m:has_status("regen") end },
+	},
 	speech = {
 		start = { "The water carried your oar to me.", "Still your boat, {player}. Stillness is kind.", chance = 60 },
 		turn = { "The lake remembers every wreck.", "Breathe slowly. It is quieter that way.", chance = 15 },

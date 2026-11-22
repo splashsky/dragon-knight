@@ -132,13 +132,13 @@ t_get /admin/monsters/1
 t_form_submit /admin/monsters/1 "lore=$(t_sql "SELECT lore FROM monsters WHERE id = 1")" name=Slimer maxhp=2 maxdam=9 resist.arcane=100 ward.sleep=100 resist.frost=-50 maxmp=12 uses_mp=0 attack_weight=3 roams=0
 expect_redirect '/admin/monsters/1\?saved=1'
 admin_eq "SELECT name || '|' || maxhp || '|' || maxdam || '|' || resist || '|' || ward || '|' || maxmp || '|' || uses_mp || '|' || attack_weight || '|' || roams FROM monsters WHERE id = 1" \
-	"Slimer|2|9|arcane=100,frost=-50|sleep=100|12|0|3|0" "monster overrides applied"
+	"Slimer|2|9|arcane=100,frost=-50,lightning=-50,water=50|sleep=100|12|0|3|0" "monster overrides applied (on the file's affinities)"
 admin_eq "SELECT group_concat(field || '=' || value, ';') FROM (SELECT * FROM content_overrides WHERE kind = 'monsters' ORDER BY field)" \
 	"attack_weight=3;maxdam=9;maxhp=2;maxmp=12;name=Slimer;resist.arcane=100;resist.frost=-50;roams=0;uses_mp=0;ward.sleep=100" "only the changed fields are overridden"
 t_get '/admin/monsters/1?saved=1'; expect_body 'Monster updated.'; expect_body 'File value: Blue Slime'
 expect_body '<option value="0" selected>No</option>'
 t_get /help/monsters;      expect_body 'Slimer <span class="light">(not met at random)</span>'
-expect_body '<td style="width: 12%">Weak to Frost (+50%)<br>Immune to Arcane<br>Wards off Sleep (100%)</td>'
+expect_body '<td style="width: 12%">Weak to Frost (+50%)<br>Weak to Lightning (+50%)<br>Resists Water (50%)<br>Immune to Arcane<br>Wards off Sleep (100%)</td>'
 t_get /admin/monsters/1
 t_post /admin/monsters/1/reset "csrf=$(t_csrf)&field=*"
 expect_redirect '/admin/monsters/1\?saved=1'
