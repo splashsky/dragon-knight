@@ -1,6 +1,14 @@
+{#- Exploring (routes/home.lua). Above the legacy line, the weather's: what changed at the
+		player's tile in this minute (change) and other weather on a tile next to theirs (edge),
+		lib/weather.lua's. They change on their own (and when the player moves), so they are a
+		region of their own, there even when empty: the middle column stays the same. -#}
 <section class="box">
 <h1 class="title page-title">{{{ art("exploring", "Exploring") }}}</h1>
 <div class="box-body">
+{{{ region("explore-weather") }}}<div class="explore-weather" data-r="explore-weather">
+{%- if change then %}<p class="explore-change">{{ change }}</p>{% end %}
+{%- if edge then %}<p class="explore-edge">{{ edge }}</p>{% end -%}
+</div>{{{ endregion() }}}
 You are exploring the map, and nothing has happened. Continue exploring using the direction buttons or the Travel To menus.
 </div>
 </section>

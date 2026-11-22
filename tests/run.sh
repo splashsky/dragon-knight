@@ -77,19 +77,23 @@ t_fail() {
 t_jar() { JAR="$T/jar.$1"; }
 t_reset_jar() { rm -f "$JAR"; }
 
+# Every request pins the game's clock (X-Test-Now, app/lib/clock.lua): the weather is the
+# same on every run and doesn't change between two requests. T_NOW=<unix> t_get / pins
+# another time (tests/e2e/weather.sh).
+T_NOW=4000000000
 # t_req METHOD PATH [extra curl args...] -> sets STATUS, $BODY, $HEADERS
 t_req() {
 	local method=$1 path=$2
 	shift 2
 	LAST_REQ="$method $path"
 	STATUS=$(curl -s -X "$method" -o "$BODY" -D "$HEADERS" -w '%{http_code}' \
-		-b "$JAR" -c "$JAR" "$@" "$BASE$path")
+		-b "$JAR" -c "$JAR" -H "X-Test-Now: $T_NOW" "$@" "$BASE$path")
 }
 t_get() { local p=$1; shift; t_req GET "$p" "$@"; }
 # HEAD request (curl -I); $BODY gets the headers too
 t_head() {
 	LAST_REQ="HEAD $1"
-	STATUS=$(curl -s -I -o "$BODY" -D "$HEADERS" -w '%{http_code}' -b "$JAR" -c "$JAR" "$BASE$1")
+	STATUS=$(curl -s -I -o "$BODY" -D "$HEADERS" -w '%{http_code}' -b "$JAR" -c "$JAR" -H "X-Test-Now: $T_NOW" "$BASE$1")
 }
 # t_post PATH 'a=1&b=2' (urlencoded as given; use t_enc for values)
 t_post() { local p=$1 d=${2:-}; shift; [ $# -gt 0 ] && shift; t_req POST "$p" --data "$d" "$@"; }

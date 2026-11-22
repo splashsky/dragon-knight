@@ -16,6 +16,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Themes, font | `app/lib/themes.lua`, `app/routes/theme.lua` | `templates/layout/{head,logo,theme_picker}.html`, `public/css/themes/*.css`, `public/images/themes/*`, `public/fonts/vollkorn/*` | `tests/e2e/theme.sh` |
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
+| Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
@@ -230,7 +231,8 @@ and templates don't change for it: the same code answers both ways.
 carries the same name in `data-r` for the client to find it. Regions nest, names
 (`[a-z][a-z0-9-]*`) are unique in a page; `root` is the `<body>` (attributes included) and
 `head` the `<head>` contents but `<title>` (compared, never sent). The main layout has
-`banner`, `topnav` (the header's links), `left` (`loc`, `towns`, `functions`), `main`, `right` (`charpanel`, `invpanel`,
+`banner`, `topnav` (the header's links), `left` (`loc` with `weather`, `towns`, `functions`), `main` (on the
+exploring page with `explore-weather`), `right` (`charpanel`, `invpanel`,
 `spellpanel`, `online-count`), `foot` (with `foot-time`, the timing line), `themes` (with
 `theme-back`), and on `/babble` the chat's `chat` (with `chat-posts`, and `chat-form` with
 `chat-back`); `minimal` and
@@ -557,7 +559,8 @@ shares one stream between a browser's tabs.
 **Testing.** `test_routes = true` in the config (the e2e config sets it) enables
 `POST /__test/publish` (`channel`, `event`, `data`, optional `delay_ms`, `fail=1`) for any
 logged-in user, and the request header `X-Test-Seed: <digits>` (`math.randomseed` before the
-route runs: `tests/e2e/fight_api.sh` plays a round twice with the same dice); `tests/e2e/live.sh` reads streams with `curl -N` (the `live_*` helpers
+route runs: `tests/e2e/fight_api.sh` plays a round twice with the same dice), `X-Test-Now: <unix>` (the
+clock, [Clock and weather](#clock-and-weather)); `tests/e2e/live.sh` reads streams with `curl -N` (the `live_*` helpers
 of `tests/run.sh`, see [End-to-end tests](#end-to-end-tests)).
 
 ### Events
@@ -1124,6 +1127,114 @@ the admin class pages. `tests/lua/test_leveling.lua` pins them and the stock cla
 against a frozen copy of the original table (`tests/lua/levels_original.lua`), so update
 its expectations with them. Moving thresholds needs no data fixup: a player whose
 experience already covers the next level gets it (or several) on the next victory.
+
+## Clock and weather
+
+(3.2, `docs/plans/elements-and-weather.md` part 3.) The game's one clock
+(`app/lib/clock.lua`) and a weather computed from it (`app/lib/weather.lua`; the words in
+`app/lib/weather_lines.lua`): pure functions of the place, the time and a fixed seed.
+Nothing is stored and nothing runs in the background, so GETs stay pure, every worker
+agrees, and a page computes the weather when it shows it. No dice: every choice is a hash
+(64-bit mixing of `weather.SEED`, a salt and integers), and the game's dice
+(`math.random`) are left alone.
+
+- **The clock** is the single source of game time: whatever moves with time counts in its
+	ticks, and no browser drives it. `clock.now()` is the time every caller passes on
+	(`dk.now()`, or the time a test pinned: below); everything else takes `now` (unix
+	seconds) as an argument. Game time goes in **base ticks of 10 s** (`clock.TICK`),
+	numbered from the unix epoch: `clock.tick(now)` is the number of the tick `now` is in
+	(`now // 10`), `clock.tick_start(n)` the unix time tick `n` starts. A game day lasts 2
+	hours (`clock.DAY`): dawn 15 minutes, day 60, dusk 15 and night 30 (`clock.PHASES`, whole
+	ticks). `clock.time_of_day(now)` is the phase, `clock.phase_ends(now)` when it ends. (A
+	later phase runs the game's tick on the server and puts fights on this clock.)
+- **The weather's step** is 6 clock ticks (`weather.STEP`): it changes only as a minute
+	begins, and is the same all through one.
+- **The grid.** The map in cells of 10 by 10 tiles (`weather.CELL`). Each cell has a base
+	sky that holds 20 minutes (`weather.SPELL`; each cell changes at its own moment), picked
+	by a hash from its place and the time of day: fog likelier at dawn (and a little at
+	night) within 150 tiles of Narcissa, heat by day within 180 tiles of Endworld, a little
+	drizzle (snow north of latitude 150, `weather.NORTH`), clouds, sun by day, else clear.
+- **Storms.** A slot every 20 minutes (`weather.SLOT`). One hash per slot decides whether
+	its storm forms (3 in 5), its size (a squall, half of them, with a radius of 8-14
+	tiles; a storm, 35%, 16-26; a great storm, 15%, 30-40), its birth (in the slot's first
+	10 minutes), its origin (within 30 tiles of Midworld), its life (2 hours, give or take
+	12 minutes) and how far its heading is off the line to Gilead (up to 0.08 radians). It
+	moves in a straight line at the speed that takes it to Gilead in its life, so its
+	position is a closed-form function of time. It grows from 40% of its radius in the first
+	fifth of its life, holds, and from 70% of it weakens (its rain a level lighter, its
+	radius shrinking to half) until it breaks over Gilead (within about 25 tiles). Inside it
+	the rain goes by the distance from its centre over its radius: the core (under 0.35)
+	has the size's strongest (a downpour in a squall, a thunderstorm in the others), the
+	body (under 0.7) a level less, the fringe two (a drizzle at least); north of latitude 150
+	drizzle and rain fall as snow, downpours and thunderstorms as blizzards.
+	`weather.storms(now)` lists the storms alive (centre, radius, birth, end).
+- **The ground.** From each storm's closest approach to the tile along its track (closed
+	form): in the south mud from then until 20 minutes (`weather.MUD`) after its rain (rain
+	or worse) there ended; in the north snow for 20 minutes after any snowfall, then ice for
+	20 more (`weather.SNOW`). Otherwise wet while rain falls (snow while snow falls), else
+	dry. The ground follows the closest approach and the sky the moment, so the two agree
+	closely but not exactly at a storm's edge.
+- **`weather.at(lat, lon, now)`** is `{ sky, ground, time, storm, near }`, the same all
+	through a step. It looks only at the storm slots whose storms can be alive or still
+	leave mud or snow (about ten; their storms kept for the request) and costs about 3 µs
+	(`tests/lua/test_weather.lua` measures 10,000 calls). Part 4 (fields) maps `sky`,
+	`ground` and `time` to the battlefield, so their words are a contract:
+
+| Field | |
+|---|---|
+| `sky` | `clear`, `sun`, `heat`, `overcast`, `fog`, `drizzle`, `rain`, `downpour`, `thunderstorm`, `snow`, `blizzard` |
+| `ground` | `dry`, `wet`, `mud`, `snow`, `ice` |
+| `time` | `dawn`, `day`, `dusk`, `night` (`clock.time_of_day`) |
+| `storm` | the storm overhead, `{ size = "squall" \| "storm" \| "great", name }`, or nil |
+| `near` | the nearest other storm whose edge is within 40 tiles (`weather.NEAR`), `{ direction = "south-east", distance }` (tiles to its edge), or nil |
+
+- **Changes.** What a page shows of the weather is the sky, the ground, the time, the
+	storm overhead's size and a near storm's direction; a change is a difference in those.
+	`weather.changed(lat, lon, t0, t1)` says whether there is one between two times: false
+	at once within a step (no `weather.at`), else the two compared, so between two clock
+	ticks it sees every change. `weather.change(lat, lon, now)` compares the step before
+	with now's: a line for each part that changed (a storm arriving or leaving, the sky, a
+	storm coming near or going, the ground, the time of day), or nil.
+	`weather.describe(w)` is the weather as it stands (a sentence for the sky, the storm
+	overhead, the ground and a near storm), the same for the same weather.
+	`weather.edge(lat, lon, now)` is a line when a tile next to this one (north, east,
+	south, west) has another sky, naming its direction. `weather.report(lat, lon, now)` is
+	what the Location box shows.
+- **The words** (`lib/weather_lines.lua`, plain tables): names (`sky`, `ground`, `time`,
+	`storm`, `directions`); `standing` (the sky by `"sky:time"`, else by sky; the ground; the
+	storm overhead; a storm near); `change` (the sky and the ground by `"from>to"`, else by
+	the new state; the time; `storm_arrives`, `storm_leaves`, `near_comes`, `near_goes`); and
+	`edge` (by the next tile's sky). Every entry is a list of variants: add to any. One is
+	picked by a hash (a change line's of the tile and the step, a description's of the
+	weather, an edge line's of the tile and the direction), so a reload shows the same line.
+	`{direction}` in a line becomes the direction.
+- **Shown.** The Location box (`layout/nav_left.html`) has the weather in a region of its
+	own inside `loc`, `weather` (`.loc-weather`): an icon for the sky (`.wx .wx-<sky>
+	.wx-<time>`: an SVG mask in the text's colour, `dk.css`; the moon on a clear night), the
+	sky's name with a tooltip (the name; the time of day, the storm, the ground; the
+	description; `title` without JavaScript) and the time of day. Its markup changes only
+	when the weather does. The exploring page (`home/explore.html`) shows above its line the
+	change line (`.explore-change`, in the minute the weather changed) and the edge line
+	(`.explore-edge`), in a region of their own, `explore-weather`, there even when empty:
+	the middle column's own markup stays the same, and a move doesn't fade it
+	([Scenes](#scenes)). A GET can't know where the player came from, so the edge line
+	stands for "you walked into other weather": right after such a move the weather left
+	behind is next to the player, and the line is true whichever way they came. The fight
+	page will show the battlefield (part 4, fields).
+- **Open pages** learn of a change from the server, never from a timer of their own: the
+	server's game tick (a later phase) asks `weather.changed` for the tiles of the players
+	online from one tick to the next and publishes `stale` on `user:<id>` for those whose
+	weather changed, which live.js turns into `DK.refresh()` (only what changed comes: the
+	`weather` region, and `explore-weather` on the exploring page). Until then a page shows
+	the weather of its last answer.
+- **Testing.** With `test_routes = true` a request may pin the clock: `X-Test-Now: <unix
+	seconds>` (`main.lua`, `clock.pin`), for everything that asks `clock.now()`.
+	`tests/run.sh` pins every request at `$T_NOW` (4000000000), so the weather is the same on
+	every run and doesn't change between two requests (`T_NOW=<unix> t_get /` asks at another
+	time). `tests/lua/test_clock.lua`, `tests/lua/test_weather.lua` (the storms' journey,
+	snow in the north, mud after rain, the lines, `weather.changed` between clock ticks, the
+	cost), `tests/e2e/weather.sh` (the box; in the minute of a change the exploring page's
+	line, and a live answer with the weather's regions alone).
 
 ## Content
 
@@ -2628,6 +2739,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `live_open name [curl args]`, `live_close name`, `live_stop` | `GET /live` in the background with the current jar (to `$T/live.<name>`); end one / all |
 | `live_has name text`, `live_lacks name text`, `live_wait name text [tries]`, `live_count name text` | the stream has (waits up to 3 s) / hasn't the text; how many lines have it |
 | `live_publish channel event data`, `live_frames_ok name` | `POST /__test/publish`; the stream is well-formed (retry, id/event/data blocks, comments) |
+| `$T_NOW` | the time every request pins the game's clock at (`X-Test-Now`, see [Clock and weather](#clock-and-weather)); `T_NOW=<unix> t_get /` for another |
 | `$BASE`, `$T` (temp dir), `$CONFIG`, `$OUTBOX`, `$ADMIN_USER`, `$ADMIN_PASS`, `$BIN`, `$ROOT` | the server log is `$T/server.log` (one access line per request) |
 
 Lua unit tests: put `tests/lua/test_<name>.lua` returning `{ name = function() assert(...) end }`.

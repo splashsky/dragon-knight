@@ -166,6 +166,35 @@ a:hover, button.link:hover {
 .box .title { margin: 0 0 3px; }
 .box .title img { display: block; }
 
+/* the weather in the Location box (layout/nav_left.html, lib/weather.lua): an icon for the
+	sky (an SVG mask in the text's colour; the moon on a clear night), its name with the
+	description as a tooltip, and the time of day */
+.loc-weather { margin-bottom: 4px; }
+.wx {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	margin-right: 4px;
+	vertical-align: -3px;
+	background-color: currentColor;
+	opacity: 0.8;
+	-webkit-mask: var(--wx) center / contain no-repeat;
+	mask: var(--wx) center / contain no-repeat;
+}
+.wx-heat { color: #b03000; opacity: 1; }
+.wx-clear { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='3.2'/%3E%3Cpath d='M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8'/%3E%3C/svg%3E"); }
+.wx-clear.wx-night { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.5 2.2a6 6 0 1 0 3.3 9.6 4.8 4.8 0 0 1-3.3-9.6z'/%3E%3C/svg%3E"); }
+.wx-sun { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='3' fill='black'/%3E%3Cpath d='M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M3.2 12.8l1.3-1.3M11.5 4.5l1.3-1.3'/%3E%3C/svg%3E"); }
+.wx-heat { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='4.2' r='2.4' fill='black'/%3E%3Cpath d='M1.5 10.6c1.1-1.2 2.2-1.2 3.25 0s2.15 1.2 3.25 0 2.2-1.2 3.25 0 2.15 1.2 3.25 0M1.5 14c1.1-1.2 2.2-1.2 3.25 0s2.15 1.2 3.25 0 2.2-1.2 3.25 0 2.15 1.2 3.25 0'/%3E%3C/svg%3E"); }
+.wx-overcast { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.2 12.5h7.6a3 3 0 0 0 .3-6 4.3 4.3 0 0 0-8.2 1.3 2.4 2.4 0 0 0 .3 4.7z'/%3E%3C/svg%3E"); }
+.wx-fog { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 4.5h12M3.5 8h9.5M2 11.5h12'/%3E%3C/svg%3E"); }
+.wx-drizzle { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 9.5h6.6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7 1.1A2.1 2.1 0 0 0 4.6 9.5z'/%3E%3Cpath d='M5 12.5v.3M8 13.8v.3M11 12.5v.3'/%3E%3C/svg%3E"); }
+.wx-rain { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 9.5h6.6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7 1.1A2.1 2.1 0 0 0 4.6 9.5z'/%3E%3Cpath d='M5.5 11.5l-.9 2.6M8.5 11.5l-.9 2.6M11.5 11.5l-.9 2.6'/%3E%3C/svg%3E"); }
+.wx-downpour { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 9.5h6.6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7 1.1A2.1 2.1 0 0 0 4.6 9.5z' fill='black'/%3E%3Cpath d='M4.5 11.2l-1.2 3.6M7.2 11.2l-1.2 3.6M9.9 11.2l-1.2 3.6M12.6 11.2l-1.2 3.6'/%3E%3C/svg%3E"); }
+.wx-thunderstorm { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 9.5h6.6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7 1.1A2.1 2.1 0 0 0 4.6 9.5z' fill='black'/%3E%3Cpath d='M8.8 10.3 6.9 13h2.4L7.6 15.6'/%3E%3C/svg%3E"); }
+.wx-snow { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 1.8v12.4M2.6 4.9l10.8 6.2M2.6 11.1l10.8-6.2M6.6 2.6 8 4l1.4-1.4M6.6 13.4 8 12l1.4 1.4'/%3E%3C/svg%3E"); }
+.wx-blizzard { --wx: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke-width='1.8' d='M9.6 2v12M4.4 5l10.4 6M4.4 11l10.4-6'/%3E%3Cpath d='M.8 5h2.2M.8 8h2.8M.8 11h2.2'/%3E%3C/svg%3E"); }
+
 /* the Towns box (layout/nav_left.html): a button per town on the map, drawn like a link,
 	its TP cost on the right; the town the player is in, those their TP don't cover and all
 	while fighting are disabled (greyed; "here" stays readable) */

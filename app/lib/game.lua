@@ -1,6 +1,7 @@
 -- game.lua :: shared game data helpers (control row, towns, nav data, ...).
 -- Module state lives for one request only (fresh VM per request).
 local classes = require("lib.classes")
+local clock = require("lib.clock")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
@@ -8,6 +9,7 @@ local presence = require("lib.presence")
 local roles = require("lib.roles")
 local spells = require("lib.spells")
 local stats = require("lib.stats")
+local weather = require("lib.weather")
 
 local game = {}
 
@@ -184,6 +186,7 @@ function game.nav(user)
 		latitude = game.latitude_str(user.latitude),
 		longitude = game.longitude_str(user.longitude),
 		town = town,
+		weather = weather.report(user.latitude, user.longitude, clock.now()),   -- the Location box (weather.report)
 		towns = game.user_towns(user),
 		forum = game.forum_link(),
 		chat = game.control().showbabble == 1,   -- the Functions box's Babble Box link (the chat window)

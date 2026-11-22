@@ -6,6 +6,9 @@ table.maps-list td:nth-child(1), table.maps-list td:nth-child(2) { width: 25%; }
 table.maps-list td:nth-child(3) { width: 35%; }
 table.maps-list td:nth-child(4) { width: 15%; }
 
+/* the exploring page's weather lines (home/explore.html: a change, other weather next door) */
+.explore-weather p { margin: 0 0 6px; font-style: italic; }
+
 /* character sheets */
 .charsheet { width: 240px; }
 body.minimal .charsheet { width: auto; min-width: 210px; }

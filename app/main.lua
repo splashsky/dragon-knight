@@ -1,5 +1,6 @@
 -- main.lua :: request entry point. Loaded once per VM (at warm-up); the returned function
 -- handles exactly one request.
+local clock = require("lib.clock")
 local content_sync = require("lib.content.sync")
 local csrf = require("lib.csrf")
 local json = require("lib.json")
@@ -45,10 +46,13 @@ local function dispatch(req)
 	if req.method == "POST" and not csrf.verify(req) then
 		return view.csrf_failed(req)
 	end
-	-- end-to-end tests replay the same dice through two paths (tests/e2e/fight_api.sh)
+	-- end-to-end tests replay the same dice through two paths (tests/e2e/fight_api.sh) and
+	-- pin the clock (X-Test-Now: unix seconds; the weather: tests/e2e/weather.sh)
 	if dk.config.test_routes == true and not req.internal then
 		local seed = req.headers["x-test-seed"]
 		if type(seed) == "string" and seed:match("^%d+$") and #seed <= 15 then math.randomseed(math.tointeger(tonumber(seed))) end
+		local now = req.headers["x-test-now"]
+		if type(now) == "string" and now:match("^%d+$") and #now <= 12 then clock.pin(math.tointeger(tonumber(now))) end
 	end
 	return router.run(route, req, params)
 end
