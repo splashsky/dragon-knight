@@ -141,9 +141,9 @@ function T.the_player_can_breathe_too()
 	local r = cast(f, "fire_breath")
 	eq(lines(r.player), "You have cast the Fire Breath spell, and draw a deep breath.")
 	local a = round.advance(r.f, 101)
-	local dealt = math.tointeger(said(a):match("scorches the monster for (%d+) damage"))
+	local dealt = math.tointeger(said(a):match("scorches the Caster for (%d+) damage"))
 	assert(dealt and dealt >= 92 and dealt <= 110, said(a))
-	has(said(a), "The monster catches fire and burns for 30 seconds.")
+	has(said(a), "The Caster catches fire and burns for 30 seconds.")
 	eq(r.f.st.currentmp, 60)
 end
 

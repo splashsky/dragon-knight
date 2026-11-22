@@ -112,7 +112,7 @@ end
 function T.the_files_and_their_rows()
 	local k = load.kind("fields")
 	eq(#k.errors, 0, "errors: " .. table.concat(k.errors, "; "))
-	eq(#k.entities, 21)
+	eq(#k.entities, 22)
 	for key, group in pairs(kind.WORLD) do eq(k.by_key[key].group, group, key) end
 	local terrain_fields = 0
 	for _, e in ipairs(k.entities) do if e.flat.group == "terrain" then terrain_fields = terrain_fields + 1 end end

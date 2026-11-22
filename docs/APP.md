@@ -1823,6 +1823,20 @@ Draughts, 240 gold, 8 ticks) for Paladins (21, 24, 26) and Mages (34, 37, 38). R
 Gust 22, Torrent 24, Sunfire 26, Cold Snap 28 and Storm Call 41 are the Mage's, Mire the
 Warrior's (21).
 
+3.3 made the spells that hit everything on the field **area actions** (`area = true`: the
+code hurts or afflicts each of `s.targets`, every foe of the caster and every object, with
+its own roll each, once for the cost; see [Interactables and
+targeting](#interactables-and-targeting)): Rockfall, Starfall, Whiteout, Inferno, the four
+breaths and Deluge, whose breath riders other than burning go to creatures only (an
+object has nothing to weaken or drain). A line is worded per target (`hit` with the target's
+name, and `hit_you` when a monster's spell hits the player: the `_you` keys are in the
+top-level messages too, since a message key must be there before `messages.enemy` can
+word it). New: Hail (Mage 46, 30 MP, frost 55), Cyclone (Mage 52, 38 MP, wind 85),
+Whirlwind (Warrior 44, 14 MP, neutral, 75% of strength up to 55), Radiance (Paladin 58, 32
+MP, holy 80), the field spell Gale (Mage 32, 18 MP, 4 ticks: the `gale` field) and the
+monster-only `knock_over` (2 MP, 66-83% of the caster's attack, twice that against an
+object; a loadout aims it with `aim`). `tests/lua/test_area_spells.lua` plays them.
+
 ```lua
 -- app/content/spells/heal.lua (scripted: see Scripting spells and items)
 return {
@@ -2629,8 +2643,9 @@ return {
 	fight (the player doesn't move in one). It has no `begins` or `ends` lines (it never
 	changes in a fight; the Battlefield line shows it), and no spell can put one up
 	(`s:field` with a terrain field is an error; `dk check`: a terrain-group field must be
-	one the land names, and those must be in the terrain group). The 21 fields are the 11
-	weather's, the 7 land's and the three auras.
+	one the land names, and those must be in the terrain group). The 22 fields are the 11
+	weather's, the 7 land's, the three auras and the Gale (3.3, a sky field only the Gale
+	spell brings: wind 3, no rain, so it puts no fire out).
 - **Changes** become lines and `field` events: when only the weather's fields changed, at
 	the tick, and no spell holds a group of it, the weather's change line
 	(`weather.change`) says them all; otherwise each field that went says its `ends` and each
@@ -2741,7 +2756,9 @@ objects their loadout aims at (below).
 - **Area actions**: `area = true` on a spell or a consumable (fights only; schema version
 	25: the `area` columns) gives its code `s.targets`, every opponent standing and every
 	object on the field (`engine.area_targets`), and the fight's target doesn't matter to it.
-	No existing spell is one yet (the content phase picks them).
+	Since the content phase (3.3) Rockfall, Starfall, Whiteout, Inferno, the four breaths and
+	Deluge are area actions, and Hail, Cyclone, Whirlwind and Radiance are new ones (see
+	[Spells](#spells)).
 
 **Objects** are content (see [Content](#content)): `app/content/interactables/<key>.lua`,
 synced into `interactables` (`lib/content/kinds/interactables.lua`, rows by

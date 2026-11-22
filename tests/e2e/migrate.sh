@@ -1501,10 +1501,10 @@ mig_eq "SELECT count(*) || '|' || sum(retired) FROM interactables" "$M_IA|0" "th
 mig_eq "SELECT hp || ':' || resist || ':' || replace(spawn, char(10), ';') FROM interactables WHERE key = 'beehive'" \
 	"12:fire=-50:1.biomes=weald;1.chance=18;1.features=none;1.fields=heat,sun;1.unless=blizzard,downpour,night,rain,snow,thunderstorm;2.biomes=weald;2.chance=9;2.features=hill,lake,pond;2.fields=heat,sun;2.unless=blizzard,downpour,night,rain,snow,thunderstorm;3.chance=12;3.fields=forest;3.unless=blizzard,downpour,night,rain,snow,thunderstorm;4.biomes=weald;4.chance=6;4.features=hill,lake,pond;4.unless=blizzard,downpour,night,rain,snow,thunderstorm" "an object's data"
 mig_eq "SELECT group_concat(key || '=' || wind, ' ') FROM (SELECT key, wind FROM fields WHERE wind > 0 ORDER BY key)" \
-	"blizzard=3 cinders=1 hills=1 peaks=2 sand=1 thunderstorm=3" "the fields' wind"
+	"blizzard=3 cinders=1 gale=3 hills=1 peaks=2 sand=1 thunderstorm=3" "the fields' wind"
 mig_eq "SELECT (SELECT sum(area) FROM spells) || '|' || (SELECT sum(area) FROM items) || '|' ||
 	(SELECT count(*) FROM monster_items WHERE aim <> '') || '|' || (SELECT count(*) FROM monster_spells WHERE aim <> '')" \
-	"0|0|0|0" "no area actions, no aims yet"
+	"13|0|0|0" "the area spells (3.3 content), no area items, no aims yet"
 mig_eq "SELECT group_concat(id || ':' || coalesce(level, '-') || ':' || coalesce(over, '-'), ' ') FROM fight_combatants" \
 	"1:-:- 2:-:-" "the fight's combatants: no objects"
 mig_serve "$MIG/v24.lua" "$MIG/v24server.log"

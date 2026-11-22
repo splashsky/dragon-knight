@@ -92,7 +92,7 @@ than a Warrior's blade, but they rarely fall, and they never leave a companion b
 		[55] = { hp = 6, mp = 3, strength = 5, dexterity = 7 },
 		[56] = { hp = 6, mp = 4, strength = 5, dexterity = 7, spells = { "rend" } },
 		[57] = { hp = 6, mp = 4, strength = 4, dexterity = 6 },
-		[58] = { hp = 5, mp = 5, strength = 3, dexterity = 5 },
+		[58] = { hp = 5, mp = 5, strength = 3, dexterity = 5, spells = { "radiance" } },
 		[59] = { hp = 7, mp = 2, strength = 6, dexterity = 8 },
 		[60] = { hp = 0, mp = 4, strength = 6, dexterity = 7, spells = { "rage" } },
 		[61] = { hp = 7, mp = 4, strength = 6, dexterity = 8 },

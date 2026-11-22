@@ -32,6 +32,7 @@ to stop, so close the distance before the first spell is finished.]],
 		-- housekeeping: no sleep-locks, summons or weather, no second Ward
 		{ spell = "dream", weight = 0 }, { spell = "call_spirit", weight = 0 },
 		{ spell = "rain_call", weight = 0 }, { spell = "sunfire", weight = 0 }, { spell = "cold_snap", weight = 0 },
+		{ spell = "gale", weight = 0 },
 		{ spell = "sleep", when = awake }, { spell = "ward", when = unguarded },
 	},
 	speech = {

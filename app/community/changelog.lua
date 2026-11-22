@@ -14,6 +14,7 @@ changelog.RELEASES = {
 			"Things on the battlefield: objects that stand on the field with the fighters, can be hit, can burn and can go off, some of them carried in and some found where you fight. The wind matters now: a strong wind can spread a fire. Some spells strike everything on the field at once (schema version 25, run dk migrate).",
 			"Ten things you may find on the field, each from its land: explosive barrels in the Diggings, beehives in the Hambry Weald, gas pockets in the Thornbog, steam vents in the Ashlands, standing stones on the Greymoor, dead trees that fall in a gale, tide pools on the Shoals, war banners in the Storm Barrens, campfires on the Copper Downs and water cactus in the Dry Country. Knock them down, set them off, or keep clear.",
 			"Buy an Explosive Barrel in Kalle, Narcissa or Gilead and roll it onto the field: hit it or set it alight, and it blasts everyone, you included (schema version 26, run dk migrate). New statuses: Swarm, Soaked, Rallied and a lit Fuse.",
+			"Rockfall, Starfall, Whiteout, Inferno, the dragons' breaths and Deluge strike everything on the other side of the field at once, objects included. New spells: Hail and Cyclone for Mages, Whirlwind for Warriors, Radiance for Paladins, and the Mage's Gale, which raises a wind over the field that fans any fire.",
 		},
 	},
 	{

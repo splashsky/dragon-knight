@@ -88,6 +88,11 @@ end
 
 local function enemy_of(f) return state.side(f, "enemy", true)[1] end
 
+-- An area spell's s.targets (the engine's: every opponent of c and every object), else none.
+local function area(f, c, entity, tc, th)
+	if engine.is_area(entity) then return { targets = engine.area_targets(f, c, tc, th) } end
+end
+
 -- Whole amounts in every event; the statuses and summons used exist.
 local function check_events(events, what)
 	for _, e in ipairs(events) do
@@ -148,11 +153,11 @@ local function cast_by_player(entity, n, taken, in_fight)
 	local before = fm.flat(f)
 	local p = state.player(f)
 	local player = engine.handle(f, p)
-	local target
-	if entity.target == "self" then target = player elseif fight then target = engine.handle(f, engine.target(f, p)) end
+	local target, tc
+	if entity.target == "self" then target = player elseif fight then tc = engine.target(f, p); target = engine.handle(f, tc) end
 	local r = action.perform({
 		kind = "spell", entity = entity, caster = player, target = target, in_fight = fight, rand = f.rand,
-		summon_room = fight and engine.summon_room(f, p) or 0,
+		summon_room = fight and engine.summon_room(f, p) or 0, fields = fight and area(f, p, entity, tc, target) or nil,
 	})
 	local what = ("%s, state %d%s%s"):format(entity.key, n, taken and ", ally taken" or "", fight and "" or ", in town")
 	if r.reason == "error" then error(what .. ": " .. tostring(r.refused)) end
@@ -226,11 +231,13 @@ function T.every_spell_cast_by_a_monster()
 				local f = model(n, taken)
 				local c = enemy_of(f)
 				local me = engine.handle(f, c)
+				local tc = entity.target ~= "self" and engine.target(f, c) or nil
 				local o = {
 					kind = "spell", entity = entity, caster = me, in_fight = true, rand = f.rand, free = n % 2 == 0,
-					target = entity.target == "self" and me or engine.handle(f, engine.target(f, c)),
+					target = entity.target == "self" and me or engine.handle(f, tc),
 					summon_room = engine.summon_room(f, c),
 				}
+				o.fields = area(f, c, entity, tc, o.target)
 				local what = ("%s by a monster, state %d"):format(entity.key, n)
 				local check = action.check(o)
 				if check.reason == "error" then error(what .. ": can_cast fails or needs dice: " .. tostring(check.err)) end
@@ -280,8 +287,9 @@ function T.immune_monsters_are_not_hurt_or_afflicted()
 				local c = enemy_of(f)
 				c.row.resist, c.row.ward = resist, ward
 				local player = engine.handle(f, state.player(f))
-				local r = action.perform({ kind = "spell", entity = entity, caster = player, target = engine.handle(f, c),
-					in_fight = true, rand = f.rand, summon_room = 1 })
+				local target = engine.handle(f, c)
+				local r = action.perform({ kind = "spell", entity = entity, caster = player, target = target,
+					in_fight = true, rand = f.rand, summon_room = 1, fields = area(f, state.player(f), entity, c, target) })
 				if r.ok then
 					for _, e in ipairs(r.events) do
 						if e.id == c.id then
@@ -338,7 +346,7 @@ local ORIGINAL_EXCEPTIONS = { ["warrior heal"] = true }
 local NOBODY = { hyper_beam = true, solar_beam = true, regen = true, poison = true, call_wolf = true,
 	fire_breath = true, frost_breath = true, venom_breath = true, shadow_breath = true, heavy_blow = true,
 	thunderbolt = true, water_jet = true, doom = true, deluge = true, nightfall = true, fog_bank = true,
-	miasma = true, brimstone = true }
+	miasma = true, brimstone = true, knock_over = true }
 
 function T.class_spells_exist_and_are_affordable()
 	local seen = {}

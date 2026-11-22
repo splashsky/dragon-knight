@@ -33,6 +33,7 @@ about him.]],
 		{ spell = "nightmare", weight = 0 },
 		{ spell = "dream", weight = 0 }, { spell = "call_spirit", weight = 0 },
 		{ spell = "rain_call", weight = 0 }, { spell = "sunfire", weight = 0 }, { spell = "cold_snap", weight = 0 },
+		{ spell = "gale", weight = 0 },
 		{ spell = "sleep", when = awake }, { spell = "ward", when = unguarded }, { spell = "fend", when = unguarded },
 	},
 	speech = {
