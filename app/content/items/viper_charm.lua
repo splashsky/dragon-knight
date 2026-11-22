@@ -5,7 +5,7 @@ return {
 	lore = [[
 A green stone taken from a snake-charmer's belt, which the charmer swears was a gift from
 a grateful adder. Kalle's charmers sell them to travellers bound for the bogs, and
-Narcissa's apothecaries will not sell one without a tin of Antidote to go with it. The
+Kalle's apothecaries will not sell one without a tin of Antidote to go with it. The
 stones are worn smooth from handling, and the sellers say every one of them came from the
 same belt.]],
 	icon = "viper_charm",

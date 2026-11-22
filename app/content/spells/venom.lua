@@ -15,7 +15,7 @@ return {
 	lore = [[
 Apothecaries in Bris keep their venom in a locked cabinet and sell it by the drop. The spell
 is cheaper than the vial and does the same work: it thickens the blood, so the monster
-bleeds a little more every turn and hits a little softer. Paladins call it a sin and use
+bleeds a little more every turn and hits a little softer. Warriors call it a sin and use
 it anyway when a fight is going badly.]],
 	icon = "venom",
 	mp = 14,

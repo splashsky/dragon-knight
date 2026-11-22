@@ -130,8 +130,9 @@ now)` plus a fixed seed. Nothing is stored and nothing runs in the background.
 	cell has a base climate from its place (fog more likely at dawn in the low south-west
 	toward Narcissa; heat by day toward Endworld; snow instead of rain north of latitude
 	150, around Hambry and Gilead) and the time of day.
-- **Storms**: every 20 minutes there is a storm slot. A hash of the seed and the slot
-	decides whether a storm forms (about 3 in 5), its size (squall, storm or great storm:
+- **Storms**: every 45 minutes there is a storm slot (20 minutes until the rarer storms of
+	section 7). A hash of the seed and the slot
+	decides whether a storm forms (45 in 100; 3 in 5 before), its size (squall, storm or great storm:
 	a radius of roughly 8 to 40 tiles), its origin (within 30 tiles of Midworld) and a
 	slight wobble on its heading. It travels toward Gilead (200, -200) at a speed that
 	crosses in about 2 hours. It grows for its first part, holds, then weakens and breaks

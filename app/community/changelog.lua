@@ -17,6 +17,7 @@ changelog.RELEASES = {
 			"Rockfall, Starfall, Whiteout, Inferno, the dragons' breaths and Deluge strike everything on the other side of the field at once, objects included. New spells: Hail and Cyclone for Mages, Whirlwind for Warriors, Radiance for Paladins, and the Mage's Gale, which raises a wind over the field that fans any fire.",
 			"Monsters use the field too: goblins, bandits and deserters roll out barrels and set them off when you are close (never in the rain); bears knock down hives over your head; trolls, ogres, giants and the Titan topple standing stones and dead trees onto you; knights raise their war banners; the Aqua Elemental quenches steam vents on you; the Bog Witch bursts gas pockets. They tell you first.",
 			"Every new object, status, spell and item has its story in its tooltip and on the help pages.",
+			"A few stories in the tooltips now agree with the world: where the ward draughts, the Antidote and the Viper Charm are really sold, who curses Venom, and where the rain falls and the Fire Wyrm lives.",
 		},
 	},
 	{
