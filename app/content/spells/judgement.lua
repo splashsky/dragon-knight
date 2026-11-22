@@ -9,7 +9,7 @@ local function release(s)
 	local dealt = s.target:hurt(damage, "holy")
 	s:say("hit", s.name, dealt)
 	local healed = s.caster:heal("hp", math.floor(dealt / 4))
-	if healed > 0 then s:say("heal", healed) end
+	if healed > 0 then s:say("heal", s.name, healed) end
 end
 
 return {
