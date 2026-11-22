@@ -22,7 +22,9 @@
 -- it was applied with), tick (the last tick it counted: at first the one it was applied
 -- in), source (a combatant id), position }
 -- Persisted values are names and plain data only (lib/action.lua action.params), never
--- code: a charged spell's release step is saved by name.
+-- code: a charged spell's release step is saved by name, the battlefield's fields by key
+-- in f.data (fight/fields.lua).
+local fields = require("fight.fields")
 local monsters = require("lib.monsters")
 local statuses = require("lib.statuses")
 local summons = require("lib.summons")
@@ -244,11 +246,16 @@ function state.load(user, st)
 end
 
 -- The next tick the server's tick must advance fight f at: the next one while anything in
--- it counts ticks (a status on anyone, an ally), else the player's turn's deadline.
+-- it counts ticks (a status on anyone, an ally, a spell's field or one with on_tick), else
+-- the player's turn's deadline, or the next step of the weather when that comes first (the
+-- world's fields follow it: fight/fields.lua).
 function state.due(f)
 	for _, c in ipairs(f.combatants) do
 		if c.side == "ally" or #c.statuses > 0 then return f.tick + 1 end
 	end
+	if fields.ticking(f) then return f.tick + 1 end
+	local change = fields.next_change(f)
+	if change and change < f.deadline then return change end
 	return f.deadline
 end
 

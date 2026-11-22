@@ -115,7 +115,8 @@ local function all_of(entities)
 	end
 	table.sort(k.entities, function(a, b) return a.key < b.key end)
 	return { kinds = { classes = k, spells = load.kind("spells"), items = load.kind("items"),
-		statuses = load.kind("statuses"), summons = load.kind("summons"), monsters = load.kind("monsters") }, errors = {} }
+		statuses = load.kind("statuses"), fields = load.kind("fields"), summons = load.kind("summons"),
+		monsters = load.kind("monsters") }, errors = {} }
 end
 
 function T.fingerprint_stability()

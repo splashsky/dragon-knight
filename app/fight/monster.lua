@@ -15,6 +15,7 @@
 local action = require("lib.action")
 local act = require("fight.act")
 local engine = require("fight.engine")
+local fields = require("fight.fields")
 local items = require("lib.items")
 local monsters = require("lib.monsters")
 local sandbox = require("lib.content.sandbox")
@@ -29,17 +30,19 @@ end
 
 -- What a `when` condition sees: m.hp, m.maxhp, m.mp, m.maxmp, m.level, m.name, ... (the
 -- monster's combatant handle, read-only), m:has_status(key), m:status(key),
--- m:statuses(kind), plus m.round (the fight's round), m.target (the handle of the
--- opponent it faces by default: the player) and m.stock (the uses left of this item, nil:
--- no limit).
+-- m:statuses(kind), m:has_field(key) (the battlefield: fight/fields.lua), plus m.round (the
+-- fight's round), m.turn (its own turn: 1 on its first action of the fight, counting only
+-- the turns it acted), m.target (the handle of the opponent it faces by default: the
+-- player) and m.stock (the uses left of this item, nil: no limit).
 function monster.context(f, c, extra)
 	local h = engine.handle(f, c)
 	local tc = engine.target(f, c)
-	local fields = { round = f.round, target = tc and engine.handle(f, tc) or nil }
-	for k, v in pairs(extra or {}) do fields[k] = v end
+	local seen = { round = f.round, turn = c.data.turn or 0, target = tc and engine.handle(f, tc) or nil,
+		has_field = function(_, key) return fields.has(f, key) end }
+	for k, v in pairs(extra or {}) do seen[k] = v end
 	return setmetatable({}, {
 		__index = function(_, k)
-			if fields[k] ~= nil then return fields[k] end
+			if seen[k] ~= nil then return seen[k] end
 			local v = h[k]
 			if type(v) == "function" then return function(_, ...) return v(h, ...) end end
 			return v
@@ -82,7 +85,8 @@ local function allowed(f, c, kind, entity)
 	local me = engine.handle(f, c)
 	local tc = engine.target(f, c)
 	local r = action.check({ kind = kind, entity = entity, caster = me, in_fight = true,
-		target = aims_at_self(entity) and me or (tc and engine.handle(f, tc)), summon_room = engine.summon_room(f, c) })
+		target = aims_at_self(entity) and me or (tc and engine.handle(f, tc)), summon_room = engine.summon_room(f, c),
+		battlefield = fields.battlefield(f) })
 	if r.reason == "error" then
 		warn("monster %s: %s %s can't be checked (not used this turn): %s", tostring(c.row.key), kind, tostring(entity.key),
 			tostring(r.err))
@@ -103,6 +107,7 @@ local function use(f, c, target, kind, entity)
 		kind = kind, entity = entity, caster = me, in_fight = true, rand = f.rand,
 		target = aims_at_self(entity) and me or (tc and engine.handle(f, tc)),
 		free = kind == "spell" and not uses_mp(c), summon_room = engine.summon_room(f, c),
+		battlefield = fields.battlefield(f),
 	})
 	if not r.ok then return false end
 	local prev = engine.doing(f, c, kind)

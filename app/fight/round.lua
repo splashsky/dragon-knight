@@ -15,12 +15,13 @@
 --   4. the player's next turn begins: guarding ends.
 --
 -- The fight's clock (round.advance): a fight plays the game's clock ticks (10 s,
--- lib/clock.lua) in order. At each one a turn the player can't act in ends (a round with
--- the blocked turn), then every combatant's statuses tick and count down (sleep may wake,
--- a charge releases) and allies count down and leave, then a turn whose deadline passed
--- (round.TURN ticks after it began) is played as a Guard. The server's tick (lib/tick.lua)
--- and every POST /fight, before its command, advance the fight to now the same way
--- (fight/encounter.lua encounter.advance).
+-- lib/clock.lua) in order. At each one the battlefield's fields follow the weather and
+-- spells' fields count down (fight/fields.lua; a field's on_tick runs), then a turn the
+-- player can't act in ends (a round with the blocked turn), then every combatant's statuses
+-- tick and count down (sleep may wake, a charge releases) and allies count down and leave,
+-- then a turn whose deadline passed (round.TURN ticks after it began) is played as a Guard.
+-- The server's tick (lib/tick.lua) and every POST /fight, before its command, advance the
+-- fight to now the same way (fight/encounter.lua encounter.advance).
 --
 -- Death checks follow every step that changed HP: the player dead ends the fight (the
 -- same death as ever); the current wave defeated brings the next wave on, or is the
@@ -34,6 +35,7 @@ local act = require("fight.act")
 local ai = require("fight.ai")
 local combat = require("fight.combat")
 local engine = require("fight.engine")
+local fields = require("fight.fields")
 local speech = require("fight.speech")
 local state = require("fight.state")
 
@@ -89,13 +91,15 @@ local function over(f, r, player_struck)
 	return false
 end
 
--- An ally's or an enemy's turn (steps 2 and 3): its action, unless a status blocks it.
+-- An ally's or an enemy's turn (steps 2 and 3): its action, unless a status blocks it. A
+-- monster counts the turns it acts (c.data.turn: its `when` conditions' m.turn).
 local function turn(f, r, c)
 	local blocked, inst = engine.blocked(f, c)
 	f.speaker = c.id   -- (who has the last word, should the player fall: fight/speech.lua)
 	if blocked then
 		engine.blocked_line(f, c, inst)
 	else
+		if c.kind == "monster" then c.data.turn = (c.data.turn or 0) + 1 end
 		if c.side == "enemy" then speech.turn(f, c) end
 		local cand, target = ai.choose(f, c)
 		if cand then cand.perform(f, c, target) end
@@ -182,6 +186,28 @@ function round.lines(r, out)
 	return out
 end
 
+-- Clock tick k (f.tick is k) on the battlefield: the spells' fields count down and the
+-- world's follow the weather (their lines), then each field's on_tick runs. Lines go to
+-- r.ending, r.changed when a field came or went; returns true when that ended the fight.
+local function field_tick(f, r, k)
+	engine.budget(f)
+	f.hp_changed = false
+	f.out, f.part = r.ending, "ending"
+	local changes, line = fields.advance(f, k)
+	if #changes > 0 then
+		r.changed = true
+		local prev = engine.doing(f, nil, "field")
+		engine.fields_changed(f, changes, line)
+		engine.done(f, prev)
+	end
+	for _, x in ipairs(fields.up(f)) do
+		engine.field_hook(f, x)
+		if over(f, r) then return true end
+	end
+	f.out, f.part = nil, nil
+	return false
+end
+
 -- Clock tick k (f.tick is k): every combatant's statuses tick and count down, allies count
 -- down and leave (those that joined at this tick wait for the next). Lines go to r.ending,
 -- r.changed when anything counted; returns true when that ended the fight (r.died,
@@ -206,11 +232,12 @@ end
 
 -- Advances fight f (in progress) to clock tick n: plays every tick after f.tick up to n in
 -- order (at most `limit` of them when given; the rest is for the next call, and a fight
--- more than round.CATCHUP ticks behind skips the older ones). At each tick: a turn the
--- player can't act in ends (a round with the blocked turn: the monsters act); then the
--- statuses and allies count the tick; then a turn whose deadline passed is played as a
--- Guard ("You hesitate, and raise your guard."). A fight not on the clock yet (f.tick 0:
--- made before 3.2, or by a test) starts on it at n, its turn with its full time. Returns {
+-- more than round.CATCHUP ticks behind skips the older ones). At each tick: the fields
+-- follow the weather and count down; a turn the player can't act in ends (a round with the
+-- blocked turn: the monsters act); then the statuses and allies count the tick; then a turn
+-- whose deadline passed is played as a Guard ("You hesitate, and raise your guard."). A
+-- fight not on the clock yet (f.tick 0: made before 3.2, or by a test) starts on it at n,
+-- its turn with its full time and the weather's fields up. Returns {
 -- f (the model after it), lines = { { part, line }, ... } (what was said, in order: part
 -- "player", "allies", "enemies" or "ending"), ticks (how many were played), changed (a
 -- round was played or a status or ally counted: the page has something new), and died or
@@ -219,6 +246,7 @@ function round.advance(f, n, limit)
 	local a = { lines = {}, ticks = 0, changed = false }
 	if f.tick == 0 then
 		f.tick, f.deadline = n, n + round.TURN
+		fields.start(f, n)
 		a.f = f
 		return a
 	end
@@ -235,6 +263,11 @@ function round.advance(f, n, limit)
 		local k = f.tick + 1
 		f.tick = k
 		a.ticks = a.ticks + 1
+		local w = { ending = {} }
+		local field_over = field_tick(f, w, k)
+		round.lines(w, a.lines)
+		if w.changed or #w.ending > 0 then a.changed = true end
+		if field_over and ended(w) then break end
 		if round.locked(f) then
 			local r = round.play(f, { kind = "continue" })
 			f = r.f

@@ -11,7 +11,8 @@
 -- `when` condition is a function: it stays in the file (fight/monster.lua runs it) and
 -- the flat form only notes that there is one ("items.1.when" = 1). Flat fields:
 -- "equipment.weapon" = "broadsword", "items.1.item" = "potion", "items.1.weight",
--- "items.1.stock" (absent: no limit), "spells.1.spell" = "hurt", "spells.1.weight".
+-- "items.1.stock" (absent: no limit), "spells.1.spell" = "hurt", "spells.1.weight" (0: never
+-- chosen, which switches off its class's spell of that key).
 -- `speech` (what it says in a fight: fight/speech.lua) stays in the file too, read when the
 -- fight runs; it is checked here, and the statuses it answers or its conditions name are
 -- noted in the flat form ("speech.statuses" = "poison,sleep": they must exist).
@@ -75,7 +76,7 @@ local SPEECH = {}
 for _, p in ipairs(monsters.SPEECH_POINTS) do SPEECH[p] = true end
 local LINE_MAX = 200
 
-local WEIGHT = { type = "int", min = 1, max = STAT }
+local WEIGHT = { type = "int", min = 0, max = STAT }   -- a loadout entry's (0: never chosen)
 local STOCK = { type = "int", min = 1, max = 10000 }
 local WHEN = { type = "int", min = 1, max = 1 }
 
@@ -151,7 +152,7 @@ local function entries(data, list, ref, allowed, flat, err)
 			end
 			local w = e.weight == nil and 1 or e.weight
 			local value, msg = schema.check(WEIGHT, w)
-			if value == nil then err(at .. ".weight " .. msg .. " (how likely, next to its other actions)")
+			if value == nil then err(at .. ".weight " .. msg .. " (how likely, next to its other actions; 0: never)")
 			else flat[prefix .. "weight"] = value end
 			if allowed.stock and e.stock ~= nil then
 				value, msg = schema.check(STOCK, e.stock)

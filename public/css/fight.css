@@ -19,6 +19,12 @@
 .fight-foe-text { min-width: 0; }
 .fight-ally-icon { width: 22px; height: 22px; border-radius: 4px; vertical-align: -6px; box-shadow: 0 0 0 1px rgba(40, 32, 20, 0.35); }
 .fight-status-icon { width: 16px; height: 16px; margin-right: 3px; border-radius: 3px; vertical-align: -3px; }
+/* the battlefield (fight/battlefield.html; 3.2): the fields up, each its icon and name with a
+	tooltip, under the monster */
+.fight .box-body .fight-battlefield { margin: -0.4em 0 1em; }
+.fight-battlefield-label { font-weight: bold; margin-right: 4px; }
+.fight-fields { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; vertical-align: top; }
+.fight-field-icon { width: 18px; height: 18px; margin-right: 4px; border-radius: 3px; vertical-align: -4px; }
 /* a monster speaking (fight/speech.lua): its line set apart from the action's */
 .fight-speech { font-style: italic; }
 .fight-taunt { font-size: 16px; }
@@ -84,8 +90,8 @@
 .fight-js .meter-fill { transition: width 0.35s ease-out; }
 .fight-line { animation: fight-in 0.3s ease-out; }
 .fight-hurt { animation: fight-shake 0.35s ease-out; }
-.fight-healed, .fight-status-new, .fight-joined { animation: fight-glow 0.6s ease-out; }
-.fight-status-gone { text-decoration: line-through; animation: fight-out 0.8s ease-in forwards; }
+.fight-healed, .fight-status-new, .fight-joined, .fight-field-new { animation: fight-glow 0.6s ease-out; }
+.fight-status-gone, .fight-field-gone { text-decoration: line-through; animation: fight-out 0.8s ease-in forwards; }
 .fight-gone { opacity: 0.4; transition: opacity 0.4s; }
 .fight-skip { margin: 0 0 1em; }
 form[data-fight] [data-fight-locked] { opacity: 0.75; }
@@ -108,7 +114,8 @@ form[data-fight] [data-fight-locked] { opacity: 0.75; }
 
 @media (prefers-reduced-motion: reduce) {
 	.fight-js .meter-fill, .fight-gone, .fight-clock-bar { transition: none; }
-	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone { animation: none; }
+	.fight-line, .fight-hurt, .fight-healed, .fight-status-new, .fight-joined, .fight-status-gone, .fight-field-new,
+	.fight-field-gone { animation: none; }
 }
 
 /* a drop (fight/drop_offer.html; 3.1): the purchase's head and comparison (town.css .buy),

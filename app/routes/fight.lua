@@ -34,6 +34,7 @@ local auth = require("lib.auth")
 local clock = require("lib.clock")
 local encounter = require("fight.encounter")
 local events = require("fight.events")
+local fields = require("fight.fields")
 local game = require("lib.game")
 local hotbar = require("lib.hotbar")
 local inventory = require("lib.inventory")
@@ -203,7 +204,19 @@ local function shows_mp(c)
 	return #monsters.loadout(c.row).spells > 0
 end
 
--- What the fight page shows of the fight: the enemies of the wave, the allies, statuses.
+-- The battlefield line: each field up with its icon, and its tooltip (a spell's says the
+-- time it has left).
+local function battlefield(f)
+	local out = {}
+	for _, x in ipairs(fields.up(f)) do
+		out[#out + 1] = { key = x.key, name = x.row.name, icon = schema.entity_icon("fields", x.row.icon),
+			tip = tips.field(x.row, x.ticks and events.left(x.ticks)) }
+	end
+	return out
+end
+
+-- What the fight page shows of the fight: the enemies of the wave, the allies, statuses,
+-- the battlefield.
 local function view_of(f)
 	local p = state.player(f)
 	local enemies, allies = {}, {}
@@ -218,7 +231,8 @@ local function view_of(f)
 			left = c.ticks_left and events.left(c.ticks_left),
 			statuses = status_list(c), icon = schema.entity_icon("summons", c.row.icon) }
 	end
-	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p) }
+	return { enemies = enemies, allies = allies, player_id = p.id, player_statuses = status_list(p),
+		battlefield = battlefield(f) }
 end
 
 -- The events of what this request did to fight f (its trace: the clock's ticks it caught

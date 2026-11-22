@@ -34,7 +34,7 @@ return function(r)
 	r:get("/admin/spells/#id", guard, spells.edit)
 	r:post("/admin/spells/#id", guard, spells.save)
 	r:post("/admin/spells/#id/reset", guard, spells.reset)
-	for _, name in ipairs({ "statuses", "summons", "monsters" }) do
+	for _, name in ipairs({ "statuses", "summons", "monsters", "fields" }) do
 		r:get("/admin/" .. name, guard, effects.index(name))
 		r:get("/admin/" .. name .. "/#id", guard, effects.edit(name))
 		r:post("/admin/" .. name .. "/#id", guard, effects.save(name))

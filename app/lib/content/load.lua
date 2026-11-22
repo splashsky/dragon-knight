@@ -99,7 +99,7 @@ local function check_refs(all, k)
 		if k.kind.validate_refs then
 			k.kind.validate_refs(e.flat, all, function(msg)
 				k.errors[#k.errors + 1] = load.path(k.kind, e.key) .. ": " .. msg
-			end)
+			end, e.key)
 		end
 	end
 end

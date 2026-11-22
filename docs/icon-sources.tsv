@@ -1,6 +1,16 @@
 # The game's icons and the art they were made from (Icons/: licensed packs, not in the
 # repository). icon	source	adjustments (place_icon.py options; - none). Icons made
 # before 3.1 (Midworld's wares, Heal, Magic Bolt, Attack, Run) aren't listed.
+public/images/fields/blizzard.png	Icons/SkillsIcons/Bonus/Skill1_Standart/blizzard.png	-
+public/images/fields/brimstone.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_181_firelasso.png	-
+public/images/fields/consecrated.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Holy_power.png	-
+public/images/fields/heat.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_182_fireblast.png	-
+public/images/fields/ice.png	Icons/SkillsIcons/Bonus/Skill1_Standart/frost_arrow.png	-
+public/images/fields/miasma.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Plague.png	-
+public/images/fields/mud.png	Icons/SkillsIcons/SkillIcons3/SkillVol3/Skill_Avalanche.png	-
+public/images/fields/rain.png	Icons/SkillsIcons/Skillicons2/Skill_standart/Skill_333_waterwave.png	-
+public/images/fields/sun.png	Icons/SkillsIcons/Skillicons2/Skill_standart/skill_159_sunrays.png	-
+public/images/fields/thunderstorm.png	Icons/SkillsIcons/Bonus/Skill1_Standart/Big_Lightning.png	-
 public/images/items/acid_vial.png	Icons/ProfessionIcons/ProfessionAndCraftIcons/Alchemy/Alchemy_14_poison.png	-
 public/images/items/angels_joy.png	Icons/ProfessionIcons/LootIcons/Loot_43_feather.png	--sat 0.15 --bright 1.15
 public/images/items/angels_love.png	Icons/ArmorIcons/RingAndNeck_Icons/Ring_37_white.png	-

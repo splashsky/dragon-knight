@@ -12,11 +12,17 @@
 -- fight. A status blocks the bearer's action while it has blocks_action (true, or a
 -- function returning true). Allies count the ticks too, and leave when theirs run out.
 --
--- Robustness: an error in status or summon code is logged as a warning and removes that
--- status or summon (without its hooks); the round goes on. A combatant holds at most
--- MAX_STATUSES statuses (more are not applied, logged) and a round (or a clock tick) runs
--- status and summon code at most MAX_RUNS times (the rest is skipped, logged).
+-- The battlefield's fields (fight/fields.lua) count everywhere here: the handles' numbers,
+-- the damage of attacks and of content's :hurt, the statuses applied; their lines, their
+-- trace and a field's on_tick are run here too.
+--
+-- Robustness: an error in status, summon or field code is logged as a warning and removes
+-- that status or summon (without its hooks; a field stays up); the round goes on. A
+-- combatant holds at most MAX_STATUSES statuses (more are not applied, logged) and a round
+-- (or a clock tick) runs status, summon and field code at most MAX_RUNS times (the rest is
+-- skipped, logged).
 local action = require("lib.action")
+local fields = require("fight.fields")
 local items = require("lib.items")
 local load = require("lib.content.load")
 local spells = require("lib.spells")
@@ -56,7 +62,8 @@ local function name_of(f, c)
 end
 
 -- c starts a step of kind `kind` ("attack", "spell", "item", "guard", "status", "summon",
--- "blocked", "run", "ambush", "wave"). Returns the step it interrupts, for engine.done.
+-- "blocked", "run", "ambush", "wave", "field"; c nil: nobody acts, the battlefield). Returns
+-- the step it interrupts, for engine.done.
 function engine.doing(f, c, kind)
 	if not f.trace then return nil end
 	local prev = f.doing
@@ -119,7 +126,8 @@ local function status_view(c)
 	return out
 end
 
--- A combatant handle (lib/action.lua) of combatant c, as it is now.
+-- A combatant handle (lib/action.lua) of combatant c, as it is now: its attack, defense,
+-- strength and dexterity under the battlefield's fields.
 function engine.handle(f, c)
 	local t = { id = c.id, side = c.side, statuses = status_view(c) }
 	if c.side == "player" then
@@ -140,6 +148,10 @@ function engine.handle(f, c)
 		t.name, t.hp, t.maxhp = r.name, c.hp, c.maxhp
 		t.attack, t.defense, t.dexterity = r.attack, r.defense, r.dexterity
 		t.attack_element, t.resist, t.ward = r.element, r.resist, r.ward
+	end
+	local pcts = fields.stats(f)
+	if pcts then
+		for stat, pct in pairs(pcts) do t[stat] = fields.stat(t[stat], pct) end
 	end
 	return action.combatant(t)
 end
@@ -223,6 +235,7 @@ function engine.status_hook(f, c, inst, fname, check, ...)
 	local r = action.call({
 		kind = "status", entity = inst.row, module = module, fn = fn, args = table.pack(...), check = check, plain = true,
 		caster = bearer, target = bearer, in_fight = f.in_fight, rand = f.rand, data = inst.data,
+		battlefield = fields.battlefield(f),
 		fields = { bearer = bearer, source = src and engine.handle(f, src) or nil, ticks_left = inst.ticks_left,
 			round = f.round },
 	})
@@ -259,7 +272,7 @@ function engine.summon_hook(f, c, fname, target)
 	local r = action.call({
 		kind = "summon", entity = c.row, module = module, fn = fn, caster = me, plain = true,
 		target = target and engine.handle(f, target) or nil, in_fight = f.in_fight, rand = f.rand, data = c.data,
-		fields = { self = me, ticks_left = c.ticks_left, round = f.round },
+		fields = { self = me, ticks_left = c.ticks_left, round = f.round }, battlefield = fields.battlefield(f),
 	})
 	if not r.ok then
 		warn("summon %s failed (it leaves the fight): %s", label(f, c), tostring(r.err or r.refused))
@@ -289,7 +302,7 @@ function engine.release(f, c, e)
 	local r = action.call({
 		kind = kind, entity = entity, module = module, fn = fn, caster = caster,
 		target = tc and engine.handle(f, tc) or nil, in_fight = f.in_fight, rand = f.rand,
-		summon_room = engine.summon_room(f, c),
+		summon_room = engine.summon_room(f, c), battlefield = fields.battlefield(f),
 	})
 	if not r.ok then
 		warn("%s %s: the release (%s) failed: %s", kind, entity.key, tostring(e.step), tostring(r.err or r.refused))
@@ -306,7 +319,9 @@ end
 
 -- Applies status `key` to c (replacing an instance it has). params: names and values
 -- (lib/action.lua action.params); ticks (0 or absent: the status's ticks) is the duration.
--- It counts from the tick after f.tick (the fight's clock, or the world's).
+-- The battlefield's fields may adjust both (fight/fields.lua fields.adjust); the status
+-- keeps what it was applied with. It counts from the tick after f.tick (the fight's clock,
+-- or the world's).
 function engine.afflict(f, c, key, params, source)
 	local row = statuses.by_key(key)
 	if not row or row.retired ~= 0 or not load.module("statuses", key) then
@@ -327,6 +342,7 @@ function engine.afflict(f, c, key, params, source)
 	local ticks = data.ticks
 	data.ticks = nil
 	if ticks == nil or ticks == 0 then ticks = row.ticks end
+	ticks, data = fields.adjust(f, key, ticks, data, row)
 	local inst = { status_id = row.id, key = key, row = row, ticks_left = ticks > 0 and ticks or nil, data = data,
 		tick = f.tick or 0, source = source and source.id or nil }
 	c.statuses[#c.statuses + 1] = inst
@@ -437,9 +453,64 @@ end
 
 -- What an attack of `element` meets in target `h` (a handle), for combat.lua to type its
 -- damage with (lib/elements.lua): { element, resist (h's), field_pct (the battlefield's
--- percent for the element: 0, there are no fields yet) }.
+-- percent for the element, fight/fields.lua) }.
 function engine.typed(f, h, element)
-	return { element = element, resist = h:resist(element), field_pct = 0 }
+	return { element = element, resist = h:resist(element), field_pct = fields.pct(f, element) }
+end
+
+---------------------------------------------------------------------------------------
+-- The battlefield
+
+-- The fields that came and went (fight/fields.lua: { { change = "add" | "remove", key, row
+-- }, ... }) as lines: `line` (the weather's change line) for them all, else each field's
+-- "ends" or "begins" message; each change is traced after its line.
+function engine.fields_changed(f, changes, line)
+	if line then say(f, line) end
+	for _, x in ipairs(changes) do
+		if not line then
+			local text = x.row.messages[x.change == "add" and "begins" or "ends"]
+			if type(text) == "string" and text ~= "" then say(f, text) end
+		end
+		trace(f, { field = x.change, key = x.key, label = x.row.name, icon = x.row.icon })
+	end
+end
+
+-- A spell's field (s:field): `key` up for `ticks` clock ticks in place of its group's.
+function engine.set_field(f, key, ticks)
+	local changes = fields.set(f, key, ticks)
+	if changes then engine.fields_changed(f, changes) end
+end
+
+-- A field's on_tick (field x of fields.up) with the context e: e.combatants (every
+-- combatant standing: the player, the allies, the enemies of the wave), e.player,
+-- e.ticks_left (a spell's field: the ticks it has left), e.round. An error is logged; the
+-- field stays up.
+function engine.field_hook(f, x)
+	local module = load.module("fields", x.key)
+	local fn = module and module.on_tick
+	if type(fn) ~= "function" or not code_budget(f) then return end
+	local list, player = {}, nil
+	for _, side in ipairs({ "player", "ally", "enemy" }) do
+		for _, c in ipairs(state.side(f, side)) do
+			local h = engine.handle(f, c)
+			if side == "player" then player = h end
+			list[#list + 1] = h
+		end
+	end
+	if not player then return end
+	local r = action.call({
+		kind = "field", entity = x.row, module = module, fn = fn, caster = player, plain = true, in_fight = f.in_fight,
+		rand = f.rand, battlefield = fields.battlefield(f),
+		fields = { combatants = list, player = player, ticks_left = x.ticks, round = f.round },
+	})
+	if not r.ok then
+		warn("field %s in the fight of user %s failed: %s", x.key, tostring(f.user_id), tostring(r.err or r.refused))
+		return
+	end
+	local prev = engine.doing(f, nil, "field")
+	for _, line in ipairs(r.lines) do say(f, line) end
+	apply(f, r.events)
+	engine.done(f, prev)
 end
 
 ---------------------------------------------------------------------------------------
@@ -566,6 +637,8 @@ apply = function(f, events, source)
 				engine.cure(f, c, e.status)
 			elseif e.type == "summon" then
 				engine.summon(f, e.summon, e.params, c)
+			elseif e.type == "field" then
+				engine.set_field(f, e.field, e.ticks)
 			end
 		end
 	end

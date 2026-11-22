@@ -56,7 +56,8 @@ wd_is "level || '|' || base_maxmp || '|' || $T_KNOWN" "2|10|1,25"
 wd_sql "UPDATE users SET base_attack = 0, currentaction = 'In Town', latitude = 0, longitude = 0, currenthp = base_maxhp"
 
 t_section "wand: Magic Bolt in a fight"
-# Red Slime (no immunity): 1 MP, 3-4 damage
+# Red Slime (no immunity): 1 MP, 3-4 damage (at the calm place: no battlefield)
+t_calm wizard
 t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 5, currenthp = 100, base_maxhp = 100"
 t_get /fight; CS=$(t_csrf)
@@ -96,6 +97,7 @@ t_get "/shop/buy/$WD_WAND_ITEM"; expect_body 'Cheat attempt detected.'
 wd_sql "UPDATE users SET latitude = 0, longitude = 0"
 
 t_section "wand: cast from its fight button"
+t_calm wizard
 t_fight wizard 2 50
 wd_sql "UPDATE users SET currentmp = 0, currenthp = 100, base_maxhp = 100"
 WAND=$(wd_wand)

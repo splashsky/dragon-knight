@@ -21,9 +21,10 @@ ef_is() {  # ef_is EXPR EXPECTED (an SQL expression on the users row)
 sp() { t_sql "SELECT id FROM spells WHERE key = '$1'"; }
 it() { t_sql "SELECT id FROM items WHERE key = '$1'"; }
 t_spells effector "$(sp heal),$(sp poison),$(sp regen),$(sp hyper_beam),$(sp solar_beam),$(sp call_wolf)"
-# sturdy and never hit: dexterity 22500 dodges every attack (rand(1,150) <= 150)
-ef_sql "UPDATE users SET base_maxhp = 500, currenthp = 500, base_maxmp = 200, currentmp = 200, dexterity = 22500,
-	latitude = 3, longitude = 3"
+# sturdy and never hit: dexterity 22500 dodges every attack (rand(1,150) <= 150); at the
+# calm place (t_calm: no field changes the damage, the statuses or the dodging)
+ef_sql "UPDATE users SET base_maxhp = 500, currenthp = 500, base_maxmp = 200, currentmp = 200, dexterity = 22500"
+t_calm effector
 t_get /character; expect_no_body 'Statuses:'
 
 t_section "effects: Poison"
@@ -72,6 +73,7 @@ t_get /fight; expect_body 'You are gathering power.'; expect_body 'The Solar Bea
 CS=$(t_csrf)
 dmg=$((hp - $(t_sql "SELECT $T_MONSTER_HP FROM users $EQ")))
 [ "$dmg" -ge 75 ] && [ "$dmg" -le 90 ] && t_ok || t_fail "solar beam damage $dmg"
+ef_is "(SELECT instr(data, 'field_') FROM fights f WHERE f.user_id = users.id)" 0   # (the calm place: no field)
 # Continue when nothing locks the turn does nothing (the page shows the last round again)
 FIGHT=$(t_sql "SELECT $T_ROUND || '|' || currenthp || '|' || $T_MONSTER_HP FROM users $EQ")
 t_round "csrf=$CS&continue=Continue"; expect_body 'The Solar Beam fires for'

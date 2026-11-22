@@ -178,8 +178,11 @@ function T.loadout_validation()
 		assert(not ok, "expected errors")
 		return errs
 	end
-	has_error(errors({ spells = { { spell = "hurt", weight = 0 } } }), "spells[1].weight must be an integer from 1")
-	has_error(errors({ items = { { item = "potion", weight = -1 } } }), "items[1].weight must be an integer from 1")
+	local off = assert(schema.validate(kind, base_data({ spells = { { spell = "dream", weight = 0 } },
+		items = { { item = "potion", weight = 0 } } })))
+	eq(off["spells.1.weight"], 0, "weight 0: never chosen"); eq(off["items.1.weight"], 0)
+	has_error(errors({ spells = { { spell = "hurt", weight = -1 } } }), "spells[1].weight must be an integer from 0")
+	has_error(errors({ items = { { item = "potion", weight = -1 } } }), "items[1].weight must be an integer from 0")
 	has_error(errors({ items = { { item = "potion", stock = 0 } } }), "items[1].stock must be an integer from 1")
 	has_error(errors({ items = { { item = "potion", when = true } } }), "items[1].when must be a function")
 	has_error(errors({ items = { { item = "potion", chance = 3 } } }), "items[1]: unknown field 'chance'")
@@ -548,6 +551,41 @@ function T.class_spells_join_the_loadout()
 		-- without a class: its own spells only
 		row.class = ""
 		eq(#monsters.loadout(row).spells, 1)
+	end)
+	dk.db:exec("ROLLBACK TO test_monsters")
+	dk.db:exec("RELEASE test_monsters")
+	monsters.reload()
+	if not ok then error(err, 0) end
+end
+
+function T.weight_zero_is_never_chosen()
+	-- an entry of weight 0 is left out of the loadout (never weighed, never chosen)
+	local m = test_monster(nil, { spells = { { spell = "hurt", weight = 0 }, { spell = "heal", weight = 2 } },
+		items = { { item = "potion", weight = 0 } } })
+	local lo = monsters.loadout(m)
+	eq(#lo.spells, 1); eq(lo.spells[1].spell.key, "heal"); eq(#lo.items, 0)
+	local f, c = fight(no_rolls, test_monster(nil, { spells = { { spell = "hurt", weight = 0 } } }))
+	eq(kinds(ai.actions(f, c)), "attack:")
+	-- with a class: an own entry of weight 0 switches off the class's spell of that key
+	dk.db:exec("SAVEPOINT test_monsters")
+	local ok, err = pcall(function()
+		local hurt = assert(spells.by_key("hurt"))
+		dk.db:exec("INSERT INTO monster_spells (monster_id, position, spell_id, weight, has_when) VALUES (1, 1, ?, 0, 0)", hurt.id)
+		monsters.reload()
+		local row = {}
+		for k, v in pairs(monsters.get(1)) do row[k] = v end
+		eq(#monsters.loadout(row).spells, 0, "without a class: nothing to cast")
+		eq(monsters.acts(row), false)
+		row.class, row.level = "mage", 20
+		local taught = false
+		for _, s in ipairs(require("lib.classes").spells_up_to(assert(require("lib.classes").find("mage")), 20)) do
+			if s.key == "hurt" then taught = true end
+		end
+		assert(taught, "the Mage learns Hurt by level 20")
+		local keys = {}
+		for _, e in ipairs(monsters.loadout(row).spells) do keys[#keys + 1] = e.spell.key end
+		assert(#keys >= 3, "the class's other spells")
+		for _, key in ipairs(keys) do assert(key ~= "hurt", "hurt is switched off") end
 	end)
 	dk.db:exec("ROLLBACK TO test_monsters")
 	dk.db:exec("RELEASE test_monsters")

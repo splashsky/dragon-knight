@@ -44,6 +44,8 @@ for _ in $(seq 1 15); do
 	t_get /fight; expect_status 200
 	[ "$(t_sql "SELECT $T_MONSTER BETWEEN 1 AND 151 FROM users $MQ")" = 1 ] && t_ok || t_fail "picked a monster that doesn't roam"
 done
+# the given monsters from here on: at the calm place (their spells' damage, the dodging)
+t_fight_clear monsterer; t_calm monsterer
 
 t_section "monsters: the Goblin Shaman's potions (stock 2 per encounter)"
 SHAMAN=$(mon goblin_shaman)
@@ -53,10 +55,11 @@ t_get /fight; CS=$(t_csrf)
 expect_body 'You are fighting a <b class="tip-term" data-tip tabindex="0">Goblin Shaman<template class="tip">'; expect_body "Monster's MP: 0"
 t_round "csrf=$CS&fight=Fight"
 expect_body 'The Goblin Shaman uses the Potion.<br>The Goblin Shaman recovers '   # (it may speak first)
-mo_is "$(enemy hp)" 40; mo_is "$(enemy data)" "stock_1=i:1"
+# (its data: the stock left, and the turns it acted: m.turn)
+mo_is "$(enemy hp)" 40; mo_is "replace($(enemy data), char(10), ';')" "stock_1=i:1;turn=i:1"
 mo_enemy_set "hp = 10"
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
-mo_is "$(enemy data)" "stock_1=i:0"
+mo_is "replace($(enemy data), char(10), ';')" "stock_1=i:0;turn=i:2"
 mo_enemy_set "hp = 10"
 t_round "csrf=$CS&fight=Fight"; expect_no_body 'uses the Potion'
 expect_body 'You dodge the monster&#39;s attack.'
@@ -64,7 +67,7 @@ expect_body 'You dodge the monster&#39;s attack.'
 t_fight monsterer "$SHAMAN" 10
 mo_enemy_set "mp = 0, maxmp = 17"
 t_round "csrf=$CS&fight=Fight"; expect_body 'The Goblin Shaman uses the Potion.'
-mo_is "$(enemy data)" "stock_1=i:1"
+mo_is "replace($(enemy data), char(10), ';')" "stock_1=i:1;turn=i:1"
 
 t_section "monsters: the Goblin Shaman casts Hurt (MP)"
 t_fight monsterer "$SHAMAN" 40   # full HP: no heal, no potion; 17 MP
@@ -156,7 +159,8 @@ t_sql "UPDATE monsters SET maxdam = $MO_SLIME_DAM WHERE id = 1"
 t_get /fight; expect_body '<p class="fight-taunt"><span class="fight-speech">Blue Slime: &ldquo;Blub blub blub!&rdquo;</span></p>'
 cp "$T/blue_slime.lua.orig" "$MO_SLIME"
 t_fight_clear monsterer
-t_sql "UPDATE users SET currentaction = 'Exploring', base_maxhp = 500, currenthp = 500, dexterity = 22500, latitude = 20, longitude = 0 $MQ"
+t_sql "UPDATE users SET currentaction = 'Exploring', base_maxhp = 500, currenthp = 500, dexterity = 22500 $MQ"
+t_calm monsterer
 
 t_section "monsters: elements, resistances and wards"
 # (overrides) the Red Slime weak to fire, its attack frost; the Dagger a fire weapon that

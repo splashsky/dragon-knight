@@ -1,21 +1,24 @@
--- action.lua :: the action API: what spells, consumables, statuses and summons are scripted
--- against (docs/APP.md "Scripting spells and items", "Fight engine"). Pure: no DB access;
--- dice come from an injected rand.
+-- action.lua :: the action API: what spells, consumables, statuses, summons and fields
+-- are scripted against (docs/APP.md "Scripting spells and items", "Fight engine"). Pure: no
+-- DB access; dice come from an injected rand.
 --
 -- A content file's cast (spells) / use (items) receives a context `s` built here per cast
 -- or use, with combatant handles for the one who acts (`s.caster`) and the one aimed at
 -- (`s.target`; the caster for self-targeted actions, nil outside fights for the others).
--- A status's hooks get the same kind of context (`t`, with `t.bearer`), and so does a
--- summon's act (`a`, with `a.self`). Content never writes the game state: the handles'
--- methods (:heal, :hurt, :afflict, ...) update the handle's own view of the numbers and
--- record events, in order; action.perform / action.call return them and the caller
--- (fight/engine.lua) applies them to its state. A refusal, or an error in content code,
--- returns no events at all, so nothing changes and nothing (MP, the item, the turn) is
--- spent. Messages are worded for the player; a file may give `messages.enemy` variants for
--- a monster acting, and without one a generic line ("The Dragon casts Hurt.") plus the
--- numbers is shown. Damage has an element and meets the target's resistance, and a status
--- its ward (lib/elements.lua): a hit against a weakness or a resistance adds a line after
--- the next one said ("It resists fire.").
+-- A status's hooks get the same kind of context (`t`, with `t.bearer`), and so do a
+-- summon's act (`a`, with `a.self`) and a field's on_tick (`e`, with `e.combatants`).
+-- Content never writes the game state: the handles' methods (:heal, :hurt, :afflict, ...)
+-- update the handle's own view of the numbers and record events, in order; action.perform
+-- / action.call return them and the caller (fight/engine.lua) applies them to its state. A
+-- refusal, or an error in content code, returns no events at all, so nothing changes and
+-- nothing (MP, the item, the turn) is spent. Messages are worded for the player; a file may
+-- give `messages.enemy` variants for a monster acting, and without one a generic line ("The
+-- Dragon casts Hurt.") plus the numbers is shown. Damage has an element and meets the
+-- battlefield's fields and the target's resistance, and a status the fields' rules and its
+-- ward (lib/elements.lua; the fields are fight/fields.lua's, handed in as o.battlefield): a
+-- hit against a weakness or a resistance adds a line after the next one said ("It resists
+-- fire."), and so does a field that keeps a status from taking hold ("The rain puts the
+-- fire out before it can catch.").
 local clock = require("lib.clock")
 local elements = require("lib.elements")
 local load = require("lib.content.load")
@@ -268,7 +271,7 @@ function Combatant:hurt(n, element)
 	element = element_key(element)
 	local v, ctx = changing(self)
 	local resist = self:resist(element)
-	local dealt, healed = elements.damage(n, ctx.field_pct and ctx.field_pct(element) or 0, resist)
+	local dealt, healed = elements.damage(n, ctx.battlefield and ctx.battlefield.pct(element) or 0, resist)
 	local note = elements.note(element, resist, v.is_player)
 	if healed > 0 then
 		local gained = math.max(0, math.min(healed, v.maxhp - v.hp))
@@ -307,18 +310,33 @@ function Combatant:buff(kind, pct)
 	end
 end
 
--- Whether status `key` takes hold of h, against its ward: 0 always and 100 never, both
--- without a roll; 1-99 rolls rand(1, 100) with the action's dice (resisted at or below it).
+-- Whether a percent chance comes true: 0 never and 100 always, both without a roll; 1-99
+-- rolls rand(1, 100) with the action's dice.
+local function chance(ctx, pct)
+	if pct <= 0 then return false end
+	if pct >= 100 then return true end
+	return ctx.rand(1, 100) <= pct
+end
+
+-- Whether status `key` takes hold of h: a field that blocks it stops it first (its line
+-- follows the next one said), then its ward (0 always and 100 never take hold, without a
+-- roll; 1-99 rolls: resisted at or below it), then each field's chance that it takes hold.
 local function takes_hold(h, ctx, key)
-	local ward = h:ward(key)
-	if ward == 0 then return true end
-	if ward == 100 then return false end
-	return ctx.rand(1, 100) > ward
+	local rule = ctx.battlefield and ctx.battlefield.status(key)
+	if rule and rule.blocked then
+		record(ctx, h, { type = "field_blocked", status = key, note = rule.line })
+		return false
+	end
+	if chance(ctx, h:ward(key)) then return false end
+	for _, pct in ipairs(rule and rule.chances or {}) do
+		if not chance(ctx, pct) then return false end
+	end
+	return true
 end
 
 -- Puts it to sleep (the status sleep): it stays asleep while rand(1, 15) <= chance,
 -- rolled on every tick of the clock (0 wakes it). Returns whether it fell asleep
--- (false: its ward against sleep stopped it; waking always works).
+-- (false: a field or its ward against sleep stopped it; waking always works).
 function Combatant:sleep(chance)
 	chance = whole(chance, "the chance to stay asleep")
 	local _, ctx = changing(self)
@@ -336,7 +354,8 @@ end
 -- Applies the status `key` (app/content/statuses/<key>.lua) with `params` (names and
 -- values: ticks = how many clock ticks, 0 or absent: the file's ticks, and anything its code reads as
 -- t.data). Applying it again replaces the one it has (the new duration and params win,
--- even when shorter). Returns whether it took hold (false: its ward stopped it).
+-- even when shorter). Returns whether it took hold (false: a field or its ward stopped it).
+-- The fields may also shorten or strengthen it as it is applied (fight/fields.lua).
 function Combatant:afflict(key, params)
 	local p = action.params(params, "the status params")
 	local _, ctx = changing(self)
@@ -398,6 +417,7 @@ action.KINDS = {
 	item = { run = "use", check = "can_use", content = "items", generic = "The %s uses the %s." },
 	status = { content = "statuses", generic = "The %s is %s." },
 	summon = { run = "act", content = "summons", generic = "The %s acts." },
+	field = { content = "fields", generic = "The %s is caught in the %s." },
 }
 
 -- The file's messages (strings and functions) under the stored strings (the database's,
@@ -423,13 +443,15 @@ local function enemy_voice(caster)
 	return not caster.is_player and caster.side ~= "ally"
 end
 
--- A context. o: { kind = "spell" | "item" | "status" | "summon", entity (the content row:
--- key, name, mp, power, decoded data and messages), module (the loaded content file),
--- caster, target (combatant handles; target may be nil), in_fight, rand (php.rand-like),
+-- A context. o: { kind = "spell" | "item" | "status" | "summon" | "field", entity (the
+-- content row: key, name, mp, power, decoded data and messages), module (the loaded content
+-- file), caster, target (combatant handles; target may be nil), in_fight, rand (php.rand-like),
 -- data (overrides of the data: a status's params), fields (more read-only fields: bearer,
--- source, self, ticks_left, round), summon_room (allies that may still join), plain (its
--- lines are never worded for a monster: statuses and summons), field_pct (a
--- function(element) giving the battlefield's damage percent for it; absent: 0) }.
+-- source, self, ticks_left, round, combatants; handles, or lists of them), summon_room
+-- (allies that may still join), plain (its lines are never worded for a monster: statuses,
+-- summons and fields), battlefield (the fight's fields, fight/fields.lua
+-- fields.battlefield: pct(element), status(key), has(key), set(key); absent: none, as
+-- outside fights) }.
 function action.new(o)
 	local entity, module = o.entity, o.module or {}
 	local data = {}
@@ -446,11 +468,16 @@ function action.new(o)
 	for k, v in pairs(o.fields or {}) do s[k] = v end
 	setmetatable(s, ACTION_MT)
 	INNER[s] = { rand = o.rand, events = {}, running = false, checking = false, module = module,
-		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room, field_pct = o.field_pct }
+		enemy = not o.plain and enemy_voice(o.caster), summon_room = s.summon_room, battlefield = o.battlefield }
 	INNER[o.caster].ctx = s
 	if o.target then INNER[o.target].ctx = s end
 	for _, h in pairs(o.fields or {}) do
-		if getmetatable(h) == COMBATANT_MT then INNER[h].ctx = s end
+		if getmetatable(h) == COMBATANT_MT then INNER[h].ctx = s
+		elseif type(h) == "table" then
+			for _, x in ipairs(h) do
+				if getmetatable(x) == COMBATANT_MT then INNER[x].ctx = s end
+			end
+		end
 	end
 	return s
 end
@@ -543,6 +570,29 @@ end
 function Action:recharge(ticks)
 	ticks = whole(ticks, "the ticks to recharge")
 	self.caster:afflict("recharging", { ticks = math.max(ticks, 1) })
+end
+
+-- The battlefield (fights only; docs/APP.md "Fields"). field: puts field `key`
+-- (app/content/fields/<key>.lua) up for params.ticks clock ticks (at least 1), in place of
+-- the field of its group (the weather's comes back after it). Returns true when it was set,
+-- false when that field is already up or there is no fight. has_field: whether field `key`
+-- is up.
+function Action:field(key, params)
+	local i = running(self, "field")
+	if type(key) ~= "string" or not key:find("^[a-z0-9_]+$") then error("a field key expected (got " .. tostring(key) .. ")", 2) end
+	local p = action.params(params, "the field params")
+	if math.type(p.ticks) ~= "integer" or p.ticks < 1 then error("a field needs ticks = n (clock ticks, at least 1)", 2) end
+	if not self.in_fight or not i.battlefield then return false end
+	local ok, err = i.battlefield.set(key)
+	if ok == nil then error(err, 2) end
+	if not ok then return false end
+	record(i, self.caster, { type = "field", field = key, ticks = p.ticks })
+	return true
+end
+
+function Action:has_field(key)
+	local bf = INNER[self].battlefield
+	return bf ~= nil and bf.has(key)
 end
 
 -- How long n clock ticks last, in seconds (for lines: "burns for %d seconds").
@@ -654,7 +704,7 @@ function action.perform(o)
 	local module = behaviour(o, k)
 	if not module then return { reason = "cannot" } end
 	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
-		in_fight = o.in_fight, rand = o.rand, summon_room = o.summon_room })
+		in_fight = o.in_fight, rand = o.rand, summon_room = o.summon_room, battlefield = o.battlefield })
 	local i = INNER[s]
 	local function finish(r)
 		i.running = false
@@ -694,7 +744,7 @@ function action.check(o)
 	if not module then return { reason = "cannot" } end
 	if module[k.check] == nil then return { ok = true } end
 	local s = action.new({ kind = o.kind, entity = o.entity, module = module, caster = o.caster, target = o.target,
-		in_fight = o.in_fight, rand = no_dice, summon_room = o.summon_room })
+		in_fight = o.in_fight, rand = no_dice, summon_room = o.summon_room, battlefield = o.battlefield })
 	local i = INNER[s]
 	i.running, i.checking = true, true
 	local ok, r = sandbox.call(module[k.check], s)

@@ -191,12 +191,14 @@ return {
 	player's tile, followed on every tick (`sky` -> the field of the same key for `sun`,
 	`heat`, `fog`, `rain`, `downpour`, `thunderstorm`, `snow`, `blizzard`; ground `mud`
 	-> `mud`, `ice` -> `ice`; time `night` -> `night`). And spells': `s:field(key, {
-	ticks = n })` (a field spell, by the player or a monster), which displaces the world's
-	field of the same group for its ticks. After it ends, the weather's field comes back.
+	ticks = n })` (a field spell, by the player or a monster; true when it was set, false
+	when that field is already up), which displaces the world's field of the same group for
+	its ticks. After it ends, the weather's field comes back.
 	`aura` fields come only from spells (`consecrated`, `miasma`, ...).
 - **Weather moving mid-fight**: on each tick the fight compares the world's fields with
-	those it has (`f.data`). The differences become lines (the field's `begins` / `ends`,
-	or the weather's change line) with `field` events for `fight.js`. A field spell in
+	those it has (`f.data`). The differences become lines (the weather's change line when
+	only the weather's fields changed, just now, with no spell holding one of its groups;
+	else the fields' `begins` / `ends`) with `field` events for `fight.js`. A field spell in
 	effect hides the change in its group until it ends. Because every action first catches
 	the fight up to now, a spell cast just as the rain clears meets a clear sky: its burn
 	takes hold.
@@ -205,12 +207,12 @@ return {
 	the field's `blocked` line), a ward is rolled only after that, then `ticks` and `scale`
 	adjust the params it is applied with. The status keeps its adjusted values: rain
 	starting later doesn't shorten a burn already burning. `stats` adjusts the handles'
-	numbers that formulas read (`combat.lua` sees the adjusted dexterity). Equivalence
-	holds with no fields.
+	numbers that formulas read (`combat.lua` sees the adjusted dexterity; running away and
+	who swings first keep the unadjusted numbers). Equivalence holds with no fields.
 - **Shown**: on the fight page, a "Battlefield" line under the monster with each field's
 	icon and name and a tooltip (description, modifiers as lines: "Fire damage -40%",
 	"Burning can't take hold"); the help pages list fields (`/help/fields`); fight events
-	gain `field = { { key, name, change = "add" | "remove" } }`.
+	gain `field = { { key, name, change = "add" | "remove", icon } }`.
 - **The first fields** (content, part 5): `sun`, `heat`, `fog`, `rain`, `downpour`,
 	`thunderstorm`, `snow`, `blizzard`, `mud`, `ice`, `night`, and aura fields for spells.
 

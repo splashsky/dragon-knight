@@ -64,7 +64,7 @@ ct_eq "SELECT id || '|' || key || '|' || name || '|' || start_hp || '|' || exp_b
 	"4|knight|Knight|30|10|0" "class row"
 ct_eq "SELECT count(*) || '|' || sum(hp) FROM class_levels WHERE class_id = 4" "99|198" "class levels"
 ct_eq "SELECT group_concat(spell_id) FROM class_spells WHERE class_id = 4 AND level = 3" "1,6" "class spells"
-grep -qF "content synced (statuses: $(ct_n statuses), 0 new, 0 retired, 0 restored; summons: $(ct_n summons), 0 new, 0 retired, 0 restored; spells: $(ct_n spells), 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored; items: $(ct_n items), 0 new, 0 retired, 0 restored; monsters: $(ct_n monsters), 0 new, 0 retired, 0 restored)" "$T/server.log" && t_ok || t_fail "sync not logged"
+grep -qF "content synced (statuses: $(ct_n statuses), 0 new, 0 retired, 0 restored; fields: $(ct_n fields), 0 new, 0 retired, 0 restored; summons: $(ct_n summons), 0 new, 0 retired, 0 restored; spells: $(ct_n spells), 0 new, 0 retired, 0 restored; classes: 4, 1 new, 0 retired, 0 restored; items: $(ct_n items), 0 new, 0 retired, 0 restored; monsters: $(ct_n monsters), 0 new, 0 retired, 0 restored)" "$T/server.log" && t_ok || t_fail "sync not logged"
 t_get /help;          expect_body '<b>Knight</b>'; expect_body '<li>Test class.</li>'; expect_body 'There are four character classes'
 t_get /help/levels;   expect_body 'Knight Levels'
 "$BIN" content status --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk content status"
@@ -178,7 +178,7 @@ rm "$CT_DIR/Bad-Name.lua"
 t_jar admin
 ct_wait_gone /admin 'Content files have errors' && t_ok || t_fail "content error not cleared"
 "$BIN" check --config "$CONFIG" >"$T/content.log" 2>&1 && t_ok || t_fail "dk check after the fix: $(cat "$T/content.log")"
-grep -qF "content: ok ($(ct_n statuses) statuses, $(ct_n summons) summons, $(ct_n spells) spells, 4 classes, $(ct_n items) items, $(ct_n monsters) monsters)" "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
+grep -qF "content: ok ($(ct_n statuses) statuses, $(ct_n fields) fields, $(ct_n summons) summons, $(ct_n spells) spells, 4 classes, $(ct_n items) items, $(ct_n monsters) monsters)" "$T/content.log" && t_ok || t_fail "check output: $(cat "$T/content.log")"
 
 t_section "content: a new spell, learned through a class file"
 cat > "$CT_SPELLS/zap.lua" <<'EOF'
@@ -225,7 +225,9 @@ ct_eq "SELECT us.learned_level FROM user_spells us JOIN users u ON u.id = us.use
 	"12" "learned at level 12"
 t_get /;              expect_no_body 'action="/spell/'"$CT_ZAP"'"'   # fight-only: not a Fast Spell
 t_post /spell/$CT_ZAP "csrf=$(t_csrf)"; expect_body 'This is not a healing spell.'
-# cast in a fight: both lines, MP spent (Red Slime: no immunity)
+# cast in a fight: both lines, MP spent (Red Slime: no immunity; at the calm place: no
+# battlefield)
+t_calm ctknight
 t_fight ctknight 2 50
 t_sql "UPDATE users SET currentmp = 10, currenthp = 500, base_maxhp = 500 WHERE username = 'ctknight'"
 t_get /fight;         expect_body 'name="spell" value="'"$CT_ZAP"'" title="Zap ('

@@ -56,13 +56,14 @@ raw = open(path, "rb").read()
 text = raw.decode("utf-8")
 
 ACTORS = {"player", "ally", "enemy"}
-TYPES = {"attack", "spell", "item", "guard", "status", "summon", "blocked", "run", "ambush", "wave", "speech", "say",
-	"victory", "death", "escape"}
+TYPES = {"attack", "spell", "item", "guard", "status", "summon", "blocked", "run", "ambush", "wave", "field", "speech",
+	"say", "victory", "death", "escape"}
 PARTS = {"player", "allies", "enemies", "ending"}
-EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon"}
+EVENT = {"part", "actor", "actor_id", "actor_name", "type", "text", "hp", "mp", "tp", "status", "summon", "field"}
 CHANGE = {"who", "id", "name", "from", "to", "max"}
 STATUS = {"who", "id", "name", "key", "status", "ticks", "change", "statuses"}
 SUMMON = {"change", "id", "name", "hp", "max", "ticks"}
+FIELD = {"key", "name", "change", "icon"}
 
 def inner(body, start, tag):
 	m = re.search(start + r'[^>]*>(.*?)</' + tag + '>', body, re.S)
@@ -113,7 +114,7 @@ def check(d):
 			assert "text" not in e and e["actor"] == "player", "an outcome"
 		else:
 			assert e.get("part") in PARTS, "a round's event has its part"
-			assert "text" in e or any(k in e for k in ("hp", "mp", "tp", "status", "summon")), "an empty event"
+			assert "text" in e or any(k in e for k in ("hp", "mp", "tp", "status", "summon", "field")), "an empty event"
 		for k in ("hp", "mp", "tp"):
 			for c in e.get(k, None) or []:
 				assert set(c) <= CHANGE and c["who"] in ACTORS, "%s change %r" % (k, c)
@@ -129,6 +130,10 @@ def check(d):
 				assert "icon" not in x or (isinstance(x["icon"], str) and x["icon"].startswith("/static/images/statuses/")), "status icon %r" % x
 		for s in e.get("summon", []):
 			assert set(s) <= SUMMON and s["change"] in ("join", "leave", "ticks"), "summon %r" % s
+		for x in e.get("field", []):
+			assert set(x) <= FIELD and x["change"] in ("add", "remove"), "field %r" % x
+			assert isinstance(x["key"], str) and isinstance(x["name"], str), "field names %r" % x
+			assert "icon" not in x or x["icon"].startswith("/static/images/fields/"), "field icon %r" % x
 
 if cmd == "lines-html":
 	for p in re.findall(r'<p class="fight-(?:yourturn|allyturn|monsterturn|roundend)">(.*?)</p>', text, re.S):
@@ -190,12 +195,14 @@ fa_both() {
 	fi
 }
 
-# the player: level 10 Mage, sturdy, no gear, at 30N (fights against given monsters)
+# the player: level 10 Mage, sturdy, no gear, at the calm place (fights against given
+# monsters, without a battlefield: the rounds' numbers and events are the fight's own)
 fa_player() {
 	t_items_clear fapi
 	fa_sql "UPDATE users SET level = 10, currenthp = 300, base_maxhp = 300, currentmp = 100, base_maxmp = 100,
 		currenttp = 10, base_maxtp = 10, strength = 30, dexterity = 30, base_attack = 0, base_defense = 0,
-		base_exp_bonus = 0, base_gold_bonus = 0, gold = 500, experience = 5000, dropcode = 0, latitude = 30, longitude = 0"
+		base_exp_bonus = 0, base_gold_bonus = 0, gold = 500, experience = 5000, dropcode = 0,
+		latitude = $T_CALM_LAT, longitude = $T_CALM_LON"
 }
 # a fight on the clock at T_START (t_fight's isn't yet: its first POST starts it at its time)
 fa_on_clock() {

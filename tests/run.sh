@@ -292,6 +292,15 @@ t_tick() {
 	t_get /changepassword
 	t_post /__test/tick "csrf=$(t_csrf)"
 }
+# A calm place: the weather brings no field to it (fight/fields.lua) from $T_START until
+# nightfall, 1400 s later (tests/lua/test_fields.lua checks it), so a fight there has no
+# battlefield, the same on every run. A check of the numbers of a fight (damage, healing, a
+# status's data or duration, an attack that never lands) fights there: t_calm USER moves
+# USER to it (Midworld's level band; no town). The weather's fields have tests of their own
+# (tests/e2e/fields.sh).
+T_CALM_LAT=-3
+T_CALM_LON=3
+t_calm() { t_sql "UPDATE users SET latitude = $T_CALM_LAT, longitude = $T_CALM_LON WHERE username = '$1'"; }
 # t_round 'fields' [curl args]: POST /fight like a form, following its redirect back to the
 # fight page (a round, a refusal's note, a stale form: Post/Redirect/Get), so $BODY is the
 # page it shows; any other answer (a victory's redirect, a 403) as it is.

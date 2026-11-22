@@ -60,7 +60,9 @@ t_get /victory; expect_redirect /
 
 t_section "fight: run away blocked"
 # Lucifuge (maxdam 600): ceil(sqrt(600)) = 25 beats any run roll with dexterity 0 (max 10);
-# no dodge with dexterity 0, and the hit is rand(300,600) - 0
+# no dodge with dexterity 0, and the hit is rand(300,600) - 0 (at the calm place: no field
+# changes the monster's attack)
+t_calm fighter
 t_fight fighter 151 30000
 f_sql "UPDATE users SET dexterity = 0, base_defense = 0, currenthp = 5000, base_maxhp = 5000"
 t_round "csrf=$CS&run=Run"; expect_status 200
@@ -73,8 +75,10 @@ t_fight_clear fighter
 f_sql "UPDATE users SET currentaction = 'Exploring', dexterity = $DEX"
 
 t_section "fight: victory + level up"
-f_sql "UPDATE users SET latitude = 0, longitude = 0,
-	base_attack = 495, currenthp = 500, base_maxhp = 500, experience = 17, gold = 100"
+# (from here to the deaths, at the calm place, Midworld's level band: the sleep spell's
+# chance and the spells' numbers are what they are without a battlefield)
+f_sql "UPDATE users SET base_attack = 495, currenthp = 500, base_maxhp = 500, experience = 17, gold = 100"
+t_calm fighter
 t_fight_new fighter
 t_get /fight; CS=$(t_csrf)
 for _ in $(seq 1 30); do
@@ -279,6 +283,7 @@ t_section "fight: use an item"
 # when its can_use refuses now; the form before 2.4 (item=Use Item&useritem=<id>) still works
 t_items_clear fighter
 t_give fighter herb 3; t_give fighter ether 1; t_give fighter stick 1
+t_calm fighter   # (the slime's attack after the herb: its damage without a battlefield)
 t_fight fighter 2 50
 f_sql "UPDATE users SET currenthp = 10, base_maxhp = 100, currentmp = 0,
 	base_maxmp = 50, base_attack = 0, base_defense = 0"

@@ -1362,6 +1362,30 @@ UPDATE fight_statuses SET tick = 0;
 	end
 end
 
+-- 23: fields (3.2, app/fight/fields.lua): effects on the whole battlefield, the weather's
+-- or a spell's, a content kind (the sync fills the table). A fight keeps the ones that are
+-- up in its data, so fights in progress start without any and take the weather's at their
+-- next tick. Monsters' loadout entries may weigh 0 (never chosen): nothing to convert.
+local function v23_fields()
+	dk.db:exec_script([[
+CREATE TABLE fields (
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	lore         TEXT    NOT NULL DEFAULT '',
+	icon         TEXT    NOT NULL DEFAULT '',
+	"group"      TEXT    NOT NULL DEFAULT 'sky',
+	damage       TEXT    NOT NULL DEFAULT '',
+	stats        TEXT    NOT NULL DEFAULT '',
+	statuses     TEXT    NOT NULL DEFAULT '',
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT '',
+	retired      INTEGER NOT NULL DEFAULT 0
+);
+]])
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1402,6 +1426,8 @@ migrations.STEPS = {
 	{ name = "fights in real time on the server's tick: durations in ticks, the turn's deadline (fights in progress " ..
 		"start on the clock when next played), Guard on the hotbar's key 9 (what was there moves to a free key or off the bar)",
 		up = v22_fights_on_the_clock },
+	{ name = "fields: effects on the whole battlefield (the weather's and spells'), a content kind; monsters' " ..
+		"loadout entries may weigh 0", up = v23_fields },
 }
 
 migrations.VERSION = #migrations.STEPS

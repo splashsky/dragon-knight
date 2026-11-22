@@ -18,6 +18,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
 | The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
+| Fields (the battlefield: the weather's and spells' effects on a fight) | `app/fight/fields.lua`, `app/lib/fields.lua`, `app/lib/content/kinds/fields.lua`, `app/content/fields/*.lua`, `app/fight/{engine,round}.lua`, `app/community/help.lua` (`/help/fields`), `app/admin/effects.lua` | `templates/fight/battlefield.html`, `templates/community/help/fields.html`, `public/js/fight.js`, `public/css/fight.css`, `public/images/fields/*` | `tests/lua/test_fields.lua`, `tests/e2e/fields.sh` |
 | Town, shop, explore, heal, character, map | `app/routes/town.lua`, `app/town/*` | `templates/town/*`, `public/css/town.css` | `tests/e2e/town.sh` |
 | Items, inventory, derived stats | `app/content/items/*.lua`, `app/lib/{items,inventory,stats}.lua`, `app/town/{inventory,shop,inn}.lua`, `app/admin/items.lua` | `templates/town/{inventory,inventory_discard,shop,shop_buy,inn}.html`, `templates/fight/drop*.html`, `templates/admin/item{,s}.html`, `public/images/items/*` | `tests/e2e/{inventory,town,fight,wand}.sh`, `tests/lua/test_{items,stats,inventory}.lua` |
 | Fight, victory, drops | `app/routes/fight.lua`, `app/fight/{combat,act,encounter}.lua`, `app/lib/leveling.lua` | `templates/fight/*`, `public/css/fight.css` | `tests/e2e/fight.sh`, `tests/lua/test_{fight,leveling}.lua` |
@@ -25,7 +26,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Smooth fights (fight events) | `app/fight/events.lua`, `app/routes/fight.lua` | `templates/fight/*`, `public/js/fight.js`, `public/css/fight.css` | `tests/e2e/fight_api.sh`, `tests/lua/test_round.lua`, `tests/e2e/browser.sh` |
 | Fight engine (round pipeline, statuses, summons, AI, world statuses) | `app/fight/{state,engine,round,ai,act}.lua`, `app/lib/{statuses,summons,world}.lua`, `app/content/{statuses,summons}/*.lua`, `app/admin/effects.lua` | `templates/fight/{fight,statuses}.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_round.lua` (+ `fight_original.lua`, `fight_model.lua`, `spells_original.lua`), `tests/e2e/effects.sh` |
 | Monsters (content with MP, equipment, items, spells) | `app/content/monsters/*.lua`, `app/lib/content/kinds/monsters.lua`, `app/lib/monsters.lua`, `app/fight/monster.lua`, `app/admin/effects.lua`, `app/community/help.lua` | `templates/community/help/monsters.html`, `templates/admin/{effects,effect}.html` | `tests/lua/test_monsters.lua`, `tests/e2e/monsters.sh` |
-| Content (statuses, summons, classes, spells, items, monsters) | `app/content/{statuses,summons,classes,spells,items,monsters}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,summons,monsters}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
+| Content (statuses, fields, summons, classes, spells, items, monsters) | `app/content/{statuses,fields,summons,classes,spells,items,monsters}/*.lua`, `app/lib/content/*`, `app/lib/{classes,spells,items,statuses,fields,summons,monsters}.lua`, `app/cli/{content,check}.lua`, `app/admin/{classes,spells,items,effects,content}.lua` | `templates/admin/{class,classes,spell,spells,item,items,effect,effects,content_form,content_status}.html` | `tests/e2e/content.sh`, `tests/lua/test_{content,items}.lua` |
 | Scripted spells and items (what they do) | `app/lib/action.lua`, `app/lib/content/{sandbox,scripted}.lua`, `app/fight/{act,engine}.lua` | | `tests/lua/test_action.lua` (+ `effects_original.lua`), `tests/e2e/content.sh` |
 | Forum (boards), help, changelog | `app/routes/community.lua`, `app/community/{forum,help,changelog}.lua`, `app/lib/paging.lua` | `templates/community/{forum,help}/*`, `templates/community/changelog.html`, `public/css/community.css` | `tests/e2e/community.sh` |
 | News (town box, `/news`, News board threads) | `app/lib/news.lua`, `app/community/news.lua`, `app/admin/news.lua` | `templates/community/news/*`, `templates/home/town.html`, `templates/admin/news.html` | `tests/e2e/news.sh`, `tests/lua/test_news.lua` |
@@ -1012,20 +1013,22 @@ at a glance: the price set large with the player's gold or what is missing, the 
 a table of figures with the change against the item worn in that slot, green or red, a
 gray "+0" when it doesn't change, and the stats a swap loses, the effects (a consumable's, the spell gear casts, its charges),
 the trade-in, then the description; no lore); the discard confirmation), the monster's name on the fight page (name,
-level, description, lore) and the class names on the registration page (starting HP/MP, the
+level, description, lore), the fields on the fight page's Battlefield line (`tips.field`: the
+field's icon and name, its group and a spell's time left, its modifiers as lines, the
+description, lore) and the class names on the registration page (starting HP/MP, the
 description's points, lore). Names that aren't links get `class="tip-term" tabindex="0"`.
 
 ## Lore
 
 `lore` is an optional content field of every kind (classes, spells, items, monsters,
-statuses, summons): story text, up to 2,000 characters (`schema.LORE_MAX`), several lines,
+statuses, summons, fields): story text, up to 2,000 characters (`schema.LORE_MAX`), several lines,
 a blank line between paragraphs (the lines of a paragraph are joined, so files may wrap
 it). Synced into the kinds' `lore` columns (schema version 13), overridable in the admin
 panel (a textarea on every content admin page), escaped wherever it shows
 (`paragraphs(text)`): in the tooltips (`.tip-lore`) and on the help pages under each entry
 (`.help-lore`: classes on `/help`, spells, statuses and allies on `/help/spells`, items on
-`/help/items`, monsters on `/help/monsters`). Empty lore shows nothing. Every class, item, monster, spell, status and ally has
-some (3.1). The voice is plain and concrete (a place, a
+`/help/items`, monsters on `/help/monsters`, fields on `/help/fields`). Empty lore shows nothing. Every class, item, monster, spell, status and ally has
+some (3.1); the fields (3.2) get theirs in a later pass. The voice is plain and concrete (a place, a
 habit, a rumour, who uses it), and only the upper echelon sounds legendary: monsters from
 level 42, the dragons and demon lords, the Destiny gear and the Dragon's, Angel's, Seraph's
 and Demon's accessories, the strongest spells:
@@ -1049,9 +1052,11 @@ panel and tooltips (see [Items](#items), [Spells](#spells)); the monster's portr
 "You are fighting a ..." and its HP (`.fight-foe`, 72px) and in its tooltip; an ally's
 icon before its name and a status's before its name on the fight page (`fight/statuses.html`,
 and `fight.js` from the fight API's status lists); each entry's icon before its name on
-the help pages. Templates get an entity's own icon with `entity_icon(kind, name)` (nil
-when it has none; `schema.entity_icon`), which shows nothing rather than the spells'
-default picture.
+the help pages. Fields (3.2, [Fields](#fields)) may have one too, in `fields/` (copies of
+the skill icons that fit the weather; a field without one shows its name alone), on the
+Battlefield line, in its tooltip and on `/help/fields`. Templates get an entity's own icon
+with `entity_icon(kind, name)` (nil when it has none; `schema.entity_icon`), which shows
+nothing rather than the spells' default picture.
 
 They are made from licensed icon packs kept outside the repository (`Icons/`, ignored by
 git: standard art, never the "nobg" variants; items from the weapon, armor and profession
@@ -1232,7 +1237,7 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	([Scenes](#scenes)). A GET can't know where the player came from, so the edge line
 	stands for "you walked into other weather": right after such a move the weather left
 	behind is next to the player, and the line is true whichever way they came. The fight
-	page will show the battlefield (part 4, fields).
+	page shows the battlefield: the weather's fields ([Fields](#fields)).
 - **Open pages** learn of a change from the server, never from a timer of their own: the
 	server's tick (`lib/tick.lua`), at each tick that begins a weather step, asks
 	`weather.changed` between the tick before and this one for the tiles of the players
@@ -1291,8 +1296,11 @@ connection, a closed tab) drives it.
 - **Fights on the clock** (`fight/round.lua` `round.advance(f, n [, limit])`): a fight saves
 	the last tick it played (`fights.tick`), the tick its turn runs out at
 	(`fights.deadline`) and when the tick must advance it next (`fights.due`: the next tick
-	while anything in it counts ticks, a status or an ally, else the deadline). Advancing it
-	to tick `n` plays every tick after `fights.tick` in order; at each:
+	while anything in it counts ticks, a status, an ally, a spell's field or a field with
+	`on_tick`, else the deadline, or the weather's next step when that comes first). Advancing
+	it to tick `n` plays every tick after `fights.tick` in order; at each:
+	0. the battlefield: spells' fields count down, the world's follow the weather at the
+		player's tile, each field's `on_tick` runs ([Fields](#fields));
 	1. a turn the player can't act in (asleep, recharging, charging: `round.locked`) ends:
 		a round with the blocked turn (its line), the allies and the monsters acting;
 	2. every combatant's statuses tick (`on_tick`) and count down, those that run out
@@ -1305,7 +1313,8 @@ connection, a closed tab) drives it.
 	+1, the deadline `round.TURN` = 3 ticks, 30 s, later). A fight further behind than
 	`round.CATCHUP` (360 ticks, an hour) skips the older ticks. A fight not on the clock yet
 	(`fights.tick` 0: in progress when the database was migrated, or made by a test) starts
-	on it at `n` with its turn's full time; world statuses with `tick` 0 too.
+	on it at `n` with its turn's full time and the weather's fields; world statuses with
+	`tick` 0 too.
 	`encounter.advance(user, f, n [, limit])` runs it and settles what it did: its lines go
 	into the fight's log, a death or a victory ends the fight as a round's would, else the
 	fight is saved.
@@ -1330,11 +1339,12 @@ connection, a closed tab) drives it.
 
 ## Content
 
-Classes, spells, items, statuses, summons and monsters are **content**: Lua files in git,
-one per entity, hot-reloaded like the code and synced into the database, where players' rows
-reference them by id. Spells, consumables, statuses and summons also carry code: what they
-do (see [Scripting spells and items](#scripting-spells-and-items) and
-[Fight engine](#fight-engine)); monsters may carry conditions (see [Monsters](#monsters)).
+Classes, spells, items, statuses, fields, summons and monsters are **content**: Lua files in
+git, one per entity, hot-reloaded like the code and synced into the database, where players'
+rows reference them by id. Spells, consumables, statuses and summons also carry code: what
+they do (see [Scripting spells and items](#scripting-spells-and-items) and
+[Fight engine](#fight-engine)); monsters may carry conditions (see [Monsters](#monsters)),
+and fields an `on_tick` (see [Fields](#fields)).
 
 ```lua
 -- app/content/classes/knight.lua: the file name is the key ("knight")
@@ -1379,9 +1389,10 @@ High hit points]],                       -- one line per point on the help page
 - **Sync** (`lib/content/sync.lua`): upsert every file entity by key (a new key gets the
 	next id; existing rows keep theirs), mark rows whose file is gone `retired = 1` (never
 	deleted: players keep their class), un-retire keys whose file is back, then apply the
-	admin overrides. Kinds sync in `schema.KINDS` order (statuses, summons, spells,
-	classes, items, monsters: kinds others reference first; spells before classes, whose
-	`class_spells` rows need the spell ids, items and spells before monsters). The original
+	admin overrides. Kinds sync in `schema.KINDS` order (statuses, fields, summons, spells,
+	classes, items, monsters: kinds others reference first; statuses before fields, whose
+	rules name them, spells before classes, whose `class_spells` rows need the spell ids,
+	items and spells before monsters). The original
 	classes keep ids 1-3, the original spells 1-19, the items 1-68, the statuses of the
 	original mechanics (`sleep`, `uber_damage`, `uber_defense`) 1-3 and the original
 	monsters 1-151 (seeded in `seed.sql`).
@@ -1398,11 +1409,12 @@ High hit points]],                       -- one line per point on the help page
 	`dk install` fail (and change nothing) instead.
 - **Overrides**: `content_overrides(kind, key, field, value)` hold per-server values that
 	win over the file and survive syncs. The admin pages (`/admin/classes/#id`,
-	`/admin/spells/#id`, `/admin/items/#id`, `/admin/{statuses,summons,monsters}/#id`,
+	`/admin/spells/#id`, `/admin/items/#id`, `/admin/{statuses,summons,monsters,fields}/#id`,
 	shared code in `admin/content.lua` and `templates/admin/content_form.html`) write them
 	for the kind's `admin_fields` (every kind: lore; classes: name, description, sort, playable, starting
 	stats; spells: name, description, MP, power, icon, numbers and message strings; items: see
-	[Items](#items); monsters: see [Monsters](#monsters); a value equal to the file's
+	[Items](#items); monsters: see [Monsters](#monsters); fields: see [Fields](#fields); a
+	value equal to the file's
 	deletes the override) and offer "reset to file". Field names are those of the
 	flat form: `name`, `levels.17.hp`, `levels.17.spells` (`"heal,hurt"`), `power`,
 	`data.min`, `messages.hit`, `messages.enemy.hit`, `modifiers.2.stat`.
@@ -1424,7 +1436,8 @@ load. Deleting the file retires the class. Adding a kind: a `kinds/<kind>.lua` m
 `retired`) and an entry in `schema.KINDS` (in sync order: kinds others reference first).
 A field of type `keys` with `refs = "<kind>"` lists keys of another kind (type `key`: one
 key or `""`, an item's `casts`; both checked by `load.all`); `write_children` maps them to ids; an optional `validate_refs(flat, all,
-err)` checks more against the other kinds' files (a monster's weapon must be a weapon). A kind with code uses
+err, key)` checks more against the other kinds' files (a monster's weapon must be a weapon; a
+world field's group must be the weather's). A kind with code uses
 `lib/content/scripted.lua` (function fields, messages, data; `load.module(kind, key)`
 gives the runtime the loaded file). Bump `load.FORMAT` when the flat form changes meaning.
 
@@ -1636,8 +1649,9 @@ read-only fields `id` (the combatant's number in the fight), `side` (`"player"`,
 `attack`, `defense`, `strength`, `dexterity`, `attack_element` (the element of its attack:
 the player's weapon's, a monster's `attack_element`, a summon's `element`; default
 `"neutral"`), and, from its statuses, `asleep`, `sleep_chance`, `uber_damage`,
-`uber_defense`; and methods (resistances and wards: see [Elements and
-wards](#elements-and-wards)):
+`uber_defense`; in a fight `attack`, `defense`, `strength` and `dexterity` are under the
+battlefield's fields' percents ([Fields](#fields)); and methods (resistances and wards: see
+[Elements and wards](#elements-and-wards)):
 
 | | |
 |---|---|
@@ -1647,8 +1661,8 @@ wards](#elements-and-wards)):
 | `:ward(key)` | its ward against status `key` (percent chance, 0..100, that it doesn't take hold) |
 | `:spend(stat, n)` | uses up `n` of a stat (a cost) |
 | `:buff(kind, pct)` | `"damage"`: +pct% damage dealt, `"defense"`: -pct% damage taken, until the end of the fight (the statuses `uber_damage` / `uber_defense`; 0 ends it) |
-| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance`, rolled on every clock tick (0 wakes it); returns whether it fell asleep (false: its ward stopped it) |
-| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`ticks`: how many clock ticks; the rest is the status's `t.data`); replaces an instance it has; returns whether it took hold (false: its ward stopped it) |
+| `:sleep(chance)` | asleep (the status `sleep`); stays asleep while `rand(1, 15) <= chance`, rolled on every clock tick (0 wakes it); returns whether it fell asleep (false: a field or its ward stopped it) |
+| `:afflict(key, params)` | applies the status `key` (see [Fight engine](#fight-engine)); `params`: names and plain values (`ticks`: how many clock ticks; the rest is the status's `t.data`); replaces an instance it has; returns whether it took hold (false: a field or its ward stopped it; the fields may also adjust its ticks and data, see [Fields](#fields)) |
 | `:cure(key or kind)` | removes a status, or all of a kind (`"harmful"`, `"helpful"`, `"neutral"`); returns how many |
 | `:has_status(key)`, `:status(key)`, `:statuses([kind])` | what it has: `{ key, name, kind, ticks_left, data }` copies |
 
@@ -1670,8 +1684,12 @@ casting (`town/heal.lua`) and the inventory's Use (`town/inventory.lua`) call
 More context methods: `s:summon(key, params)` (an ally joins, in fights, for `ticks` of
 the clock; `s.summon_room` says how many more may), `s:charge(ticks, step)` and
 `s:recharge(ticks)` (multi-stage actions), `s:seconds(n)` (`n` clock ticks in seconds, for
-a line: "burns for %d seconds"), and the file's `stages = { release = fn }` (named steps;
-see [Fight engine](#fight-engine)).
+a line: "burns for %d seconds"), `s:field(key, { ticks = n })` (a field spell: field `key`
+up for `n` clock ticks in place of its group's; true when it was set, false when that field
+is already up or outside a fight) and `s:has_field(key)` (whether it is up; statuses'
+hooks have `t:has_field`; see [Fields](#fields)), and the file's `stages = { release = fn
+}` (named steps; see [Fight engine](#fight-engine)). A file declares the fields it sets
+like the statuses it applies: `uses = { fields = { "rain" } }`.
 
 **Monsters acting.** Messages are worded for the player. When a monster is the caster,
 `s:say("hit", ...)` uses `messages.enemy.hit` if there is one (same arguments); otherwise
@@ -1769,8 +1787,8 @@ because `data-now` differs on every request): fight.js works out its clock's off
 
 | | |
 |---|---|
-| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result, tick, deadline }`. `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the lines since the player's last command, its round's and then what the clock did, at most `encounter.LOG_LINES` (60), the latest (`encounter.log_of`, `encounter.log_add`, `encounter.lines`: paragraphs in order); `result`: a victory's rewards; `tick`: the last clock tick it played (0: not on the clock yet); `deadline`: the tick the player's turn runs out at (`fights.due`, when the server's tick must advance it, is `state.due(f)`, written by `state.save`) |
-| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, ticks_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `ticks_left`: the clock ticks an ally stays (nil: the whole fight); `data`: a monster's item stock (`stock_<position>`) |
+| `f` | `{ user_id, round, wave, data, st, in_fight, combatants, next_id, outcome, log, result, tick, deadline }`. `data`: fight-level values, among them the battlefield's fields (`field_<group>`, and a spell's ticks: [Fields](#fields)); `round` counts the rounds played (the encounter's first strike is round 1, so the first form carries 2; no cap, unlike the original's 255); `st` is `game.player(user)` (the player's HP/MP/TP stay in `users`); `outcome`: `""` in progress, `"victory"` or `"death"` for a finished fight kept for its page; `log`: the lines since the player's last command, its round's and then what the clock did, at most `encounter.LOG_LINES` (60), the latest (`encounter.log_of`, `encounter.log_add`, `encounter.lines`: paragraphs in order); `result`: a victory's rewards; `tick`: the last clock tick it played (0: not on the clock yet); `deadline`: the tick the player's turn runs out at (`fights.due`, when the server's tick must advance it, is `state.due(f)`, written by `state.save`) |
+| combatant `c` | `{ id, side = "player" \| "ally" \| "enemy", kind = "player" \| "monster" \| "summon", entity_id, wave, hp, maxhp, mp, maxmp, ticks_left, data, row, statuses }`, numbered from 1 per fight (the player is 1); `row` is the summons row, or the monsters row with its equipment counted (`monsters.effective`); `mp`/`maxmp`: a monster's MP; `ticks_left`: the clock ticks an ally stays (nil: the whole fight); `data`: a monster's item stock (`stock_<position>`) and the turns it acted (`turn`: its conditions' `m.turn`) |
 | status instance | `{ status_id, key, row, ticks_left, data, tick, source }`: `data` holds the params it was applied with, `tick` the last clock tick it counted (at first the one it was applied in), `source` the combatant who applied it |
 
 `state.load(user, st)`, `state.save(f)`, `state.clear(user_id)` (an escape, a new
@@ -1800,7 +1818,7 @@ changing spell files.
 	 exactly as it was: the round runs on a copy (`state.copy`);
 2. each ally (summon), in the order summoned: its `act` unless blocked;
 3. each enemy of the current wave: unless blocked (its `blocked_other` message), an action
-	 and a target chosen by `fight/ai.lua`;
+	 and a target chosen by `fight/ai.lua` (a monster that acts counts its turn: `m.turn`);
 4. the player's next turn begins: `guarding` ends.
 
 No status ticks in a round: they tick on the clock (below). After each step that changed
@@ -1815,7 +1833,8 @@ defeated the victory, an ally at 0 HP leaves ("Your Wolf has been defeated.", or
 command plays nothing, and the turn ends at the clock's next tick.
 
 **The clock** (`round.advance(f, n [, limit])`, see [The server tick](#the-server-tick)):
-every tick after `f.tick` up to `n` in order: a blocked turn ends (a round with `continue`:
+every tick after `f.tick` up to `n` in order: the battlefield's fields follow the weather and
+count down, and their `on_tick` runs ([Fields](#fields)); a blocked turn ends (a round with `continue`:
 its blocked line, the allies and monsters acting); every combatant's statuses tick and
 count down (`engine.tick(f, c, k)`: those applied before tick `k`, which counts from the
 tick after a status came, so one put on in a round played at a tick waits for the next)
@@ -1827,8 +1846,8 @@ server's tick and before every command.
 
 **The trace.** With `f.trace = {}` set on the model before `round.play` or `round.advance`
 (a live request does), they record in `f.trace`, in order, every line said, every change
-of HP, MP or TP, every status applied, counted down, expiring or removed and every ally
-joining, counting down or leaving, each with its step (`f.doing`: who acts and how, set by
+of HP, MP or TP, every status applied, counted down, expiring or removed, every ally
+joining, counting down or leaving and every field coming up or going, each with its step (`f.doing`: who acts and how, set by
 `engine.doing(f, c, kind)` / `engine.done(f, prev)` around the code that acts). Lines go
 through `engine.say(f, line)`. Tracing rolls nothing and changes nothing (the equivalence
 test below traces every other fight); `fight/events.lua` turns it into the live client's
@@ -1882,7 +1901,7 @@ return {
 	`t.ticks_left` (nil: no limit), `t.data` (the status's data under the params it was
 	applied with), `t.name`, `t.messages`, `t.round`, `t.in_fight`, `t:roll`, `t:say`,
 	`t:expire()` / `t:remove()` (end it, once the hook returns), `t:release()` (charging:
-	run the charged action's stage).
+	run the charged action's stage), `t:has_field(key)` (the battlefield: [Fields](#fields)).
 - Applying: `s.target:afflict("poison", { ticks = 2, min = 1, max = 3 })` from any
 	context (`turns` is refused: durations are ticks since 3.2). **Re-applying replaces** the
 	instance: the old one's `on_remove` runs (not `on_expire`), then the new one's
@@ -2028,7 +2047,8 @@ stock, resistances).
 	type = "spell",                -- attack, spell, item, guard, status (a status's tick or hook, or
 	                               -- its countdown), summon (an ally acting, joining, leaving),
 	                               -- blocked (a status blocks the turn), run, ambush, wave (the next
-	                               -- enemy), speech (a monster speaking: "Troll: “Tickles.”", see
+	                               -- enemy), field (the battlefield: the weather's fields coming and
+	                               -- going, a field's on_tick), speech (a monster speaking: "Troll: “Tickles.”", see
 	                               -- [Monster speech](#monster-speech)), say (anything else); the last event of a round that
 	                               -- ended: victory, death or escape (no text)
 	text = "The monster casts Hurt on you for 14 damage.",   -- absent: a change without a line
@@ -2040,6 +2060,8 @@ stock, resistances).
 		statuses = { { key = "poison", name = "Poisoned", ticks = 3, left = "30s",   -- the bearer's, after it
 			icon = "/static/images/statuses/poison.png" } } } },   -- (icon: absent when none)
 	summon = { { change = "join", id = 3, name = "Wolf", hp = 30, max = 30, ticks = 5 } },   -- join | leave | ticks
+	field = { { key = "rain", name = "Rain", change = "add",   -- add | remove: the battlefield's
+		icon = "/static/images/fields/rain.png" } },             -- (icon: absent when none)
 }
 ```
 
@@ -2076,7 +2098,9 @@ line (in the page's paragraphs, `fight-yourturn` ... `fight-roundend`) 400 ms af
 previous one; its changes update the player's numbers and bars in the right column
 (`[data-meter=hp|mp|tp]` values, `[data-bar=hp|mp|tp]` widths), the numbers and bars of the
 monsters and allies (`[data-fighter=<id>][data-stat=hp|mp][data-value][data-max]`), the
-status chips of a combatant's line (made if the page had none), allies joining and leaving.
+status chips of a combatant's line (made if the page had none), allies joining and leaving,
+and the Battlefield line's fields (`[data-battlefield]`: a field coming up is added with a
+glow, `.fight-field-new`; one going is struck out, `.fight-field-gone`).
 A click in the middle column, any key (not while typing) or the "Skip" button plays the rest
 at once; with `prefers-reduced-motion` there are no delays and no animations (`fight.css`).
 A round that ends in a victory or an escape pauses 800 ms before the next page comes. Then
@@ -2101,7 +2125,9 @@ numbers only), apply it in fight.js's `show(e, log)` (look elements up by
 ## Elements and wards
 
 (3.2, `docs/plans/elements-and-weather.md` parts 1 and 2.) Every hit has an **element**, and
-every combatant a **resistance** to each element and a **ward** against each status.
+every combatant a **resistance** to each element and a **ward** against each status. The
+battlefield's fields ([Fields](#fields)) scale damage by element before resistance, and may
+keep a status from taking hold before its ward is rolled.
 `app/lib/elements.lua` (pure) holds the elements, the damage formula and the lines.
 
 - **Elements** (`elements.LIST`, in this order): `neutral` (shown as "Physical"), `fire`,
@@ -2123,7 +2149,9 @@ every combatant a **resistance** to each element and a **ward** against each sta
 - **The damage formula**, the only one (`elements.damage(n, field_pct, resist)`: attacks in
 	`fight/combat.lua`, `:hurt` for spells, items and status ticks): `scaled = floor(n * (100
 	+ field_pct) / 100)` (never below 0; `field_pct` is the battlefield's percent for the
-	element: 0, as there are no fields yet), then `floor(scaled * (100 - resist) / 100)`; at
+	element, the sum of the fields' up: `fields.pct`, see [Fields](#fields); handed to
+	`engine.typed` for attacks and to the action context as its `battlefield`), then
+	`floor(scaled * (100 - resist) / 100)`; at
 	100 it deals 0, above 100 it deals 0 and heals `floor(scaled * (resist - 100) / 100)`
 	(never above the maximum). A hit that dealt at least 1 before resistance and isn't
 	resisted fully deals at least 1. With no field and no resistance it is `n`: fights
@@ -2166,6 +2194,112 @@ the handles' API and the wards' dice), `tests/lua/test_spells.lua` (a monster im
 everything is never hurt or afflicted), `tests/e2e/monsters.sh` (a typed attack and a
 resistance in a fight, the sheet, the help page, a class).
 
+## Fields
+
+(3.2, `docs/plans/elements-and-weather.md` part 4.) A **field** is an effect on the whole
+battlefield, for everyone in a fight: the weather's (rain, mud, the night) or a spell's
+(consecrated ground). Fields are content (see [Content](#content)):
+`app/content/fields/<key>.lua`, synced into `fields` (`lib/content/kinds/fields.lua`, rows
+by `lib/fields.lua`), overridable in the admin panel (`/admin/fields`). What a field does
+is data, so the pages can show it; only an optional `on_tick` is code.
+
+```lua
+-- app/content/fields/downpour.lua
+return {
+	name = "Downpour",
+	description = "Hard rain: fire is weak, lightning strong, no fire can catch, ...",
+	lore = [[...]],                   -- optional, like every kind's
+	icon = "",                        -- a PNG in public/images/fields/ (optional; none here)
+	group = "sky",                    -- sky | ground | time | aura: one field per group is up
+	damage = { water = 15, lightning = 25, fire = -40 },   -- percent, by element (-100..1000)
+	statuses = {                      -- how statuses behave under it, by status key
+		burning = { blocked = true },   -- can't take hold (the field's `blocked` line)
+		-- { ticks = -1 }: lasts a tick less (at least 1); { scale = { amount = 150 } }: a
+		-- value it is applied with (or the status's default) at 150%; { chance = 50 }: takes
+		-- hold half of the time (rolled after the ward)
+	},
+	stats = { dexterity = -10 },      -- percent on every combatant's attack, defense, strength, dexterity
+	messages = { begins = "...", ends = "...", blocked = "The rain puts the fire out before it can catch." },
+	-- data = { ... } and on_tick = function(e) ... end: optional (the thunderstorm's bolts)
+}
+```
+
+- **The fields of a fight** (`fight/fields.lua`, the one place they combine; saved in the
+	fight's data as names: `field_<group>` the key, and for a spell's `field_<group>_ticks`,
+	its ticks left, and `field_<group>_tick`, the last it counted). The world's follow the
+	weather at the player's tile ([Clock and weather](#clock-and-weather)): the field of the
+	same key as the sky (`sun`, `heat`, `fog`, `rain`, `downpour`, `thunderstorm`, `snow`,
+	`blizzard`), the ground (`mud`, `ice`) and the time (`night`), when a file of that key
+	exists (`dk check`: a world field's group is the part of the weather it follows). They
+	are up from the encounter's start (`fields.start`) and follow the weather on every clock
+	tick the fight plays (`fields.advance`, the first thing `round.advance` does at a
+	tick). A spell's (`s:field(key, { ticks = n })`, the player's or a monster's) takes its
+	group's place for `n` ticks, counted from the tick after the one it was cast in, and
+	when it ends the weather's comes back; `aura` fields (`consecrated`, `brimstone`,
+	`miasma`) come only from spells. The 14 fields are the 11 world fields and the three
+	auras, with the starting numbers of the 3.2 design (Phase E tunes them).
+- **Changes** become lines and `field` events: when only the weather's fields changed, at
+	the weather's step, and no spell holds a group of it, the weather's change line
+	(`weather.change`) says them all; otherwise each field that went says its `ends` and each
+	that came its `begins` (a spell's too, after its own lines). A spell's field hides the
+	weather's changes in its group until it ends. Because every command catches the fight up
+	first, a spell cast just as the rain clears meets a clear sky: its burn takes hold. A
+	fight on the clock is due at the weather's next step when that comes before its deadline
+	(`state.due`), and every tick while a spell's field or a field with `on_tick` is up.
+- **Combinations**: damage of an element is scaled by the sum of the fields' percents for it
+	(`fields.pct`, the formula's `field_pct`: attacks through `engine.typed`, content's
+	`:hurt` through the action context's `battlefield`, `fields.battlefield(f)`). A status
+	being applied (`:afflict`, `:sleep`) meets the fields' rules: `blocked` stops it first,
+	without a roll (the field's `blocked` message follows the next line said, like a
+	resistance's), then its ward is rolled ([Elements and wards](#elements-and-wards)), then
+	each field's `chance`; then `engine.afflict` adjusts what it is applied with (`ticks`
+	added, `scale` on the named values: `fields.adjust`), which it keeps: rain starting later
+	doesn't shorten a burn already burning. `stats` are percents on the handles' `attack`,
+	`defense`, `strength` and `dexterity` (`engine.handle`: floor, never below 0), which the
+	formulas read (`fight/combat.lua`'s attacks: a monster's attack rolls from its handle's,
+	so fog weakens it; dodging reads the dexterity) and content sees. Running away and who
+	swings first keep the unadjusted numbers. With no field up every one of these is the
+	identity and rolls nothing: fights roll the same dice (`tests/lua/test_round.lua`).
+- **The API**: `s:field(key, { ticks = n })` (spells and items; true when set, false when
+	that field is already up or outside a fight; a key that isn't a field is an error),
+	`s:has_field(key)` and `t:has_field(key)` (status hooks), `m:has_field(key)` in monsters'
+	`when` conditions ([Monsters](#monsters)). A field's `on_tick(e)` runs on every tick it is
+	up, after the fields followed the weather: `e` is a context like a status's (`e:roll`,
+	`e:say`, `e.data`, `e.messages`, `e.round`, `e.ticks_left`: a spell's field's) with
+	`e.combatants` (every combatant standing: the player, the allies, the enemies of the
+	wave, handles) and `e.player`. The thunderstorm's: one tick in `data.chance` (6) a bolt
+	strikes a random combatant for `data.min`-`data.max` lightning. Its lines are a `field`
+	event; an error is logged and the field stays.
+- **Shown**: the fight page's **Battlefield** line under the monster
+	(`templates/fight/battlefield.html`, the region `battlefield`, there and hidden when no
+	field is up): each field's icon and name with a tooltip (`tips.field`: its group, a
+	spell's time left, its modifiers as lines, "Fire damage -40%", "Burning can't take
+	hold", "Burning lasts 10s less", "Sleep chance +30%", "Dexterity -20%":
+	`fields.lines`, then the description and lore). `fight.js` adds and strikes out its
+	fields as a round's `field` events play ([Fight events](#fight-events-smooth-fights)).
+	`/help/fields` lists every field (icon, group, modifiers, description, lore), linked
+	from the help index. `/admin/fields` overrides the name, description, lore, icon, the
+	damage percent of every element, the stats, the file's status rules, numbers and
+	messages (the group is the file's).
+- **Storage** (schema version 23): the `fields` table's `damage` and `stats`
+	(`"fire=-40,water=15"`), `statuses` (`"burning.blocked=1,sleep.scale.chance=120"`),
+	`messages` and `data`; the flat form's `damage.fire`, `stats.dexterity`,
+	`statuses.burning.blocked`, `statuses.burning.ticks`, `statuses.burning.chance`,
+	`statuses.burning.scale.amount`. A status a rule names must be a status file.
+
+Adding a field: copy `app/content/fields/rain.lua` (or `thunderstorm.lua` for one with
+`on_tick`) to `<key>.lua`, give it a group (`aura` unless the weather brings it), run
+`./dk check`; a spell puts it up with `s:field("<key>", { ticks = n })` (declare it: `uses =
+{ fields = { "<key>" } }`). Testing: `tests/lua/test_fields.lua` (the files and their
+validation, nothing changing without fields, the damage percent, `blocked` before the ward,
+`chance`, `ticks` and `scale`, stats on the handles, a spell's field displacing the
+world's, auras, the weather moving the fields and its events, a spell meeting a sky just
+cleared, `on_tick`, `m.turn`, the e2e tests' calm place: `t_calm` in [End-to-end
+tests](#end-to-end-tests)), `tests/lua/test_monsters.lua` (weight 0),
+`tests/e2e/fields.sh` (the help page, the Battlefield line and its tooltips, nightfall in a
+fight on the clock, a live round's `field` event, the admin page), `tests/e2e/migrate.sh`
+(step 23), `tests/e2e/pure.sh`.
+
 ## Monsters
 
 Monsters are content (see [Content](#content)): `app/content/monsters/<key>.lua`, synced
@@ -2193,7 +2327,7 @@ return {
 	attack_weight = 3,                        -- its attack's weight (default 1; 0: fallback only)
 	roams = false,                            -- met in random encounters (default true)
 	equipment = { weapon = "dagger" },        -- slot = item key (weapon, armor, shield, accessory1-3)
-	spells = {                                -- { spell, weight (default 1), when (optional) }
+	spells = {                                -- { spell, weight (default 1; 0: never), when (optional) }
 		{ spell = "hurt", weight = 2 },
 		{ spell = "heal", weight = 3, when = function(m) return m.hp < m.maxhp // 2 end },
 	},
@@ -2203,9 +2337,10 @@ return {
 }
 ```
 
-- **Validation** (`dk check`): the stats as above (`maxhp` >= 1, weights >= 1,
-	`attack_weight` >= 0, `stock` >= 1 or absent; `resist` of known elements, -100 to 200;
-	`ward` 0 to 100); item, spell, class and warded status keys must be files;
+- **Validation** (`dk check`): the stats as above (`maxhp` >= 1, the entries' weights >= 0
+	(0: never chosen, see below), `attack_weight` >= 0, `stock` >= 1 or absent; `resist` of
+	known elements, -100 to 200; `ward` 0 to 100); item, spell, class and warded status keys
+	must be files;
 	equipment must fit its slot (a weapon in `weapon`, an accessory in `accessory1`-`3`);
 	items must be consumables and spells usable in fights; `when` must be a function.
 - **MP**: every original monster has `maxmp` = the Mage's total MP at its level (the 2.2
@@ -2238,9 +2373,14 @@ return {
 	all (another target), the monster attacks instead.
 - **`when` conditions** (inline or free-standing functions) get the monster as its AI sees
 	it: `m.hp`, `m.maxhp`, `m.mp`, `m.maxmp`, `m.level`, `m.name`, `m.attack`, ... (its
-	read-only handle), `m:has_status(key)`, `m:status(key)`, `m:statuses(kind)`, plus
-	`m.round` (the fight's round), `m.target` (the default opponent's handle: the player;
-	`m.target:has_status("sleep")`) and `m.stock` (items: uses left). They only decide: no
+	read-only handle, its numbers under the battlefield's fields), `m:has_status(key)`,
+	`m:status(key)`, `m:statuses(kind)`, `m:has_field(key)` (the battlefield: [Fields](#fields)),
+	plus `m.round` (the fight's round: the opening, an ambush, is round 1 and the player's
+	first command round 2), `m.turn` (its own turns: 1 on its first action of the fight,
+	counting only the turns it acted, not those a status blocked, ambush or not; kept in the
+	combatant's data, so openers are `m.turn == 1` and rotations `m.turn % 4 == 0`),
+	`m.target` (the default opponent's handle: the player; `m.target:has_status("sleep")`)
+	and `m.stock` (items: uses left). They only decide: no
 	dice, no changes (an error, logged, makes the entry ineligible this turn). They stay in
 	the file (`has_when` in the loadout tables marks them; the runtime takes them from the
 	loaded file by position).
@@ -2263,6 +2403,10 @@ return {
 	`from_class`), after its own spells; its own entry for one of them wins (its weight and
 	`when`). It pays MP for them from `maxmp` like for its own (unless `uses_mp = false`).
 	No monster has a class yet.
+- **Weight 0**: a `spells` or `items` entry with `weight = 0` is never chosen: the loadout
+	leaves it out (`monsters.loadout`), and with it its class's spell of that key. That is how
+	a class's unwanted spells are switched off: `{ spell = "dream", weight = 0 }`. The help
+	page and the fight page don't count it.
 - **Random encounters** pick among the roaming, non-retired monsters of the level band
 	(`monsters.roaming`: the original rows and order). Monsters with `roams = false` (the
 	examples) are only met where content or a test puts them (`state.add_monster(f, row,
@@ -2275,15 +2419,16 @@ return {
 	original's check that the highest roaming level is the map size / 5.
 - **Help** (`/help/monsters`): every non-retired monster with its effective stats and MP,
 	its affinities ("Weak to Frost (+50%)", "Immune to Arcane", "Wards off Sleep (100%)";
-	`elements.lines`), and the spells (its own, then its class's: "Mage spells: ..."), items
-	(with stock) and equipment of those that have them. Its tooltip in a fight lists the
+	`elements.lines`), and the spells (its own, then its class's: "Mage spells: ..."; not
+	those of weight 0), items (with stock) and equipment of those that have them. Its tooltip in a fight lists the
 	affinities too.
 - **Retired** monsters (file deleted) are no longer met; fights against them go on.
 
 `lib/monsters.lua`: `monsters.get(id)`, `monsters.by_key(key)`, `monsters.active()`,
 `monsters.all()`, `monsters.roaming(min, max)`, `monsters.loadout(row)` (`{ equipment,
 items, spells }` with item and spell rows, read once per request; a row may carry its own
-`loadout` table: tests; with its class's spells), `monsters.condition(row, list, entry)`
+`loadout` table: tests; with its class's spells; without the entries of weight 0),
+`monsters.condition(row, list, entry)`
 (the `when` function), `monsters.effective(row)` (a copy with the equipment counted, base
 values in `base`), `monsters.reload()`. Rows come back with `resist` and `ward` decoded into
 tables.
@@ -2795,8 +2940,9 @@ To change the schema:
 	 foreign key, trigger or view uses (step 2).
 3. Extend `tests/e2e/migrate.sh`: it builds databases from the frozen schemas
 	 `tests/fixtures/schema_v0.sql` (version 0) to `schema_v9.sql` (version 9),
-	 `schema_v11.sql` to `schema_v14.sql` and `schema_v21.sql` with the game data of that time
-	 (`seed_v3.sql` to `seed_v9.sql`, `seed_v11.sql` to `seed_v14.sql`, `seed_v21.sql`), migrates them, checks the data and compares
+	 `schema_v11.sql` to `schema_v14.sql`, `schema_v21.sql` and `schema_v22.sql` with the game
+	 data of that time (`seed_v3.sql` to `seed_v9.sql`, `seed_v11.sql` to `seed_v14.sql`,
+	 `seed_v21.sql`, also version 22's), migrates them, checks the data and compares
 	 the column, foreign key and index layout with a fresh install. Never edit the
 	 fixtures; add a `schema_vN.sql` copy of the old schema when a test needs to start
 	 from version N.
@@ -2869,6 +3015,7 @@ t_get /inn;   expect_body 'You do not have enough gold'
 | `t_give username key [qty [slot]]`, `t_items_clear username`, `$T_ITEMS` | give an item (into the bag, or equipped in `slot`; an item that casts with full charges); take all away; SQL expression for a users row's items (`stick@weapon,herbx3`) |
 | `t_fight username monster_id hp [round]`, `t_fight_new username`, `t_fight_win`, `t_fight_clear username`, `t_fight_status username who key [data [ticks]]` | a fight in progress against a monster (round 2 by default; not on the clock yet: its first POST or tick starts it at its time); an encounter beginning where the player stands, as on a map move (the current jar's player: `POST /__test/encounter`; `$BODY` is the fight page); the current jar's won fight (`t_fight user m 0`) paid by a round, `$BODY` the victory page; no fight; a status on the player (who 1) or the monster (2), data like `'chance=i:5'` |
 | `t_tick [seconds]` | the clock moves on (default 10 s: a tick; `$T_NOW` too, until the next script) and the server's tick runs there (`POST /__test/tick`, the current jar logged in; the e2e server's own tick is off: `tick = false`); `$BODY` says what it advanced |
+| `t_calm username`, `$T_CALM_LAT`, `$T_CALM_LON` | put the player at the calm place (-3, 3): the weather brings no [field](#fields) to it from `$T_START` until nightfall 1400 s later (`tests/lua/test_fields.lua` checks it), and it has Midworld's level band and no town. A check of a fight's numbers (damage, healing, a status's data or duration, an attack that never lands) fights there, so the battlefield is the same, none, on every run: the weather is a pure function of the place and the pinned time, and elsewhere it may bring the sun (fire +10%), fog (attack -15%) or mud (dexterity -20%). The weather's fields have tests of their own (`tests/e2e/fields.sh`) |
 | `$T_ROUND`, `$T_MONSTER`, `$T_MONSTER_HP`, `$T_SLEEP`, `$T_UBER_DAMAGE`, `$T_UBER_DEFENSE`, `$T_STATUSES`, `$T_WORLD` | SQL expressions for a users row's fight in progress (0 when there is none; a finished fight kept for its page doesn't count) and statuses (`player:regen/4,enemy:sleep`; world statuses `regen/9`) |
 | `t_stats`, `expect_stats "maxhp maxmp maxtp str dex atk def" label` | the logged-in character's effective stats from `/character` |
 | `t_mail_latest`, `t_mail_count` | outbox |

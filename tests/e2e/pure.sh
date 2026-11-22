@@ -23,10 +23,10 @@ pu_path() {
 	esac
 }
 PU_ROUTES="/ /admin /admin/broadcast /admin/classes /admin/classes/#id /admin/drops /admin/items /admin/items/#id
-	/admin/levels /admin/monsters /admin/monsters/#id /admin/news /admin/server /admin/settings /admin/spells
+	/admin/fields /admin/fields/#id /admin/levels /admin/monsters /admin/monsters/#id /admin/news /admin/server /admin/settings /admin/spells
 	/admin/spells/#id /admin/statuses /admin/statuses/#id /admin/summons /admin/summons/#id /admin/towns
 	/admin/towns/#id /admin/users /admin/users/#id /babble /changelog /changepassword /character /character/#id
-	/dead /drop /drop/room /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/items /hotbar
+	/dead /drop /drop/room /fight /forum /forum/#board /forum/#board/new /forum/new /forum/thread/#id /help /help/fields /help/items /hotbar
 	/help/levels /help/monsters /help/spells /inn /inventory /inventory/discard/#id /live /live/state /login
 	/lostpassword /map /maps /maps/buy/#id /news /news/#id /ninja /online /register /shop /shop/buy/#id
 	/verify /victory /__test/routes"

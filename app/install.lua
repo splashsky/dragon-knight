@@ -29,7 +29,7 @@ usage: dk install [--partial] [--force]
 local TABLES = { "sessions", "babble", "control", "drops", "news", "forum", "forums", "user_items", "user_hotbar",
 								 "town_items", "town_maps", "monster_equipment", "monster_items", "monster_spells", "items", "levels", "monsters", "user_spells", "class_levels", "class_spells",
 								 "spells", "towns", "fight_statuses", "fight_combatants", "fights", "user_statuses", "users",
-								 "classes", "statuses", "summons", "content_overrides", "content_adopt", "meta" }
+								 "classes", "statuses", "fields", "summons", "content_overrides", "content_adopt", "meta" }
 
 local function read_file(path)
 	local f, err = io.open(path, "rb")

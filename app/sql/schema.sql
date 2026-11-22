@@ -219,8 +219,8 @@ CREATE TABLE monster_equipment (
 	PRIMARY KEY (monster_id, slot)
 ) WITHOUT ROWID;
 
--- The consumables a monster may use (position: the file's order), by weight; stock: uses
--- per encounter (NULL: no limit).
+-- The consumables a monster may use (position: the file's order), by weight (0: never;
+-- schema version 23); stock: uses per encounter (NULL: no limit).
 CREATE TABLE monster_items (
 	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
 	position    INTEGER NOT NULL,
@@ -231,7 +231,8 @@ CREATE TABLE monster_items (
 	PRIMARY KEY (monster_id, position)
 ) WITHOUT ROWID;
 
--- The spells a monster may cast (position: the file's order), by weight.
+-- The spells a monster may cast (position: the file's order), by weight (0: never, which
+-- switches off its class's spell of that key; schema version 23).
 CREATE TABLE monster_spells (
 	monster_id  INTEGER NOT NULL REFERENCES monsters (id),
 	position    INTEGER NOT NULL,
@@ -296,6 +297,28 @@ CREATE TABLE statuses (
 	icon           TEXT    NOT NULL DEFAULT '',
 	resist         TEXT    NOT NULL DEFAULT '',
 	ward           TEXT    NOT NULL DEFAULT ''
+);
+
+-- Fields: content files app/content/fields/<key>.lua (schema version 23): effects on the
+-- whole battlefield, the weather's or a spell's (app/fight/fields.lua). group ('sky',
+-- 'ground', 'time', 'aura': one field per group is up); damage ("fire=-40,water=15":
+-- percent per element) and stats ("dexterity=-10": percent per stat); statuses (how
+-- statuses behave under it: "burning.blocked=1,burning.ticks=-1,sleep.scale.chance=120");
+-- messages and data like a status's; on_tick is the file's code.
+CREATE TABLE fields (
+	id           INTEGER PRIMARY KEY,
+	key          TEXT    NOT NULL UNIQUE,
+	name         TEXT    NOT NULL DEFAULT '',
+	description  TEXT    NOT NULL DEFAULT '',
+	lore         TEXT    NOT NULL DEFAULT '',
+	icon         TEXT    NOT NULL DEFAULT '',
+	"group"      TEXT    NOT NULL DEFAULT 'sky',
+	damage       TEXT    NOT NULL DEFAULT '',
+	stats        TEXT    NOT NULL DEFAULT '',
+	statuses     TEXT    NOT NULL DEFAULT '',
+	messages     TEXT    NOT NULL DEFAULT '',
+	data         TEXT    NOT NULL DEFAULT '',
+	retired      INTEGER NOT NULL DEFAULT 0
 );
 
 -- Summons: content files app/content/summons/<key>.lua: allies that fight alongside the
@@ -449,7 +472,8 @@ CREATE INDEX sessions_expires ON sessions (expires);
 -- A fight (app/fight/state.lua), one per player, loaded and saved once per request.
 -- round: the fight's counter (+1 per round played, without the original's cap of 255; the
 -- encounter's first strike is round 1, so the first form carries 2); wave: the enemies'
--- wave on the field; data: fight-level values ("name=value" lines, typed). outcome: '' in
+-- wave on the field; data: fight-level values ("name=value" lines, typed; the battlefield's
+-- fields since schema version 23: app/fight/fields.lua). outcome: '' in
 -- progress, 'victory' or 'death': a finished fight is kept for its page (GET /fight, GET
 -- /victory) until the next encounter or a move (app/fight/encounter.lua); log: the lines
 -- since the player's last command ("<part>\t<line>" lines: its round's, then what the clock

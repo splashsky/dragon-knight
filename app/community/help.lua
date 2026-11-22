@@ -5,6 +5,7 @@
 local classes = require("lib.classes")
 local clock = require("lib.clock")
 local elements = require("lib.elements")
+local fields = require("lib.fields")
 local game = require("lib.game")
 local items = require("lib.items")
 local leveling = require("lib.leveling")
@@ -119,6 +120,16 @@ function help.monsters(req)
 			special = m.roams == 0, free = m.uses_mp == 0 and #lo.spells > 0 }
 	end
 	return page(req, "Monsters", "community/help/monsters", { monsters = list })
+end
+
+-- Every field that isn't retired, by group: what it does (its modifiers as lines), its
+-- description and lore; the weather's and the spells' alike.
+function help.fields(req)
+	local list = {}
+	for _, f in ipairs(fields.active()) do
+		list[#list + 1] = { field = f, group = fields.GROUP_NAMES[f.group] or f.group, lines = fields.lines(f) }
+	end
+	return page(req, "Fields", "community/help/fields", { fields = list })
 end
 
 -- Columns per class: HP (gain + milestone bonus), MP, TP (formula), Strength, Dexterity.

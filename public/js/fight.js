@@ -1,7 +1,8 @@
 // fight.js :: smooth fights (docs/APP.md "Fight events"). A fight round sent by the live
 // client (client.js) comes back with the round's events (an `events fight` frame), which
 // this script plays on the page being shown before the page's regions apply: a line every
-// STEP ms, with the HP/MP bars and numbers, the statuses and the allies they change. Then
+// STEP ms, with the HP/MP bars and numbers, the statuses, the allies and the battlefield's
+// fields they change. Then
 // the regions bring the page as the server renders it, so what stays on screen is what a
 // page load shows. A click in the middle column, any key or "Skip" finishes the round at
 // once; with prefers-reduced-motion there are no delays. The fight forms are disabled while
@@ -220,6 +221,32 @@
 		}
 	}
 
+	// the battlefield line (fight/battlefield.html): a field coming up is added, one going is
+	// struck out (the page as the server renders it follows the round)
+	function field(x) {
+		var line = $("[data-battlefield]", middle());
+		var list = line && $(".fight-fields", line);
+		if (!list) return;
+		var old = $('[data-field="' + String(x.key).replace(/[^a-z0-9_]/g, "") + '"]', list);
+		if (x.change === "remove") {
+			if (old) old.classList.add("fight-field-gone");
+			return;
+		}
+		if (old) remove(old);
+		var chip = el("span", "fight-field fight-field-new");
+		chip.setAttribute("data-field", x.key);
+		if (x.icon) {
+			var icon = el("img", "fight-field-icon");
+			icon.src = x.icon;
+			icon.width = icon.height = 18;
+			icon.alt = "";
+			chip.appendChild(icon);
+		}
+		chip.appendChild(txt(x.name));
+		list.appendChild(chip);
+		line.hidden = false;
+	}
+
 	// ---- playing a round
 
 	function show(e, log) {
@@ -239,6 +266,7 @@
 		(e.tp || []).forEach(function (c) { stat("tp", c); });
 		(e.status || []).forEach(status);
 		(e.summon || []).forEach(summon);
+		(e.field || []).forEach(field);
 	}
 
 	function play(events) {

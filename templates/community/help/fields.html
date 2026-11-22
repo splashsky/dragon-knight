@@ -1,0 +1,23 @@
+{#- Fields spoilers (3.2; app/fight/fields.lua): every field with its icon, group, what it
+		does and its lore. ctx: fields { field (row, decoded), group (its group's name), lines
+		(its modifiers) }. -#}
+{{{ include("community/help/header") }}}
+
+<table class="help-table help-w75" id="fields">
+<thead>
+<tr><th colspan="3" class="help-caption">Fields</th></tr>
+<tr><th>Name</th><th>Group</th><th>Effects</th></tr>
+</thead>
+<tbody>
+{%- for _, r in ipairs(fields) do %}
+{%- local f = r.field %}
+<tr><td style="width: 45%">{% local ic = entity_icon("fields", f.icon) %}{% if ic then %}<img class="help-icon" src="{{ ic }}" width="24" height="24" alt="">{% end %}{{ f.name }}{% if f.description ~= "" then %}<br><span class="small">{{ f.description }}</span>{% end %}{% if (f.lore or "") ~= "" then %}<div class="help-lore">{{{ paragraphs(f.lore) }}}</div>{% end %}</td><td style="width: 15%">{{ r.group }}</td><td style="width: 40%">{% if #r.lines > 0 then %}{% for i, l in ipairs(r.lines) do %}{% if i > 1 then %}<br>{% end %}{{ l }}{% end %}{% else %}<span class="light">None</span>{% end %}</td></tr>
+{%- end %}
+</tbody>
+</table>
+<p>A field is an effect on the whole battlefield, for everyone in the fight. The weather where you stand brings its own:
+the sky (sun, heat, fog, rain, a downpour, a thunderstorm, snow, a blizzard), the ground (mud, ice) and the night.
+They follow the weather as it changes during a fight. Some spells call up a field for a while in place of the weather's
+(rain on a clear day, say), and auras come only from spells. One field of each group is up at a time, and the fight page
+shows them under the monster.</p>
+{{{ include("community/help/footer") }}}

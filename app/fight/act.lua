@@ -14,6 +14,7 @@
 local action = require("lib.action")
 local combat = require("fight.combat")
 local engine = require("fight.engine")
+local fields = require("fight.fields")
 local items = require("lib.items")
 local spells = require("lib.spells")
 local state = require("fight.state")
@@ -68,7 +69,7 @@ function act.run(f, a)
 	local r = action.perform({
 		kind = kind, entity = entity, module = a.module, caster = player, in_fight = true, rand = f.rand,
 		target = entity.target == "self" and player or (target and engine.handle(f, target)),
-		summon_room = engine.summon_room(f, p), free = gear,
+		summon_room = engine.summon_room(f, p), free = gear, battlefield = fields.battlefield(f),
 	})
 	if not r.ok then return { refused = r.reason == "cannot" and cannot or r.refused } end
 	local prev = engine.doing(f, p, gear and "item" or kind)
@@ -98,18 +99,19 @@ function act.can_use(f, item)
 	local r = action.check({
 		kind = "item", entity = item, caster = player, in_fight = true,
 		target = item.target == "self" and player or (target and engine.handle(f, target)),
-		summon_room = engine.summon_room(f, p),
+		summon_room = engine.summon_room(f, p), battlefield = fields.battlefield(f),
 	})
 	return r.ok == true
 end
 
--- A monster's attack (the original formula, of its attack_element) on `target` (the player
--- or an ally).
+-- A monster's attack (the original formula with its handle's attack: its maxdam under the
+-- fields; of its attack_element) on `target` (the player or an ally).
 function act.enemy_attack(f, c, target)
 	if not target then return end
-	local element = engine.handle(f, c).attack_element
+	local me = engine.handle(f, c)
+	local element = me.attack_element
 	local them = engine.handle(f, target)
-	local lines, damage, healed = combat.monster_attack(c.row.maxdam, them, f.rand, function(d)
+	local lines, damage, healed = combat.monster_attack(me.attack, them, f.rand, function(d)
 		return engine.modify_damage(f, c, target, d, element)
 	end, engine.typed(f, them, element))
 	local prev = engine.doing(f, c, "attack")

@@ -8,14 +8,16 @@
 --   { part = "player" | "allies" | "enemies" | "ending",   -- the page's paragraph
 --     actor = "player" | "ally" | "enemy", actor_id, actor_name,   -- who acts (a status: its bearer)
 --     type = "attack" | "spell" | "item" | "guard" | "status" | "summon" | "blocked" | "run"
---            | "ambush" | "wave" | "speech" (a monster speaking: fight/speech.lua) | "say" (any
---            other line) | "victory" | "death" | "escape" (the outcome),
+--            | "ambush" | "wave" | "field" (the battlefield: the weather's fields coming and
+--            going, a field's on_tick) | "speech" (a monster speaking: fight/speech.lua) | "say"
+--            (any other line) | "victory" | "death" | "escape" (the outcome),
 --     text,                                     -- absent for a change without a line
 --     hp = { { who, id, name, from, to, max } },   -- who: "player" | "ally" | "enemy"
 --     mp = { ... }, tp = { ... },               -- (an enemy's MP only where the page shows it)
 --     status = { { who, id, name, key, status, ticks, change = "add" | "remove" | "expire"
 --                | "ticks", statuses = { { key, name, ticks, left, icon } } } },  -- statuses: after it
---     summon = { { change = "join" | "leave" | "ticks", id, name, hp, max, ticks } } }
+--     summon = { { change = "join" | "leave" | "ticks", id, name, hp, max, ticks } },
+--     field = { { key, name, change = "add" | "remove", icon } } }   -- the battlefield's
 --
 -- Lists are present only when not empty; ticks (clock ticks left) is absent when a status
 -- has no limit (or an ally stays for the whole fight); left is the time it says on its chip
@@ -76,6 +78,8 @@ function events.build(trace, opts)
 				change = x.status == "error" and "remove" or x.status, statuses = copy_list(x.list) })
 		elseif x.summon then
 			add(x, "summon", { change = x.summon, id = x.id, name = x.name, hp = x.hp, max = x.max, ticks = x.ticks })
+		elseif x.field then
+			add(x, "field", { key = x.key, name = x.label, change = x.field, icon = schema.entity_icon("fields", x.icon) })
 		end
 	end
 	for _, e in ipairs(out) do e.step = nil end

@@ -1,12 +1,14 @@
--- admin/effects.lua :: /admin/statuses, /admin/summons and /admin/monsters -- the
--- statuses, summons and monsters (content files app/content/{statuses,summons,monsters}/
--- <key>.lua, synced into their tables; see docs/APP.md "Fight engine", "Monsters"). Like
--- the spells page: admins override the names, descriptions, numbers and message strings per
--- server (the kinds' admin_fields); "reset to file" deletes an override; what they do is
--- the file's code, a monster's loadout the file's (shown read-only).
+-- admin/effects.lua :: /admin/statuses, /admin/summons, /admin/monsters and /admin/fields
+-- -- the statuses, summons, monsters and fields (content files
+-- app/content/{statuses,summons,monsters,fields}/<key>.lua, synced into their tables; see
+-- docs/APP.md "Fight engine", "Monsters", "Fields"). Like the spells page: admins override
+-- the names, descriptions, numbers and message strings per server (the kinds' admin_fields);
+-- "reset to file" deletes an override; what they do is the file's code, a monster's loadout
+-- the file's (shown read-only).
 local affinities = require("lib.content.affinities")
 local common = require("admin.common")
 local content = require("admin.content")
+local field_kind = require("lib.content.kinds.fields")
 local game = require("lib.game")
 local monsters = require("lib.monsters")
 local php = require("lib.php")
@@ -92,6 +94,27 @@ local KINDS = {
 		note = monster_note,
 		retired_note = "the file is gone, so it is no longer met; fights against it go on.",
 	},
+	fields = {
+		kind = field_kind, rows = require("lib.fields"), title = "Fields", one = "Field",
+		code = "on_tick, when it has one",
+		intro = "Fields are content files, <code>app/content/fields/&lt;key&gt;.lua</code>: effects on the whole " ..
+			"battlefield, the weather's (the sky, the ground, the night) or a spell's. The game picks up a new or " ..
+			"edited file on the next page load. Click one to override its name, description, icon, damage percents " ..
+			"by element, percents on the stats, how statuses behave under it, its numbers and its messages on this " ..
+			"server; its group is the file's.",
+		adding = "Copy one of the files in <code>app/content/fields/</code> to a new name (the file name is its key: " ..
+			"lowercase letters, digits and <code>_</code>; it can't be changed later) and edit it; spells put it up " ..
+			"with <code>s:field(\"&lt;key&gt;\", { ticks = n })</code> (see <code>docs/APP.md</code>, \"Fields\"). " ..
+			"The weather's fields are named after the weather (rain, mud, night, ...). Deleting a file retires it. " ..
+			"Run <code>dk check</code> to validate the files.",
+		columns = { "group" },
+		in_use = function(id)
+			local key = dk.db:value("SELECT key FROM fields WHERE id = ?", id)
+			return dk.db:value("SELECT count(*) FROM fights WHERE outcome = '' AND ('\n' || data || '\n') LIKE ?",
+				"%=s:" .. key .. "\n%")
+		end,
+		retired_note = "the file is gone, so it no longer comes up; fights where it is up drop it.",
+	},
 }
 
 local function all_rows(k)
@@ -135,7 +158,7 @@ end
 local function detail(req, k, name, e, opts)
 	opts = opts or {}
 	local current = k.scripted and scripted.flatten(e, {}) or {}
-	affinities.flatten(e, current)
+	if k.kind.flatten then k.kind.flatten(e, current) else affinities.flatten(e, current) end
 	for _, f in ipairs(k.kind.fields) do current[f.name] = e[f.name] end
 	local facts = {}
 	if k.facts then

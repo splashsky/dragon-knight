@@ -17,6 +17,8 @@ changelog.RELEASES = {
 			"Fights happen in real time. You have 30 seconds for each turn; in the last 20 a thin bar under your hotbar runs down, and when it runs out you raise your guard. Burns, poisons, sleep, charged attacks and allies last seconds instead of turns, so they keep working between your moves, and a fight you walk away from goes on without you (schema version 22, run dk migrate).",
 			"A new Guard action, always on key 9: it costs your turn and softens the blows you take until your next one. Your own hotbar keys are 2 to 8.",
 			"Effects that last outside fights, like the Regen Potion's, wear off with time instead of with your steps.",
+			"The weather reaches into fights: rain dampens fire and feeds lightning, a downpour puts fires out before they catch, the heat makes burns worse, mud and ice slow everyone down, fog dulls blades, and night favours shadow. The battlefield changes as the weather moves, in the middle of a fight, and some spells and monsters change it on purpose. The fight page shows the battlefield under the monster, and a new help page lists every kind (schema version 23, run dk migrate).",
+			"Judgement tells you how much it healed you again.",
 		},
 	},
 	{

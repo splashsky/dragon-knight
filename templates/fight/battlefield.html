@@ -1,0 +1,8 @@
+{#- The battlefield (fight/fight.html, under the monster; app/fight/fields.lua): each field
+		up with its icon and name, its tooltip saying what it does. A region of its own, there
+		even when no field is up (hidden then): it changes with the weather while the rest of
+		the page doesn't, and fight.js adds and strikes out its fields as a round plays
+		(data-battlefield, data-field). -#}
+{{{ region("battlefield") }}}<p class="fight-battlefield" data-r="battlefield" data-battlefield{% if #battlefield == 0 then %} hidden{% end %}><span class="fight-battlefield-label">Battlefield:</span> <span class="fight-fields">
+{%- for _, x in ipairs(battlefield) do %}<span class="fight-field tip-term" data-field="{{ x.key }}" data-tip tabindex="0">{% if x.icon then %}<img class="fight-field-icon" src="{{ x.icon }}" width="18" height="18" alt="">{% end %}{{ x.name }}{{{ include("tip/tip", x.tip) }}}</span>{% end -%}
+</span></p>{{{ endregion() }}}

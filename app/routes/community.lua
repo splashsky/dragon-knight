@@ -24,6 +24,7 @@ return function(r)
 	r:get("/help/items", help.items)
 	r:get("/help/spells", help.spells)
 	r:get("/help/monsters", help.monsters)
+	r:get("/help/fields", help.fields)
 	r:get("/help/levels", help.levels)
 
 	r:get("/changelog", changelog.page)

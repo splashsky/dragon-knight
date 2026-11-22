@@ -17,7 +17,7 @@ local monsters = {}
 
 monsters.SLOTS = kind.SLOTS
 
-local by_id, by_key, loadouts, classed = {}, {}, nil, {}
+local by_id, by_key, loadouts, plain, classed = {}, {}, nil, {}, {}
 
 local function remember(row)
 	if row then
@@ -63,7 +63,7 @@ end
 
 -- Forget the cache (after a sync in the same request).
 function monsters.reload()
-	by_id, by_key, loadouts, classed = {}, {}, nil, {}
+	by_id, by_key, loadouts, plain, classed = {}, {}, nil, {}, {}
 end
 
 local SLOT_ORDER = {}
@@ -124,19 +124,34 @@ local function with_class(m, lo)
 	return out
 end
 
+-- A loadout without its entries of weight 0: those are never chosen (an own entry of weight
+-- 0 switches off its class's spell of that key).
+local function chosen(lo)
+	local out = { equipment = lo.equipment, items = {}, spells = {} }
+	for _, list in ipairs({ "items", "spells" }) do
+		for _, e in ipairs(lo[list]) do
+			if (e.weight or 1) > 0 then out[list][#out[list] + 1] = e end
+		end
+	end
+	return out
+end
+
 -- The loadout of monster row `m`: { equipment = { { slot, item }, ... } (in slot order),
 -- items = { { position, item, weight, stock (nil: no limit), has_when }, ... },
 -- spells = { { position, spell, weight, has_when }, ... , then its class's: { spell,
--- weight = 1, from_class = true } } } (item and spell rows; entries whose row is gone are
--- left out). A row may carry its own `loadout` table instead (tests; entries may then hold
--- their `when` function).
+-- weight = 1, from_class = true } } } (item and spell rows; entries whose row is gone and
+-- those of weight 0 are left out). A row may carry its own `loadout` table instead (tests;
+-- entries may then hold their `when` function).
 function monsters.loadout(m)
-	if m.loadout then return m.loadout end
+	if m.loadout then return chosen(m.loadout) end
 	if m.id == nil then return empty() end
 	loadouts = loadouts or load_all()
 	local lo = loadouts[m.id] or empty()
-	if (m.class or "") == "" then return lo end
-	classed[m.id] = classed[m.id] or with_class(m, lo)
+	if (m.class or "") == "" then
+		plain[m.id] = plain[m.id] or chosen(lo)
+		return plain[m.id]
+	end
+	classed[m.id] = classed[m.id] or chosen(with_class(m, lo))
 	return classed[m.id]
 end
 

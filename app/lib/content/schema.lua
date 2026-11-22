@@ -1,8 +1,9 @@
 -- content/schema.lua :: the content kinds and the field validators they share.
 --
 -- A kind (app/lib/content/kinds/<kind>.lua) describes one sort of content entity
--- (statuses, summons, spells, classes, items, monsters): where its files live, its DB table and the
--- fields of its files. Validating a file produces the entity's *flat* form: a table of
+-- (statuses, fields, summons, spells, classes, items, monsters): where its files live, its
+-- DB table and the fields of its files. Validating a file produces the entity's *flat*
+-- form: a table of
 -- field name -> value (integer or string) covering everything the file says, nested data
 -- included ("levels.2.hp", "messages.hit"). The flat form is what gets fingerprinted,
 -- overridden by admins (content_overrides rows hold a field name and its value as text)
@@ -20,7 +21,7 @@
 --   extra_keys         { levels = true }: other top-level keys validate_extra handles
 --   field(name)        the spec of any flat field (top-level or nested), or nil
 --   write_children(id, flat)          optional: child tables after the row is written
---   validate_refs(flat, all, err)     optional: checks against the other kinds' files
+--   validate_refs(flat, all, err, key)   optional: checks against the other kinds' files
 --                      (load.all; a monster's equipment must fit its slot, ...)
 --   admin_fields(flat)  { spec, ... } of the fields the admin page edits for an entity
 --                      (spec.name: the flat field name, spec.label)
@@ -41,9 +42,9 @@ local leveling = require("lib.leveling")
 
 local schema = {}
 
--- Sync order: kinds that others reference come first (statuses and summons are used by
--- spells and items, spells by classes, items and spells by monsters).
-schema.KINDS = { "statuses", "summons", "spells", "classes", "items", "monsters" }
+-- Sync order: kinds that others reference come first (statuses are used by fields, statuses,
+-- fields and summons by spells and items, spells by classes, items and spells by monsters).
+schema.KINDS = { "statuses", "fields", "summons", "spells", "classes", "items", "monsters" }
 
 local KNOWN = {}
 for _, k in ipairs(schema.KINDS) do KNOWN[k] = true end

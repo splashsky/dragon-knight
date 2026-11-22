@@ -7,6 +7,7 @@
 -- everything. Plain data: no HTML here.
 local classes = require("lib.classes")
 local elements = require("lib.elements")
+local fields = require("lib.fields")
 local items = require("lib.items")
 local php = require("lib.php")
 local schema = require("lib.content.schema")
@@ -133,6 +134,16 @@ end
 function tips.monster(m)
 	return { title = m.name, icon = schema.entity_icon("monsters", m.icon), meta = { "Level " .. m.level },
 		lines = elements.lines(m.resist, m.ward), body = m.description, lore = m.lore }
+end
+
+-- A field on the battlefield: its icon (when it has one) and name; its group (and, a
+-- spell's, the time it has left: "30s"); what it does ("Fire damage -40%", "Burning can't
+-- take hold", "Dexterity -20%"); its description; its lore.
+function tips.field(f, left)
+	local meta = { fields.GROUP_NAMES[f.group] or f.group }
+	if left then meta[#meta + 1] = left .. " left" end
+	return { title = f.name, icon = schema.entity_icon("fields", f.icon), meta = meta, lines = fields.lines(f),
+		body = f.description, lore = f.lore }
 end
 
 -- The fight menu's Attack button: the player's attack power (and the weapon's name, when

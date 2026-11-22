@@ -53,7 +53,9 @@ function T.fights_due_are_advanced_and_told()
 		fight(a, N - 10)   -- the most behind
 		fight(b, N - 5)
 		fight(c, N)        -- not due: its turn runs out at N + 3
-		eq(row(c).due, N + 3, "due at its deadline")
+		-- due at its deadline (N + 3), or at the weather's next step when that comes first (its
+		-- fields follow the weather: fight/fields.lua)
+		eq(row(c).due, N + 2, "due at the weather's next step")
 		tick.FIGHTS = 1
 		local out = tick.run(N * 10)
 		eq(out.fights, 1, "one fight a run (tick.FIGHTS)")
