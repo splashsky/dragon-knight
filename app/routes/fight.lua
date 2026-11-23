@@ -389,7 +389,7 @@ local function ended(req, f, how)
 			scene = { "victory", "Victory!", victory_detail(f.result), page = true } })
 	end
 	return go(req, "/fight", { events = fight_trace(f, "death"),
-		scene = { "death", "You have died", "The " .. foe(f) .. " defeated you. Half your gold is lost." } })
+		scene = { "death", "You have died", "The " .. foe(f) .. " defeated you. A quarter of your gold is lost." } })
 end
 
 local function fight(req)

@@ -488,6 +488,10 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 		"Already purchased" is gone).
 	- The Mage starts with 5 MP and Magic Bolt (2.4); its MP gains per level are the
 		original's.
+	- Gold (3.4): a victory pays the original's roll times 1 + 3 / (level + 1) (the monster's
+		level), rounded, plus 5 - level below level 5 (`combat.gold_for`: a level 1 monster 7
+		to 9 gold instead of 1 or 2; the strong ones a few percent more; the same dice), and
+		a death costs a quarter of the gold instead of half.
 - Dropped: the admin "page compression" switch (the server doesn't gzip). The internal
 	forum is only reachable when `control.forumtype = 1`.
 

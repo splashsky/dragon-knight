@@ -305,28 +305,46 @@ function T.run_chance()
 	eq(combat.run_chance(player(), CREATURE, dice({ 5, 4 }).rand), true)
 end
 
+-- 3.4: a quarter of the gold goes (rounded down), not half
 function T.death_penalty()
 	local d = combat.death(player({ gold = 101, maxhp = 15 }))
-	eq(d.gold, 51); eq(d.currenthp, 4)
+	eq(d.gold, 76); eq(d.currenthp, 4)
+	eq(combat.death(player({ gold = 3, maxhp = 15 })).gold, 3, "a few coins kept")
+	eq(combat.death(player({ gold = 0, maxhp = 15 })).gold, 0)
+end
+
+-- 3.4: the weak monsters pay more: the original's roll times 1 + 3 / (level + 1), rounded,
+-- plus 5 - level below level 5; the strong ones about what they did
+function T.early_gold()
+	eq(combat.gold_for(1, 1), 7); eq(combat.gold_for(1, 2), 9)
+	eq(combat.gold_for(2, 2), 7); eq(combat.gold_for(3, 2), 6); eq(combat.gold_for(3, 3), 7)
+	eq(combat.gold_for(4, 5), 9); eq(combat.gold_for(5, 7), 11); eq(combat.gold_for(10, 18), 23)
+	eq(combat.gold_for(50, 150), 159); eq(combat.gold_for(nil, 1), 7, "no level: the first")
+	for level = 1, 100 do
+		for _, roll in ipairs({ 1, 5, 40, 300 }) do
+			assert(combat.gold_for(level, roll) >= roll, "never less than the roll")
+		end
+	end
 end
 
 function T.victory_rewards()
 	-- Creature maxexp 4: (4/6)*5 = 3.33 -> rand(3,4) = 4, unscaled
-	-- maxgold 2: (2/6)*5 = 1.66 -> rand(1,2) = 2
+	-- maxgold 2: (2/6)*5 = 1.66 -> rand(1,2) = 2; level 2: round(2 * 2) + 3 = 7
 	local d = dice({ 4, 2 })
 	local r = combat.rewards(player(), CREATURE, d.rand)
 	d.done(); ranges(d, "3,4 1,2")
-	eq(r.exp, 4); eq(r.gold, 2); eq(r.newexp, 4); eq(r.newgold, 102); eq(r.warnexp, ""); eq(r.warngold, "")
-	-- Blue Slime maxexp 1: (1/6)*5 = 0.83 -> rand(0,1) = 0 -> at least 1
-	-- bonuses: exp 1 + ceil(0.1*1) = 2; gold 1 + ceil(0.1*1) = 2
+	eq(r.exp, 4); eq(r.gold, 7); eq(r.newexp, 4); eq(r.newgold, 107); eq(r.warnexp, ""); eq(r.warngold, "")
+	-- Blue Slime maxexp 1: (1/6)*5 = 0.83 -> rand(0,1) = 0 -> at least 1; gold the same: 1, at
+	-- level 1 round(2.5) + 4 = 7
+	-- bonuses: exp 1 + ceil(0.1*1) = 2; gold 7 + ceil(0.1*7) = 8
 	d = dice({ 0, 0 })
 	r = combat.rewards(player({ expbonus = 10, goldbonus = 10 }), BLUE_SLIME, d.rand)
-	ranges(d, "0,1 0,1"); eq(r.exp, 2); eq(r.gold, 2)
-	-- the gold bonus is a % of the gold (legacy: of the exp, 2 + ceil(0.5*4) = 4)
+	ranges(d, "0,1 0,1"); eq(r.exp, 2); eq(r.gold, 8)
+	-- the gold bonus is a % of the gold (legacy: of the exp)
 	r = combat.rewards(player({ goldbonus = 50 }), CREATURE, dice({ 4, 2 }).rand)
-	eq(r.exp, 4); eq(r.gold, 3)
+	eq(r.exp, 4); eq(r.gold, 11)
 	r = combat.rewards(player({ goldbonus = -50 }), CREATURE, dice({ 4, 2 }).rand)
-	eq(r.gold, 1)
+	eq(r.gold, 4)
 	-- caps
 	r = combat.rewards(player({ experience = 16777214, gold = 16777214 }), CREATURE, dice({ 4, 2 }).rand)
 	eq(r.exp, 0); eq(r.newexp, 16777214); eq(r.warnexp, "You have maxed out your experience points.")

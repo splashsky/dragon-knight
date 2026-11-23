@@ -389,7 +389,7 @@ a getaway, arriving in a town, setting out from one.
 | `POST /move` out of a town (`town/explore.lua`) | `explore` | Exploring | "You leave Midworld behind." |
 | `POST /move` into an encounter | `fight` (`death` when the ambush kills) | Fight! | "A Blue Slime blocks your way." |
 | `POST /fight`, the winning round (`routes/fight.lua`) | `victory` | Victory! | "You defeated the Blue Slime: +12 experience, +5 gold." (and "You gained a level!" or "It left something behind.") |
-| `POST /fight`, the fatal round | `death` | You have died | "The Blue Slime defeated you. Half your gold is lost." |
+| `POST /fight`, the fatal round | `death` | You have died | "The Blue Slime defeated you. A quarter of your gold is lost." |
 | `POST /fight`, a getaway | `escape` | You got away | "The Blue Slime is left behind." |
 
 - **The client** plays it after the round's events (`fight.js`) and before the regions
@@ -2255,8 +2255,10 @@ charged spell's release step is saved by name.
 every encounter is one wave with one monster (the original random pick). The pipeline
 already acts with every enemy of the current wave; when the wave is defeated the next one
 enters ("Another monster appears: ..."), and the victory is "no enemy left". The winning
-round pays each defeated enemy's rewards (summed) and rolls for a drop once (at the highest
-level); `GET /victory` shows them. The player's actions aim at "the current target" (`engine.target`, `s.target` in
+round pays each defeated enemy's rewards (summed: `combat.rewards`, the original's dice; the
+gold for a monster's roll is `combat.gold_for(level, roll)` since 3.4, more from the weak
+ones) and rolls for a drop once (at the highest level); `GET /victory` shows them. A death
+costs a quarter of the gold (`combat.death`; half until 3.4). The player's actions aim at "the current target" (`engine.target`, `s.target` in
 spells: the target the player chose with the target picker while it is targetable, else the
 first living enemy of the wave; [Interactables and targeting](#interactables-and-targeting)),
 the one place that decides. Objects (interactables) stand on the field beside the waves:

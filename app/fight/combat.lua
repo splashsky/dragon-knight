@@ -124,9 +124,21 @@ function combat.attack(attacker, target, rand, modify, typed)
 	return lines, damage, healed
 end
 
--- Death penalty: half the gold (rounded up) and a quarter of max HP (rounded up).
+-- Death penalty: a quarter of the gold (rounded down: three quarters kept, rounded up) and a
+-- quarter of max HP (rounded up). fixed (3.4): legacy took half the gold, which set a young
+-- character back by many fights for one death.
 function combat.death(user)
-	return { gold = php.ceil(user.gold / 2), currenthp = php.ceil(user.maxhp / 4) }
+	return { gold = user.gold - user.gold // 4, currenthp = php.ceil(user.maxhp / 4) }
+end
+
+-- The gold a victory over a monster of `level` pays for the original's roll `gold` (3.4:
+-- more of it from the weak monsters, whose roll is a coin or two while the first gear costs
+-- 25 to 100): the roll times 1 + 3 / (level + 1), rounded, plus 5 - level below level 5. A
+-- level 1 monster pays 7 to 9 (was 1 or 2), a level 3 one 6 or 7 (was 2 or 3), a level 10 one
+-- about 23 (was about 18), a level 50 one about 6% more; the dice are the original's.
+function combat.gold_for(level, gold)
+	level = math.max(level or 1, 1)
+	return math.floor(gold * (1 + 3 / (level + 1)) + 0.5) + math.max(5 - level, 0)
 end
 
 -- Victory rewards. Returns { exp, gold, newexp, newgold, warnexp, warngold }.
@@ -136,6 +148,7 @@ function combat.rewards(user, monster, rand)
 	if user.expbonus ~= 0 then exp = exp + php.ceil((user.expbonus / 100) * exp) end
 	local gold = rand((monster.maxgold / 6) * 5, monster.maxgold)
 	if gold < 1 then gold = 1 end
+	gold = combat.gold_for(monster.level, gold)
 	-- fixed: legacy took the gold bonus as a percentage of the experience gained.
 	if user.goldbonus ~= 0 then gold = gold + php.ceil((user.goldbonus / 100) * gold) end
 

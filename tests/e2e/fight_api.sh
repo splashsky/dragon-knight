@@ -490,7 +490,7 @@ t_section "fight api: death"
 fa_doomed() { fa_player; fa_sql "UPDATE users SET currenthp = 1, dexterity = 0"; t_fight fapi 146 30000; }
 fa_both death 1 fa_doomed "fight=Fight&round=2"
 fa_expect 'd["events"][-1]["type"] == "death" and "<b>You have died.</b>" in d["fragments"]["main"] and "round" not in d'
-fa_expect 'd["scene"]["kind"] == "death" and d["scene"]["title"] == "You have died" and d["scene"]["detail"].endswith("defeated you. Half your gold is lost.")'
+fa_expect 'd["scene"]["kind"] == "death" and d["scene"]["title"] == "You have died" and d["scene"]["detail"].endswith("defeated you. A quarter of your gold is lost.")'
 fa_expect '"name=\"fight\"" not in d["fragments"]["main"] and d["url"] == "/fight"'
 fa_is currentaction "In Town"
 fa_live GET /dead; expect_status 200; fa_check

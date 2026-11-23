@@ -251,12 +251,12 @@ t_get /fight; CS=$(t_csrf)
 t_round "csrf=$CS&fight=Fight"
 expect_status 200; expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'
 expect_no_body 'name="fight"'
-f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
+f_is currentaction 'In Town'; f_is gold 76; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0
 t_get /; expect_status 200; expect_body 'class="town-banners"'
 # the fight as it ended stays on its page (GET /fight) until the player moves on
 t_get /fight; expect_status 200; expect_body '<b>You have died.</b>'; expect_body 'The monster attacks you for'
-expect_no_body 'name="fight"'; f_is gold 51
+expect_no_body 'name="fight"'; f_is gold 76
 t_get /victory; expect_redirect /
 
 t_section "fight: death on a spell turn keeps the MP spent, clears buffs"
@@ -267,7 +267,7 @@ f_sql "UPDATE users SET currenthp = 1, currentmp = 30, base_maxmp = 50, gold = 1
 t_round "csrf=$CS&spell=Spell&userspell=14"
 expect_status 200; expect_body 'You have cast the Craze spell'; expect_body '<b>You have died.</b>'
 f_is currentaction 'In Town'; f_is currentmp 20; f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0
-f_is gold 50; f_is currenthp 8
+f_is gold 75; f_is currenthp 8
 
 t_section "fight: run away blocked, fatal"
 t_fight fighter 146 30000
@@ -276,7 +276,7 @@ f_sql "UPDATE users SET currenthp = 1, currentmp = 7, gold = 101, latitude = 40,
 t_round "csrf=$CS&run=Run"
 expect_status 200; expect_body 'You tried to run away, but were blocked in front!'
 expect_body 'The monster attacks you for'; expect_body '<b>You have died.</b>'; expect_no_body 'name="run"'
-f_is currentaction 'In Town'; f_is gold 51; f_is currenthp 8; f_is latitude 0; f_is longitude 0
+f_is currentaction 'In Town'; f_is gold 76; f_is currenthp 8; f_is latitude 0; f_is longitude 0
 f_is "$T_ROUND" 0; f_is "$T_MONSTER" 0; f_is "$T_MONSTER_HP" 0
 f_is "$T_UBER_DAMAGE" 0; f_is "$T_UBER_DEFENSE" 0; f_is currentmp 7
 t_get /; expect_status 200; expect_body 'class="town-banners"'
@@ -422,18 +422,19 @@ esac
 f_sql "UPDATE users SET dropcode = 0, level = 3"
 
 t_section "fight: victory stores negative experience as 0 (MySQL UNSIGNED)"
-# Blue Slime: exp rand(0,1) -> at least 1; -500% bonus: 1 + ceil(-5) = -4; gold 1
+# Blue Slime: exp rand(0,1) -> at least 1; -500% bonus: 1 + ceil(-5) = -4; gold 1, a level 1
+# monster's: round(1 * 2.5) + 4 = 7 (combat.gold_for)
 t_fight fighter 1 0
 f_sql "UPDATE users SET experience = 0, gold = 0, base_exp_bonus = -500, base_gold_bonus = 0, level = 2"
-t_fight_win; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 1 gold.'
-f_is experience 0; f_is gold 1; f_is level 2
+t_fight_win; expect_status 200; expect_body 'You gain -4 experience.'; expect_body 'You gain 7 gold.'
+f_is experience 0; f_is gold 7; f_is level 2
 
 t_section "fight: gold bonus is a percentage of the gold"
-# Blue Slime: exp 1 + ceil(5 * 1) = 6; gold 1 + ceil(1 * 1) = 2 (legacy: of the exp, 7)
+# Blue Slime: exp 1 + ceil(5 * 1) = 6; gold 7 + ceil(1 * 7) = 14 (legacy: of the exp)
 t_fight fighter 1 0
 f_sql "UPDATE users SET experience = 0, gold = 0, base_exp_bonus = 500, base_gold_bonus = 100"
-t_fight_win; expect_body 'You gain 6 experience.'; expect_body 'You gain 2 gold.'
-f_is experience 6; f_is gold 2
+t_fight_win; expect_body 'You gain 6 experience.'; expect_body 'You gain 14 gold.'
+f_is experience 6; f_is gold 14
 
 t_section "fight: several levels at once"
 # Blue Slime gives exactly 1 exp: 53 + 1 = 54 reaches Warrior levels 2 (18) and 3 (54)
