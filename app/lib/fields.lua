@@ -3,6 +3,7 @@
 -- words. Rows come back with damage, stats, statuses, messages and data decoded
 -- (lib/content/kinds/fields.lua fields.decode_row). How fields combine in a fight is
 -- app/fight/fields.lua; a field's on_tick is its file's code.
+local cache = require("lib.cache")
 local clock = require("lib.clock")
 local elements = require("lib.elements")
 local kind = require("lib.content.kinds.fields")
@@ -11,28 +12,16 @@ local fields = {}
 
 fields.GROUP_NAMES = { sky = "Sky", ground = "Ground", time = "Time of day", terrain = "Terrain", aura = "Aura" }
 
-local by_id, by_key = {}, {}
-
-local function remember(row)
-	if row then
-		kind.decode_row(row)
-		by_id[row.id] = row
-		by_key[row.key] = row
-	end
-	return row
-end
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): shared, so
+-- don't change one
+local rows = cache.rows("fields", kind.decode_row)
+local remember = rows.remember
 
 -- The field with id `id` (retired or not), or nil.
-function fields.get(id)
-	if by_id[id] == nil then remember(dk.db:first("SELECT * FROM fields WHERE id = ?", id)) end
-	return by_id[id]
-end
+fields.get = rows.get
 
 -- The field with key `key` (retired or not), or nil.
-function fields.by_key(key)
-	if by_key[key] == nil then by_key[key] = remember(dk.db:first("SELECT * FROM fields WHERE key = ?", key)) or false end
-	return by_key[key] or nil
-end
+fields.by_key = rows.by_key
 
 local GROUP_ORDER = "CASE \"group\" WHEN 'sky' THEN 1 WHEN 'ground' THEN 2 WHEN 'time' THEN 3 WHEN 'terrain' THEN 4 " ..
 	"ELSE 5 END"
@@ -46,7 +35,7 @@ end
 
 -- Forget the cache (after a sync in the same request).
 function fields.reload()
-	by_id, by_key = {}, {}
+	rows.clear()
 end
 
 local function signed(n)

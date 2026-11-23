@@ -5,6 +5,7 @@
 -- their effective numbers with their equipment (lib/stats.lua stats.monster). Cached per
 -- request. What a monster does with its loadout in a fight is app/fight/monster.lua.
 local affinities = require("lib.content.affinities")
+local cache = require("lib.cache")
 local classes = require("lib.classes")
 local elements = require("lib.elements")
 local items = require("lib.items")
@@ -17,28 +18,19 @@ local monsters = {}
 
 monsters.SLOTS = kind.SLOTS
 
-local by_id, by_key, loadouts, plain, classed = {}, {}, nil, {}, {}
-
-local function remember(row)
-	if row then
-		affinities.decode_row(row)
-		by_id[row.id] = row
-		by_key[row.key] = row
-	end
-	return row
-end
+-- the rows by id and key, and the loadouts by monster id (raw, and chosen: without and
+-- with the class's spells), kept for the request as they are used (lib/cache.lua): shared,
+-- so don't change one
+local rows = cache.rows("monsters", affinities.decode_row)
+local remember = rows.remember
+local loadouts = cache.store("monster_loadouts", { size = 128, tables = { "monsters", "monster_equipment",
+	"monster_items", "monster_spells", "items", "spells", "classes", "class_spells" } })
 
 -- The monster with id `id` (retired or not), or nil.
-function monsters.get(id)
-	if by_id[id] == nil then remember(dk.db:first("SELECT * FROM monsters WHERE id = ?", id)) end
-	return by_id[id]
-end
+monsters.get = rows.get
 
 -- The monster with key `key` (retired or not), or nil.
-function monsters.by_key(key)
-	if by_key[key] == nil then remember(dk.db:first("SELECT * FROM monsters WHERE key = ?", key)) end
-	return by_key[key]
-end
+monsters.by_key = rows.by_key
 
 -- Monsters that aren't retired (help) / every monster (admin), by id.
 local function remember_all(rows)
@@ -63,7 +55,8 @@ end
 
 -- Forget the cache (after a sync in the same request).
 function monsters.reload()
-	by_id, by_key, loadouts, plain, classed = {}, {}, nil, {}, {}
+	rows.clear()
+	loadouts:clear()
 end
 
 local SLOT_ORDER = {}
@@ -73,35 +66,29 @@ local function empty()
 	return { equipment = {}, items = {}, spells = {} }
 end
 
--- Every monster's loadout, read once per request (three queries; few monsters have one).
-local function load_all()
-	local all = {}
-	local function of(id)
-		all[id] = all[id] or empty()
-		return all[id]
-	end
-	for _, r in ipairs(dk.db:query("SELECT monster_id, slot, item_id FROM monster_equipment")) do
+-- Monster `id`'s own loadout (three queries; its items and spells from their caches).
+local function load_one(id)
+	local lo = empty()
+	for _, r in ipairs(dk.db:query("SELECT slot, item_id FROM monster_equipment WHERE monster_id = ?", id)) do
 		local it = items.get(r.item_id)
-		if it then table.insert(of(r.monster_id).equipment, { slot = r.slot, item = it }) end
+		if it then table.insert(lo.equipment, { slot = r.slot, item = it }) end
 	end
-	for _, r in ipairs(dk.db:query("SELECT * FROM monster_items ORDER BY monster_id, position")) do
+	for _, r in ipairs(dk.db:query("SELECT * FROM monster_items WHERE monster_id = ? ORDER BY position", id)) do
 		local it = items.get(r.item_id)
 		if it then
-			table.insert(of(r.monster_id).items, { position = r.position, item = it, weight = r.weight, stock = r.stock,
+			table.insert(lo.items, { position = r.position, item = it, weight = r.weight, stock = r.stock,
 				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
 		end
 	end
-	for _, r in ipairs(dk.db:query("SELECT * FROM monster_spells ORDER BY monster_id, position")) do
+	for _, r in ipairs(dk.db:query("SELECT * FROM monster_spells WHERE monster_id = ? ORDER BY position", id)) do
 		local sp = spells.get(r.spell_id)
 		if sp then
-			table.insert(of(r.monster_id).spells, { position = r.position, spell = sp, weight = r.weight,
+			table.insert(lo.spells, { position = r.position, spell = sp, weight = r.weight,
 				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
 		end
 	end
-	for _, lo in pairs(all) do
-		table.sort(lo.equipment, function(a, b) return (SLOT_ORDER[a.slot] or 99) < (SLOT_ORDER[b.slot] or 99) end)
-	end
-	return all
+	table.sort(lo.equipment, function(a, b) return (SLOT_ORDER[a.slot] or 99) < (SLOT_ORDER[b.slot] or 99) end)
+	return lo
 end
 
 -- A loadout with the spells of monster m's class: those the class learns up to m's level
@@ -145,14 +132,12 @@ end
 function monsters.loadout(m)
 	if m.loadout then return chosen(m.loadout) end
 	if m.id == nil then return empty() end
-	loadouts = loadouts or load_all()
-	local lo = loadouts[m.id] or empty()
-	if (m.class or "") == "" then
-		plain[m.id] = plain[m.id] or chosen(lo)
-		return plain[m.id]
-	end
-	classed[m.id] = classed[m.id] or chosen(with_class(m, lo))
-	return classed[m.id]
+	local classed = (m.class or "") ~= ""
+	-- (keyed by the class too: a test's row may give a monster another)
+	return loadouts:fetch(m.id .. "|" .. (m.class or ""), function()
+		local lo = loadouts:fetch(m.id, load_one)
+		return chosen(classed and with_class(m, lo) or lo)
+	end)
 end
 
 -- Whether monster row `m` has spells or items to choose from.

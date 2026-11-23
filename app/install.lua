@@ -114,6 +114,7 @@ local function seed_sql(full, sql)
 end
 
 local function run(...)
+	require("lib.dbcount").install()   -- (writes seen by the request cache, lib/cache.lua)
 	local o, err = parse_args({ ... })
 	if not o then
 		io.stderr:write("dk install: ", err, "\n\n", USAGE)

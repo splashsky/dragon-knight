@@ -4,6 +4,7 @@
 -- hex(sha256(token)). Normal sessions: browser-session cookie, server expiry 1 day,
 -- sliding. "Remember me": Max-Age 1 year, server expiry 1 year, sliding.
 local cookie = require("lib.cookie")
+local game = require("lib.game")
 local json = require("lib.json")
 local presence = require("lib.presence")
 
@@ -34,7 +35,7 @@ function session.load(req)
 	local now = dk.now()
 	local th = hash(token)
 	local s = dk.db:first("SELECT * FROM sessions WHERE token_hash = ?", th)
-	local user = s and s.expires > now and dk.db:first("SELECT * FROM users WHERE id = ?", s.user_id)
+	local user = s and s.expires > now and game.user(s.user_id)
 	if not user then
 		if s then dk.db:exec("DELETE FROM sessions WHERE token_hash = ?", th) end
 		cookie.clear(req, session.COOKIE)
@@ -53,6 +54,8 @@ function session.load(req)
 		end
 	end
 	presence.touch(user, now)
+	-- (the row as presence.touch left it, in the database too: the page's layout reads it again)
+	game.remember_user(user)
 	req.session, req.user = s, user
 	return user
 end
@@ -78,7 +81,7 @@ function session.create(req, user_id, remember)
 						 s.remember)
 	cookie.set(req, session.COOKIE, token, { max_age = remember and session.REMEMBER_TTL or nil })
 	req.session = s
-	req.user = dk.db:first("SELECT * FROM users WHERE id = ?", user_id)
+	req.user = game.user(user_id)
 	return s
 end
 

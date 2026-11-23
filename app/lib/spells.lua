@@ -2,6 +2,7 @@
 -- app/content/spells/*.lua; see lib/content/) and the spells characters know
 -- (user_spells). Rows come back with `messages` and `data` decoded into tables
 -- (lib/content/scripted.lua); what a spell does is its file's cast (lib/action.lua).
+local cache = require("lib.cache")
 local schema = require("lib.content.schema")
 local scripted = require("lib.content.scripted")
 local spell_kind = require("lib.content.kinds.spells")
@@ -15,6 +16,10 @@ local function decode(row)
 	end
 	return row
 end
+
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): each lookup
+-- a copy of the row (its decoded tables shared)
+local rows = cache.rows("spells", decode, { copy = true })
 
 -- Whether `spell` can be cast in `place` ("town" or "fight"), per its usable_in. A
 -- retired spell (its file is gone, and with it what it does) can't be cast any more.
@@ -47,25 +52,25 @@ end
 
 -- The spell with id `id` (retired or not), or nil.
 function spells.get(id)
-	return decode(dk.db:first("SELECT * FROM spells WHERE id = ?", id))
+	return rows.get(id)
 end
 
 -- The spell with key `key` (retired or not), or nil.
 function spells.by_key(key)
-	return decode(dk.db:first("SELECT * FROM spells WHERE key = ?", key))
+	return rows.by_key(key)
 end
 
 -- Spells that aren't retired, by id (help pages).
 function spells.active()
 	local out = dk.db:query("SELECT * FROM spells WHERE retired = 0 ORDER BY id")
-	for _, s in ipairs(out) do decode(s) end
+	for _, s in ipairs(out) do rows.remember(s) end
 	return out
 end
 
 -- Every spell, retired ones too, by id (admin).
 function spells.all()
 	local out = dk.db:query("SELECT * FROM spells ORDER BY id")
-	for _, s in ipairs(out) do decode(s) end
+	for _, s in ipairs(out) do rows.remember(s) end
 	return out
 end
 

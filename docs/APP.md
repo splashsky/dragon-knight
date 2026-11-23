@@ -1122,9 +1122,9 @@ and run `./dk check`.
 
 | Function | Returns |
 |---|---|
-| `game.control()` | control row (id 1), cached per request; `game.reload_control()` after updating it |
-| `game.user(id)` | fresh users row |
-| `game.town_at(lat, lon)`, `game.current_town(user)` | town row or nil (by coordinates) |
+| `game.control()` | control row (id 1), kept for the request ([the cache](#the-request-cache)); `game.reload_control()` reads it again |
+| `game.user(id)` | the users row (a copy: change it as you like; kept for the request until `users` is written), `game.remember_user(row)` (a row read and kept up to date elsewhere: `session.load`'s) |
+| `game.towns()`, `game.town(id)`, `game.town_at(lat, lon)`, `game.current_town(user)` | every town (shared rows), a town row or nil (by id, by coordinates): one query a request |
 | `game.class_name(n)` | the class's name for a `users.charclass` value (nil if unknown); `lib/classes.lua` has the rest |
 | `game.stats(user)` | the effective stats of a users row: `{ maxhp, maxmp, maxtp, strength, dexterity, attack, defense, exp_bonus_pct, gold_bonus_pct }` (see [Derived stats](#derived-stats)) |
 | `game.player(user)` | a copy of the row with the effective stats under the original column names (`maxhp`, `attackpower`, `defensepower`, `expbonus`, `goldbonus`, ...): what the fight code and the spell and item actions (`fight/engine.lua` handles) take |
@@ -3406,7 +3406,7 @@ an item that casts, see [Items](#items)), equipped in a slot
 
 | Function | |
 |---|---|
-| `inventory.entries(uid)`, `inventory.bag(uid)`, `inventory.equipped(uid)` (slot -> entry, cached per request), `inventory.entry(uid, id)`, `inventory.find(uid, item_id)` | entries `{ id, user_id, qty, equipped, item }` |
+| `inventory.entries(uid)`, `inventory.bag(uid)`, `inventory.equipped(uid)` (slot -> entry, kept for the request until `user_items` or `items` is written), `inventory.entry(uid, id)`, `inventory.find(uid, item_id)` | entries `{ id, user_id, qty, equipped, item }` |
 | `inventory.size()`, `inventory.used(bag)`, `inventory.free(bag, size)`, `inventory.room(item, bag, size)` | the cap |
 | `inventory.add(uid, item, qty)`, `inventory.take(entry [, qty])` | into / out of the bag |
 | `inventory.full_charges(item)`, `inventory.spend_charge(entry)`, `inventory.recharge(uid)` | an item's charges when obtained; one charge used (true: a single-use item's last, the item is gone); the inn: refill the equipped rechargeable items (returns them) |
@@ -3580,6 +3580,39 @@ in a comment.
 	(`app/content/`).
 - Foreign keys are on (`PRAGMA foreign_keys=ON` per connection): delete children before
 	parents, and reference users with `ON DELETE SET NULL` where the row should outlive them.
+
+### The request cache
+
+`lib/cache.lua` (3.4) keeps records looked up during a request, so the same row isn't read
+twice: a fight used to read about 500 rows a request (every monster's loadout, its spells
+one by one), now about 25; a town page 13 instead of 15.
+
+- **Stores**: `cache.store(name, { tables = {...}, size = n })` is a small
+	least-recently-used cache (two generations: the entries used since the last turnover and
+	the ones before; when the young half is full it becomes the old one, the old one
+	dropped; O(1), no lists), keeping misses too. `store:fetch(key, load)`, `:get(key)`,
+	`:put(key, value)`, `:clear()`; `cache.stats()` (entries, hits, misses).
+	`cache.rows(table, decode, { copy, size })` is a content table's rows by id and by key
+	(`rows.get`, `rows.by_key`, `rows.remember` for rows of a list query). Records are
+	shared unless the store hands out copies (`copy`: spells and items, whose callers set
+	fields; `game.user` copies too): don't change a shared one.
+- **What uses it**: spells, items, statuses, summons, fields, interactables and monsters by
+	id and key (`lib/<kind>.lua`), the monsters' loadouts (read per monster now, not all at
+	once), a character's equipment (`inventory.equipped`), the control row, users rows and
+	the towns (`lib/game.lua`).
+- **Never stale**: every statement goes through `lib/dbcount.lua`'s wrapper, which tells
+	`cache.statement(sql)` first: an `INSERT`, `UPDATE` or `DELETE` forgets the stores of its
+	table; a `DELETE` from a table others reference with `ON DELETE` (`users`, `fights`,
+	`fight_combatants`, `forum`), a script, a `ROLLBACK` and anything it can't tell forget
+	every store (`main.lua` forgets them after its own rollbacks too). Reads change nothing.
+	A store keeps records only on that wrapper (every request's; a command line run's is
+	installed at its start by `cli/*.lua` and `install.lua`, or by its first lookup).
+- **For one request**: the VM is restored after each request, so a store starts empty every
+	time and nothing outlives the transaction it was read in: no worker ever sees another's
+	writes late. Within the request (a live answer following redirects, the server's tick
+	advancing many fights) records are shared.
+- **A new store**: name the tables its records come from; a record built from several
+	(a monster's loadout) names them all. `tests/lua/test_cache.lua`.
 
 ### Schema changes and migrations
 

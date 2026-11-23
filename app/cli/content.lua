@@ -59,6 +59,7 @@ local function status()
 end
 
 function content.run(...)
+	require("lib.dbcount").install()   -- (writes seen by the request cache, lib/cache.lua)
 	local args = { ... }
 	local cmd = args[1]
 	if #args ~= 1 or cmd == "-h" or cmd == "--help" or (cmd ~= "sync" and cmd ~= "status") then

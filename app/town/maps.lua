@@ -13,7 +13,7 @@ local maps = {}
 local function check(req, id)
 	local here = common.town_here(req)
 	if not here then return nil, common.cheat(req) end
-	local town = dk.db:first("SELECT * FROM towns WHERE id = ?", id)
+	local town = game.town(id)
 	if not town or php.in_list(req.user.towns, town.id) or not game.sells_map(here.id, town.id) then
 		return nil, common.cheat(req)
 	end

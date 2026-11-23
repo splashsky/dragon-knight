@@ -4,34 +4,25 @@
 -- `ward` (lib/content/affinities.lua); what a status does is its file's hooks
 -- (app/fight/engine.lua runs them).
 local affinities = require("lib.content.affinities")
+local cache = require("lib.cache")
 local scripted = require("lib.content.scripted")
 
 local statuses = {}
 
-local by_id, by_key = {}, {}
-
-local function remember(row)
-	if row then
-		row.messages = scripted.decode_messages(row.messages)
-		row.data = scripted.decode_data(row.data)
-		affinities.decode_row(row)
-		by_id[row.id] = row
-		by_key[row.key] = row
-	end
-	return row
-end
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): shared, so
+-- don't change one
+local rows = cache.rows("statuses", function(row)
+	row.messages = scripted.decode_messages(row.messages)
+	row.data = scripted.decode_data(row.data)
+	affinities.decode_row(row)
+end)
+local remember = rows.remember
 
 -- The status with id `id` (retired or not), or nil.
-function statuses.get(id)
-	if by_id[id] == nil then remember(dk.db:first("SELECT * FROM statuses WHERE id = ?", id)) end
-	return by_id[id]
-end
+statuses.get = rows.get
 
 -- The status with key `key` (retired or not), or nil.
-function statuses.by_key(key)
-	if by_key[key] == nil then remember(dk.db:first("SELECT * FROM statuses WHERE key = ?", key)) end
-	return by_key[key]
-end
+statuses.by_key = rows.by_key
 
 -- Statuses that aren't retired, by id (help pages).
 function statuses.active()
@@ -42,7 +33,7 @@ end
 
 -- Forget the cache (after a sync in the same request).
 function statuses.reload()
-	by_id, by_key = {}, {}
+	rows.clear()
 end
 
 return statuses

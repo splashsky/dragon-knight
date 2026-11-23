@@ -50,6 +50,7 @@ end
 
 return {
 	run = function(cmd, ...)
+		require("lib.dbcount").install()   -- (writes seen by the request cache, lib/cache.lua)
 		local fn = commands[cmd or ""]
 		local rc = fn and fn(...)
 		if rc == nil then

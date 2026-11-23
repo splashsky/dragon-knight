@@ -3,6 +3,7 @@
 -- arrival goes straight to the town's page (3.0: no "You have travelled to ..." page in
 -- between), a scene for the live client (lib/scene.lua).
 local common = require("town.common")
+local game = require("lib.game")
 local php = require("lib.php")
 local scene = require("lib.scene")
 local state = require("fight.state")
@@ -14,7 +15,7 @@ function travel.go(req, id, usepoints)
 	local user = req.user
 	if user.currentaction == "Fighting" then return view.redirect("/fight") end
 
-	local town = dk.db:first("SELECT * FROM towns WHERE id = ?", id)
+	local town = game.town(id)
 	if not town then return common.cheat(req) end   -- legacy travelled to (null, null)
 	if usepoints then
 		if user.currenttp < town.travelpoints then return common.message(req, "Travel To", "travel_tp") end

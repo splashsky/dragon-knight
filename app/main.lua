@@ -1,5 +1,6 @@
 -- main.lua :: request entry point. Loaded once per VM (at warm-up); the returned function
 -- handles exactly one request.
+local cache = require("lib.cache")
 local clock = require("lib.clock")
 local content_sync = require("lib.content.sync")
 local csrf = require("lib.csrf")
@@ -198,12 +199,14 @@ return function(req)
 		-- (GET /fight and /victory advance the game): discard the request's writes.
 		-- Queued cookies go too: the session/CSRF state behind them was not saved.
 		dbcount.raw():exec("ROLLBACK")
+		cache.clear()
 		req.out_headers = {}
 	end
 	if not ok then
 		-- undo this request's writes ourselves so we can still render a friendly page
 		-- (the engine skips COMMIT when no transaction is open)
 		pcall(function() dbcount.raw():exec("ROLLBACK") end)
+		cache.clear()
 		dk.log("error", req.method .. " " .. req.target .. " -> 500\n" .. tostring(res))
 		req.out_headers = {}
 		res = view.server_error(req, tostring(res))

@@ -3,33 +3,24 @@
 -- `messages` and `data` decoded into tables, and `resist` and `ward`
 -- (lib/content/affinities.lua); what a summon does is its file's act (app/fight/engine.lua).
 local affinities = require("lib.content.affinities")
+local cache = require("lib.cache")
 local scripted = require("lib.content.scripted")
 
 local summons = {}
 
-local by_id, by_key = {}, {}
-
-local function remember(row)
-	if row then
-		row.messages = scripted.decode_messages(row.messages)
-		row.data = scripted.decode_data(row.data)
-		affinities.decode_row(row)
-		by_id[row.id] = row
-		by_key[row.key] = row
-	end
-	return row
-end
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): shared, so
+-- don't change one
+local rows = cache.rows("summons", function(row)
+	row.messages = scripted.decode_messages(row.messages)
+	row.data = scripted.decode_data(row.data)
+	affinities.decode_row(row)
+end)
+local remember = rows.remember
 
 -- The summon with id `id` (retired or not), or nil.
-function summons.get(id)
-	if by_id[id] == nil then remember(dk.db:first("SELECT * FROM summons WHERE id = ?", id)) end
-	return by_id[id]
-end
+summons.get = rows.get
 
-function summons.by_key(key)
-	if by_key[key] == nil then remember(dk.db:first("SELECT * FROM summons WHERE key = ?", key)) end
-	return by_key[key]
-end
+summons.by_key = rows.by_key
 
 -- Summons that aren't retired, by id (help pages).
 function summons.active()
@@ -39,7 +30,7 @@ function summons.active()
 end
 
 function summons.reload()
-	by_id, by_key = {}, {}
+	rows.clear()
 end
 
 return summons

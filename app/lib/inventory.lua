@@ -8,14 +8,15 @@
 -- unit-tested in tests/lua/test_inventory.lua.
 --
 -- Effective stats (inventory.stats, game.stats) are lib/stats.lua's derive() of the users
--- row and the equipped items; the equipped items are cached for the request and forgotten
--- by every change made here. After an equipment change, current HP/MP/TP are clamped to
+-- row and the equipped items; the equipped items are kept for the request (lib/cache.lua)
+-- and forgotten by any write to user_items or items. After an equipment change, current HP/MP/TP are clamped to
 -- the new maxima (inventory.changed).
 --
 -- Items that cast a spell (lib/items.lua items.casts) have charges per row
 -- (user_items.charges): full (items.charges) when obtained, one spent per cast, refilled
 -- for the equipped ones at an inn (inventory.recharge); a single-use one (not
 -- rechargeable) is gone with its last charge.
+local cache = require("lib.cache")
 local items = require("lib.items")
 local stats = require("lib.stats")
 
@@ -76,7 +77,7 @@ end
 ---------------------------------------------------------------------------------------
 -- Reading.
 
-local cache = {}   -- user id -> equipped entries (this request only)
+local equipped = cache.store("equipped", { tables = { "user_items", "items" }, size = 32 })   -- user id -> entries
 
 local function entry_of(r)
 	local e = { id = r.entry_id, user_id = r.entry_user, qty = r.entry_qty, equipped = r.entry_equipped,
@@ -106,15 +107,14 @@ end
 
 -- Equipped entries: { slot -> entry }.
 function inventory.equipped(user_id)
-	if not cache[user_id] then
+	return equipped:fetch(user_id, function()
 		local out = {}
 		for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? AND ui.equipped IS NOT NULL", user_id)) do
 			local e = entry_of(r)
 			out[e.equipped] = e
 		end
-		cache[user_id] = out
-	end
-	return cache[user_id]
+		return out
+	end)
 end
 
 -- Bag entries, by entry id.
@@ -162,7 +162,7 @@ end
 
 -- Forget the cached equipment and clamp current HP/MP/TP to the (new) maxima.
 function inventory.changed(user_id)
-	cache[user_id] = nil
+	equipped:clear()
 	local user = dk.db:first("SELECT * FROM users WHERE id = ?", user_id)
 	if not user then return end
 	local c = stats.clamped(user, inventory.stats(user))
@@ -246,7 +246,7 @@ function inventory.spend_charge(entry)
 		return true
 	end
 	dk.db:exec("UPDATE user_items SET charges = charges - 1 WHERE id = ? AND charges > 0", entry.id)
-	cache[entry.user_id] = nil
+	equipped:clear()
 	return false
 end
 
@@ -261,7 +261,7 @@ function inventory.recharge(user_id)
 			out[#out + 1] = e
 		end
 	end
-	cache[user_id] = nil
+	equipped:clear()
 	return out
 end
 

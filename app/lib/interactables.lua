@@ -6,6 +6,7 @@
 -- rules, lib/content/kinds/interactables.lua). What an object does in a fight is its file's
 -- hooks (app/fight/engine.lua runs them).
 local affinities = require("lib.content.affinities")
+local cache = require("lib.cache")
 local elements = require("lib.elements")
 local kind = require("lib.content.kinds.interactables")
 local scripted = require("lib.content.scripted")
@@ -17,31 +18,21 @@ local interactables = {}
 -- Midlands: where new players learn (and where the e2e tests' calm place is).
 interactables.QUIET = 12
 
-local by_id, by_key = {}, {}
-
-local function remember(row)
-	if row then
-		row.messages = scripted.decode_messages(row.messages)
-		row.data = scripted.decode_data(row.data)
-		affinities.decode_row(row)
-		row.spawn = kind.decode_spawn(row.spawn)
-		by_id[row.id] = row
-		by_key[row.key] = row
-	end
-	return row
-end
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): shared, so
+-- don't change one
+local rows = cache.rows("interactables", function(row)
+	row.messages = scripted.decode_messages(row.messages)
+	row.data = scripted.decode_data(row.data)
+	affinities.decode_row(row)
+	row.spawn = kind.decode_spawn(row.spawn)
+end)
+local remember = rows.remember
 
 -- The object with id `id` (retired or not), or nil.
-function interactables.get(id)
-	if by_id[id] == nil then remember(dk.db:first("SELECT * FROM interactables WHERE id = ?", id)) end
-	return by_id[id]
-end
+interactables.get = rows.get
 
 -- The object with key `key` (retired or not), or nil.
-function interactables.by_key(key)
-	if by_key[key] == nil then by_key[key] = remember(dk.db:first("SELECT * FROM interactables WHERE key = ?", key)) or false end
-	return by_key[key] or nil
-end
+interactables.by_key = rows.by_key
 
 -- Objects that aren't retired, by key (the help page; the order they are tried in where
 -- they appear by themselves).
@@ -53,7 +44,7 @@ end
 
 -- Forget the cache (after a sync in the same request).
 function interactables.reload()
-	by_id, by_key = {}, {}
+	rows.clear()
 end
 
 -- 32-bit FNV-1a of s (the same hash as monster speech's, fight/speech.lua).

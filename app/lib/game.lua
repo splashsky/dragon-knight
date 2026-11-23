@@ -1,5 +1,6 @@
 -- game.lua :: shared game data helpers (control row, towns, nav data, ...).
 -- Module state lives for one request only (fresh VM per request).
+local cache = require("lib.cache")
 local classes = require("lib.classes")
 local clock = require("lib.clock")
 local inventory = require("lib.inventory")
@@ -14,33 +15,63 @@ local weather = require("lib.weather")
 
 local game = {}
 
-local cache = {}
+-- Records kept for the request as they are used (lib/cache.lua: a write to their table
+-- forgets them): the control row, users rows and the towns.
+local control = cache.store("control", { tables = { "control" }, size = 2 })
+local users = cache.store("users", { tables = { "users" }, size = 64 })
+local towns = cache.store("towns", { tables = { "towns" }, size = 2 })
 
--- The control row (id 1), cached for the request. Call game.reload_control() after
--- updating it.
+local DEFAULT_CONTROL = { id = 1, gamename = "Dragon Knight", gamesize = 250, gameopen = 1, forumtype = 0,
+	forumaddress = "", verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "", adminemail = "" }
+
+-- The control row (id 1). A write to it is seen at once; game.reload_control() reads it again
+-- anyway.
 function game.control()
-	if not cache.control then
-		cache.control = dk.db:first("SELECT * FROM control WHERE id = 1") or
-			{ id = 1, gamename = "Dragon Knight", gamesize = 250, gameopen = 1, forumtype = 0,
-				forumaddress = "", verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "",
-				adminemail = "" }
-	end
-	return cache.control
+	return control:fetch(1, function() return dk.db:first("SELECT * FROM control WHERE id = 1") end) or DEFAULT_CONTROL
 end
 
 function game.reload_control()
-	cache.control = nil
+	control:clear()
 	return game.control()
 end
 
-function game.user(id)
-	return dk.db:first("SELECT * FROM users WHERE id = ?", id)
+local function copy(row)
+	if not row then return nil end
+	local out = {}
+	for k, v in pairs(row) do out[k] = v end
+	return out
 end
 
--- Town at a map position (or nil).
+-- The users row of `id` (a copy of it: change it as you like), or nil.
+function game.user(id)
+	return copy(users:fetch(id, function() return dk.db:first("SELECT * FROM users WHERE id = ?", id) end))
+end
+
+-- A users row read (and kept up to date) elsewhere, as the database has it now: the next
+-- game.user of its id needn't read it again (session.load's).
+function game.remember_user(user)
+	users:put(user.id, copy(user))
+end
+
+-- Every town, by id (shared rows: don't change them).
+function game.towns()
+	return towns:fetch("all", function() return dk.db:query("SELECT * FROM towns ORDER BY id") end)
+end
+
+-- The town with id `id`, or nil.
+function game.town(id)
+	for _, t in ipairs(game.towns()) do
+		if t.id == id then return t end
+	end
+	return nil
+end
+
+-- Town at a map position (or nil; the first by id).
 function game.town_at(latitude, longitude)
-	return dk.db:first("SELECT * FROM towns WHERE latitude = ? AND longitude = ? ORDER BY id LIMIT 1",
-										 latitude, longitude)
+	for _, t in ipairs(game.towns()) do
+		if t.latitude == latitude and t.longitude == longitude then return t end
+	end
+	return nil
 end
 
 -- Town the user is standing in (by coordinates, regardless of currentaction) or nil.
@@ -69,7 +100,7 @@ end
 -- Towns on the user's map (users.towns comma list), ordered by id.
 function game.user_towns(user)
 	local out = {}
-	for _, t in ipairs(dk.db:query("SELECT * FROM towns ORDER BY id")) do
+	for _, t in ipairs(game.towns()) do
 		if php.in_list(user.towns, t.id) then out[#out + 1] = t end
 	end
 	return out

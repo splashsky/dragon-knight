@@ -14,6 +14,7 @@ usage: dk migrate [--status]
 ]]
 
 local function run(...)
+	require("lib.dbcount").install()   -- (writes seen by the request cache, lib/cache.lua)
 	local status_only = false
 	for _, a in ipairs({ ... }) do
 		if a == "--status" then

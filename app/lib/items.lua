@@ -3,6 +3,7 @@
 -- are described. Rows come back with `modifiers` decoded into a list (lib/stats.lua) and
 -- `messages` and `data` into tables (lib/content/scripted.lua); what a consumable does is
 -- its file's use (lib/action.lua).
+local cache = require("lib.cache")
 local elements = require("lib.elements")
 local kind = require("lib.content.kinds.items")
 local php = require("lib.php")
@@ -48,18 +49,22 @@ function items.decode(row)
 	return row
 end
 
-local function decode_all(rows)
-	for _, r in ipairs(rows) do items.decode(r) end
-	return rows
+-- the rows by id and key, kept for the request as they are used (lib/cache.lua): each lookup
+-- a copy of the row (its decoded tables shared)
+local rows = cache.rows("items", items.decode, { copy = true })
+
+local function decode_all(list)
+	for _, r in ipairs(list) do rows.remember(r) end
+	return list
 end
 
 -- The item with id `id` (retired or not), or nil.
 function items.get(id)
-	return items.decode(dk.db:first("SELECT * FROM items WHERE id = ?", id))
+	return rows.get(id)
 end
 
 function items.by_key(key)
-	return items.decode(dk.db:first("SELECT * FROM items WHERE key = ?", key))
+	return rows.by_key(key)
 end
 
 -- Items that aren't retired (help pages) / every item (admin), by id.
