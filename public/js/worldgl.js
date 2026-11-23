@@ -4,8 +4,9 @@
 // GET /map/sky, which stays the reference rendering): light by the time of day over the
 // land's relief (public/images/world-relief.bin), clouds and their shadows, swirling storms
 // gliding between ticks, fog banks on low ground, rain, falling and settled snow,
-// lightning, lit towns at night. A deliberate exception to "markup comes from the server":
-// the server sends data and the page draws the pixels.
+// lightning, lit towns at night; nothing beyond the cells the player knows (the map's
+// data-sky-known: the fog of war, town/fog.lua, covers the rest). A deliberate exception to
+// "markup comes from the server": the server sends data and the page draws the pixels.
 //
 // windows.js loads it when a map that offers it (.world-map[data-sky-data]) shows. It runs
 // on a hardware GPU only (a software renderer, or first frames slower than SLOW_MS, keep

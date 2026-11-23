@@ -539,8 +539,8 @@ Game logic must match legacy PHP exactly. Helpers in `app/lib/php.lua`:
 	 objects on the field, wind, area actions, monsters aiming at objects (schema version 25);
 	 ✅ K the ten objects and the barrel (schema version 26), area spells, monsters using
 	 objects; ✅ L lore.
-12. **3.4 the map's clouds and fog of war** (`docs/plans/map-clouds-and-fog.md`): A the
-	 weather's coherent fields, B stylized clouds, rain and snow on the map, C fog of war
+12. **3.4 the map's clouds and fog of war** (`docs/plans/map-clouds-and-fog.md`): ✅ A the
+	 weather's coherent fields, ✅ B stylized clouds, rain and snow on the map, ✅ C fog of war
 	 (schema version 27).
 
 ## Definition of done
