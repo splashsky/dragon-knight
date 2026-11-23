@@ -2,7 +2,8 @@
 -- place (latitude, longitude), the time and a fixed seed. Nothing is stored, nothing runs
 -- in the background, and no dice roll: every choice is a hash of the seed. The map is a
 -- grid of 10 x 10 tile cells, each with a base climate from the land at its centre (the
--- biome's, lib/terrain.lua) and the time of day; every 45 minutes a storm may form near
+-- biome's, lib/terrain.lua) and the time of day, its sky read from smooth fields drifting
+-- over the grid (clouds in banks, fog in patches); every 45 minutes a storm may form near
 -- Midworld and drift to Gilead in about two hours, its position a closed-form function of
 -- time. It moves on the game's clock (lib/clock.lua), in steps of weather.STEP ticks: every
 -- tick, 10 seconds. The words are in lib/weather_lines.lua.
@@ -15,7 +16,6 @@ local weather = {}
 weather.STEP = 1               -- the weather moves every clock tick (10 s)
 weather.SEED = 0x3200
 weather.CELL = 10              -- the grid's cells, in tiles
-weather.SPELL = 1200           -- a cell's base weather holds this long (the cells staggered)
 weather.SLOT = 2700            -- a storm slot every 45 minutes
 weather.FORMS = 0.45           -- the chance that a slot's storm forms (about one storm every 100 minutes)
 weather.ORIGIN = 30            -- storms form within this many tiles of Midworld (0, 0)
@@ -40,7 +40,8 @@ local SNOW = { "snow", "snow", "blizzard", "blizzard" }
 local FALLING = { drizzle = true, rain = true, downpour = true, thunderstorm = true, snow = true, blizzard = true }
 local STEP = weather.STEP * clock.TICK   -- a step, in seconds
 -- salts: what a hash is for
-local CELL_SHIFT, CELL_SKY, STORM, CHANGE, DESCRIBE, EDGE = 1, 2, 3, 4, 5, 6
+local STORM, CHANGE, DESCRIBE, EDGE = 3, 4, 5, 6
+local CLOUD, FOG = 16, 32   -- the base sky's fields (plus the octave)
 
 local sqrt, atan, sin, cos, floor, min, max = math.sqrt, math.atan, math.sin, math.cos, math.floor, math.min, math.max
 
@@ -160,25 +161,121 @@ local function snows(lat, lon, c)
 	return lat > c.snow_line or terrain.at(lat, lon).feature == "peak"
 end
 
--- A cell's base sky by its climate c: fog (likelier at dawn and at night where the climate
--- says), heat by day (not where it snows), a little drizzle (snow where it snows), clouds,
--- sun by day, else clear. Each cell changes every weather.SPELL, at its own moment.
+-- The base sky's fields (3.4): smooth value noise over the grid's cells (a hashed value at
+-- each point of a lattice in space and time, smoothstep between), so neighbouring cells
+-- share their weather and it changes gradually: clouds gather in banks and fog in patches.
+-- Each field is the weighted sum of its octaves ({ lattice step in cells, period in seconds,
+-- weight }), drifting with its wind (cells a second, toward the east and the north), and is
+-- mapped to an even share of [0, 1) by its quantiles (QUANTILES: the raw value at shares 0,
+-- 1/64, ..., 1, sampled by tools/weather_fields.lua), so a threshold p covers a share p of
+-- the cells over time, as the per-cell hash before it did.
+local FIELDS = {
+	-- clouds drift toward Gilead (the north-west) at a cell every five minutes
+	cloud = { salt = CLOUD, wind = { -1 / 300 / sqrt(2), 1 / 300 / sqrt(2) },
+		octaves = { { 6, 1800, 0.65 }, { 2.5, 1200, 0.35 } } },
+	-- fog lies where it forms and goes
+	fog = { salt = FOG, wind = { 0, 0 }, octaves = { { 4, 2400, 1 } } },
+}
+for _, f in pairs(FIELDS) do
+	for _, o in ipairs(f.octaves) do o.corners = {} end
+end
+FIELDS.cloud.QUANTILES = {
+	0.01901, 0.21968, 0.25293, 0.27519, 0.29267, 0.30719, 0.31998, 0.33135, 0.34173, 0.35129,
+	0.36035, 0.36877, 0.37681, 0.38452, 0.39185, 0.39898, 0.40583, 0.41251, 0.41899, 0.42538,
+	0.43163, 0.43765, 0.4436, 0.44954, 0.4553, 0.46108, 0.46678, 0.47242, 0.47807, 0.48371,
+	0.48922, 0.49478, 0.50028, 0.50583, 0.51138, 0.51693, 0.52246, 0.52813, 0.53382, 0.5395,
+	0.54525, 0.5511, 0.55692, 0.56298, 0.56903, 0.57518, 0.58152, 0.58802, 0.59463, 0.60151,
+	0.60866, 0.61601, 0.62369, 0.63174, 0.64022, 0.64916, 0.65886, 0.6692, 0.68045, 0.69319,
+	0.70784, 0.72529, 0.74733, 0.77999, 0.96647,
+}
+FIELDS.fog.QUANTILES = {
+	0.00007, 0.1255, 0.16283, 0.18911, 0.21063, 0.22895, 0.24568, 0.26095, 0.27504, 0.28838,
+	0.301, 0.3129, 0.32438, 0.33534, 0.34605, 0.35625, 0.36617, 0.37594, 0.38541, 0.39458,
+	0.40356, 0.41233, 0.42093, 0.42944, 0.43782, 0.44609, 0.45416, 0.4622, 0.47011, 0.47794,
+	0.48571, 0.49351, 0.50125, 0.50897, 0.5168, 0.52456, 0.53243, 0.54028, 0.54829, 0.55644,
+	0.56465, 0.57306, 0.58154, 0.59014, 0.59893, 0.60787, 0.617, 0.6263, 0.63592, 0.64583,
+	0.65605, 0.66654, 0.67739, 0.68885, 0.70084, 0.71328, 0.72648, 0.74023, 0.75532, 0.77175,
+	0.78999, 0.81137, 0.83725, 0.87428, 0.99982,
+}
+
+local function smooth(f) return f * f * (3 - 2 * f) end
+
+-- The lattice's values, kept for the request: neighbouring cells (the map's 2,601) share them.
+local lattice = {}
+local function point(salt, octave, i, j, k)
+	local key = ((k * 0x200000 + (i & 0x1fffff)) * 0x200000 + (j & 0x1fffff)) * 64 + salt + octave
+	local v = lattice[key]
+	if not v then
+		v = unit(mix((weather.SEED + salt + octave) * 0x9e3779b97f4a7c15 + i * 0x632be59bd9b4e019 + j * 0x85157af5d7c1ae33
+			+ k * 0xc2b2ae3d27d4eb4f))
+		lattice[key] = v
+	end
+	return v
+end
+
+-- A field's raw value at the cell (x, y) (its column and row: x east, y north) at t.
+local function raw(f, x, y, t)
+	local sum = 0
+	local px, py = x - f.wind[1] * t, y - f.wind[2] * t
+	for n, o in ipairs(f.octaves) do
+		local gx, gy, gz = px / o[1], py / o[1], t / o[2]
+		local i, j, k = floor(gx), floor(gy), floor(gz)
+		local fx, fy, fz = smooth(gx - i), smooth(gy - j), smooth(gz - k)
+		local salt, c = f.salt, o.corners
+		if c[1] ~= i or c[2] ~= j or c[3] ~= k then
+			-- (the last cell's corners are often this one's: the map reads the cells in rows)
+			c[1], c[2], c[3] = i, j, k
+			c[4], c[5], c[6], c[7] = point(salt, n, i, j, k), point(salt, n, i + 1, j, k), point(salt, n, i, j + 1, k),
+				point(salt, n, i + 1, j + 1, k)
+			c[8], c[9], c[10], c[11] = point(salt, n, i, j, k + 1), point(salt, n, i + 1, j, k + 1),
+				point(salt, n, i, j + 1, k + 1), point(salt, n, i + 1, j + 1, k + 1)
+		end
+		local a0, a1 = c[4] + (c[5] - c[4]) * fx, c[6] + (c[7] - c[6]) * fx
+		local b0, b1 = c[8] + (c[9] - c[8]) * fx, c[10] + (c[11] - c[10]) * fx
+		local a, b = a0 + (a1 - a0) * fy, b0 + (b1 - b0) * fy
+		sum = sum + o[3] * (a + (b - a) * fz)
+	end
+	return sum
+end
+
+-- A field's share at the cell (x, y) at t: [0, 1), even over the cells and time.
+local function field(f, x, y, t)
+	local v, q = raw(f, x, y, t), f.QUANTILES
+	if v <= q[1] then return 0 end
+	local n = #q
+	if v >= q[n] then return 0.999999 end
+	local lo, hi = 1, n
+	while hi - lo > 1 do
+		local mid = (lo + hi) // 2
+		if q[mid] <= v then lo = mid else hi = mid end
+	end
+	return ((lo - 1) + (v - q[lo]) / (q[hi] - q[lo])) / (n - 1)
+end
+
+-- A field ("cloud" or "fog") at the weather's cell (x, y) at t: its share, or its raw value
+-- (tools/weather_fields.lua samples those).
+function weather.field(kind, x, y, t, unmapped)
+	return (unmapped and raw or field)(FIELDS[kind], x, y, t)
+end
+
+-- A cell's base sky by its climate c (each sky's share of the cells over time is the
+-- climate's): fog where the fog field is under fog's share (likelier at dawn and at night
+-- where the climate says); else along the cloud field, from its wet end a little drizzle
+-- (snow where it snows), then clouds; from its dry end heat by day (not where it snows),
+-- then sun by day; clear between. Where the shares add up past the whole (the Ashlands' heat
+-- by day) heat comes first, then drizzle and clouds, and sun has what remains.
 local function base_sky(lat, lon, t, time, north, c)
 	local cell = weather.CELL
 	local x, y = lon // cell, lat // cell
-	local shift = hash(CELL_SHIFT, x, y, 0) % weather.SPELL
-	local u = unit(hash(CELL_SKY, x, y, (t + shift) // weather.SPELL))
 	local fog = c.fog + (time == "dawn" and c.fog_dawn or time == "night" and c.fog_night or 0)
-	if u < fog then return "fog" end
-	u = u - fog
-	local heat = (time == "day" and not north) and c.heat or 0
-	if u < heat then return "heat" end
-	u = u - heat
-	if u < c.drizzle then return north and "snow" or "drizzle" end
-	u = u - c.drizzle
-	if u < c.overcast then return "overcast" end
-	u = u - c.overcast
-	if time == "day" and u < c.sun then return "sun" end
+	if fog > 0 and field(FIELDS.fog, x, y, t) < fog then return "fog" end
+	local k = 1 / (1 - fog)   -- the other skies' shares of what fog leaves
+	local u = field(FIELDS.cloud, x, y, t)
+	local heat = (time == "day" and not north) and c.heat * k or 0
+	if u >= 1 - heat then return "heat" end
+	if u < c.drizzle * k then return north and "snow" or "drizzle" end
+	if u < (c.drizzle + c.overcast) * k then return "overcast" end
+	if time == "day" and u >= 1 - heat - c.sun * k then return "sun" end
 	return "clear"
 end
 

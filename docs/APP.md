@@ -1213,17 +1213,28 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	allies count its ticks.
 - **The weather's step** is one clock tick (`weather.STEP` = 1): the weather moves in real
 	tick time, every 10 s (storms advance every tick, a change can land on any tick), and
-	is the same all through a tick. (Only a cell's base sky holds longer: `weather.SPELL`.)
+	is the same all through a tick.
 - **The grid.** The map in cells of 10 by 10 tiles (`weather.CELL`). Each cell has a base
-	sky that holds 20 minutes (`weather.SPELL`; each cell changes at its own moment), picked
-	by a hash from its place and the time of day, by the **climate of the land** at the
-	cell's centre (its biome's `climate`, [Terrain and the map](#terrain-and-the-map); one
-	climate per cell, so a cell keeps one sky): fog (likelier at dawn and at night where the
-	biome says: the Greymoor's dawns are foggy half the time), heat by day (the Ashlands and
-	the Dry Country), a little drizzle (snow where it snows), clouds, sun by day, else
-	clear. The Midlands keep the weather's numbers from before the land exactly (fog 4%,
-	drizzle 6%, overcast 20%, sun 35% by day), so the e2e tests' calm place sees the same
-	skies.
+	sky, picked by the **climate of the land** at the cell's centre (its biome's `climate`,
+	[Terrain and the map](#terrain-and-the-map); one climate per cell, so a cell keeps one
+	sky) from two smooth **fields** over the grid (3.4: before, each cell drew its own hash
+	every 20 minutes, which scattered the clouds like salt and pepper). Each field is value
+	noise (a hashed value at each point of a lattice in space and time, smoothstep between;
+	the lattice's values kept for the request, which the map's cells share), mapped to an
+	even share of [0, 1) by a table of its quantiles (`tools/weather_fields.lua` samples
+	them: run it with any Lua 5.4 and paste its output when a field changes), so a threshold
+	p covers a share p of the cells over time. **Clouds**: two octaves (lattice 6 and 2.5
+	cells, reshaped every 30 and 20 minutes) drifting toward Gilead, north-west, a cell every
+	five minutes. **Fog**: one octave (lattice 4 cells, reshaped every 40 minutes), lying
+	where it forms. A cell is fog where the fog field is under the climate's fog (likelier at
+	dawn and at night where the biome says: the Greymoor's dawns are foggy half the time);
+	otherwise along the cloud field, from its wet end a little drizzle (snow where it
+	snows), then overcast; from its dry end heat by day (the Ashlands and the Dry Country),
+	then sun by day; clear between (heat first where the shares add up past the whole, sun
+	taking what remains). So clouds gather in banks over regions, with drizzle at their
+	hearts, and change gradually as they pass. The Midlands keep the weather's numbers (fog
+	4%, drizzle 6%, overcast 20%, sun 35% by day). `weather.field(kind, x, y, t [, raw])` is
+	a field at a weather cell (its share, or its raw value).
 - **Snow.** Falling weather is snow (drizzle and rain as snow, downpours and thunderstorms
 	as blizzards) north of the cell's climate's snow line (`snow_line`: latitude 150 in the
 	Midlands and most lands; 100 in the Hambry Weald and the Storm Barrens) and, at any
@@ -1256,7 +1267,7 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	closely but not exactly at a storm's edge.
 - **`weather.at(lat, lon, now)`** is `{ sky, ground, time, storm, near }`, the same all
 	through a step. It looks only at the storm slots whose storms can be alive or still
-	leave mud or snow (about ten; their storms kept for the request) and costs about 3 µs
+	leave mud or snow (about ten; their storms kept for the request) and costs about 4 µs
 	(`tests/lua/test_weather.lua` measures 10,000 calls). Part 4 (fields) maps `sky`,
 	`ground` and `time` to the battlefield, so their words are a contract:
 
@@ -1307,9 +1318,9 @@ agrees, and a page computes the weather when it shows it. No dice: every choice 
 	publishes `stale` on `user:<id>` for those whose weather changed, which live.js turns
 	into `DK.refresh()` (only what changed comes: the `weather` region, and
 	`explore-weather` on the exploring page). Until then a page shows the weather of its
-	last answer. The check costs about 4 µs a player a tick (4 ms a tick for 1,000 online
-	with a stream), and about 1% of a player's ticks change their page (one push every 15
-	minutes or so on average, one every 8 on the storms' road; a player under a storm's
+	last answer. The check costs about 8 µs a player a tick (8 ms a tick for 1,000 online
+	with a stream), and about 2% of a player's ticks change their page (one push every 10
+	minutes or so on average, one every 6 on the storms' road; a player under a storm's
 	moving edge may get one a tick for a while).
 - **Testing.** With `test_routes = true` a request may pin the clock: `X-Test-Now: <unix
 	seconds>` (`main.lua`, `clock.pin`), for everything that asks `clock.now()`.
@@ -1476,7 +1487,7 @@ where a player may go.
 	each 10-tile weather cell's sky and ground from `weather.at` at its centre, one
 	character each, `mapsky.ALPHABET[sky index * 5 + ground index]` over `mapsky.SKIES`
 	and `mapsky.GROUNDS`, 51 x 51 rows from the north; `weather.storms`: born, size, lat,
-	lon, radius). **The server's tick builds it once** (`mapsky.store`, about 5 ms: 2,601
+	lon, radius). **The server's tick builds it once** (`mapsky.store`, about 9 ms: 2,601
 	`weather.at`) into one row of `meta` (`map_sky`: the tick on its first line, then the
 	facts as text, numbers exactly), and every reader in that tick takes the row
 	(`mapsky.at(now)`): both renderings below, whatever the number of open maps. A read in
@@ -1624,8 +1635,8 @@ connection, a closed tab) drives it.
 		(they can't take the last hit point outside a fight); while the character fights,
 		the ticks pass them by.
 	- **The weather** (it moves every tick): the players online with an event stream whose
-		tile's weather changed since the tick before (about 4 µs a player); the World Map's
-		sky for the tick, built once into `meta` (`mapsky.store`, about 5 ms); and `sky` `{
+		tile's weather changed since the tick before (about 8 µs a player); the World Map's
+		sky for the tick, built once into `meta` (`mapsky.store`, about 9 ms); and `sky` `{
 		tick }` on the public channel `sky`, for every stream: the World Map's weather moved
 		(the maps open fetch `/map/sky` or `/map/sky/data`, which read that row: [Terrain
 		and the map](#terrain-and-the-map)).

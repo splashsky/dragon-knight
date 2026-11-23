@@ -397,6 +397,74 @@ function T.the_report_stays_the_same_through_a_step()
 	end)
 end
 
+-- The base sky's fields (3.4): each covers its share evenly (a threshold p is under it about
+-- p of the time, over the cells and the days), so the climates' shares hold.
+function T.the_fields_cover_their_shares()
+	for _, kind in ipairs({ "cloud", "fog" }) do
+		local ps, under, n = { 0.02, 0.06, 0.2, 0.5, 0.8, 0.95 }, {}, 0
+		for i = 1, #ps do under[i] = 0 end
+		for k = 0, 499 do
+			local t = START + k * 4999
+			for y = -25, 25, 5 do
+				for x = -25, 25, 5 do
+					local u = weather.field(kind, x, y, t)
+					assert(u >= 0 and u < 1, kind .. " in [0, 1): " .. u)
+					n = n + 1
+					for i, p in ipairs(ps) do if u < p then under[i] = under[i] + 1 end end
+				end
+			end
+		end
+		for i, p in ipairs(ps) do
+			local share = under[i] / n
+			assert(math.abs(share - p) < math.max(0.012, p * 0.15), ("%s under %.2f: %.3f"):format(kind, p, share))
+		end
+	end
+end
+
+-- Clouds over regions: a cloudy cell's neighbours are cloudy far more often than the share of
+-- cloudy cells (the per-cell hash before 3.4 scattered them), and so is fog's.
+function T.the_base_sky_gathers_in_banks()
+	local function banks(is)
+		local hits, cells, both = 0, 0, 0
+		for k = 0, 19 do
+			local t = START + k * 3001
+			for y = -24, 23 do
+				for x = -24, 23 do
+					local a = is(weather.field("cloud", x, y, t), weather.field("fog", x, y, t))
+					cells = cells + 1
+					if a then
+						hits = hits + 1
+						if is(weather.field("cloud", x + 1, y, t), weather.field("fog", x + 1, y, t)) then both = both + 1 end
+					end
+				end
+			end
+		end
+		return hits / cells, both / hits
+	end
+	local share, next_to = banks(function(cloud) return cloud < 0.26 end)
+	assert(next_to > 0.6 and next_to > share * 2.5, ("clouds in banks: %.2f of cells, %.2f next to one"):format(share, next_to))
+	share, next_to = banks(function(_, fog) return fog < 0.1 end)
+	assert(next_to > 0.5 and next_to > share * 4, ("fog in patches: %.2f of cells, %.2f next to one"):format(share, next_to))
+end
+
+-- The clouds drift toward Gilead (the north-west), a cell every five minutes: a cell's cloud
+-- field is found again later a cell to the north-west, not to the south-east.
+function T.clouds_drift_toward_gilead()
+	local dt = 300 * math.sqrt(2)   -- a cell north and a cell west
+	local down, up = 0, 0
+	for k = 0, 19 do
+		local t = START + k * 2003
+		for y = -20, 20, 2 do
+			for x = -20, 20, 2 do
+				local now = weather.field("cloud", x, y, t, true)
+				down = down + math.abs(weather.field("cloud", x - 1, y + 1, t + dt, true) - now)
+				up = up + math.abs(weather.field("cloud", x + 1, y - 1, t + dt, true) - now)
+			end
+		end
+	end
+	assert(down < up * 0.6, ("carried north-west: %.1f against %.1f"):format(down, up))
+end
+
 function T.weather_at_is_cheap()
 	local n = 10000
 	local t0 = os.clock()
