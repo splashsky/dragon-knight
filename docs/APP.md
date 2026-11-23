@@ -1497,15 +1497,25 @@ where a player may go.
 	units drawn from the facts at `clock.now()` (`sky.draw(f)`, `sky.markup(now)`): the
 	reference rendering of the map's weather, shown wherever the WebGL sky isn't:
 	`<g class="world-sky" data-sky="<tick>">` (the clock tick) holding its
-	patterns, `.sky-cells` (each 10-tile weather cell's sky,
-	as runs of equal cells in a row: overcast a grey wash, fog a pale one, drizzle, rain and
-	downpour hatching of growing density over a darker wash, a thunderstorm's cells a bolt,
-	snow and blizzard flecks, heat a warm shimmer; the washes softly blurred into clouds),
+	patterns, `.sky-cells` (each 10-tile weather cell's sky, as runs of equal cells in a
+	row: fog a pale wash and heat a warm one with a shimmer, softly blurred; then the
+	**clouds** (3.4, `.sky-clouds`), drawn as the WebGL sky draws them: each sky has a cover
+	(overcast 0.72 up to a thunderstorm's 1, clear 0.03), smoothed between the cells'
+	centres, and puffs on two jittered lattices (steps of 3 and 1.5 units, drifting toward
+	Gilead with the weather) are circles that grow with the cover where they stand, so a full
+	sky is one mass with a scalloped edge and a thin one scattered puffs; where a cell and
+	all its neighbours are cloudy a run of their squares stands for the puffs inside, and a
+	small puff already covered is left out (about 700 circles at most). Their shapes are in
+	`<defs>` once (`#sky-puffs`, `#sky-puffs-rain`: rain clouds darker), used for an inked
+	outline (stroked under the fill), the shade and the light (the shapes shifted toward the
+	north-west, masked by them: a crescent of shade on the far side); over them the rain as
+	dark hatching of growing density and the snow as rimmed flakes, faded at the edges of
+	their cells (a mask of their runs, blurred), and a thunderstorm's cells a bolt),
 	`.sky-storms` (each storm alive, a soft disc at its centre and
 	radius, keyed by its birth, `data-storm`, placed by a CSS `transform` so it can glide,
 	with the same `transform` attribute for renderers without CSS) and `.sky-time
-	.sky-<phase>` (a wash for dawn, dusk and night). 20-30 KB; from the tick's row about
-	2.5 ms (computed on a miss, about 8 ms). `/map/sky` answers it as
+	.sky-<phase>` (a wash for dawn, dusk and night). 25-40 KB; from the tick's row about
+	6 ms (computed on a miss, about 15 ms). `/map/sky` answers it as
 	`image/svg+xml` (`auth.game`, a GET: pure); `/map` carries the same group inline.
 - **The sky in real time**: the server's tick, at every tick (the weather moves every
 	tick), keeps the tick's facts and publishes `sky` `{ tick }` on
@@ -1537,12 +1547,16 @@ where a player may go.
 	time of day's wash (warm at dawn, purple at dusk, blue at night, at most 0.42 so the map
 	stays readable) and light over the relief (smoothed on the client, lit and shaded by
 	the sun's or the moon's angle: low warm light at dawn and dusk, moonlight at night);
-	wet ground darker and snow lying from the high ground down (not on water); clouds of
-	drifting fractal noise as dense as each cell's sky, their shadows cast away from the
+	wet ground darker and snow lying from the high ground down (not on water); the clouds
+	(3.4) as banks of puffs like the SVG's (the cells' cover, B-spline smoothed, growing
+	circles on two jittered lattices drifting toward Gilead: the distance inside their
+	union's edge gives a crisp edge, an inked outline, light on the side toward the sun or
+	the moon and shade away from it, darker rain clouds), their shadows cast away from the
 	light; each storm a swirling mass with spiral arms and a dark core, dragging the
 	clouds round, gliding to its new place over the tick (it trails the real storm by a
-	tick, like the SVG's); fog banks on the low ground; darkening and streaks under rain;
-	falling snow; flashes in thunderstorm cells; heat's waver; the towns' lights at night
+	tick, like the SVG's); fog banks on the low ground; dark slanted streaks falling from
+	rain clouds and rimmed flakes from snow clouds, denser with the weather; flashes in
+	thunderstorm cells; heat's waver; the towns' lights at night
 	(and `.world-map-lit`: the town marks lit). The cells' skies fade into the next tick's
 	over 3 s. On `dk-sky` it fetches `/map/sky/data` (not when it shows that tick already;
 	a hidden page when it shows again).

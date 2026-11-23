@@ -28,8 +28,8 @@
 	var ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	// per sky: cloud cover, rain, snowfall, fog; then whether it moves fast (30 fps) or slowly (15)
 	var SKY = {
-		clear: [0.08, 0, 0, 0, 0], sun: [0, 0, 0, 0, 0], heat: [0, 0, 0, 0, 15], overcast: [0.72, 0, 0, 0, 15],
-		fog: [0.25, 0, 0, 0.85, 15], drizzle: [0.72, 0.3, 0, 0, 30], rain: [0.85, 0.55, 0, 0, 30],
+		clear: [0.03, 0, 0, 0, 0], sun: [0, 0, 0, 0, 0], heat: [0, 0, 0, 0, 15], overcast: [0.72, 0, 0, 0, 15],
+		fog: [0.12, 0, 0, 0.85, 15], drizzle: [0.72, 0.3, 0, 0, 30], rain: [0.85, 0.55, 0, 0, 30],
 		downpour: [0.95, 0.85, 0, 0, 30], thunderstorm: [1, 1, 0, 0, 30], snow: [0.8, 0, 0.55, 0, 30], blizzard: [1, 0, 1, 0, 30],
 	};
 	var GROUND = [[0, 0], [0.45, 0], [0.85, 0], [0, 1], [0.2, 0.75]];   // dry wet mud snow ice: wetness, snow
@@ -64,6 +64,13 @@
 		"  s += a * nz(p); n += a; p = ROT * p * 2.03 + 17.1; a *= 0.5; } return s / n; }",
 		"float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }",
 		"float H(vec2 p) { return texture(uRelief, p / 101.0).r * 6.0; }",
+		// the puffs at scale sc: how far inside the nearest circle of a jittered lattice (units)
+		"float puffs(vec2 p, float sc) { vec2 g = p / sc, i = floor(g), f = g - i; float best = -9.0;",
+		"  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 c = i + vec2(float(x), float(y));",
+		"    vec2 o = vec2(float(x), float(y)) + 0.15 + 0.7 * vec2(hash(c), hash(c + 19.19)) - f;",
+		"    best = max(best, 0.45 + 0.4 * hash(c + 7.7) - length(o)); }",
+		"  return best * sc; }",
+		"float clouds(vec2 q, float bias) { return max(puffs(q, 3.0), puffs(q + vec2(13.7, 5.3), 1.5) - 0.15) + bias; }",
 		"void main() {",
 		"  vec2 p = (vec2(gl_FragCoord.x, uView.w - gl_FragCoord.y) - uView.xy) / uView.z;",
 		"  if (p.x < 0.0 || p.y < 0.0 || p.x > 101.0 || p.y > 101.0) { outColor = vec4(0.0); return; }",
@@ -94,26 +101,38 @@
 		"    cov = max(cov, w * st.w * (0.55 + 0.45 * arms) * (0.75 + 0.25 * inner));",
 		"    dark = max(dark, (1.0 - smoothstep(0.1, 1.0, dist)) * st.w);",
 		"  }",
-		"  vec2 wind = vec2(-0.035, -0.03) * uTime;",
-		"  float thr = 0.68 - 0.3 * cov, gate = smoothstep(0.05, 0.3, cov);",
-		"  float dens = 0.0, sd = 0.0, n1 = 0.0, n2 = 0.0;",
-		"  if (gate > 0.0) {",
-		"    n1 = fbm((q + wind) * 0.9, 5); dens = smoothstep(thr - 0.04, thr + 0.18, n1) * gate * 0.95;",
-		"    vec2 off = uL.z > 0.02 ? uL.xy / max(uL.z, 0.25) * 1.6 : vec2(0.0);",
-		"    n2 = fbm((q + wind + off) * 0.9, 3); sd = smoothstep(thr - 0.04, thr + 0.18, n2) * gate;",
+		// the clouds: banks of puffs (circles on a jittered lattice at two scales, their union
+		// grown by the cells' cover, so a full sky is one mass and a thin one scattered puffs),
+		// drifting toward Gilead with the weather; F is the distance inside their edge (units)
+		"  vec2 cq = q + vec2(-0.005, -0.005) * uTime; float bias = (cov - 0.535) * 4.4 - (1.0 - smoothstep(0.12, 0.3, cov)) * 0.8;",
+		"  float aa = 0.8 / uView.z, F = -9.0, dens = 0.0, sd = 0.0;",
+		"  if (cov > 0.08) {",
+		"    F = clouds(cq, bias); dens = smoothstep(-aa, aa, F);",
+		"    vec2 off = uL.z > 0.02 ? uL.xy / max(uL.z, 0.25) * 1.2 : vec2(0.0);",
+		"    sd = smoothstep(-0.2, 0.2, clouds(cq + off, bias));",
 		"  }",
-		"  over(vec3(0.05, 0.06, 0.1), sd * 0.3 * uDay);",                         // the clouds' shadows
-		"  over(vec3(0.12, 0.14, 0.2), s.g * 0.22);",                               // under the rain
+		"  over(vec3(0.08, 0.07, 0.12), sd * 0.26 * (0.3 + 0.7 * uDay));",              // the clouds' shadows
+		"  over(vec3(0.12, 0.14, 0.2), s.g * 0.18);",                                  // under the rain
 		"  float fog = s.a * smoothstep(0.72, 0.38, h) * smoothstep(0.25, 0.6, fbm(p * 1.3 + vec2(uTime * 0.04, uTime * 0.01), 3) + 0.15);",
 		"  over(vec3(0.94, 0.95, 0.97) * (0.45 + 0.55 * uDay) + uLCol * 0.05, fog * 0.9);",   // fog banks on low ground
 		"  if (g.a > 0.02) over(vec3(0.95, 0.62, 0.3), g.a * (0.1 + 0.05 * sin(p.y * 6.0 + uTime * 2.0 + nz(p * 8.0) * 6.0)));",   // heat
-		"  if (dens > 0.0) {",
-		"    float thick = clamp(s.g * 0.8 + s.b * 0.2 + dark * 0.7, 0.0, 1.0);",
-		"    vec3 lit = mix(vec3(1.0), uLCol, 0.35) * (0.5 + 0.5 * uDay);",
-		"    vec3 cloud = mix(vec3(1.0), vec3(0.45, 0.48, 0.54), thick) * lit;",
-		"    cloud = mix(cloud, vec3(0.22, 0.24, 0.3) * (0.5 + 0.5 * uDay), dark * 0.8);",
-		"    cloud *= 0.88 + 0.2 * fbm((q + wind) * 2.5 + 3.0, 2) - clamp((n2 - n1) * 2.5, 0.0, 0.25) * uDay;",
-		"    over(cloud, dens * 0.85);",
+		"  if (F > -aa) {",
+		"    float thick = clamp(s.g * 0.9 + s.b * 0.25 + dark * 0.7, 0.0, 1.0);",
+		// near an edge: lit on the side toward the sun or the moon, shaded away from it
+		"    float lit = 0.0, shade = 0.0;",
+		"    if (F < 1.2) { vec2 ld = length(uL.xy) > 0.05 ? normalize(uL.xy) : vec2(-0.6, -0.8);",
+		"      lit = 1.0 - smoothstep(-0.06, 0.06, clouds(cq + ld * 0.3, bias));",
+		"      shade = 1.0 - smoothstep(-0.4, 0.5, clouds(cq - ld * 0.9, bias)); }",
+		"    vec3 light = mix(vec3(1.0), uLCol, 0.2) * (0.62 + 0.38 * uDay);",
+		"    vec3 cloud = mix(vec3(1.0), vec3(0.6, 0.63, 0.7), thick);",
+		"    cloud = mix(cloud, vec3(0.3, 0.32, 0.38), dark * 0.8);",
+		"    cloud = mix(cloud, cloud * vec3(0.7, 0.74, 0.84), shade * 0.8) * light;",
+		"    cloud = mix(cloud, light * 1.05, lit * 0.6 * (1.0 - 0.5 * thick));",
+		"    over(cloud, dens * (0.78 + 0.12 * uDay));",
+		// their edge inked like the map's lines (darker for rain clouds)
+		"    float w = 1.8 * uDpr / uView.z;",
+		"    float line = dens * (1.0 - smoothstep(w - aa, w + aa, F));",
+		"    over(mix(vec3(0.3, 0.26, 0.24), vec3(0.18, 0.2, 0.27), thick) * (0.5 + 0.5 * uDay), line * (0.6 + 0.3 * uDay));",
 		"  }",
 		// lightning: now and then a thunderstorm's cell flashes
 		"  if (g.b > 0.05) {",
@@ -124,18 +143,21 @@
 		"  }",
 		// rain streaks and falling snow, in the screen's pixels
 		"  vec2 sp = gl_FragCoord.xy / uDpr;",
-		"  if (s.g > 0.02) {",
-		"    vec2 rs = mat2(0.97, -0.26, 0.26, 0.97) * sp; rs.y += uTime * 260.0;",
-		"    vec2 c = floor(rs / vec2(5.0, 26.0)); vec2 f = fract(rs / vec2(5.0, 26.0)); float rnd = hash(c); f.y = fract(f.y + rnd * 7.0);",
-		"    float streak = step(rnd, s.g * 0.55) * (1.0 - smoothstep(0.06, 0.16, abs(f.x - 0.5))) * smoothstep(0.0, 0.4, f.y) * (1.0 - smoothstep(0.55, 0.75, f.y));",
-		"    over(vec3(0.8, 0.84, 0.92) * (0.5 + 0.5 * uDay), streak * 0.45);",
+		// rain falls from the clouds as dark slanted streaks, snow as rimmed flakes
+		"  float rain = s.g * smoothstep(-0.8, 0.2, F), snowing = s.b * smoothstep(-0.8, 0.2, F);",
+		"  if (rain > 0.02) {",
+		"    vec2 rs = mat2(0.97, -0.26, 0.26, 0.97) * sp; rs.y += uTime * 220.0;",
+		"    vec2 c = floor(rs / vec2(4.0, 28.0)); vec2 f = fract(rs / vec2(4.0, 28.0)); float rnd = hash(c); f.y = fract(f.y + rnd * 7.0);",
+		"    float streak = step(rnd, 0.25 + rain * 0.6) * (1.0 - smoothstep(0.1, 0.24, abs(f.x - 0.5))) * smoothstep(0.0, 0.25, f.y) * (1.0 - smoothstep(0.65, 0.85, f.y));",
+		"    over(vec3(0.12, 0.18, 0.32) * (0.6 + 0.4 * uDay), streak * 0.8 * smoothstep(0.02, 0.2, rain));",
 		"  }",
-		"  if (s.b > 0.02) {",
-		"    for (int layer = 0; layer < 2; layer++) { float sz = layer == 0 ? 9.0 : 14.0; float fall = layer == 0 ? 22.0 : 34.0;",
+		"  if (snowing > 0.02) {",
+		"    for (int layer = 0; layer < 2; layer++) { float sz = layer == 0 ? 12.0 : 18.0; float fall = layer == 0 ? 20.0 : 30.0;",
 		"      vec2 rs = sp + vec2(sin(uTime * 0.7 + sp.y * 0.03) * 4.0, uTime * fall);",
 		"      vec2 c = floor(rs / sz); vec2 f = fract(rs / sz) - 0.5; vec2 o = vec2(hash(c + 3.1), hash(c + 7.7)) - 0.5;",
-		"      float flake = step(hash(c + float(layer) * 13.0), s.b * 0.7) * (1.0 - smoothstep(0.05, 0.12 + float(layer) * 0.04, length(f - o * 0.6)));",
-		"      over(vec3(1.0) * (0.6 + 0.4 * uDay), flake * 0.85); }",
+		"      float on = step(hash(c + float(layer) * 13.0), 0.25 + snowing * 0.6), d = length(f - o * 0.6), r0 = 0.12 + float(layer) * 0.04;",
+		"      over(vec3(0.22, 0.27, 0.38), on * (1.0 - smoothstep(r0, r0 + 0.06, d)) * 0.75);",
+		"      over(vec3(1.0) * (0.7 + 0.3 * uDay), on * (1.0 - smoothstep(r0 - 0.04, r0, d))); }",
 		"  }",
 		// the towns' lights at night, dimmer through clouds
 		"  if (uNight > 0.01) { float glow = 0.0;",

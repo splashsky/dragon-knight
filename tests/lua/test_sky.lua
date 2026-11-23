@@ -1,7 +1,7 @@
 -- Unit tests for the weather over the World Map (town/sky.lua): an SVG overlay in the map's
 -- units, a pure function of the time: each storm alive as a disc keyed by its birth at its
--- centre and radius (weather.storms), snow drawn where it snows, rain where it rains, the
--- time of day's wash (the night's at night, none by day), the same all through a tick (the
+-- centre and radius (weather.storms), the clouds' puffs over the cloudy country and none over
+-- the clear, snow drawn where it snows, rain where it rains, the time of day's wash (the night's at night, none by day), the same all through a tick (the
 -- weather's step) and moving from one to the next, and what it costs.
 local clock = require("lib.clock")
 local sky = require("town.sky")
@@ -19,9 +19,10 @@ local function num(n)
 	return s == "-0" and "0" or s
 end
 
--- The runs (rectangles: x, y, w, h) of sky `s`'s wash in the markup.
+-- The runs (rectangles: x, y, w, h) of sky `s`'s wash or pattern (the rain and the snow) in
+-- the markup.
 local function runs(markup, s)
-	local d = markup:match("<path class=\"sky%-" .. s .. "\" fill=\"#%x+\" fill%-opacity=\"[%d.]+\" d=\"([^\"]*)\"")
+	local d = markup:match("<path class=\"sky%-" .. s .. "\" fill=\"[^\"]+\"[^>]* d=\"([^\"]*)\"")
 	local out = {}
 	for x, y, w, h in (d or ""):gmatch("M([%d.%-]+) ([%d.%-]+)h([%d.]+)v([%d.]+)h%-[%d.]+z") do
 		out[#out + 1] = { tonumber(x), tonumber(y), tonumber(w), tonumber(h) }
@@ -95,6 +96,56 @@ function T.the_time_of_days_wash()
 	local function storms(t) return sky.markup(t):match("<g class=\"sky%-storms\">.-</g></g>") end
 	assert(#weather.storms(now) > 0 and storms(now - now % 10) ~= storms(now - now % 10 + 10), "the storms move every tick")
 	assert(sky.svg(now):find("^<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 101 101\""), "the map's units")
+end
+
+-- The clouds (3.4): puffs (circles) and the deep clouds' squares over the cloudy cells, none
+-- over clear country; rain clouds apart from fair ones.
+function T.clouds_over_the_cloudy_cells()
+	local cloudy = { overcast = true, drizzle = true, rain = true, downpour = true, thunderstorm = true, snow = true,
+		blizzard = true }
+	local bare = { clear = true, sun = true, heat = true }
+	local inside, outside = 0, 0
+	for now = START, START + 12 * 3600, 2400 do
+		local markup = sky.markup(now)
+		local clouds = markup:match("<g class=\"sky%-clouds\"><defs>(.-)</defs>") or ""
+		local circles, rects = {}, {}
+		for x, y, r in clouds:gmatch("<circle cx=\"([%d.%-]+)\" cy=\"([%d.%-]+)\" r=\"([%d.]+)\"/>") do
+			circles[#circles + 1] = { tonumber(x), tonumber(y), tonumber(r) }
+		end
+		for d in clouds:gmatch("<path d=\"([^\"]*)\"/>") do
+			for x, y, w, h in d:gmatch("M([%d.%-]+) ([%d.%-]+)h([%d.]+)v([%d.]+)h%-[%d.]+z") do
+				rects[#rects + 1] = { tonumber(x), tonumber(y), tonumber(w), tonumber(h) }
+			end
+		end
+		local function covered(x, y)
+			for _, c in ipairs(circles) do if (x - c[1]) ^ 2 + (y - c[2]) ^ 2 <= c[3] ^ 2 then return true end end
+			for _, r in ipairs(rects) do if x >= r[1] and x <= r[1] + r[3] and y >= r[2] and y <= r[2] + r[4] then return true end end
+			return false
+		end
+		local function all(lat, lon, set)
+			for dlat = -10, 10, 10 do
+				for dlon = -10, 10, 10 do
+					if not set[weather.at(lat + dlat, lon + dlon, now).sky] then return false end
+				end
+			end
+			return true
+		end
+		for lat = -235, 235, 10 do
+			for lon = -235, 235, 10 do
+				local x, y = lon / 5 + 50.5, 50.5 - lat / 5
+				if all(lat, lon, cloudy) then
+					inside = inside + 1
+					assert(covered(x, y), ("a cloud over the cloudy country at %d,%d"):format(lat, lon))
+				elseif all(lat, lon, bare) then
+					outside = outside + 1
+					assert(not covered(x, y), ("no cloud over the clear country at %d,%d"):format(lat, lon))
+				end
+			end
+		end
+		assert(markup:find("<g id=\"sky-puffs\">", 1, true) and markup:find("<g id=\"sky-puffs-rain\">", 1, true),
+			"the fair clouds and the rain clouds")
+	end
+	assert(inside > 50 and outside > 50, "both kinds of country seen: " .. inside .. ", " .. outside)
 end
 
 function T.the_overlay_is_cheap_and_small()

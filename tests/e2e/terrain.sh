@@ -154,7 +154,7 @@ t_get /map/sky/data; TE_CELLS=$(python3 -c 'import json,sys; print(json.load(ope
 [ "$(t_sql "SELECT instr(value, '$TE_CELLS') > 0 FROM meta WHERE key = 'map_sky'")" = 1 ] && t_ok || t_fail "the data's cells are the row's"
 t_sql "UPDATE meta SET value = replace(value, '$TE_CELLS', '$(printf '0%.0s' $(seq 2601))') WHERE key = 'map_sky'"
 t_get /map/sky/data; expect_body "\"cells\":\"$(printf '0%.0s' $(seq 2601))\""
-t_get /map/sky; expect_no_body 'class="sky-overcast"'; expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+t_get /map/sky; expect_no_body 'class="sky-clouds"'; expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
 TE_DOCTORED=$(t_sql "SELECT value FROM meta WHERE key = 'map_sky'")
 T_NOW=$((T_NOW + 10)) t_get /map/sky/data; expect_no_body "\"cells\":\"$(printf '0%.0s' $(seq 2601))\""
 [ "$(t_sql "SELECT value FROM meta WHERE key = 'map_sky'")" = "$TE_DOCTORED" ] && t_ok || t_fail "a read in another tick wrote"

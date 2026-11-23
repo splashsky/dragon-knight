@@ -11,6 +11,7 @@ changelog.RELEASES = {
 		version = "3.4.0", date = "unreleased",
 		changes = {
 			"The sky moves in whole regions: clouds gather in banks with drizzle (or snow) at their heart and drift slowly toward Gilead, and fog lies in patches, so the weather around you changes as the clouds pass instead of tile by tile. Each land keeps its own share of each sky.",
+			"The World Map draws its clouds as clouds: banks of white puffs with inked edges, lit and shaded by the sun or the moon, darker when they carry rain. Rain falls from them in dark streaks and snow in flakes you can see.",
 		},
 	},
 	{
