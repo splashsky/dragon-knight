@@ -8,6 +8,11 @@ local changelog = {}
 
 changelog.RELEASES = {
 	{
+		version = "3.4.0", date = "unreleased",
+		changes = {
+		},
+	},
+	{
 		version = "3.3.0", date = "11.22.2026",
 		changes = {
 			"Choose your target: click a monster or an object on the fight page (or use the keyboard), and your attacks and spells go at it until it is gone.",
