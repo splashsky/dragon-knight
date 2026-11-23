@@ -9,6 +9,7 @@ local php = require("lib.php")
 local scene = require("lib.scene")
 local state = require("fight.state")
 local travel = require("town.travel")
+local users = require("lib.users")
 local view = require("lib.view")
 
 local explore = {}
@@ -28,8 +29,6 @@ function explore.move(req)
 	if form.west ~= nil then lon = lon - 1; if lon < -size then lon = -size end end
 	local leaving = user.currentaction == "In Town" and game.current_town(user) or nil
 
-	-- moving on: the page of the last finished fight goes
-	state.forget(user.id)
 	-- where they walk is on their map for good (the World Map's fog of war)
 	explored.reveal(user.id, lat, lon)
 
@@ -39,8 +38,11 @@ function explore.move(req)
 	if php.rand(1, 5) == 1 then
 		-- the encounter begins here: the monster is picked, its first strike played
 		-- (fight/encounter.lua); with no monster to meet the move is an ordinary one
-		dk.db:exec("UPDATE users SET currentaction = 'Fighting', latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
-							 lat, lon, user.id)
+		users.exec(user.id, "UPDATE users SET currentaction = 'Fighting', latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
+			lat, lon, user.id)
+		-- (the row as it is now, for the encounter to read)
+		user.currentaction, user.latitude, user.longitude, user.dropcode = "Fighting", lat, lon, 0
+		users.remember(user)
 		local outcome, monster = encounter.begin(user.id)
 		if outcome == "death" then
 			return scene.add(req, view.redirect("/fight"), "death", "You have died",
@@ -49,6 +51,9 @@ function explore.move(req)
 			return scene.add(req, view.redirect("/fight"), "fight", "Fight!", "A " .. monster.name .. " blocks your way.")
 		end
 	end
+	-- moving on: the page of the last finished fight goes (an encounter, a town's arrival
+	-- clear it themselves)
+	state.forget(user.id)
 	dk.db:exec("UPDATE users SET currentaction = 'Exploring', latitude = ?, longitude = ?, dropcode = 0 WHERE id = ?",
 						 lat, lon, user.id)
 	if leaving then

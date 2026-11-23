@@ -18,21 +18,17 @@
 -- panel) and the next code change checks again. `dk content sync`, `dk install` and
 -- `dk migrate` run sync.run() directly.
 local load = require("lib.content.load")
+local meta = require("lib.meta")
 local schema = require("lib.content.schema")
 
 local sync = {}
 
 function sync.meta(key)
-	return dk.db:value("SELECT value FROM meta WHERE key = ?", key)
+	return meta.get(key)
 end
 
 function sync.set_meta(key, value)
-	if value == nil then
-		dk.db:exec("DELETE FROM meta WHERE key = ?", key)
-	else
-		dk.db:exec("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-							 key, tostring(value))
-	end
+	meta.set(key, value)
 end
 
 -- This process and code generation.

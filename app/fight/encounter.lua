@@ -23,6 +23,7 @@ local speech = require("fight.speech")
 local spells = require("lib.spells")
 local state = require("fight.state")
 local terrain = require("lib.terrain")
+local users = require("lib.users")
 
 local encounter = {}
 
@@ -108,12 +109,12 @@ end
 
 -- The player's numbers after a round (users' HP/MP/TP; the fight's tables are state.save's).
 function encounter.save_player(user_id, st)
-	dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
+	users.exec(user_id, "UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
 		st.currenthp, st.currentmp, st.currenttp, user_id)
 end
 
--- The player died in fight f (its log set by the caller: the lines that led to it): half
--- the gold, a quarter of the HP, back to town. The fight is kept as it ended (outcome
+-- The player died in fight f (its log set by the caller: the lines that led to it): a
+-- quarter of the gold, a quarter of the HP (combat.death), back to town. The fight is kept as it ended (outcome
 -- "death") for its page.
 function encounter.die(user, f)
 	local st = f.st
@@ -124,7 +125,7 @@ function encounter.die(user, f)
 	-- the monster's last word over the player, for the death page (fight/speech.lua)
 	f.result = f.taunt and { taunt_by = f.taunt.by, taunt = f.taunt.text } or {}
 	state.save(f)
-	dk.db:exec([[UPDATE users SET currenthp = ?, currentmp = ?, currentaction = 'In Town', latitude = 0,
+	users.exec(user.id, [[UPDATE users SET currenthp = ?, currentmp = ?, currentaction = 'In Town', latitude = 0,
 		longitude = 0, gold = ? WHERE id = ?]], d.currenthp, st.currentmp, d.gold, user.id)
 end
 
@@ -179,7 +180,7 @@ function encounter.win(user, f)
 	if f.last_words then res.said_by, res.said = f.last_words.by, f.last_words.text end
 	f.outcome, f.result = "victory", res
 	state.save(f)
-	dk.db:exec([[UPDATE users SET currentaction = 'Exploring', level = ?, base_maxhp = base_maxhp + ?,
+	users.exec(user.id, [[UPDATE users SET currentaction = 'Exploring', level = ?, base_maxhp = base_maxhp + ?,
 		base_maxmp = base_maxmp + ?, base_maxtp = base_maxtp + ?, strength = strength + ?,
 		dexterity = dexterity + ?, dropcode = ?, experience = ?, gold = ? WHERE id = ?]],
 		g.level, g.hp, g.mp, g.tp, g.strength, g.dexterity, dropcode, php.mysql_uint(newexp),

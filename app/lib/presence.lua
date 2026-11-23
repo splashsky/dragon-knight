@@ -10,6 +10,7 @@
 -- list and count are the marked players, so they always agree with the events. Event
 -- data: { id, name, online } (online: the count after the change).
 local json = require("lib.json")
+local meta = require("lib.meta")
 
 local presence = {}
 
@@ -60,9 +61,12 @@ local function publish(event, id, name)
 end
 
 -- An authenticated request by `user` (session.load): updates onlinetime and announces
--- the player when they weren't online.
+-- the player when they weren't online. onlinetime moves at most once every
+-- presence.TOUCH seconds (a write a minute, not one a request: the window is ten minutes).
+presence.TOUCH = 60
 function presence.touch(user, now)
 	if user.online == 1 then
+		if now >= (user.onlinetime or 0) and now - (user.onlinetime or 0) < presence.TOUCH then return end
 		dk.db:exec("UPDATE users SET onlinetime = ? WHERE id = ?", now, user.id)
 	else
 		dk.db:exec("UPDATE users SET onlinetime = ?, online = 1 WHERE id = ?", now, user.id)
@@ -75,7 +79,7 @@ end
 -- The departures sweep, when one is due (main.lua calls this on every request).
 function presence.sweep(now)
 	now = now or dk.now()
-	local last = math.tointeger(tonumber(dk.db:value("SELECT value FROM meta WHERE key = ?", presence.META)))
+	local last = math.tointeger(tonumber(meta.get(presence.META)))
 	if last and now - last < presence.sweep_interval() and now >= last then return end
 	dk.db:exec("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
 						 presence.META, tostring(now))

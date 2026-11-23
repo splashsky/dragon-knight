@@ -21,11 +21,13 @@
 local clock = require("lib.clock")
 local encounter = require("fight.encounter")
 local game = require("lib.game")
+local inventory = require("lib.inventory")
 local json = require("lib.json")
 local mapsky = require("lib.mapsky")
 local php = require("lib.php")
 local presence = require("lib.presence")
 local state = require("fight.state")
+local users = require("lib.users")
 local weather = require("lib.weather")
 local world = require("lib.world")
 
@@ -45,6 +47,12 @@ end
 local function fights(n, out, told)
 	local due = dk.db:query("SELECT user_id FROM fights WHERE outcome = '' AND due <= ? ORDER BY due, user_id LIMIT ?",
 		n, tick.FIGHTS)
+	-- their players, gear and fights read together (a query each, not each per fight)
+	local ids = {}
+	for _, row in ipairs(due) do ids[#ids + 1] = row.user_id end
+	users.preload(ids)
+	inventory.preload(ids)
+	state.preload(ids)
 	for _, row in ipairs(due) do
 		local user = game.user(row.user_id)
 		local f = user and state.load(user, game.player(user))
@@ -61,6 +69,10 @@ end
 local function world_statuses(n, out, told)
 	local due = dk.db:query("SELECT user_id FROM user_statuses WHERE tick < ? GROUP BY user_id ORDER BY min(tick), user_id " ..
 		"LIMIT ?", n, tick.WORLD)
+	local ids = {}
+	for _, row in ipairs(due) do ids[#ids + 1] = row.user_id end
+	users.preload(ids)
+	inventory.preload(ids)
 	for _, row in ipairs(due) do
 		local user = game.user(row.user_id)
 		if user then

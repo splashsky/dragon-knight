@@ -55,6 +55,11 @@ function spells.get(id)
 	return rows.get(id)
 end
 
+-- The spells of a list of ids (or keys, by = "key"), read in one query at most: { [id] = row }.
+function spells.many(list, by)
+	return rows.many(list, by)
+end
+
 -- The spell with key `key` (retired or not), or nil.
 function spells.by_key(key)
 	return rows.by_key(key)
@@ -76,17 +81,37 @@ end
 
 -- Spells `user` knows, by id; `place` ("town" or "fight") keeps those castable there.
 -- A spell whose file was deleted (retired) stays known, but can't be cast.
+-- (read once and kept for the request until user_spells or spells is written; handed out as
+-- copies)
+local known = cache.store("known_spells", { tables = { "user_spells", "spells" }, size = 32 })
+local function known_rows(user_id)
+	return known:fetch(user_id, function()
+		local out = {}
+		for _, s in ipairs(dk.db:query("SELECT s.*, us.learned_level FROM user_spells us JOIN spells s ON s.id = us.spell_id " ..
+			"WHERE us.user_id = ? ORDER BY s.id", user_id)) do
+			out[#out + 1] = decode(s)
+			-- (the spell's own row too: spells.get after spells.knows needn't read it again)
+			local row = cache.copy(s)
+			row.learned_level = nil
+			rows.put(row)
+		end
+		return out
+	end)
+end
+
 function spells.known(user, place)
 	local out = {}
-	for _, s in ipairs(dk.db:query("SELECT s.*, us.learned_level FROM user_spells us JOIN spells s ON s.id = us.spell_id " ..
-																 "WHERE us.user_id = ? ORDER BY s.id", user.id)) do
-		if place == nil or spells.usable(s, place) then out[#out + 1] = decode(s) end
+	for _, s in ipairs(known_rows(user.id)) do
+		if place == nil or spells.usable(s, place) then out[#out + 1] = cache.copy(s) end
 	end
 	return out
 end
 
 function spells.knows(user, spell_id)
-	return dk.db:value("SELECT 1 FROM user_spells WHERE user_id = ? AND spell_id = ?", user.id, spell_id) ~= nil
+	for _, s in ipairs(known_rows(user.id)) do
+		if s.id == spell_id then return true end
+	end
+	return false
 end
 
 -- Teaches `user_id` the spell (known ones keep their learned_level).

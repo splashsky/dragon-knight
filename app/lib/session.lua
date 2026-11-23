@@ -4,9 +4,9 @@
 -- hex(sha256(token)). Normal sessions: browser-session cookie, server expiry 1 day,
 -- sliding. "Remember me": Max-Age 1 year, server expiry 1 year, sliding.
 local cookie = require("lib.cookie")
-local game = require("lib.game")
 local json = require("lib.json")
 local presence = require("lib.presence")
+local users = require("lib.users")
 
 local session = {}
 
@@ -22,6 +22,11 @@ local function ttl_of(remember)
 	return remember and session.REMEMBER_TTL or session.TTL
 end
 
+local SESSION_COLUMNS = { "token_hash", "user_id", "csrf", "created", "expires", "remember" }
+local SESSION_SQL = "SELECT s.token_hash AS s_token_hash, s.user_id AS s_user_id, s.csrf AS s_csrf, " ..
+	"s.created AS s_created, s.expires AS s_expires, s.remember AS s_remember, u.* " ..
+	"FROM sessions s LEFT JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?"
+
 -- Loads req.session and req.user from the cookie. Touches users.onlinetime (legacy
 -- cookies.php did this on every authenticated request; a player not online yet is
 -- announced, lib/presence.lua) and slides the expiry.
@@ -34,8 +39,16 @@ function session.load(req)
 	end
 	local now = dk.now()
 	local th = hash(token)
-	local s = dk.db:first("SELECT * FROM sessions WHERE token_hash = ?", th)
-	local user = s and s.expires > now and game.user(s.user_id)
+	-- the session and its user in one query
+	local row = dk.db:first(SESSION_SQL, th)
+	local s, user = nil, nil
+	if row then
+		s = {}
+		for _, k in ipairs(SESSION_COLUMNS) do
+			s[k], row["s_" .. k] = row["s_" .. k], nil
+		end
+		user = row.id and s.expires > now and row or nil
+	end
 	if not user then
 		if s then dk.db:exec("DELETE FROM sessions WHERE token_hash = ?", th) end
 		cookie.clear(req, session.COOKIE)
@@ -55,7 +68,7 @@ function session.load(req)
 	end
 	presence.touch(user, now)
 	-- (the row as presence.touch left it, in the database too: the page's layout reads it again)
-	game.remember_user(user)
+	users.remember(user)
 	req.session, req.user = s, user
 	return user
 end
@@ -81,7 +94,7 @@ function session.create(req, user_id, remember)
 						 s.remember)
 	cookie.set(req, session.COOKIE, token, { max_age = remember and session.REMEMBER_TTL or nil })
 	req.session = s
-	req.user = game.user(user_id)
+	req.user = users.get(user_id)
 	return s
 end
 

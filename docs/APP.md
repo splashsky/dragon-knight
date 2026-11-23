@@ -54,8 +54,9 @@ for one request only):
 	 otherwise every request gets a 503 page saying to run `dk migrate` (or `dk install`).
 2. `content_sync.check()` syncs the content files into the database when they changed
 	 (one query when they didn't; see [Content](#content)).
-3. `session.load(req)` reads the `dk_session` cookie. It sets `req.user` (the full `users`
-	 row) and `req.session`, and updates `users.onlinetime` (a player not marked online is
+3. `session.load(req)` reads the `dk_session` cookie (the session and its user in one
+	 query). It sets `req.user` (the full `users` row) and `req.session`, and updates
+	 `users.onlinetime` at most once a minute (`presence.TOUCH`; a player not marked online is
 	 announced: see [Presence](#presence-whos-online)). Then the presence sweep runs when
 	 one is due (once a minute).
 4. The router matches the method and path. No match gives a 404 page; the wrong method
@@ -738,7 +739,8 @@ messages that come to every list on the page (the window's too).
 ### Presence (who's online)
 
 `lib/presence.lua`. **Online** = has a stream open (`dk.subscribers("user:<id>") > 0`) or
-made a request within `online_seconds` (600). `users.online = 1` marks the players
+made a request within `online_seconds` (600; `users.onlinetime`, written at most once a
+minute: `presence.TOUCH`). `users.online = 1` marks the players
 announced as online; the Who's Online list (town page, `/babble`) and the count in the
 right column ("Online: N", when `control.showonline` is on) are those players, so they
 always match the events. Both read the partial index `users_online` (schema version 11:
@@ -3586,8 +3588,11 @@ in a comment.
 ### The request cache
 
 `lib/cache.lua` (3.4) keeps records looked up during a request, so the same row isn't read
-twice: a fight used to read about 500 rows a request (every monster's loadout, its spells
-one by one), now about 25; a town page 13 instead of 15.
+twice, and the modules that read many rows read them together. A fight's page used to take
+about 500 queries (every monster's loadout, its spells one by one); now about 14, a round
+with the live client's page after it about 19 (two dispatches), a town page about 12; the
+server's tick reads all the fights due in a handful of queries (8 fights: 45 queries in all,
+most of them the fights' own writes).
 
 - **Stores**: `cache.store(name, { tables = {...}, size = n })` is a small
 	least-recently-used cache (two generations: the entries used since the last turnover and
@@ -3599,14 +3604,30 @@ one by one), now about 25; a town page 13 instead of 15.
 	shared unless the store hands out copies (`copy`: spells and items, whose callers set
 	fields; `game.user` copies too): don't change a shared one.
 - **What uses it**: spells, items, statuses, summons, fields, interactables and monsters by
-	id and key (`lib/<kind>.lua`), the monsters' loadouts (read per monster now, not all at
-	once), a character's equipment (`inventory.equipped`), the control row, users rows and
-	the towns (`lib/game.lua`).
+	id and key (`lib/<kind>.lua`; `rows.many(ids)` reads the missing ones of a list in one
+	`IN` query: a monster's loadout's items and spells, a class's spells), a monster's
+	loadout (equipment, items and spells in one `UNION ALL` query, read per monster), a
+	character's entries (`inventory`: one query for all of them, `equipped`, `bag`, `entry`
+	and `find` derived; copies handed out), the spells a character knows (with the spells'
+	own rows), the control row (`lib/control.lua`), users rows (`lib/users.lua`), the towns
+	(`lib/game.lua`), the meta values every request asks for (`lib/meta.lua`: read
+	together), the schema's version (`migrations.current`) and the fights' rows
+	(`fight/state.lua`).
+- **Batched reads**: `state.preload(ids)`, `users.preload(ids)`, `inventory.preload(ids)`
+	read many characters' fights (three queries), rows and entries (one each) at once; the
+	server's tick preloads the fights due and the characters whose world statuses are due
+	before it advances them one by one.
+- **Writes that keep the rest**: `store:own(fn)` runs writes to the store's tables without
+	forgetting it; the writer forgets (`store:forget(key)`) or puts back what it wrote.
+	`state.save` writes one fight (its combatants and their statuses in one multi-row
+	`INSERT` each) and keeps the rows it wrote, so the page that follows reads none; the
+	tick's other fights stay read. `users.exec(id, sql, ...)` updates one row and forgets
+	only it. A `DELETE` forgets the stores of its table and of those that reference it with
+	`ON DELETE` (`cache.CASCADES`, checked against the schema by the test), not everything.
 - **Never stale**: every statement goes through `lib/dbcount.lua`'s wrapper, which tells
 	`cache.statement(sql)` first: an `INSERT`, `UPDATE` or `DELETE` forgets the stores of its
-	table; a `DELETE` from a table others reference with `ON DELETE` (`users`, `fights`,
-	`fight_combatants`, `forum`), a script, a `ROLLBACK` and anything it can't tell forget
-	every store (`main.lua` forgets them after its own rollbacks too). Reads change nothing.
+	table (a `DELETE` or a `REPLACE` those of the tables referencing it too); a script, a
+	`ROLLBACK`, a `PRAGMA` that sets and anything it can't tell forget every store (`main.lua` forgets them after its own rollbacks too). Reads change nothing.
 	A store keeps records only on that wrapper (every request's; a command line run's is
 	installed at its start by `cli/*.lua` and `install.lua`, or by its first lookup).
 - **For one request**: the VM is restored after each request, so a store starts empty every
@@ -3614,7 +3635,9 @@ one by one), now about 25; a town page 13 instead of 15.
 	writes late. Within the request (a live answer following redirects, the server's tick
 	advancing many fights) records are shared.
 - **A new store**: name the tables its records come from; a record built from several
-	(a monster's loadout) names them all. `tests/lua/test_cache.lua`.
+	(a monster's loadout) names them all. `tests/lua/test_cache.lua` (the stores, the
+	cascades against the schema, `own`), `tests/lua/test_tick.lua` (the tick's fights read
+	together).
 
 ### Schema changes and migrations
 

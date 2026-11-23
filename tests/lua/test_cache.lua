@@ -68,11 +68,47 @@ function T.a_write_forgets_its_tables_stores_only()
 		a:put(1, "x"); b:put(1, "y")
 		dk.db:exec("DELETE FROM sessions WHERE user_id = -1")
 		eq(select(2, b:get(1)), true, "a DELETE from a table nothing references")
+		local held = cache.store("test_held", { tables = { "user_items" } })
+		held:put(1, "z")
 		dk.db:exec("DELETE FROM users WHERE id = -1")
-		eq(select(2, a:get(1)) or select(2, b:get(1)), false, "a DELETE from users (others cascade)")
+		eq(select(2, held:get(1)), false, "a DELETE from users: what references it (user_items) forgotten")
+		eq(select(2, b:get(1)), true, "the rest kept")
 		a:put(1, "x")
 		dk.db:exec("SAVEPOINT inner_test"); dk.db:exec("ROLLBACK TO inner_test"); dk.db:exec("RELEASE inner_test")
 		eq(select(2, a:get(1)), false, "a ROLLBACK")
+	end)
+end
+
+-- cache.CASCADES names every table that references another with ON DELETE (the schema's)
+function T.the_cascades_are_the_schemas()
+	local listed = {}
+	for parent, children in pairs(cache.CASCADES) do
+		for _, child in ipairs(children) do listed[parent .. ">" .. child] = true end
+	end
+	for _, t in ipairs(dk.db:query("SELECT name FROM sqlite_master WHERE type = 'table'")) do
+		for _, fk in ipairs(dk.db:query("SELECT * FROM pragma_foreign_key_list(?)", t.name)) do
+			if fk.on_delete == "CASCADE" or fk.on_delete == "SET NULL" then
+				assert(listed[fk.table .. ">" .. t.name], "cache.CASCADES." .. fk.table .. " lacks " .. t.name)
+			end
+		end
+	end
+end
+
+-- A store running its own writes (Store:own) keeps its other keys; the key written is the
+-- writer's to forget
+function T.a_store_owns_its_writes()
+	with_db(function()
+		local s = cache.store("test_own", { tables = { "towns" } })
+		local other = cache.store("test_other", { tables = { "towns" } })
+		s:put(1, "a"); s:put(2, "b"); other:put(1, "c")
+		eq(s:own(function(x) dk.db:exec("UPDATE towns SET innprice = innprice WHERE id = 1"); return x end, 7), 7, "fn's result")
+		s:forget(1)
+		eq(select(2, s:get(1)), false, "the key written, forgotten")
+		eq(select(2, s:get(2)), true, "the others kept")
+		eq(select(2, other:get(1)), false, "another store of the table forgets as always")
+		assert(not pcall(function() s:own(function() error("boom") end) end), "an error goes through")
+		dk.db:exec("UPDATE towns SET innprice = innprice WHERE id = 2")
+		eq(select(2, s:get(2)), false, "after it, writes forget it again")
 	end)
 end
 

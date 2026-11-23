@@ -3,6 +3,7 @@
 local cache = require("lib.cache")
 local classes = require("lib.classes")
 local clock = require("lib.clock")
+local control = require("lib.control")
 local inventory = require("lib.inventory")
 local items = require("lib.items")
 local php = require("lib.php")
@@ -11,47 +12,31 @@ local roles = require("lib.roles")
 local spells = require("lib.spells")
 local stats = require("lib.stats")
 local terrain = require("lib.terrain")
+local users = require("lib.users")
 local weather = require("lib.weather")
 
 local game = {}
 
 -- Records kept for the request as they are used (lib/cache.lua: a write to their table
--- forgets them): the control row, users rows and the towns.
-local control = cache.store("control", { tables = { "control" }, size = 2 })
-local users = cache.store("users", { tables = { "users" }, size = 64 })
+-- forgets them): the control row, users rows (lib/control.lua, lib/users.lua) and the towns.
 local towns = cache.store("towns", { tables = { "towns" }, size = 2 })
-
-local DEFAULT_CONTROL = { id = 1, gamename = "Dragon Knight", gamesize = 250, gameopen = 1, forumtype = 0,
-	forumaddress = "", verifyemail = 0, shownews = 0, showbabble = 0, showonline = 0, gameurl = "", adminemail = "" }
 
 -- The control row (id 1). A write to it is seen at once; game.reload_control() reads it again
 -- anyway.
 function game.control()
-	return control:fetch(1, function() return dk.db:first("SELECT * FROM control WHERE id = 1") end) or DEFAULT_CONTROL
+	return control.row()
 end
 
 function game.reload_control()
-	control:clear()
-	return game.control()
-end
-
-local function copy(row)
-	if not row then return nil end
-	local out = {}
-	for k, v in pairs(row) do out[k] = v end
-	return out
+	return control.reload()
 end
 
 -- The users row of `id` (a copy of it: change it as you like), or nil.
-function game.user(id)
-	return copy(users:fetch(id, function() return dk.db:first("SELECT * FROM users WHERE id = ?", id) end))
-end
+game.user = users.get
 
 -- A users row read (and kept up to date) elsewhere, as the database has it now: the next
 -- game.user of its id needn't read it again (session.load's).
-function game.remember_user(user)
-	users:put(user.id, copy(user))
-end
+game.remember_user = users.remember
 
 -- Every town, by id (shared rows: don't change them).
 function game.towns()

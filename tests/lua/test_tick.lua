@@ -87,6 +87,31 @@ function T.fights_due_are_advanced_and_told()
 	end)
 end
 
+-- The fights due are read together: their players, gear and fights in a few queries, not
+-- several per fight; each fight then costs its writes (the fight, its combatants, the
+-- player's numbers) and little else.
+function T.the_fights_due_are_read_together()
+	with_db(function()
+		local dbcount = require("lib.dbcount")
+		dbcount.install()
+		local list = {}
+		for i = 1, 8 do
+			list[i] = user("batch_" .. i)
+			fight(list[i], N - 10)
+		end
+		require("lib.cache").clear()
+		local before = dbcount.count()
+		local out = tick.run(N * 10)
+		local queries = dbcount.count() - before
+		eq(out.fights, 8, "all advanced")
+		for _, u in ipairs(list) do eq(row(u).tick, N, "advanced to the tick") end
+		-- (a fight writes 4 statements; the run's own reads, the world statuses', the sky's
+		-- and the weather's are a few dozen in all)
+		print("tick: " .. queries .. " queries for 8 fights")
+		assert(queries <= 8 * 5 + 30, "the fights' reads together: " .. queries .. " queries for 8 fights")
+	end)
+end
+
 function T.world_statuses_count_the_clock()
 	with_db(function(published)
 		local regen = statuses.by_key("regen")

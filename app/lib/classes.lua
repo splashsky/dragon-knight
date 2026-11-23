@@ -78,9 +78,11 @@ end
 -- The spells a new character of class `c` knows (its start_spells): spells rows that exist
 -- and aren't retired, by id.
 function classes.start_spells(c)
-	local out = {}
-	for key in tostring(c.start_spells or ""):gmatch("[^,]+") do
-		local s = spells.by_key(key)
+	local out, keys = {}, {}
+	for key in tostring(c.start_spells or ""):gmatch("[^,]+") do keys[#keys + 1] = key end
+	local rows = spells.many(keys, "key")
+	for _, key in ipairs(keys) do
+		local s = rows[key]
 		if s and s.retired == 0 then out[#out + 1] = s end
 	end
 	table.sort(out, function(a, b) return a.id < b.id end)
@@ -98,10 +100,13 @@ function classes.spells_up_to(c, level)
 		end
 	end
 	for _, s in ipairs(classes.start_spells(c)) do add(s) end
+	local ids = {}
 	for _, r in ipairs(dk.db:query("SELECT spell_id FROM class_spells WHERE class_id = ? AND level <= ? ORDER BY level, spell_id",
 		c.id, level)) do
-		add(spells.get(r.spell_id))
+		ids[#ids + 1] = r.spell_id
 	end
+	local rows = spells.many(ids)
+	for _, id in ipairs(ids) do add(rows[id]) end
 	return out
 end
 

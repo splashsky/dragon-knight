@@ -9,11 +9,12 @@ local game = require("lib.game")
 local php = require("lib.php")
 local round = require("fight.round")
 local state = require("fight.state")
+local users = require("lib.users")
 
 local world = {}
 
 local function save_player(user_id, st)
-	dk.db:exec("UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
+	users.exec(user_id, "UPDATE users SET currenthp = ?, currentmp = ?, currenttp = ? WHERE id = ?",
 		php.mysql_uint(st.currenthp), php.mysql_uint(st.currentmp), php.mysql_uint(st.currenttp), user_id)
 end
 

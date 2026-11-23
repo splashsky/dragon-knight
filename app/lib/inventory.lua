@@ -8,8 +8,8 @@
 -- unit-tested in tests/lua/test_inventory.lua.
 --
 -- Effective stats (inventory.stats, game.stats) are lib/stats.lua's derive() of the users
--- row and the equipped items; the equipped items are kept for the request (lib/cache.lua)
--- and forgotten by any write to user_items or items. After an equipment change, current HP/MP/TP are clamped to
+-- row and the equipped items; a user's entries are read once and kept for the request
+-- (lib/cache.lua), forgotten by any write to user_items or items. After an equipment change, current HP/MP/TP are clamped to
 -- the new maxima (inventory.changed).
 --
 -- Items that cast a spell (lib/items.lua items.casts) have charges per row
@@ -17,8 +17,10 @@
 -- for the equipped ones at an inn (inventory.recharge); a single-use one (not
 -- rechargeable) is gone with its last charge.
 local cache = require("lib.cache")
+local control = require("lib.control")
 local items = require("lib.items")
 local stats = require("lib.stats")
+local users = require("lib.users")
 
 local inventory = {}
 
@@ -44,7 +46,7 @@ end
 
 -- control.inventory_size (bag stacks).
 function inventory.size()
-	return dk.db:value("SELECT inventory_size FROM control WHERE id = 1") or 12
+	return control.row().inventory_size or 12
 end
 
 ---------------------------------------------------------------------------------------
@@ -77,7 +79,9 @@ end
 ---------------------------------------------------------------------------------------
 -- Reading.
 
-local equipped = cache.store("equipped", { tables = { "user_items", "items" }, size = 32 })   -- user id -> entries
+-- every entry of a user (by entry id), read once and kept for the request until user_items or
+-- items is written: equipped, bag, entry and find hand out copies of them
+local held = cache.store("inventory", { tables = { "user_items", "items" }, size = 32 })   -- user id -> entries
 
 local function entry_of(r)
 	local e = { id = r.entry_id, user_id = r.entry_user, qty = r.entry_qty, equipped = r.entry_equipped,
@@ -90,47 +94,82 @@ end
 local SELECT = "SELECT ui.id AS entry_id, ui.user_id AS entry_user, ui.qty AS entry_qty, " ..
 							 "ui.equipped AS entry_equipped, ui.charges AS entry_charges, i.* FROM user_items ui JOIN items i ON i.id = ui.item_id "
 
--- Every entry of a user: { id, user_id, qty, equipped, charges, item }, by entry id.
-function inventory.entries(user_id)
-	local out = {}
-	for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? ORDER BY ui.id", user_id)) do
-		out[#out + 1] = entry_of(r)
-	end
-	return out
-end
-
--- The user's entry `entry_id`, or nil.
-function inventory.entry(user_id, entry_id)
-	local r = dk.db:first(SELECT .. "WHERE ui.user_id = ? AND ui.id = ?", user_id, entry_id)
-	return r and entry_of(r)
-end
-
--- Equipped entries: { slot -> entry }.
-function inventory.equipped(user_id)
-	return equipped:fetch(user_id, function()
+local function all(user_id)
+	return held:fetch(user_id, function()
 		local out = {}
-		for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? AND ui.equipped IS NOT NULL", user_id)) do
-			local e = entry_of(r)
-			out[e.equipped] = e
+		for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? ORDER BY ui.id", user_id)) do
+			out[#out + 1] = entry_of(r)
 		end
 		return out
 	end)
 end
 
--- Bag entries, by entry id.
-function inventory.bag(user_id)
+-- Reads the entries of many users (those not kept yet) in one query: the server's tick reads
+-- its fights' players' at once.
+function inventory.preload(user_ids)
+	if not cache.watched() then return end
+	local missing = {}
+	for _, id in ipairs(user_ids) do
+		if not select(2, held:get(id)) then missing[#missing + 1] = id end
+	end
+	for i = 1, #missing, 500 do
+		local part = table.move(missing, i, math.min(i + 499, #missing), 1, {})
+		local got = {}
+		for _, id in ipairs(part) do got[id] = {} end
+		for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id IN (" .. ("?,"):rep(#part):sub(1, -2) .. ") " ..
+			"ORDER BY ui.user_id, ui.id", table.unpack(part))) do
+			local e = entry_of(r)
+			table.insert(got[e.user_id], e)
+		end
+		for id, list in pairs(got) do held:put(id, list) end
+	end
+end
+
+-- (an entry's own table; its item row shared)
+local function own(e)
+	return { id = e.id, user_id = e.user_id, qty = e.qty, equipped = e.equipped, charges = e.charges, item = e.item }
+end
+
+-- Every entry of a user: { id, user_id, qty, equipped, charges, item }, by entry id.
+function inventory.entries(user_id)
 	local out = {}
-	for _, r in ipairs(dk.db:query(SELECT .. "WHERE ui.user_id = ? AND ui.equipped IS NULL ORDER BY ui.id", user_id)) do
-		out[#out + 1] = entry_of(r)
+	for _, e in ipairs(all(user_id)) do out[#out + 1] = own(e) end
+	return out
+end
+
+-- The user's entry `entry_id`, or nil.
+function inventory.entry(user_id, entry_id)
+	for _, e in ipairs(all(user_id)) do
+		if e.id == entry_id then return own(e) end
+	end
+	return nil
+end
+
+-- Equipped entries: { slot -> entry }.
+function inventory.equipped(user_id)
+	local out = {}
+	for _, e in ipairs(all(user_id)) do
+		if e.equipped then out[e.equipped] = own(e) end
 	end
 	return out
 end
 
--- The first bag entry of item `item_id`, or nil.
+-- Bag entries, by entry id.
+function inventory.bag(user_id)
+	local out = {}
+	for _, e in ipairs(all(user_id)) do
+		if not e.equipped then out[#out + 1] = own(e) end
+	end
+	return out
+end
+
+-- The first bag entry of item `item_id` (the smallest stack, then the oldest), or nil.
 function inventory.find(user_id, item_id)
-	local r = dk.db:first(SELECT .. "WHERE ui.user_id = ? AND ui.item_id = ? AND ui.equipped IS NULL " ..
-												"ORDER BY ui.qty, ui.id LIMIT 1", user_id, item_id)
-	return r and entry_of(r)
+	local best
+	for _, e in ipairs(all(user_id)) do
+		if not e.equipped and e.item.id == item_id and (not best or e.qty < best.qty) then best = e end
+	end
+	return best and own(best)
 end
 
 -- Effective stats of a users row (lib/stats.lua) with what it has equipped, and what the
@@ -162,8 +201,8 @@ end
 
 -- Forget the cached equipment and clamp current HP/MP/TP to the (new) maxima.
 function inventory.changed(user_id)
-	equipped:clear()
-	local user = dk.db:first("SELECT * FROM users WHERE id = ?", user_id)
+	held:clear()
+	local user = users.get(user_id)
 	if not user then return end
 	local c = stats.clamped(user, inventory.stats(user))
 	if c.currenthp ~= user.currenthp or c.currentmp ~= user.currentmp or c.currenttp ~= user.currenttp then
@@ -246,7 +285,7 @@ function inventory.spend_charge(entry)
 		return true
 	end
 	dk.db:exec("UPDATE user_items SET charges = charges - 1 WHERE id = ? AND charges > 0", entry.id)
-	equipped:clear()
+	held:clear()
 	return false
 end
 
@@ -261,7 +300,7 @@ function inventory.recharge(user_id)
 			out[#out + 1] = e
 		end
 	end
-	equipped:clear()
+	held:clear()
 	return out
 end
 

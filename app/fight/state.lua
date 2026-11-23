@@ -26,6 +26,7 @@
 -- Persisted values are names and plain data only (lib/action.lua action.params), never
 -- code: a charged spell's release step is saved by name, the battlefield's fields by key
 -- in f.data (fight/fields.lua).
+local cache = require("lib.cache")
 local fields = require("fight.fields")
 local interactables = require("lib.interactables")
 local load = require("lib.content.load")
@@ -199,11 +200,67 @@ end
 ---------------------------------------------------------------------------------------
 -- Persistence
 
--- Status instances of a query; those of a retired status (its file is gone, and with it
--- its code) end here.
-local function status_rows(sql, ...)
+-- The rows of a user's fight as the database has them: { fight = row or false, combatants
+-- = { row, ... } (by id), statuses = { row, ... } (by combatant, position) }, read for many
+-- users at once by state.preload (the server's tick), else one user's when loaded, and kept
+-- for the request; state.save and state.clear write one user's and forget only that one.
+local rows = cache.store("fight_rows", { tables = { "fights", "fight_combatants", "fight_statuses" }, size = 512 })
+local function in_list(n) return "(" .. ("?,"):rep(n):sub(1, -2) .. ")" end
+
+-- Reads the fights of `user_ids` (those not kept yet) in three queries.
+function state.preload(user_ids)
+	if not cache.watched() then return end
+	local missing = {}
+	for _, id in ipairs(user_ids) do
+		if not select(2, rows:get(id)) then missing[#missing + 1] = id end
+	end
+	for i = 1, #missing, 500 do
+		local part = table.move(missing, i, math.min(i + 499, #missing), 1, {})
+		local got = {}
+		for _, id in ipairs(part) do got[id] = { fight = false, combatants = {}, statuses = {} } end
+		local list = in_list(#part)
+		for _, r in ipairs(dk.db:query("SELECT * FROM fights WHERE user_id IN " .. list, table.unpack(part))) do
+			got[r.user_id].fight = r
+		end
+		for _, r in ipairs(dk.db:query("SELECT * FROM fight_combatants WHERE user_id IN " .. list ..
+			" ORDER BY user_id, id", table.unpack(part))) do
+			table.insert(got[r.user_id].combatants, r)
+		end
+		for _, r in ipairs(dk.db:query("SELECT * FROM fight_statuses WHERE user_id IN " .. list ..
+			" ORDER BY user_id, combatant_id, position", table.unpack(part))) do
+			table.insert(got[r.user_id].statuses, r)
+		end
+		for id, g in pairs(got) do rows:put(id, g) end
+	end
+end
+
+local function fight_rows(user_id)
+	local g, found = rows:get(user_id)
+	if found then return g end
+	state.preload({ user_id })
+	g, found = rows:get(user_id)
+	if found then return g end
+	-- (a store not kept: a command line run without the request's connection)
+	local fr = dk.db:first("SELECT * FROM fights WHERE user_id = ?", user_id)
+	return { fight = fr or false,
+		combatants = fr and dk.db:query("SELECT * FROM fight_combatants WHERE user_id = ? ORDER BY id", user_id) or {},
+		statuses = fr and dk.db:query("SELECT * FROM fight_statuses WHERE user_id = ? ORDER BY combatant_id, position",
+			user_id) or {} }
+end
+
+-- Writes to user `user_id`'s fight (fn runs them): only that fight's rows are forgotten, or
+-- kept as fn says they are now (its result: the rows written).
+local function writing(user_id, fn)
+	local raw = rows:own(fn)
+	rows:forget(user_id)
+	if raw and cache.watched() then rows:put(user_id, raw) end
+end
+
+-- Status instances of rows; those of a retired status (its file is gone, and with it its
+-- code) end here.
+local function status_list(list)
 	local out = {}
-	for _, r in ipairs(dk.db:query(sql, ...)) do
+	for _, r in ipairs(list) do
 		local row = statuses.get(r.status_id)
 		if row and row.retired == 0 then
 			out[#out + 1] = {
@@ -214,18 +271,22 @@ local function status_rows(sql, ...)
 	end
 	return out
 end
+local function status_rows(sql, ...)
+	return status_list(dk.db:query(sql, ...))
+end
 
 -- The fight of users row `user` (st: game.player(user)), or nil when there is none. Enemies
 -- whose monster is gone, summons whose row is gone and objects whose file is gone (retired)
 -- are left out (they can't act).
 function state.load(user, st)
-	local fr = dk.db:first("SELECT * FROM fights WHERE user_id = ?", user.id)
+	local raw = fight_rows(user.id)
+	local fr = raw.fight
 	if not fr then return nil end
 	local f = { user_id = user.id, round = fr.round, wave = fr.wave, data = state.decode(fr.data), st = st,
 		in_fight = true, combatants = {}, next_id = 1, outcome = fr.outcome, log = fr.log,
 		result = state.decode(fr.result), tick = fr.tick, deadline = fr.deadline }
 	local by_id = {}
-	for _, r in ipairs(dk.db:query("SELECT * FROM fight_combatants WHERE user_id = ? ORDER BY id", user.id)) do
+	for _, r in ipairs(raw.combatants) do
 		local c = { id = r.id, side = r.side, kind = r.kind, entity_id = r.entity_id, wave = r.wave, hp = r.hp,
 			maxhp = r.maxhp, mp = r.mp, maxmp = r.maxmp, ticks_left = r.ticks_left, data = state.decode(r.data),
 			statuses = {} }
@@ -248,7 +309,7 @@ function state.load(user, st)
 		end
 	end
 	if not state.player(f) then state.add(f, { side = "player", kind = "player" }) end
-	for _, s in ipairs(status_rows("SELECT * FROM fight_statuses WHERE user_id = ? ORDER BY combatant_id, position", user.id)) do
+	for _, s in ipairs(status_list(raw.statuses)) do
 		local c = by_id[s.combatant_id]
 		s.combatant_id = nil
 		if c then c.statuses[#c.statuses + 1] = s end
@@ -275,40 +336,76 @@ function state.due(f)
 	return fields.next_change(f, f.deadline) or f.deadline
 end
 
--- Writes the fight back (users' HP/MP/TP are the caller's: they belong to the users row).
-function state.save(f)
+-- One INSERT of many rows: `rows` lists of `width` values each (nothing when there are none).
+local function insert_many(head, width, rows)
+	if #rows == 0 then return end
+	local one = "(" .. ("?,"):rep(width):sub(1, -2) .. ")"
+	local args, n = {}, 0
+	for _, r in ipairs(rows) do
+		for i = 1, width do args[n + i] = r[i] end
+		n = n + width
+	end
+	-- (args may hold nil: pass the count)
+	dk.db:exec(head .. " VALUES " .. (one .. ","):rep(#rows):sub(1, -2), table.unpack(args, 1, #rows * width))
+end
+
+local COMBATANT_COLUMNS = { "user_id", "id", "side", "kind", "entity_id", "wave", "hp", "maxhp", "ticks_left", "data", "mp",
+	"maxmp", "level", "over" }
+local STATUS_COLUMNS = { "user_id", "combatant_id", "status_id", "position", "ticks_left", "data", "tick", "source" }
+local function named(columns, values)
+	local out = {}
+	for i, k in ipairs(columns) do out[k] = values[i] end
+	return out
+end
+
+-- the fight's row, then its combatants and their statuses in one statement each; the rows
+-- written are what the request reads next (a live answer's page after its POST)
+local function save_rows(f)
 	local uid = f.user_id
+	local fight = { user_id = uid, round = f.round, wave = f.wave, data = state.encode(f.data), outcome = f.outcome or "",
+		log = f.log or "", result = state.encode(f.result), tick = f.tick, deadline = f.deadline, due = state.due(f) }
 	dk.db:exec("INSERT INTO fights (user_id, round, wave, data, outcome, log, result, tick, deadline, due) " ..
 		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET round = excluded.round, " ..
 		"wave = excluded.wave, data = excluded.data, outcome = excluded.outcome, log = excluded.log, " ..
-		"result = excluded.result, tick = excluded.tick, deadline = excluded.deadline, due = excluded.due", uid, f.round,
-		f.wave, state.encode(f.data), f.outcome or "", f.log or "", state.encode(f.result), f.tick, f.deadline,
-		state.due(f))
+		"result = excluded.result, tick = excluded.tick, deadline = excluded.deadline, due = excluded.due", uid, fight.round,
+		fight.wave, fight.data, fight.outcome, fight.log, fight.result, fight.tick, fight.deadline, fight.due)
 	dk.db:exec("DELETE FROM fight_combatants WHERE user_id = ?", uid)
+	local combatants, statuses_ = {}, {}
 	for _, c in ipairs(f.combatants) do
 		local player = c.side == "player"
 		local object = c.kind == "object"
-		dk.db:exec("INSERT INTO fight_combatants (user_id, id, side, kind, entity_id, wave, hp, maxhp, ticks_left, data, " ..
-			"mp, maxmp, level, over) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, c.side, c.kind,
-			c.entity_id, c.wave or 0, not player and c.hp or nil, not player and c.maxhp or nil, c.ticks_left,
-			state.encode(c.data), c.kind == "monster" and c.mp or nil, c.kind == "monster" and c.maxmp or nil,
-			object and c.level or nil, object and c.over or nil)
-		for i, s in ipairs(c.statuses) do
-			dk.db:exec("INSERT INTO fight_statuses (user_id, combatant_id, status_id, position, ticks_left, data, " ..
-				"tick, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", uid, c.id, s.status_id, i, s.ticks_left,
-				state.encode(s.data), s.tick or 0, s.source)
+		combatants[#combatants + 1] = { uid, c.id, c.side, c.kind, c.entity_id, c.wave or 0, not player and c.hp or nil,
+			not player and c.maxhp or nil, c.ticks_left, state.encode(c.data), c.kind == "monster" and c.mp or nil,
+			c.kind == "monster" and c.maxmp or nil, object and c.level or nil, object and c.over or nil }
+		for i, st in ipairs(c.statuses) do
+			statuses_[#statuses_ + 1] = { uid, c.id, st.status_id, i, st.ticks_left, state.encode(st.data), st.tick or 0,
+				st.source }
 		end
 	end
+	insert_many("INSERT INTO fight_combatants (" .. table.concat(COMBATANT_COLUMNS, ", ") .. ")", 14, combatants)
+	insert_many("INSERT INTO fight_statuses (" .. table.concat(STATUS_COLUMNS, ", ") .. ")", 8, statuses_)
+	local raw = { fight = fight, combatants = {}, statuses = {} }
+	for i, c in ipairs(combatants) do raw.combatants[i] = named(COMBATANT_COLUMNS, c) end
+	for i, st in ipairs(statuses_) do raw.statuses[i] = named(STATUS_COLUMNS, st) end
+	return raw
+end
+
+-- Writes the fight back (users' HP/MP/TP are the caller's: they belong to the users row).
+function state.save(f)
+	writing(f.user_id, function() return save_rows(f) end)
 end
 
 -- No fight any more (an escape, a new encounter): its combatants and statuses go too.
 function state.clear(user_id)
-	dk.db:exec("DELETE FROM fights WHERE user_id = ?", user_id)
+	writing(user_id, function()
+		dk.db:exec("DELETE FROM fights WHERE user_id = ?", user_id)
+		return { fight = false, combatants = {}, statuses = {} }
+	end)
 end
 
 -- The player moves on (a map move, travel): a finished fight kept for its page goes.
 function state.forget(user_id)
-	dk.db:exec("DELETE FROM fights WHERE user_id = ? AND outcome <> ''", user_id)
+	writing(user_id, function() dk.db:exec("DELETE FROM fights WHERE user_id = ? AND outcome <> ''", user_id) end)
 end
 
 -- The player outside fights, with the world statuses (user_statuses); tick: the clock's
@@ -322,10 +419,11 @@ end
 
 function state.save_world(f)
 	dk.db:exec("DELETE FROM user_statuses WHERE user_id = ?", f.user_id)
+	local rows = {}
 	for i, s in ipairs(state.player(f).statuses) do
-		dk.db:exec("INSERT INTO user_statuses (user_id, status_id, position, ticks_left, data, tick) VALUES (?, ?, ?, ?, ?, ?)",
-			f.user_id, s.status_id, i, s.ticks_left, state.encode(s.data), s.tick or 0)
+		rows[#rows + 1] = { f.user_id, s.status_id, i, s.ticks_left, state.encode(s.data), s.tick or 0 }
 	end
+	insert_many("INSERT INTO user_statuses (user_id, status_id, position, ticks_left, data, tick)", 6, rows)
 end
 
 return state

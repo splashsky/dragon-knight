@@ -1556,8 +1556,11 @@ migrations.STEPS = {
 migrations.VERSION = #migrations.STEPS
 
 -- The database's schema version (PRAGMA user_version).
+-- (kept for the request, lib/cache.lua: main.lua asks on every dispatch, a live answer's
+-- redirects followed too; stamping it, a PRAGMA that sets, forgets it)
+local version = require("lib.cache").store("schema_version", { size = 2 })
 function migrations.current()
-	return dk.db:value("PRAGMA user_version")
+	return version:fetch(1, function() return dk.db:value("PRAGMA user_version") end)
 end
 
 function migrations.stamp(version)

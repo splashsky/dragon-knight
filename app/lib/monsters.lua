@@ -66,25 +66,38 @@ local function empty()
 	return { equipment = {}, items = {}, spells = {} }
 end
 
--- Monster `id`'s own loadout (three queries; its items and spells from their caches).
+-- Monster `id`'s own loadout: its equipment, items and spells in one query, then the item
+-- and spell rows it names in one query each at most (those not read yet in the request).
+local LOADOUT_SQL = "SELECT 'equipment' AS list, 0 AS position, slot, item_id AS ref, 1 AS weight, NULL AS stock, " ..
+	"0 AS has_when, '' AS aim FROM monster_equipment WHERE monster_id = ?1 " ..
+	"UNION ALL SELECT 'items', position, NULL, item_id, weight, stock, has_when, aim FROM monster_items WHERE monster_id = ?1 " ..
+	"UNION ALL SELECT 'spells', position, NULL, spell_id, weight, NULL, has_when, aim FROM monster_spells " ..
+	"WHERE monster_id = ?1 ORDER BY 1, 2"
 local function load_one(id)
 	local lo = empty()
-	for _, r in ipairs(dk.db:query("SELECT slot, item_id FROM monster_equipment WHERE monster_id = ?", id)) do
-		local it = items.get(r.item_id)
-		if it then table.insert(lo.equipment, { slot = r.slot, item = it }) end
+	local rows_, item_ids, spell_ids = dk.db:query(LOADOUT_SQL, id), {}, {}
+	for _, r in ipairs(rows_) do
+		if r.list == "spells" then spell_ids[#spell_ids + 1] = r.ref else item_ids[#item_ids + 1] = r.ref end
 	end
-	for _, r in ipairs(dk.db:query("SELECT * FROM monster_items WHERE monster_id = ? ORDER BY position", id)) do
-		local it = items.get(r.item_id)
-		if it then
-			table.insert(lo.items, { position = r.position, item = it, weight = r.weight, stock = r.stock,
-				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
-		end
-	end
-	for _, r in ipairs(dk.db:query("SELECT * FROM monster_spells WHERE monster_id = ? ORDER BY position", id)) do
-		local sp = spells.get(r.spell_id)
-		if sp then
-			table.insert(lo.spells, { position = r.position, spell = sp, weight = r.weight,
-				has_when = r.has_when ~= 0, aim = r.aim ~= "" and r.aim or nil })
+	local item_rows = #item_ids > 0 and items.many(item_ids) or {}
+	local spell_rows = #spell_ids > 0 and spells.many(spell_ids) or {}
+	for _, r in ipairs(rows_) do
+		local aim = r.aim ~= "" and r.aim or nil
+		if r.list == "equipment" then
+			local it = item_rows[r.ref]
+			if it then table.insert(lo.equipment, { slot = r.slot, item = it }) end
+		elseif r.list == "items" then
+			local it = item_rows[r.ref]
+			if it then
+				table.insert(lo.items, { position = r.position, item = it, weight = r.weight, stock = r.stock,
+					has_when = r.has_when ~= 0, aim = aim })
+			end
+		else
+			local sp = spell_rows[r.ref]
+			if sp then
+				table.insert(lo.spells, { position = r.position, spell = sp, weight = r.weight, has_when = r.has_when ~= 0,
+					aim = aim })
+			end
 		end
 	end
 	table.sort(lo.equipment, function(a, b) return (SLOT_ORDER[a.slot] or 99) < (SLOT_ORDER[b.slot] or 99) end)

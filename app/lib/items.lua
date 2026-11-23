@@ -63,6 +63,11 @@ function items.get(id)
 	return rows.get(id)
 end
 
+-- The items of a list of ids (or keys, by = "key"), read in one query at most: { [id] = row }.
+function items.many(list, by)
+	return rows.many(list, by)
+end
+
 function items.by_key(key)
 	return rows.by_key(key)
 end
