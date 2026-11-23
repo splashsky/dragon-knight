@@ -3705,3 +3705,6 @@ The version shown in the footer is `view.GAME_VERSION` (`app/lib/view.lua`); it 
 (`m.d.yyyy` dates, one short past-tense line per change). Entries up to 1.1.11 are the
 original `changelog.txt` and stay verbatim. Between releases, the version is the next one
 with `-dev` (e.g. `2.1.0-dev`) and its entry has `date = "unreleased"` until the release.
+When versions open and close (a minor a working session, a patch a group of bug fixes, one
+release a session) and what every request leaves done is the policy in `AGENTS.md`
+"Versioning".
