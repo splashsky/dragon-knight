@@ -488,6 +488,13 @@ CREATE TABLE user_hotbar (
 ) WITHOUT ROWID;
 CREATE UNIQUE INDEX user_hotbar_slot ON user_hotbar (user_id, slot);
 
+-- The World Map's cells each character has walked near (schema version 27, app/lib/explored.lua:
+-- the fog of war): a bitmap of the map's 101 x 101 cells as text, six cells a character.
+CREATE TABLE user_explored (
+	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+	cells    TEXT    NOT NULL DEFAULT ''
+);
+
 -- Server-side login sessions (app/lib/session.lua). token_hash = hex(sha256(cookie)).
 CREATE TABLE sessions (
 	token_hash  TEXT    PRIMARY KEY,

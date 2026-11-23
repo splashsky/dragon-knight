@@ -45,7 +45,7 @@ table.inventory td + td { width: 100%; }
 	background: center / contain no-repeat;
 }
 .world-map-canvas + .world-map-svg { position: relative; z-index: 1; }
-.world-map-glsky .world-map-svg > image { visibility: hidden; }
+.world-map-glsky .world-map-land { visibility: hidden; }
 .world-map-glsky .world-sky { display: none; }
 .world-map-lit .world-map-town circle { fill: #ffcf73; stroke: #3b2a1a; }
 .world-map-lit .world-map-town text { fill: #f6ecd2; stroke: #1d150c; stroke-opacity: 0.7; }

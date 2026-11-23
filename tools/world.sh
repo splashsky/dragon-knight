@@ -1,14 +1,15 @@
 #!/bin/sh
 # tools/world.sh :: (re)writes the world's data and picture (docs/APP.md "Terrain and the
 # map"): app/lib/terrain/world.lua from world generator v1 (app/lib/terrain/generator_v1.lua),
-# public/images/world.svg drawn from it (app/lib/terrain/picture.lua), and
+# public/images/world.svg drawn from it (app/lib/terrain/picture.lua) and its frame,
+# public/images/world-frame.svg (the compass rose, the scale bar and the border), and
 # public/images/world-relief.bin, its heights and water a byte a cell (terrain.relief: the
 # World Map's WebGL sky).
 #
 #   BIN=./dk tools/world.sh
 #
 # The data it writes must be the committed data, byte for byte (tests/lua/test_terrain.lua
-# checks it, and that the picture and the relief are drawn from it), so this changes nothing unless
+# checks it, and that the picture, the frame and the relief are drawn from it), so this changes nothing unless
 # generator v1 or the picture's drawing or colours changed. Generator v1 is frozen since
 # 3.2.0's release: the world is permanent, and a new world is a new generator beside v1 and
 # a deliberate commit of its data. It runs in the project's own
@@ -36,5 +37,6 @@ EOF
 DK_WORLD_OUT="$T" "$BIN" check --config "$T/config.lua" >"$T/out" 2>&1 || { cat "$T/out" >&2; exit 1; }
 cp "$T/world.lua" "$ROOT/app/lib/terrain/world.lua"
 cp "$T/world.svg" "$ROOT/public/images/world.svg"
+cp "$T/world-frame.svg" "$ROOT/public/images/world-frame.svg"
 cp "$T/world-relief.bin" "$ROOT/public/images/world-relief.bin"
-echo "wrote app/lib/terrain/world.lua, public/images/world.svg and public/images/world-relief.bin"
+echo "wrote app/lib/terrain/world.lua, public/images/world.svg, public/images/world-frame.svg and public/images/world-relief.bin"

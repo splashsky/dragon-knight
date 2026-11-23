@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 101 101" width="909" height="909">
+<g transform="translate(92 9)" fill="#5a4630" stroke="#5a4630" stroke-width=".12"><circle r="4.2" fill="none" stroke-opacity=".6"/><circle r="3.4" fill="none" stroke-opacity=".4"/><path d="M0-5L.9-.9 5 0 .9.9 0 5-.9.9-5 0-.9-.9z" fill="#efe4c6"/><path d="M0-5L.9-.9 0 0zM5 0L.9.9 0 0zM0 5L-.9.9 0 0zM-5 0L-.9-.9 0 0z" stroke="none"/><path d="M2.5-2.5L.5 0 0-.5zM2.5 2.5L0 .5.5 0zM-2.5 2.5L-.5 0 0 .5zM-2.5-2.5L0-.5-.5 0z" stroke="none" fill-opacity=".55"/><text y="-5.6" text-anchor="middle" font-size="2.4" stroke="none" font-family="Vollkorn, Georgia, serif">N</text></g>
+<g fill="#5a4630" stroke="#5a4630" stroke-width=".12" font-family="Vollkorn, Georgia, serif" font-size="1.9" text-anchor="middle"><rect x="72" y="97" width="20" height=".6" fill="none"/><rect x="72" y="97" width="5" height=".6"/><rect x="82" y="97" width="5" height=".6"/><text x="72" y="96.4" stroke="none">0</text><text x="82" y="96.4" stroke="none">50</text><text x="92" y="96.4" stroke="none">100 tiles</text></g>
+<rect x=".3" y=".3" width="100.4" height="100.4" fill="none" stroke="#5a4630" stroke-width=".35"/>
+<rect x=".9" y=".9" width="99.2" height="99.2" fill="none" stroke="#5a4630" stroke-width=".1"/>
+</svg>

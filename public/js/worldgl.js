@@ -49,7 +49,7 @@
 		"#version 300 es",
 		"precision highp float;",
 		"uniform vec4 uView;   // offset (px), pixels a unit, canvas height (px)",
-		"uniform sampler2D uNoise, uRelief, uSky0, uSky1, uGround0, uGround1;",
+		"uniform sampler2D uNoise, uRelief, uSky0, uSky1, uGround0, uGround1, uKnown;",
 		"uniform float uMix, uTime, uDpr, uNight, uDay, uLightK, uShadeK, uWashA;",
 		"uniform vec3 uL, uLCol, uShade, uWash;",
 		"uniform vec4 uStorms[" + MAX_STORMS + "]; uniform int uNStorms;",
@@ -74,6 +74,8 @@
 		"void main() {",
 		"  vec2 p = (vec2(gl_FragCoord.x, uView.w - gl_FragCoord.y) - uView.xy) / uView.z;",
 		"  if (p.x < 0.0 || p.y < 0.0 || p.x > 101.0 || p.y > 101.0) { outColor = vec4(0.0); return; }",
+		// nothing beyond the cells the player knows: the fog of war covers them (town/fog.lua)
+		"  if (texture(uKnown, p / 101.0).r <= 0.0) { outColor = vec4(0.0); return; }",
 		"  acc = vec4(0.0);",
 		"  vec2 rel = texture(uRelief, p / 101.0).rg; float h = rel.r; float water = smoothstep(0.4, 0.6, rel.g);",
 		"  vec2 warp = (nz2(p * 5.0 + 9.0) - 0.5) * 1.8;",
@@ -226,6 +228,36 @@
 		return out;
 	}
 
+	// the cells the player knows (the map's data-sky-known: lib/explored.lua's text, six cells a
+	// character, cell i bit i % 6 of character i / 6), as a texture's bytes (255 known), and
+	// whether each weather cell (two map cells a side) has a known cell within a cell of it
+	var KNOWN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+	function knownOf(text) {
+		var cells = new Uint8Array(SIDE * SIDE), weather = new Uint8Array(WSIDE * WSIDE);
+		if (text == null) { cells.fill(255); weather.fill(1); return { cells: cells, weather: weather }; }
+		for (var k = 0; k < text.length; k++) {
+			var v = KNOWN_ALPHABET.indexOf(text.charAt(k));
+			for (var b = 0; b < 6; b++) if (v > 0 && v & (1 << b) && k * 6 + b < SIDE * SIDE) cells[k * 6 + b] = 255;
+		}
+		for (var wr = 0; wr < WSIDE; wr++) for (var wc = 0; wc < WSIDE; wc++) {
+			for (var r = Math.max(2 * wr - 3, 0); r <= Math.min(2 * wr + 1, SIDE - 1) && !weather[wr * WSIDE + wc]; r++) {
+				for (var c = Math.max(2 * wc - 1, 0); c <= Math.min(2 * wc + 3, SIDE - 1); c++) {
+					if (cells[r * SIDE + c]) { weather[wr * WSIDE + wc] = 1; break; }
+				}
+			}
+		}
+		return { cells: cells, weather: weather };
+	}
+	function knowsNear(known, x, y, rad) {
+		if (!known) return true;
+		for (var r = Math.max(Math.floor(y - rad), 0); r <= Math.min(Math.floor(y + rad), SIDE - 1); r++) {
+			for (var c = Math.max(Math.floor(x - rad), 0); c <= Math.min(Math.floor(x + rad), SIDE - 1); c++) {
+				if (known.cells[r * SIDE + c]) return true;
+			}
+		}
+		return false;
+	}
+
 	function skyName(d, i) { return SKIES[(ALPHABET.indexOf(d.cells.charAt(i)) / 5) | 0] || "clear"; }
 	// a tick's sky as textures (cover, rain, snowfall, fog; wetness, snow lying, thunder, heat)
 	function skyOf(d) {
@@ -239,15 +271,16 @@
 		return { sky: bspline(ch.slice(0, 4), WSIDE, SUP, new Uint8ClampedArray(WS * WS * 4), 4, 255),
 			ground: bspline(ch.slice(4), WSIDE, SUP, new Uint8ClampedArray(WS * WS * 4), 4, 255) };
 	}
-	// the frame rate the sky needs where the map is in view (rect: map units, null all): 30
-	// for rain, snow or lightning, 15 for clouds, fog, heat or a storm, else 0 (still)
-	function levelOf(d, rect) {
+	// the frame rate the sky needs where the map is in view (rect: map units, null all) and
+	// known (the fog of war hides the rest): 30 for rain, snow or lightning, 15 for clouds,
+	// fog, heat or a storm, else 0 (still)
+	function levelOf(d, rect, known) {
 		var fps = 0;
 		for (var i = 0; i < WSIDE * WSIDE && fps < 30; i++) {
 			var f = SKY[skyName(d, i)][4];
-			if (f > fps && inView(rect, 2 * (i % WSIDE) + 1.5, 2 * ((i / WSIDE) | 0) - 0.5, 2)) fps = f;
+			if (f > fps && (!known || known.weather[i]) && inView(rect, 2 * (i % WSIDE) + 1.5, 2 * ((i / WSIDE) | 0) - 0.5, 2)) fps = f;
 		}
-		(d.storms || []).forEach(function (s) { if (fps < 15 && inView(rect, s.x, s.y, s.r)) fps = 15; });
+		(d.storms || []).forEach(function (s) { if (fps < 15 && inView(rect, s.x, s.y, s.r) && knowsNear(known, s.x, s.y, s.r)) fps = 15; });
 		return fps;
 	}
 	function inView(rect, x, y, r) { return !rect || (x + r >= rect[0] && x - r <= rect[2] && y + r >= rect[1] && y - r <= rect[3]); }
@@ -300,7 +333,7 @@
 				var e = entries[entries.length - 1];
 				r.visible = e.isIntersecting;
 				r.rect = visibleRect(r, e.isIntersecting ? e.intersectionRect : null);
-				if (r.data) r.level = levelOf(r.data, r.rect);
+				if (r.data) r.level = levelOf(r.data, r.rect, r.known);
 				if (r.visible) start(r); else r.running = false;
 			}, { threshold: [0, 0.25, 0.5, 0.75, 1] });
 		}
@@ -369,9 +402,20 @@
 		// the cells' skies, the tick before (units 2, 4) and this one (3, 5)
 		r.tex = [texture(2, "uSky0", WS, WS, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, blank), texture(3, "uSky1", WS, WS, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, blank),
 			texture(4, "uGround0", WS, WS, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, blank), texture(5, "uGround1", WS, WS, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, blank)];
+		r.knownTex = texture(6, "uKnown", SIDE, SIDE, gl.R8, gl.RED, gl.UNSIGNED_BYTE, (r.known || knownOf(null)).cells);
 		r.gl = gl; r.u = u;
 		if (r.data) { var d = r.data; r.data = null; setSky(r, d); }
 		return true;
+	}
+
+	// the cells the player knows, from the map shown (a move brings the map again)
+	function setKnown(r, text) {
+		r.known = knownOf(text);
+		if (r.gl && r.knownTex) {
+			r.gl.activeTexture(r.gl.TEXTURE6);
+			r.gl.texSubImage2D(r.gl.TEXTURE_2D, 0, 0, 0, SIDE, SIDE, r.gl.RED, r.gl.UNSIGNED_BYTE, r.known.cells);
+		}
+		if (r.data) r.level = levelOf(r.data, r.rect, r.known);
 	}
 
 	function upload(gl, unit, data) {
@@ -384,7 +428,7 @@
 		var gl = r.gl, now = performance.now(), first = !r.data, t0 = now;
 		var s = skyOf(d);
 		r.skyMs = performance.now() - t0;
-		r.level = levelOf(d, r.rect);
+		r.level = levelOf(d, r.rect, r.known);
 		var fade = !first && r.level > 0 && !r.still;
 		if (gl) {
 			if (fade) {
@@ -444,7 +488,7 @@
 		if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; }
 		r.dpr = dpr;
 		r.rect = visibleRect(r);
-		if (r.data) r.level = levelOf(r.data, r.rect);
+		if (r.data) r.level = levelOf(r.data, r.rect, r.known);
 	}
 	function view(r) {
 		var w = r.canvas.width, h = r.canvas.height, s = Math.min(w, h) / SIDE;
@@ -603,7 +647,7 @@
 	function attach(map) {
 		if (refused || !map || (R && R.map === map)) return;
 		dataUrl = map.getAttribute("data-sky-data"); reliefUrl = map.getAttribute("data-sky-relief");
-		var svg = map.querySelector(".world-map-svg"), image = svg && svg.querySelector("image");
+		var svg = map.querySelector(".world-map-svg"), image = svg && svg.querySelector(".world-map-land");
 		if (!svg || !dataUrl || !reliefUrl || !image) return;
 		var t0 = performance.now(), r = R;
 		if (!r) {
@@ -613,6 +657,7 @@
 		}
 		if (r.map && r.map !== map && r.map.isConnected) showSVG(r);
 		r.map = map; r.svg = svg;
+		setKnown(r, map.getAttribute("data-sky-known"));
 		r.still = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 		r.canvas.style.backgroundImage = "url(\"" + image.getAttribute("href") + "\")";
 		map.insertBefore(r.canvas, svg);
@@ -680,13 +725,16 @@
 				}
 				return out;
 			},
-			// a frame drawn now: how much of the canvas it covers (the mean alpha, 0 to 1)
-			coverage: function () {
-				var r = R, gl = r.gl, w = r.canvas.width, h = r.canvas.height, px = new Uint8Array(w * h * 4), sum = 0;
+			// a frame drawn now: how much of the canvas (or of a band of it, from y0 to y1, shares
+			// of its height from the top) it covers (the mean alpha, 0 to 1)
+			coverage: function (y0, y1) {
+				var r = R, gl = r.gl, w = r.canvas.width, h = r.canvas.height;
+				var top = Math.round((y0 || 0) * h), bottom = Math.round((y1 == null ? 1 : y1) * h), rows = Math.max(bottom - top, 1);
+				var px = new Uint8Array(w * rows * 4), sum = 0;
 				draw(r, performance.now());
-				gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+				gl.readPixels(0, h - top - rows, w, rows, gl.RGBA, gl.UNSIGNED_BYTE, px);
 				for (var i = 3; i < px.length; i += 4) sum += px[i];
-				return sum / (w * h * 255);
+				return sum / (w * rows * 255);
 			},
 			stats: function () { return R ? R.stats.slice() : []; },
 			resetStats: function () { if (R) R.stats = []; },

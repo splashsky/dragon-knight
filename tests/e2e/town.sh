@@ -30,32 +30,39 @@ expect_body '<a class="charpanel-more" href="/character" target="_blank" data-wi
 t_get /map -H 'X-DK-Modal: 1';       expect_header '^x-dk-modal: 1'
 # where it can, the page draws the weather with WebGL from data (worldgl.js; the test
 # routes let the browser test do it in software)
-expect_body '<div class="world-map" data-sky-data="/map/sky/data" data-sky-relief="/static/images/world-relief.bin" data-sky-test>'
+expect_body '<div class="world-map" data-sky-data="/map/sky/data" data-sky-relief="/static/images/world-relief.bin" data-sky-known="'
+expect_body '" data-sky-test>'
 expect_no_body '<html'
-# the land's picture, the weather over it as of the render, then the towns and the player on
-# top (in town at Midworld: the map's centre), with legends of the land and the weather; the
-# picture is a static file
-expect_body '<svg class="world-map-svg" viewBox="0 0 101 101"'; expect_body '<image href="/static/images/world.svg" width="101" height="101"/>'
+# the land's picture, the weather over it as of the render, the fog of war over what the
+# player hasn't mapped, the map's frame, then the towns they know and the player on top (in
+# town at Midworld: the map's centre), with legends of the land and the weather; the
+# picture and the frame are static files
+expect_body '<svg class="world-map-svg" viewBox="0 0 101 101"'; expect_body '<image class="world-map-land" href="/static/images/world.svg" width="101" height="101"/>'
 expect_body "<g class=\"world-sky\" data-sky=\"$((T_NOW / 10))\">"
+expect_body '<g class="world-fog">'; expect_body '<image class="world-map-frame" href="/static/images/world-frame.svg" width="101" height="101"/>'
 expect_body '<g class="world-map-town"><circle cx="50.5" cy="50.5" r="0.9"/><text x="52.1" y="51.5" text-anchor="start">Midworld</text></g>'
-# Endworld is on the map's corner: its mark nudged inside the frame, its name above it
-expect_body '<g class="world-map-town"><circle cx="1.4" cy="99.6" r="0.9"/><text x="3.0" y="98.0" text-anchor="start">Endworld</text></g>'
+# Endworld isn't mapped yet
+expect_no_body '>Endworld</text>'
 expect_body '<circle class="world-map-you" cx="50.5" cy="50.5" r="1.7"><title>You are here (0N, 0E)</title></circle>'
-# in that order: the picture, the sky, the towns, the player
-[ "$(grep -o '<image href="/static/images/world.svg"\|<g class="world-sky"\|<g class="world-map-town"\|<circle class="world-map-you"' "$BODY" | uniq | tr '\n' '|')" \
-	= '<image href="/static/images/world.svg"|<g class="world-sky"|<g class="world-map-town"|<circle class="world-map-you"|' ] \
+# in that order: the picture, the sky, the fog, the frame, the towns, the player
+[ "$(grep -o '<image class="world-map-land"\|<g class="world-sky"\|<g class="world-fog"\|<image class="world-map-frame"\|<g class="world-map-town"\|<circle class="world-map-you"' "$BODY" | uniq | tr '\n' '|')" \
+	= '<image class="world-map-land"|<g class="world-sky"|<g class="world-fog"|<image class="world-map-frame"|<g class="world-map-town"|<circle class="world-map-you"|' ] \
 	&& t_ok || t_fail "the map's layers in order"
 # the legend folds under the map: open on the page (the window folds it: windows.js)
 tr -d '\n' < "$BODY" | grep -qF '</svg><details class="world-map-key" open><summary>Legend</summary><ul class="world-map-legend">' \
 	&& t_ok || t_fail "the legend folding under the map"
 tr -d '\n' < "$BODY" | grep -qF 'Night</li></ul></details></div>' && t_ok || t_fail "the weather's legend in it"
-expect_body 'The Thornbog</li>'; expect_body 'Lakes and ponds</li>'; expect_body 'Peaks</li>'; expect_body 'Thunderstorm</li>'; expect_body 'Night</li>'
+expect_body 'The Thornbog</li>'; expect_body 'Lakes and ponds</li>'; expect_body 'Peaks</li>'; expect_body 'Unexplored</li>'; expect_body 'Thunderstorm</li>'; expect_body 'Night</li>'
 tu "latitude=-3, longitude=3"
 t_get /map; expect_body '<circle class="world-map-you" cx="51.1" cy="51.1" r="1.7"><title>You are here (3S, 3E)</title></circle>'
-tu "latitude=0, longitude=0"
+# a town on the map's corner: its mark nudged inside the frame, its name above it
+tu "towns='0,8'"
+t_get /map; expect_body '<g class="world-map-town"><circle cx="1.4" cy="99.6" r="0.9"/><text x="3.0" y="98.0" text-anchor="start">Endworld</text></g>'
+tu "latitude=0, longitude=0, towns='0'"
 t_get /static/images/world-relief.bin; expect_status 200; [ "$(wc -c < "$BODY")" = 10201 ] && t_ok || t_fail "the relief: a byte a cell"
 t_get /static/images/world.svg; expect_status 200; expect_header '^content-type: image/svg\+xml'
 expect_body '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 101 101"'
+t_get /static/images/world-frame.svg; expect_status 200; expect_body '>100 tiles</text>'
 t_get /character -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body '<div class="charsheet">'; expect_body 'Travel Points:'
 expect_no_body '<html'
 
@@ -441,6 +448,29 @@ tu "currentaction='Fighting', latitude=3, longitude=3"
 t_post /move "csrf=$TC&north=North"; expect_redirect /fight
 expect_db "latitude" "3" "move while fighting"
 
+t_section "town: the fog of war"
+# the map shows the cells the player has mapped (lib/explored.lua): where they walked, their
+# towns and where they stand, each with the eight cells around (a cell: 5 x 5 tiles)
+known() { python3 -c '
+import re, sys
+A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+t = re.search(r"data-sky-known=\"([^\"]*)\"", open(sys.argv[1]).read()).group(1)
+print(sum(bin(A.index(c)).count("1") for c in t))' "$BODY"; }
+t_sql "DELETE FROM user_explored WHERE user_id = (SELECT id FROM users WHERE username = 'townie')"; t_fight_clear townie
+tu "currentaction='Exploring', latitude=22, longitude=30, towns='0', currenthp=100000, base_maxhp=100000"
+t_get /map; [ "$(known)" = 9 ] && t_ok || t_fail "where they stand: $(known) cells"
+expect_no_body '>Roma</text>'; expect_no_body '>Midworld</text>'
+# a step north: the cell with Roma is next to theirs
+t_post /move "csrf=$TC&north=North"; t_fight_clear townie
+[ "$(t_sql "SELECT count(*) FROM user_explored WHERE user_id = (SELECT id FROM users WHERE username = 'townie')")" = 1 ] && t_ok || t_fail "the walk is kept"
+tu "currentaction='Exploring', latitude=-100, longitude=-20"
+t_get /map; [ "$(known)" = 18 ] && t_ok || t_fail "the walk and where they stand: $(known) cells"
+expect_body '>Roma</text>'; expect_no_body '>Midworld</text>'
+# a map bought (or a town visited) shows its town and the cells around it
+tu "towns='0,1'"
+t_get /map; [ "$(known)" = 27 ] && t_ok || t_fail "and Midworld's: $(known) cells"; expect_body '>Midworld</text>'
+tu "$TOWN_HOME, towns='0', currenthp=20, base_maxhp=20"
+
 t_section "town: heal spells"
 tu "$TOWN_HOME, currenthp=5, base_maxhp=20, currentmp=20, base_maxmp=20"; t_spells townie ""
 t_post /spell/1 "csrf=$TC";       expect_body 'You have not yet learned this spell.'
@@ -505,7 +535,7 @@ t_get "/character/$ADMIN_ID";     expect_status 200
 expect_body 'Here is the character profile for <b>Admin</b>'; expect_body 'action="/move"'
 expect_no_body 'Next Level'
 t_get /character/999999;          expect_body 'No such user.'
-t_get /map;                       expect_status 200; expect_body '<image href="/static/images/world.svg"'
+t_get /map;                       expect_status 200; expect_body '<image class="world-map-land" href="/static/images/world.svg"'
 
 t_section "town: babble"
 # (the chat in detail, live: tests/e2e/chat.sh; the rate limit is lifted here by aging the

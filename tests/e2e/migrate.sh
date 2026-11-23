@@ -20,7 +20,8 @@
 # go on, and what sat on the hotbar's key 9 (Guard's now) moves to a free key or off the
 # bar; version 22 -> 24 (schema_v22.sql) the fields and the 3.2 wares; version 24 -> 25
 # (schema_v24.sql) the interactables, the fields' wind, area actions and aims, a fight in
-# progress going on; version 25 -> 26 the Explosive Barrel in three shops. Since version
+# progress going on; version 25 -> 26 the Explosive Barrel in three shops; version 26 -> 27
+# the World Map's fog of war (each character has mapped where they stand). Since version
 # 14 every migrated Mage has 5 more MP: mig_users takes them off to compare with before.
 # Sourced by tests/run.sh. Uses its own database and a second server; the main test
 # database is only stamped with other versions for a moment.
@@ -1497,6 +1498,11 @@ mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE 
 mig_eq "SELECT count(*) FROM items i JOIN town_items t ON t.item_key = i.key WHERE t.town_id = 5 AND i.key = 'explosive_barrel' AND i.retired = 0 AND i.price = 180" \
 	"1" "a ware is an item at its price in its shop"
 mig_eq "SELECT count(*) FROM town_items WHERE item_key = 'war_standard'" "0" "the war standard is sold nowhere"
+# step 27: the character standing at 5N, 5E has mapped the map's cell there (row 49, column 51)
+# and the eight around it: rows 48-50, columns 50-52 (cell i: bit i % 6 of character i / 6)
+grep -qF "Migrating to version 27: the World Map's fog of war" "$T/migrate.log" && t_ok || t_fail "step 27 not reported: $(cat "$T/migrate.log")"
+mig_eq "SELECT user_id || ':' || length(cells) || ':' || ltrim(cells, 'A') FROM user_explored" \
+	"1:851:cAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAH" "each character has mapped where they stand"
 mig_eq "SELECT count(*) || '|' || sum(retired) FROM interactables" "$M_IA|0" "the objects synced"
 mig_eq "SELECT hp || ':' || resist || ':' || replace(spawn, char(10), ';') FROM interactables WHERE key = 'beehive'" \
 	"12:fire=-50:1.biomes=weald;1.chance=18;1.features=none;1.fields=heat,sun;1.unless=blizzard,downpour,night,rain,snow,thunderstorm;2.biomes=weald;2.chance=9;2.features=hill,lake,pond;2.fields=heat,sun;2.unless=blizzard,downpour,night,rain,snow,thunderstorm;3.chance=12;3.fields=forest;3.unless=blizzard,downpour,night,rain,snow,thunderstorm;4.biomes=weald;4.chance=6;4.features=hill,lake,pond;4.unless=blizzard,downpour,night,rain,snow,thunderstorm" "an object's data"
@@ -1518,10 +1524,10 @@ mig_unserve "$MIG/v24server.log"
 "$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v24)"
 
 t_section "migrate: version 25 database"
-# step 26 alone: a version 25 database whose shops lack the barrel gets it in the three towns, and nothing else
-# changes (the shops' other wares stay, whatever an admin did to them)
+# steps 26 and 27: a version 25 database whose shops lack the barrel gets it in the three towns, and nothing
+# else changes (the shops' other wares stay, whatever an admin did to them); its characters map where they stand
 MIG_DB=$V24_DB
-mig_sql "$V24_DB" "DELETE FROM town_items WHERE item_key = 'explosive_barrel'; INSERT OR IGNORE INTO town_items (town_id, item_key) VALUES (1, 'travel_tea'); DELETE FROM town_items WHERE town_id = 8 AND item_key = 'void_flask'; PRAGMA user_version = 25"
+mig_sql "$V24_DB" "DELETE FROM town_items WHERE item_key = 'explosive_barrel'; INSERT OR IGNORE INTO town_items (town_id, item_key) VALUES (1, 'travel_tea'); DELETE FROM town_items WHERE town_id = 8 AND item_key = 'void_flask'; DROP TABLE user_explored; PRAGMA user_version = 25"
 mig_eq "PRAGMA user_version" "25" "fixture is version 25"
 "$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && t_ok || t_fail "dk migrate (v25) failed: $(cat "$T/migrate.log")"
 grep -qE 'Migrating to version ([1-9]|1[0-9]|2[0-5]):' "$T/migrate.log" && t_fail "steps 1-25 ran on a version 25 database" || t_ok
@@ -1530,6 +1536,7 @@ mig_eq "PRAGMA user_version" "$CUR_VERSION" "v25 stamped"
 mig_eq "SELECT group_concat(town_id) FROM (SELECT town_id FROM town_items WHERE item_key = 'explosive_barrel' ORDER BY 1)" \
 	"4,5,7" "the Explosive Barrel is back in Kalle, Narcissa and Gilead"
 mig_eq "SELECT count(*) FROM town_items WHERE town_id = 8 AND item_key = 'void_flask'" "0" "what an admin took off a shop stays off"
+mig_eq "SELECT count(*) FROM user_explored" "1" "the character has mapped where they stand"
 "$BIN" migrate --config "$MIG/v24.lua" >"$T/migrate.log" 2>&1 && grep -qF 'is up to date' "$T/migrate.log" && t_ok || t_fail "second migrate (v25)"
 
 t_section "migrate: partial and forced installs are current"

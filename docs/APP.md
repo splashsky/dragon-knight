@@ -17,7 +17,7 @@ v1.1.11; where the port deliberately differs, the code says so in a comment
 | Accounts | `app/routes/auth.lua`, `app/lib/{auth,session,csrf,mail}.lua` | `templates/auth/*` | `tests/run.sh` |
 | Home (town / exploring view) | `app/routes/home.lua` | `templates/home/*` | `tests/run.sh` |
 | Clock and weather | `app/lib/{clock,weather,weather_lines}.lua`, `app/lib/game.lua` (`nav`), `app/routes/home.lua` (the exploring page) | `templates/layout/nav_left.html` (`weather`), `templates/home/explore.html`, `public/css/{dk,town}.css` | `tests/lua/test_{clock,weather}.lua`, `tests/e2e/weather.sh` |
-| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`, `/map/sky`, `/map/sky/data`), `app/lib/mapsky.lua` (the map's sky as facts, kept once a tick), `app/town/sky.lua` (the weather over the map, SVG), `app/lib/tick.lua` (`sky`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg` and `public/images/world-relief.bin` (generated), `public/css/{dk,town}.css`, `public/js/{windows,live}.js`, `public/js/worldgl.js` (the WebGL sky) | `tests/lua/test_{terrain,sky,mapsky}.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town,browser}.sh` |
+| Terrain and the world map | `app/lib/{terrain,terrain_lines}.lua`, `app/lib/terrain/world.lua` (the world: generated data), `app/lib/terrain/{generator_v1,picture}.lua` (not loaded by the game), `tools/world.{sh,lua}`, `app/town/character.lua` (`/map`, `/map/sky`, `/map/sky/data`), `app/lib/mapsky.lua` (the map's sky as facts, kept once a tick), `app/town/sky.lua` (the weather over the map, SVG), `app/lib/explored.lua` and `app/town/fog.lua` (the fog of war: what a character has mapped, and its drawing), `app/town/explore.lua` (mapping on a move), `app/lib/tick.lua` (`sky`), `app/lib/game.lua` (`land`), `app/routes/home.lua`, `app/fight/{fields,encounter,round}.lua`, `app/content/fields/{shallows,marsh,forest,hills,peaks,sand,cinders}.lua` | `templates/town/map.html`, `templates/home/explore.html`, `templates/layout/nav_left.html`, `public/images/world.svg`, `public/images/world-frame.svg` and `public/images/world-relief.bin` (generated), `public/css/{dk,town}.css`, `public/js/{windows,live}.js`, `public/js/worldgl.js` (the WebGL sky) | `tests/lua/test_{terrain,sky,mapsky,explored}.lua`, `tests/lua/test_{weather,fields}.lua`, `tests/e2e/{terrain,town,browser}.sh` |
 | The server tick (fights in real time, world statuses and weather on the clock) | `src/http.c` (the timer), `app/lib/tick.lua`, `app/routes/tick.lua`, `app/fight/round.lua` (`round.advance`), `app/fight/encounter.lua` (`encounter.advance`), `app/lib/world.lua` (`world.advance`) | `templates/fight/clock.html`, `public/js/fight.js` (the turn's timer), `public/css/fight.css` | `tests/c/test_http.c`, `tests/lua/test_{tick,round}.lua`, `tests/e2e/tick.sh` |
 | Fields (the battlefield: the weather's and spells' effects on a fight) | `app/fight/fields.lua`, `app/lib/fields.lua`, `app/lib/content/kinds/fields.lua`, `app/content/fields/*.lua`, `app/fight/{engine,round}.lua`, `app/community/help.lua` (`/help/fields`), `app/admin/effects.lua` | `templates/fight/battlefield.html`, `templates/community/help/fields.html`, `public/js/fight.js`, `public/css/fight.css`, `public/images/fields/*` | `tests/lua/test_fields.lua`, `tests/e2e/fields.sh` |
 | Interactables and targeting (objects on the battlefield, the target picker, area actions) | `app/lib/interactables.lua`, `app/lib/content/kinds/interactables.lua`, `app/content/interactables/*.lua`, `app/fight/{engine,round,monster,ai,act,encounter,state}.lua`, `app/routes/fight.lua`, `app/community/help.lua` (`/help/objects`), `app/admin/effects.lua` | `templates/fight/{fight,target}.html`, `templates/community/help/objects.html`, `public/js/{fight,hotbar}.js`, `public/css/fight.css`, `public/images/interactables/*` | `tests/lua/test_objects.lua`, `tests/lua/test_patterns.lua`, `tests/lua/test_object_patterns.lua`, `tests/e2e/{objects,fight_api,browser}.sh` |
@@ -481,8 +481,9 @@ on the minimal layout, in a new tab).
 	(`charpanel`, `invpanel`, `spellpanel`, or `right`/`root` when the answer sends those
 	whole), seen in the live client's `before` hook; it is fetched again once the answer is
 	on screen (`applied`). The map's are the Location box's (`loc`, or `left`/`root`): the
-	player's ring follows a move (the land's picture is a cached static file, so only the
-	page comes again: the towns, the ring and the weather's overlay). Its weather moves
+	player's ring and the fog of war follow a move (the land's picture is a cached static
+	file, so only the page comes again: the towns, the ring, the fog and the weather's
+	overlay). Its weather moves
 	without that: when the server's tick sends `sky`, the window swaps in `GET /map/sky`
 	and its storms glide ([Terrain and the map](#terrain-and-the-map)). Once a map that
 	offers it shows (the window's, the `/map` page's: `.world-map[data-sky-data]`),
@@ -1452,17 +1453,37 @@ where a player may go.
 	empty; an encounter opens with the land's line; the Battlefield line shows the terrain
 	field.
 - **The map** (`GET /map`, `town/map.html`, and the World Map window, [Windows](#windows)):
-	the whole world (every town and all the land, whatever maps the player bought), in
+	the world as the player has mapped it, in
 	layers in the picture's units (a cell of 5 by 5 tiles a unit, 101 by 101, north up; the
 	tile (lat, lon) at x = lon / 5 + 50.5, y = 50.5 - lat / 5): the land's picture as an
-	`<image>`, the weather over it as of the render, the towns from the `towns` table (a mark
-	and the name in the page's font, Vollkorn; a mark on the map's edge nudged inside its
-	frame, the name on the side with room: Endworld's, on the corner, above and to the
-	right) and the player's
-	red ring with a title naming where they are; under it, in a `<details
+	`<image class="world-map-land">`, the weather over it as of the render, the fog of war
+	over the cells the player doesn't know (below), the map's frame (`<image
+	class="world-map-frame">`: the border, the compass rose and the scale bar, over the fog),
+	the towns from the `towns` table that stand in known cells (a mark and the name in the
+	page's font, Vollkorn; a mark on the map's edge nudged inside its frame, the name on the
+	side with room: Endworld's, on the corner, above and to the right) and the player's red
+	ring with a title naming where they are; under it, in a `<details
 	class="world-map-key" open>` ("Legend": the server's markup, the same on the page and in
-	the window, which folds it), a legend of the land and one of the weather, each a grid.
-	It works without JavaScript.
+	the window, which folds it), a legend of the land (with "Unexplored") and one of the
+	weather, each a grid. It works without JavaScript.
+- **The fog of war** (3.4, `docs/plans/map-clouds-and-fog.md`): the map shows only the cells
+	(5 by 5 tiles: the picture's units) the player knows, `lib/explored.lua`
+	`explored.known(user)`: every cell they walked to, each town on their map (`users.towns`:
+	a map bought in a market, or the town visited) and where they stand, each with the eight
+	cells around it; no road between towns (yet). Walking keeps it: `POST /move` calls
+	`explored.reveal(id, lat, lon)`, which adds the cell it lands in and the eight around to
+	`user_explored` (schema version 27: `user_id`, `cells`, a bitmap of the 10,201 cells as
+	text, six cells a character of a base-64 alphabet, cell i bit i % 6 of character i / 6;
+	written only when a cell is new, only the characters that change touched). The step
+	mapped where each character stood. GETs only read it. The fog itself is `town/fog.lua`
+	(`fog.draw(known)`, `<g class="world-fog">`, none when all is known): blank parchment
+	over every unknown cell, opaque, over the weather and under the frame, so the land, its
+	weather, the towns and their lights there are not seen at all; its edge a bank of puffs
+	like the clouds' (a circle over each unknown cell next to known land, jittered by a hash
+	of its place, covering the cell to its corners and hardly reaching into the known; runs
+	of squares inside), its shapes once in `<defs>` and used for an inked outline, a shade
+	crescent, the parchment and a faint hatching. The map window is fetched again after a
+	move ([Windows](#windows)), so the fog follows the player.
 - **The land's picture** is a static file, `public/images/world.svg` (about 145 KB, served
 	and cached like any static file), a stylized topographic map on parchment drawn by
 	`app/lib/terrain/picture.lua` from the data: the biomes as muted tints (each row's runs
@@ -1472,11 +1493,13 @@ where a player may go.
 	down the slopes of hills and peaks (a short stroke along the gradient, a little off
 	the cell's centre) and a small mark on the peaks; lakes and ponds as water with a
 	darker shoreline (marching squares over the water cells) and a ripple on the larger
-	lakes; a compass rose, a scale bar of 100 tiles and a neat border. Its text falls back
-	to the browser's serif (a picture shown as an image can't use the page's fonts); the
-	towns' names are the page's. `tools/world.sh` writes it, and `tests/lua/test_terrain.lua`
-	requires the file to be that drawing (so a change to the drawing or the palette fails
-	until it is written again). It writes the land's relief beside it,
+	lakes. Its frame apart (3.4, so it shows over the fog of war: `picture.frame()`,
+	`public/images/world-frame.svg`, about 2 KB, on nothing): a compass rose, a scale bar
+	of 100 tiles and a neat border. Their text falls back to the browser's serif (a picture
+	shown as an image can't use the page's fonts); the towns' names are the page's.
+	`tools/world.sh` writes both, and `tests/lua/test_terrain.lua` requires the files to be
+	those drawings (so a change to the drawing or the palette fails until they are written
+	again). It writes the land's relief beside it,
 	`public/images/world-relief.bin` (`terrain.relief()`, for the WebGL sky below), which
 	the test requires to be the data's too.
 - **The map's sky as facts** (`app/lib/mapsky.lua`): what the weather over the map is at a
@@ -1537,12 +1560,15 @@ where a player may go.
 	`public/images/world-relief.bin` (generated with the picture by `tools/world.sh`:
 	`terrain.relief()`, a byte a cell: the height, plus `terrain.RELIEF_WATER` (64) on a
 	lake or a pond; 10 KB, a static file) the land it lights. The map says where they are
-	(`<div class="world-map" data-sky-data data-sky-relief>`); windows.js loads the script
+	(`<div class="world-map" data-sky-data data-sky-relief data-sky-known>`: the last, the
+	cells the player knows as `lib/explored.lua`'s text, a texture the shader reads to draw
+	nothing beyond them, the fog of war covering the rest; its frame rate counts only the
+	weather near them); windows.js loads the script
 	once such a map shows ([Windows](#windows)). It puts a canvas exactly over the map's
 	SVG (to the fraction of a pixel, following its size with a `ResizeObserver`: the window
 	resized, the page's width), the land's picture as its CSS background, under the SVG (`z-index`), which keeps
-	the towns and the player above it; once its first frame is drawn it hides the SVG's
-	own picture and sky (`.world-map-glsky`) and takes `data-sky` off the sky's group, so
+	the fog, the frame, the towns and the player above it; once its first frame is drawn it
+	hides the SVG's own picture (`.world-map-land`) and sky (`.world-map-glsky`) and takes `data-sky` off the sky's group, so
 	windows.js leaves it. In one shader pass, layer over layer on a transparent canvas: the
 	time of day's wash (warm at dawn, purple at dusk, blue at night, at most 0.42 so the map
 	stays readable) and light over the relief (smoothed on the client, lit and shaded by
@@ -1594,8 +1620,13 @@ where a player may go.
 	`tests/lua/test_fields.lua` (the terrain field held, never a spell's),
 	`tests/e2e/terrain.sh` (the Location box, the exploring page's lines, a fight on the
 	Thornbog's field and its first line, `/help/fields`; places found in the world's data),
-	`tests/e2e/town.sh` (`/map`: the picture, the sky, the towns and the player in that
-	order, the legends folding under them, open). The heights: `tests/lua/test_terrain.lua` (present, reproduced
+	`tests/e2e/town.sh` (`/map`: the picture, the sky, the fog, the frame, the towns and the
+	player in that order, the legends folding under them, open; the fog of war: where the
+	player stands, a step mapping the cells around it for good, a town's map showing its
+	cells and the town), `tests/lua/test_explored.lua` (the cells of tiles, the bitmap both
+	ways, what a character knows, a walk mapping its cells once, the fog covering every
+	unknown cell to its corners and no known cell's centre), `tests/e2e/migrate.sh`
+	(version 27: each character has mapped where they stand). The heights: `tests/lua/test_terrain.lua` (present, reproduced
 	byte for byte, agreeing with the features); the weather over the map:
 	`tests/lua/test_sky.lua` (the storms' discs where `weather.storms` says, snow and rain
 	where they fall, the time of day's wash, the same all through a tick and the storms
@@ -1612,7 +1643,8 @@ where a player may go.
 	legend folded, kept open once opened; the WebGL sky: worldgl.js loaded with a
 	map, the SVG sky kept on SwiftShader; with the test's switch a frame drawn, the SVG sky
 	and picture hidden under the towns, the canvas exactly over the map and following it
-	when the window is resized, a `sky` event fetching the data, a lost context
+	when the window is resized, nothing drawn under the fog of war, a `sky` event fetching
+	the data, a lost context
 	showing the SVG sky until restored, slow first frames keeping it).
 
 ## The server tick

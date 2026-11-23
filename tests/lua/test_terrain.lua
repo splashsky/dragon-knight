@@ -85,8 +85,21 @@ function T.the_worlds_picture_is_the_drawing_of_the_land()
 	assert(#svg < 150 * 1024, "the picture stays small: " .. #svg .. " bytes")
 	for _, b in ipairs(terrain.BIOMES) do assert(svg:find(terrain.tint(b.key), 1, true), "the picture has " .. b.key) end
 	assert(svg:find(terrain.WATER, 1, true) and svg:find(terrain.SHORE, 1, true), "water with its shoreline")
+	assert(not svg:find(">N</text>", 1, true), "the frame apart")
+	assert(svg:find("viewBox=\"0 0 101 101\"", 1, true), "a cell a unit")
+end
+
+-- public/images/world-frame.svg is the map's frame (picture.frame: the compass rose, the scale
+-- bar and the border, over the fog of war), on nothing.
+function T.the_maps_frame_is_its_drawing()
+	local f = assert(io.open((dk.config.public_dir or "public") .. "/images/world-frame.svg", "rb"))
+	local svg = f:read("a")
+	f:close()
+	assert(svg == require("lib.terrain.picture").frame(),
+		"public/images/world-frame.svg is not the drawing of the map's frame: run tools/world.sh")
 	assert(svg:find(">N</text>", 1, true) and svg:find(">100 tiles</text>", 1, true), "a compass rose and a scale bar")
 	assert(svg:find("viewBox=\"0 0 101 101\"", 1, true), "a cell a unit")
+	assert(not svg:find(terrain.PAPER .. "\"/>\n", 1, true) and #svg < 4096, "nothing under it: " .. #svg .. " bytes")
 end
 
 -- public/images/world-relief.bin is terrain.relief(): a byte a cell, the height and the water

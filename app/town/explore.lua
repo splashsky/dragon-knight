@@ -1,7 +1,9 @@
 -- town/explore.lua :: legacy explore.php move(): compass buttons, 1-in-5 chance of a fight
--- (it begins here: fight/encounter.lua). Setting out from a town, arriving in one
+-- (it begins here: fight/encounter.lua); the cells around the step are mapped for good
+-- (lib/explored.lua: the World Map's fog of war). Setting out from a town, arriving in one
 -- (town/travel.lua) and a fight beginning are scenes for the live client (lib/scene.lua).
 local encounter = require("fight.encounter")
+local explored = require("lib.explored")
 local game = require("lib.game")
 local php = require("lib.php")
 local scene = require("lib.scene")
@@ -28,6 +30,8 @@ function explore.move(req)
 
 	-- moving on: the page of the last finished fight goes
 	state.forget(user.id)
+	-- where they walk is on their map for good (the World Map's fog of war)
+	explored.reveal(user.id, lat, lon)
 
 	local town = game.town_at(lat, lon)
 	if town then return travel.go(req, town.id, false) end

@@ -236,8 +236,9 @@ async function run(wsUrl, port) {
 	check("its title", await js(SW + ".querySelector('.dk-window-title').textContent === 'Extended Stats'"));
 	await js("document.querySelector('a[data-window=map]').click()");
 	check("the map window", await until("!!" + MW + " && !" + MW + ".hidden && !!" + MW + ".querySelector('.world-map-svg image')"));
-	check("the player and the towns on it", await js("!!" + MW + ".querySelector('.world-map-you') && " + MW +
-		".querySelectorAll('.world-map-town').length >= 8"));
+	// (tests/e2e/browser.sh: the player has every town's map and has walked the north)
+	check("the player, the towns and the fog of war on it", await js("!!" + MW + ".querySelector('.world-map-you') && " + MW +
+		".querySelectorAll('.world-map-town').length >= 8 && !!" + MW + ".querySelector('.world-fog')"));
 	// the map as wide as the window, square; the legend folded under it (the page has it open),
 	// and open again once the player opened it
 	var MAP_BOX = "(function () { var s = " + MW + ".querySelector('.world-map-svg').getBoundingClientRect(), b = " + MW +
@@ -306,10 +307,14 @@ async function run(wsUrl, port) {
 	await js("localStorage.setItem('dk-sky-gl-test', 'software')");
 	await nav("/");
 	check("with the test's switch: the WebGL sky", await until("!!window.DKSky && DKSky.info().shown", 10000), await js("window.DKSky && DKSky.info()"));
-	check("a frame drawn", await js("DKSky.coverage() > 0.01"), await js("DKSky.coverage()"));
-	check("the SVG sky and picture hidden, the canvas under the towns", await js("getComputedStyle(" + SKY + ").display === 'none' && !" + SKY + ".hasAttribute('data-sky') && " +
-		"getComputedStyle(" + MW + ".querySelector('.world-map-svg image')).visibility === 'hidden' && " + MW + ".querySelector('.world-map-canvas').nextElementSibling === " +
-		MW + ".querySelector('.world-map-svg') && /world\\.svg/.test(" + MW + ".querySelector('.world-map-canvas').style.backgroundImage)"));
+	check("a frame drawn", await js("DKSky.coverage() > 0.005"), await js("DKSky.coverage()"));
+	// nothing drawn under the fog of war: the map's rows 80 to 93 are nobody's (no town near)
+	check("over the known cells only", await js("DKSky.coverage(0.05, 0.45) > 0.01 && DKSky.coverage(0.8, 0.92) === 0"),
+		await js("[DKSky.coverage(0.05, 0.45), DKSky.coverage(0.8, 0.92)]"));
+	check("the SVG sky and picture hidden, the canvas under the fog, the frame and the towns", await js("getComputedStyle(" + SKY + ").display === 'none' && !" + SKY + ".hasAttribute('data-sky') && " +
+		"getComputedStyle(" + MW + ".querySelector('.world-map-land')).visibility === 'hidden' && " + MW + ".querySelector('.world-map-canvas').nextElementSibling === " +
+		MW + ".querySelector('.world-map-svg') && /world\\.svg/.test(" + MW + ".querySelector('.world-map-canvas').style.backgroundImage) && " +
+		"getComputedStyle(" + MW + ".querySelector('.world-fog')).display !== 'none' && getComputedStyle(" + MW + ".querySelector('.world-map-frame')).visibility !== 'hidden'"));
 	// the canvas follows the map's box when the window is resized (its corner: CSS resize)
 	var CANVAS_BOX = "(function () { var s = " + MW + ".querySelector('.world-map-svg').getBoundingClientRect(), c = " + MW +
 		".querySelector('.world-map-canvas'), b = c.getBoundingClientRect(), d = Math.min(devicePixelRatio, 1.5); " +

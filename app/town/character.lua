@@ -1,12 +1,15 @@
 -- town/character.lua :: legacy index.php showchar() (own sheet, popup), onlinechar($id)
 -- (anyone's sheet, from Who's Online) and showmap() (the World Map: the land's picture,
--- public/images/world.svg, the weather over it, the towns and the player; docs/APP.md
--- "Terrain and the map").
+-- public/images/world.svg, the weather over it, the fog of war over what the player hasn't
+-- mapped, the map's frame, the towns they know and the player; docs/APP.md "Terrain and the
+-- map").
 local affinities = require("lib.content.affinities")
 local classes = require("lib.classes")
 local clock = require("lib.clock")
 local common = require("town.common")
 local elements = require("lib.elements")
+local explored = require("lib.explored")
+local fog = require("town.fog")
 local game = require("lib.game")
 local inventory = require("lib.inventory")
 local leveling = require("lib.leveling")
@@ -92,27 +95,33 @@ for _, b in ipairs(terrain.BIOMES) do LEGEND[#LEGEND + 1] = { name = b.name, col
 LEGEND[#LEGEND + 1] = { name = "Lakes and ponds", colour = terrain.WATER, mark = "water" }
 LEGEND[#LEGEND + 1] = { name = "Hills", colour = terrain.PAPER, mark = "hill" }
 LEGEND[#LEGEND + 1] = { name = "Peaks", colour = terrain.PAPER, mark = "peak" }
+LEGEND[#LEGEND + 1] = { name = "Unexplored", colour = terrain.PAPER, mark = "fog" }
 
--- GET /map: the whole world (every town, all of the land) as the land's picture, the weather
--- over it now (town/sky.lua), the towns and where the player is.
+-- GET /map: the world as the land's picture, the weather over it now (town/sky.lua), the fog
+-- of war over the cells the player doesn't know (lib/explored.lua, town/fog.lua: the land and
+-- its weather unseen there), the map's frame, the towns they know and where they are.
 function character.map(req)
 	local user = req.user
 	local side = 2 * terrain.CELLS + 1
+	local known = explored.known(user)
 	local towns = {}
 	for _, t in ipairs(dk.db:query("SELECT name, latitude, longitude FROM towns ORDER BY id")) do
-		-- the mark inside the map's frame (a town on its edge nudged in), the name beside it on
-		-- the side with room: to the right but near the east edge, a little below but near
-		-- the south edge (above) or the north (lower)
-		local x, y = spot(t.latitude, t.longitude)
-		x, y = math.min(math.max(x, EDGE), side - EDGE), math.min(math.max(y, EDGE), side - EDGE)
-		local right = x > side * 0.8
-		local ty = y > side - 4 and y - 1.6 or y < 4 and y + 3 or y + 1
-		towns[#towns + 1] = { name = t.name, x = num(x), y = num(y), tx = num(right and x - 1.6 or x + 1.6), ty = num(ty),
-			anchor = right and "end" or "start" }
+		if explored.knows(known, t.latitude, t.longitude) then
+			-- the mark inside the map's frame (a town on its edge nudged in), the name beside it on
+			-- the side with room: to the right but near the east edge, a little below but near
+			-- the south edge (above) or the north (lower)
+			local x, y = spot(t.latitude, t.longitude)
+			x, y = math.min(math.max(x, EDGE), side - EDGE), math.min(math.max(y, EDGE), side - EDGE)
+			local right = x > side * 0.8
+			local ty = y > side - 4 and y - 1.6 or y < 4 and y + 3 or y + 1
+			towns[#towns + 1] = { name = t.name, x = num(x), y = num(y), tx = num(right and x - 1.6 or x + 1.6), ty = num(ty),
+				anchor = right and "end" or "start" }
+		end
 	end
 	local x, y = spot(user.latitude, user.longitude)
 	return view.page(req, "Map", "town/map", {
 		side = side, towns = towns, legend = LEGEND, sky = sky.markup(clock.now()), test = dk.config.test_routes == true,
+		fog = fog.draw(known), known = explored.encode(known),
 		player = { x = num(x), y = num(y), where = game.latitude_str(user.latitude) .. ", " .. game.longitude_str(user.longitude) },
 	}, { layout = "minimal", nav = false })
 end

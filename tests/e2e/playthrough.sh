@@ -183,7 +183,7 @@ done
 
 t_section "playthrough: character pages"
 t_get /character; expect_status 200; expect_body '<b>Wanderer</b>'; expect_body 'Class: Mage'
-t_get /map;      expect_status 200; expect_body '<image href="/static/images/world.svg"'
+t_get /map;      expect_status 200; expect_body '<image class="world-map-land" href="/static/images/world.svg"'
 t_post /travel/1 "csrf=$TC"
 t_get /
 ADMIN_LINK=$(grep -o 'href="/character/[0-9]*">Admin<' "$BODY" | grep -o '/character/[0-9]*')

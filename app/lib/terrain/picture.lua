@@ -8,10 +8,11 @@
 --     mark on each peak;
 --   - lakes and ponds as water with a darker shoreline (marching squares over the water
 --     cells, smoothed), and a ripple or two on the larger lakes;
---   - a compass rose, a scale bar in tiles and a thin neat border.
--- The towns and the player are drawn over it by /map (town/character.lua), in the page's
--- font. The game never draws it: tools/world.sh writes the file, tests/lua/test_terrain.lua
--- requires it to be this module's drawing.
+-- and apart from it the map's frame (public/images/world-frame.svg: picture.frame): a compass
+-- rose, a scale bar in tiles and a thin neat border, over the fog of war.
+-- The towns and the player are drawn over them by /map (town/character.lua), in the page's
+-- font. The game never draws them: tools/world.sh writes the files, tests/lua/test_terrain.lua
+-- requires them to be this module's drawing.
 local terrain = require("lib.terrain")
 
 local picture = {}
@@ -312,6 +313,18 @@ function picture.svg()
 	end
 	out[#out + 1] = ("<path fill=\"none\" stroke=\"%s\" stroke-opacity=\".6\" stroke-width=\".1\" d=\"%s\"/>")
 		:format(SHORE, table.concat(ripples))
+	out[#out + 1] = "</svg>"
+	return table.concat(out, "\n") .. "\n"
+end
+
+-- The map's frame, public/images/world-frame.svg (3.4: apart from the land, so it shows over
+-- the fog of war, town/fog.lua): a compass rose, a scale bar in tiles and the neat border, on
+-- nothing, in the land's units.
+function picture.frame()
+	local CELL, CELLS = terrain.CELL, terrain.CELLS
+	local n = 2 * CELLS + 1
+	local out = { ("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %d %d\" width=\"%d\" height=\"%d\">"):format(n, n,
+		n * 9, n * 9) }
 	-- the compass rose (the north-east corner) and the scale bar (the south-east)
 	local font = "font-family=\"Vollkorn, Georgia, serif\""
 	out[#out + 1] = ("<g transform=\"translate(%d 9)\" fill=\"%s\" stroke=\"%s\" stroke-width=\".12\">"):format(n - 9, INK, INK) ..

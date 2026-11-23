@@ -1484,6 +1484,24 @@ local function v26_wares()
 	end
 end
 
+-- 27: the World Map's fog of war (lib/explored.lua): what each character has mapped, a bitmap
+-- of the map's cells; every character has mapped where they stand (their towns are mapped
+-- by users.towns).
+local function v27_explored()
+	dk.db:exec_script([[
+CREATE TABLE user_explored (
+	user_id  INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+	cells    TEXT    NOT NULL DEFAULT ''
+);
+]])
+	local explored = require("lib.explored")
+	for _, u in ipairs(dk.db:query("SELECT id, latitude, longitude FROM users ORDER BY id")) do
+		local set = {}
+		for _, i in ipairs(explored.around(u.latitude, u.longitude)) do set[i] = true end
+		dk.db:exec("INSERT INTO user_explored (user_id, cells) VALUES (?, ?)", u.id, explored.encode(set))
+	end
+end
+
 migrations.STEPS = {
 	{ name = "forum boards; news titles, authors and discussion threads", up = v1_boards_and_news_threads },
 	{ name = "remove difficulty levels", up = v2_drop_difficulty },
@@ -1531,6 +1549,8 @@ migrations.STEPS = {
 	{ name = "interactables: objects on the battlefield, a content kind and combatants of their own side; the fields' " ..
 		"wind, area spells and items, monsters' loadout entries aiming at an object", up = v25_interactables },
 	{ name = "the 3.3 ware: the Explosive Barrel in the shops of Kalle, Narcissa and Gilead", up = v26_wares },
+	{ name = "the World Map's fog of war: the map's cells each character has mapped (where they stand, so far)",
+		up = v27_explored },
 }
 
 migrations.VERSION = #migrations.STEPS
