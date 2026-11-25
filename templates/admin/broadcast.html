@@ -26,6 +26,6 @@ Please try again.</div>
 Text (up to {{ max_chars }} characters; a new banner replaces the current one):<br>
 <input type="text" name="text" size="60" maxlength="{{ max_chars }}" value="{{ text }}"><br>
 Expires after <input type="text" name="minutes" size="6" maxlength="6" value="{{ minutes }}"> minutes (empty: until cleared)<br>
-<input type="submit" name="set" value="Show Banner">
-{%- if current then %} <input type="submit" name="clear" value="Clear Banner">{% end %}
+<button class="dk-btn dk-btn-primary" type="submit" name="set" value="Show Banner">Show Banner</button>
+{%- if current then %} <button class="dk-btn dk-btn-secondary" type="submit" name="clear" value="Clear Banner">Clear Banner</button>{% end %}
 </form>

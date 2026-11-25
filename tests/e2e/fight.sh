@@ -396,7 +396,7 @@ t_sql "UPDATE user_items SET equipped = 'weapon' WHERE id = (SELECT min(ui.id) F
 	WHERE i.key = 'club' AND ui.user_id = (SELECT id FROM users WHERE username = 'fighter'))"
 t_give fighter herb 1
 f_sql "UPDATE users SET dropcode = 2"
-t_get /drop; expect_body '<button type="button" disabled>Equip it</button> <span class="drop-why">No room in your bag for your Club.</span>'
+t_get /drop; expect_body '<button class="dk-btn dk-btn-primary" type="button" disabled>Equip it</button> <span class="drop-why">No room in your bag for your Club.</span>'
 t_post /drop "csrf=$CS&equip=weapon"; expect_body 'Your bag is full: there is no room for your Club.'; f_is dropcode 2
 f_sql "UPDATE users SET dropcode = 0"
 t_items_clear fighter

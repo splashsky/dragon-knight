@@ -13,12 +13,12 @@
 <ul class="drop-room-bag">
 {%- for _, b in ipairs(bag) do %}
 <li><span class="drop-room-item"><img class="item-icon" src="{{ b.icon }}" width="28" height="28" alt=""> <b class="tip-term" data-tip tabindex="0">{{ b.entry.item.name }}{{{ tip("item", b.entry.item, b.entry) }}}</b>{% if b.entry.qty > 1 then %} <span class="light">x{{ b.entry.qty }}</span>{% end %}</span>
-<button type="submit" name="discard" value="{{ b.entry.id }}">Discard{% if b.entry.qty > 1 then %} all {{ b.entry.qty }}{% end %}</button></li>
+<button class="dk-btn dk-btn-primary" type="submit" name="discard" value="{{ b.entry.id }}">Discard{% if b.entry.qty > 1 then %} all {{ b.entry.qty }}{% end %}</button></li>
 {%- end %}
 </ul>
 </form>
 {%- if not room then %}
 <p class="small light">The discarded item is gone for good.</p>
 {%- end %}
-<div class="dk-modal-actions"><button type="button" data-modal-close>Not now</button></div>
+<div class="dk-modal-actions"><button class="dk-btn dk-btn-secondary" type="button" data-modal-close>Not now</button></div>
 </div>

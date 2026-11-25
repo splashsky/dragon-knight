@@ -3,6 +3,6 @@
 You are buying the {{ town.name }} map. Is that ok?<br><br>
 <form action="/maps/buy/{{ town.id }}" method="post">
 {{{ csrf_field() }}}
-<input type="submit" name="submit" value="Yes"> <input type="submit" name="cancel" value="No" data-modal-close>
+<button class="dk-btn dk-btn-primary" type="submit" name="submit" value="Yes">Yes</button> <button class="dk-btn dk-btn-secondary" type="submit" name="cancel" value="No" data-modal-close>No</button>
 </form>
 </div>

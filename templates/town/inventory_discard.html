@@ -12,6 +12,6 @@ You have {{ entry.qty }} x <span class="tip-term" data-tip tabindex="0">{{ entry
 {%- else %}
 Do you really want to throw away the <span class="tip-term" data-tip tabindex="0">{{ entry.item.name }}{{{ tip("item", entry.item) }}}</span>? It will be gone for good.<br><br>
 {%- end %}
-<input type="submit" name="submit" value="Discard"> <input type="submit" name="cancel" value="Cancel">
+<button class="dk-btn dk-btn-primary" type="submit" name="submit" value="Discard">Discard</button> <button class="dk-btn dk-btn-secondary" type="submit" name="cancel" value="Cancel">Cancel</button>
 </form>
 </div>

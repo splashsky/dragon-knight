@@ -60,11 +60,11 @@
 <div class="inv-actions">
 {%- if c.gear then %}
 <form class="inline" method="post" action="/inventory/equip/{{ c.entry.id }}">{{{ csrf_field() }}}
-{%- if c.accessory and not free_accessory then %}<span class="inv-replace">Equip in place of:{% for _, a in ipairs(accessories) do %} <button type="submit" name="slot" value="{{ a.n }}">{{ a.name }}</button>{% end %}</span>
-{%- else %}<button type="submit">Equip</button>{% end %}</form>
+{%- if c.accessory and not free_accessory then %}<span class="inv-replace">Equip in place of:{% for _, a in ipairs(accessories) do %} <button class="dk-btn dk-btn-primary" type="submit" name="slot" value="{{ a.n }}">{{ a.name }}</button>{% end %}</span>
+{%- else %}<button class="dk-btn dk-btn-primary" type="submit">Equip</button>{% end %}</form>
 {%- end %}
 {%- if c.usable then %}
-<form class="inline" method="post" action="/inventory/use/{{ c.entry.id }}">{{{ csrf_field() }}}<button type="submit">Use</button></form>
+<form class="inline" method="post" action="/inventory/use/{{ c.entry.id }}">{{{ csrf_field() }}}<button class="dk-btn dk-btn-primary" type="submit">Use</button></form>
 {%- end %}
 {%- if not c.quest then %}
 <a href="/inventory/discard/{{ c.entry.id }}">Discard</a>

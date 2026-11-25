@@ -46,17 +46,17 @@
 {%- for _, c in ipairs(offer.equips) do %}
 {%- local title = (c.old and c.accessory) and ("Equip it in place of your " .. c.old.item.name) or "Equip it" %}
 {%- if c.ok then %}
-<p><button type="submit" name="equip" value="{{ c.slot }}">{{ title }}</button> <span class="drop-why">{% if c.old then %}Your {{ c.old.item.name }} goes into your bag.{% elseif c.accessory then %}It goes into accessory {{ c.label:lower() }}.{% else %}You wear it at once.{% end %}</span></p>
+<p><button class="dk-btn dk-btn-primary" type="submit" name="equip" value="{{ c.slot }}">{{ title }}</button> <span class="drop-why">{% if c.old then %}Your {{ c.old.item.name }} goes into your bag.{% elseif c.accessory then %}It goes into accessory {{ c.label:lower() }}.{% else %}You wear it at once.{% end %}</span></p>
 {%- else %}
-<p><button type="button" disabled>{{ title }}</button> <span class="drop-why">No room in your bag for your {{ c.old.item.name }}.</span></p>
+<p><button class="dk-btn dk-btn-primary" type="button" disabled>{{ title }}</button> <span class="drop-why">No room in your bag for your {{ c.old.item.name }}.</span></p>
 {%- end %}
 {%- end %}
 {%- if offer.bag_room then %}
-<p><button type="submit" name="take" value="Take">Put it in your bag</button> <span class="drop-why">{% if #offer.equips > 0 then %}Equip it later from your inventory.{% else %}Use it later, in a fight or from your inventory.{% end %}</span></p>
+<p><button class="dk-btn dk-btn-primary" type="submit" name="take" value="Take">Put it in your bag</button> <span class="drop-why">{% if #offer.equips > 0 then %}Equip it later from your inventory.{% else %}Use it later, in a fight or from your inventory.{% end %}</span></p>
 {%- else %}
 <p><a class="drop-room-link" href="/drop/room" data-modal>Make room</a> <span class="drop-why">Your bag is full: discard something to take the {{ offer.drop.name }}.</span></p>
 {%- end %}
-<p><button type="submit" name="leave" value="Leave">Leave it</button> <span class="drop-why">It stays behind.</span></p>
+<p><button class="dk-btn dk-btn-secondary" type="submit" name="leave" value="Leave">Leave it</button> <span class="drop-why">It stays behind.</span></p>
 </div>
 </form>
 </div>

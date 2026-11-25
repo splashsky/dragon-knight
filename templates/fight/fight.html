@@ -73,7 +73,7 @@
 <p class="fight-locked">You can't act this turn.</p>
 <form class="fight-command" action="/fight" method="post" data-fight>
 {{{ csrf_field() }}}<input type="hidden" name="round" value="{{ round }}">
-<p><input type="submit" name="continue" value="Continue"> <span class="hotkey-hint light">(or any number key)</span></p>
+<p><button class="dk-btn dk-btn-primary" type="submit" name="continue" value="Continue">Continue</button> <span class="hotkey-hint light">(or any number key)</span></p>
 {{{ include("fight/clock") }}}
 </form>
 {%- else %}

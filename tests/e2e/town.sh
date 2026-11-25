@@ -150,7 +150,7 @@ t_post /shop/buy/1 "csrf=$TC&cancel=No" -H 'X-DK-Modal: 1'
 expect_status 200; expect_header '^x-dk-go: /'$'\r''?$'; [ -s "$BODY" ] && t_fail "X-DK-Go has a body" || t_ok
 t_post /shop/buy/4 "csrf=$TC&submit=Yes" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'; expect_body 'Cheat attempt detected.'
 t_post /shop/buy/66 "csrf=$TC&submit=Buy&qty=2" -H 'X-DK-Modal: 1'; expect_header '^x-dk-modal: 1'
-expect_body 'Thank you for purchasing this item.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the market</button></div>'
+expect_body 'Thank you for purchasing this item.<div class="dk-modal-actions"><button class="dk-btn dk-btn-secondary" type="button" data-modal-close autofocus>Back to the market</button></div>'
 expect_no_body 'direction buttons'
 expect_db "gold,$T_ITEMS" "970|herbx2" "bought in the dialog"
 t_get /shop/buy/1; expect_body '<html'; expect_body 'compass'
@@ -358,7 +358,7 @@ expect_body '<li><a class="market-map" href="/maps/buy/2" data-modal><b>Roma</b>
 expect_no_body 'href="/maps/buy/3"'      # Bris's map isn't sold in Midworld
 t_get /maps/buy/3;                expect_body 'Cheat attempt detected.'
 t_get /maps/buy/2;                expect_body 'You are buying the Roma map. Is that ok?'
-expect_body '<input type="submit" name="cancel" value="No" data-modal-close>'
+expect_body '<button class="dk-btn dk-btn-secondary" type="submit" name="cancel" value="No" data-modal-close>No</button>'
 t_post /maps/buy/2 "csrf=$TC&cancel=No"; expect_redirect /shop
 t_post /maps/buy/2 "submit=Yes";  expect_status 403
 t_post /maps/buy/2 "csrf=$TC&submit=Yes"; expect_body 'Thank you for purchasing this map.'
@@ -376,7 +376,7 @@ t_get /shop;                      expect_body '<li><a class="market-map shop-sho
 expect_body '<li class="market-map market-map-owned"><b>Midworld</b>'; expect_no_body 'href="/maps/buy/4"'
 t_get /maps/buy/3;                expect_body 'You do not have enough gold to buy this map.'
 t_post /maps/buy/3 "csrf=$TC&submit=Yes"; expect_body 'You do not have enough gold to buy this map.'
-t_get /maps/buy/3 -H 'X-DK-Modal: 1'; expect_body 'You do not have enough gold to buy this map.<div class="dk-modal-actions"><button type="button" data-modal-close autofocus>Back to the market</button></div>'
+t_get /maps/buy/3 -H 'X-DK-Modal: 1'; expect_body 'You do not have enough gold to buy this map.<div class="dk-modal-actions"><button class="dk-btn dk-btn-secondary" type="button" data-modal-close autofocus>Back to the market</button></div>'
 tu "gold=1000"
 t_post /maps/buy/4 "csrf=$TC&submit=Yes"; expect_body 'Cheat attempt detected.'   # Kalle's: not sold in Roma
 tu "currentaction='Exploring', latitude=3, longitude=3"

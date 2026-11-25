@@ -101,7 +101,7 @@ expect_stats "25 15 10 5 5 34 5" "three accessories"
 t_get /;                          expect_body 'Slot 1: Life Pebble'; expect_body 'Slot 3: Dragon&#39;s Claw'
 TEAR=$(iv_entry dragons_tear)
 # all three taken: the page offers the slots, in place of what is in each
-t_get /inventory;                 expect_body 'Equip in place of: <button type="submit" name="slot" value="1">Life Pebble</button> <button type="submit" name="slot" value="2">Magic Pebble</button>'
+t_get /inventory;                 expect_body 'Equip in place of: <button class="dk-btn dk-btn-primary" type="submit" name="slot" value="1">Life Pebble</button> <button class="dk-btn dk-btn-primary" type="submit" name="slot" value="2">Magic Pebble</button>'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=0"; expect_body 'All three accessory slots are in use.'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=4"; expect_body 'Cheat attempt detected.'
 t_post "/inventory/equip/$TEAR" "csrf=$TC&slot=2"

@@ -105,7 +105,7 @@ t_get /static/images/skills/run.png;    expect_status 200; expect_header '^conte
 # it: hotbar.js)
 t_fight_status tipper 1 recharging '' 1
 t_get /fight
-expect_body '<p><input type="submit" name="continue" value="Continue"> <span class="hotkey-hint light">(or any number key)</span></p>'
+expect_body '<p><button class="dk-btn dk-btn-primary" type="submit" name="continue" value="Continue">Continue</button> <span class="hotkey-hint light">(or any number key)</span></p>'
 expect_no_body 'class="action-btn"'; expect_no_body 'class="hotbar"'; expect_no_body 'name="run"'
 t_items_clear tipper
 t_fight_clear tipper
