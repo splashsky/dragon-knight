@@ -14,7 +14,7 @@ changelog.RELEASES = {
 			"The World Map draws its clouds as clouds: banks of white puffs with inked edges, lit and shaded by the sun or the moon, darker when they carry rain. Rain falls from them in dark streaks and snow in flakes you can see.",
 			"The World Map shows only what you know of the world: wherever you walk, the land around you goes on your map for good, and a town's map (bought in a market, or the town visited) shows the town and the land around it. The rest is blank parchment, and no weather or town shows through it (schema version 27, run dk migrate: everyone keeps their towns and where they stand).",
 			"Weak monsters pay more gold, so the first gear is within reach: a slime is worth 7 gold or more instead of 1, the monsters around Roma about twice what they were, and the strong ones a little more than before. Dying costs a quarter of your gold instead of half.",
-			"The game's buttons have a new look: rounded pills, orange for the main action and white for the other choice, that press in when clicked and show a ring when focused. The spell and item tiles, the compass and the links that look like buttons keep their own looks.",
+			"The game's buttons have a new look: compact rounded pills, orange for the main action and pale grey for the other choice, that press in when clicked and show a ring when focused. The spell and item tiles, the compass and the links that look like buttons keep their own looks.",
 		},
 	},
 	{
